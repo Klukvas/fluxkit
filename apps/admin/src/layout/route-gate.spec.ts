@@ -31,6 +31,10 @@ describe("the shell", () => {
     expect(shell).toMatch(
       /const allowed = mayOpenRoute\(handle, \(permission\) => session\.can\(permission\)\);/,
     );
-    expect(shell).toMatch(/\{allowed \? <Outlet \/> : <NotAllowedView t=\{t\} \/>\}/);
+    // A feature slice's screen is held back first (feature not known yet, not enabled, or unknown), then the same gate.
+    expect(shell).toMatch(
+      /\) : allowed \? \(\s*<Outlet \/>\s*\) : \(\s*<NotAllowedView t=\{t\} \/>\s*\)\}/,
+    );
+    expect(shell).toMatch(/\{heldBack !== null \? \(\s*<FeatureRouteFallback/);
   });
 });

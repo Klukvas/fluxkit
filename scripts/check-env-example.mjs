@@ -32,6 +32,10 @@ export const NOT_IN_ENV_EXAMPLE = new Map([
     "set only by apps/storefront/next.config.ts for `next dev` (from MEDIA_PUBLIC_BASE_URL or API_INTERNAL_URL), never by the shop's .env; docs/contracts/config.md",
   ],
   [
+    "DEV",
+    "Vite's build flag `import.meta.env.DEV` (true under `vite dev` and Vitest, false in `vite build`), read by apps/admin/src/features/registry.ts; set by Vite, never by the shop's .env",
+  ],
+  [
     "DRIZZLE_KIT_OUT",
     "set only by scripts/check-schema-drift.sh for a temporary drizzle-kit output directory",
   ],

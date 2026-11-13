@@ -3,7 +3,7 @@ import { withAreaMessages } from "../i18n/area-messages";
 import { useI18n } from "../i18n/i18n-context";
 import { ProtectedLayout } from "../layout/protected-layout";
 import type { RouteHandle } from "../layout/shell";
-import { ROUTES, type AppRoute } from "../routes";
+import { FEATURE_ROUTES, ROUTES, type AppRoute, type FeatureAppRoute } from "../routes";
 import { SessionProvider } from "../session/session-context";
 import { RootErrorBoundary, RouteErrorBoundary } from "../views/error-boundaries";
 import { NotFoundView } from "../views/status-views";
@@ -27,11 +27,12 @@ function NotFoundPage() {
   return <NotFoundView t={t} />;
 }
 
-function toRouteObject(route: AppRoute): RouteObject {
+function toRouteObject(route: AppRoute | FeatureAppRoute): RouteObject {
   const handle: RouteHandle = {
     routeId: route.id,
     titleKey: route.titleKey,
     permission: route.permission,
+    ...("feature" in route ? { feature: route.feature } : {}),
   };
   const page = route.page;
   if (page.kind === "eager") return { path: route.path, handle, Component: page.Component };
@@ -54,12 +55,18 @@ function toRouteObject(route: AppRoute): RouteObject {
 /**
  * The route table as react-router route objects (data router, `createBrowserRouter`; no framework mode, no server
  * features). `/login` sits beside the protected layout; every other route, and the not-found route for unknown paths,
- * renders inside the shell, under an error boundary that keeps the shell usable. `routes` is the app's table; a test
- * passes its own rows.
+ * renders inside the shell, under an error boundary that keeps the shell usable. The screens of feature slices
+ * (`featureRoutes`) are inside the shell too; their handle names the feature, which the shell's gate checks against
+ * `GET /admin/config`. `routes` and `featureRoutes` are the app's tables; a test passes its own rows.
  */
-export function buildRouteObjects(routes: readonly AppRoute[] = ROUTES): RouteObject[] {
+export function buildRouteObjects(
+  routes: readonly AppRoute[] = ROUTES,
+  featureRoutes: readonly FeatureAppRoute[] = FEATURE_ROUTES,
+): RouteObject[] {
   const login = routes.filter((route) => route.permission === "public").map(toRouteObject);
-  const pages = routes.filter((route) => route.permission !== "public").map(toRouteObject);
+  const pages = [...routes.filter((route) => route.permission !== "public"), ...featureRoutes].map(
+    toRouteObject,
+  );
   const notFoundHandle: RouteHandle = {
     routeId: NOT_FOUND_ROUTE_ID,
     titleKey: "notFound.title",

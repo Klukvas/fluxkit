@@ -58,9 +58,20 @@ function readJson(path: string): Record<string, unknown> {
   return JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>;
 }
 
+/** The message file of each feature slice for a locale (`features/<name>/messages/<locale>.json`, ADR 0049). */
+function featureMessageFiles(sourceDir: string, locale: string): string[] {
+  const root = join(sourceDir, "features");
+  if (!existsSync(root)) return [];
+  return readdirSync(root, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => join(root, entry.name, "messages", `${locale}.json`))
+    .filter((file) => existsSync(file));
+}
+
 /**
  * The problems of the overrides files under `sourceDir` (`apps/admin/src`): every key must be in one of the locale's message
- * files, eager or lazy (`messages/<locale>/*.json`), and every value a non-empty string. Empty when all is well.
+ * files, eager or lazy (`messages/<locale>/*.json`, and a feature slice's `features/<name>/messages/<locale>.json`), and every
+ * value a non-empty string. Empty when all is well.
  */
 export function messageOverrideProblems(sourceDir: string): string[] {
   return (["uk", "en"] as const).flatMap((locale) => {
@@ -69,6 +80,7 @@ export function messageOverrideProblems(sourceDir: string): string[] {
     for (const file of readdirSync(folder).filter((name) => name.endsWith(".json"))) {
       Object.assign(all, readJson(join(folder, file)));
     }
+    for (const file of featureMessageFiles(sourceDir, locale)) Object.assign(all, readJson(file));
     return overrideProblems(
       all,
       readJson(join(sourceDir, "messages-overrides", `${locale}.json`)),

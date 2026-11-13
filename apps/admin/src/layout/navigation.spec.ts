@@ -2,8 +2,14 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ROLE_PERMISSIONS } from "@fluxkit/core";
 import { describe, expect, it } from "vitest";
-import { routeById } from "../routes";
-import { NAVIGATION, visibleNavigation } from "./navigation";
+import type { RouteId } from "../router/paths";
+import { FEATURE_ROUTES, routeById } from "../routes";
+import {
+  FEATURE_NAVIGATION,
+  NAVIGATION,
+  visibleNavigation,
+  type FeatureNavigationEntry,
+} from "./navigation";
 
 const ids = (permissions: readonly string[]) =>
   visibleNavigation(permissions).flatMap((group) => group.items.map((item) => item.routeId));
@@ -31,10 +37,12 @@ describe("navigation configuration", () => {
       "users",
       "help",
     ]);
+    // No feature is enabled here, so every item is a core route.
     for (const group of visibleNavigation([...ROLE_PERMISSIONS.owner])) {
       for (const item of group.items) {
-        expect(item.href).toBe(routeById(item.routeId).path);
-        expect(item.permission).toBe(routeById(item.routeId).permission);
+        const route = routeById(item.routeId as RouteId);
+        expect(item.href).toBe(route.path);
+        expect(item.permission).toBe(route.permission);
       }
     }
   });
@@ -119,6 +127,69 @@ describe("navigation configuration", () => {
       "help",
     ]);
     expect(ids(["orders.read", "shipping.manage"])).not.toContain("banners");
+  });
+});
+
+describe("feature slice entries (ADR 0049, E8)", () => {
+  // A fixture entry, so the core spec holds without any slice folder (the feature matrix deletes them).
+  const notes: FeatureNavigationEntry = {
+    feature: "notes",
+    group: "storefront",
+    routeId: "feature.notes.list",
+    labelKey: "features.notes.nav",
+    href: "/features/notes",
+    permission: "catalog.read",
+  };
+  const withFeatures = (
+    permissions: readonly string[],
+    enabled: readonly string[],
+    entries: readonly FeatureNavigationEntry[] = [notes],
+  ) =>
+    visibleNavigation(permissions, enabled, entries).flatMap((group) =>
+      group.items.map((item) => `${group.id}:${item.routeId}`),
+    );
+
+  it("takes each slice's entry from its manifest, with the path and permission of the route it names", () => {
+    for (const entry of FEATURE_NAVIGATION) {
+      const route = FEATURE_ROUTES.find((candidate) => candidate.id === entry.routeId);
+      expect(route?.feature, entry.routeId).toBe(entry.feature);
+      expect(entry.href).toBe(route?.path);
+      expect(entry.permission).toBe(route?.permission);
+    }
+  });
+
+  it("shows a feature's entry only while the API lists the feature, after the group's own items", () => {
+    const owner = [...ROLE_PERMISSIONS.owner];
+    expect(withFeatures(owner, [])).not.toContain("storefront:feature.notes.list");
+    expect(withFeatures(owner, ["example"])).not.toContain("storefront:feature.notes.list");
+    expect(withFeatures(owner, ["notes"]).filter((id) => id.startsWith("storefront:"))).toEqual([
+      "storefront:banners",
+      "storefront:feature.notes.list",
+    ]);
+    const item = visibleNavigation(owner, ["notes"], [notes])
+      .flatMap((group) => group.items)
+      .find((entry) => entry.routeId === "feature.notes.list");
+    expect(item).toEqual({
+      routeId: "feature.notes.list",
+      labelKey: "features.notes.nav",
+      href: "/features/notes",
+      permission: "catalog.read",
+    });
+  });
+
+  it("follows the entry's permission", () => {
+    expect(withFeatures([...ROLE_PERMISSIONS.viewer], ["notes"])).toContain(
+      "storefront:feature.notes.list",
+    );
+    expect(withFeatures(["orders.read"], ["notes"])).not.toContain("storefront:feature.notes.list");
+    expect(withFeatures([], ["notes"])).toEqual(["help:help"]);
+  });
+
+  it("joins the group a manifest names, even one with no core item for the role", () => {
+    const sales = { ...notes, group: "sales" } as const;
+    expect(
+      visibleNavigation(["catalog.read"], ["notes"], [sales]).map((group) => group.id),
+    ).toEqual(["catalog", "storefront", "sales", "help"]);
   });
 });
 
