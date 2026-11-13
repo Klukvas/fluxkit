@@ -19,6 +19,16 @@ import type {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const MISSING_ID = "00000000-0000-4000-8000-000000000000";
 
+// Plan 2026-11-13-product-type-guide-page: rejected guide pages and the problem code at path `optionGuidePage`, for POST and PATCH.
+const INVALID_GUIDE_PAGES: [string, "empty" | "too_long" | "invalid_format"][] = [
+  ["Size-Guide", "invalid_format"],
+  ["size_guide", "invalid_format"],
+  ["/size-guide", "invalid_format"],
+  ["size--guide", "invalid_format"],
+  ["", "empty"],
+  ["a".repeat(161), "too_long"],
+];
+
 describe("admin product types API (real app, real Postgres)", () => {
   const runId = randomUUID().slice(0, 8);
   const pool = new pg.Pool({ connectionString: requireTestDatabaseUrl() });
@@ -162,22 +172,18 @@ describe("admin product types API (real app, real Postgres)", () => {
       expect((await createType({ optionGuidePage: null })).optionGuidePage).toBeNull();
     });
 
-    it.each([
-      ["Size-Guide", "invalid_format"],
-      ["size_guide", "invalid_format"],
-      ["/size-guide", "invalid_format"],
-      ["size--guide", "invalid_format"],
-      ["", "empty"],
-      ["a".repeat(161), "too_long"],
-    ])("answers 400 for the guide page %j (%s)", async (optionGuidePage, code) => {
-      const result = await http(running.baseUrl, "POST", "/admin/product-types", {
-        body: { code: uniqueCode(), name: { uk: "x" }, optionGuidePage },
-      });
-      expect(result.status).toBe(400);
-      expect(problem(result).errors).toEqual([
-        expect.objectContaining({ path: "optionGuidePage", code }),
-      ]);
-    });
+    it.each(INVALID_GUIDE_PAGES)(
+      "answers 400 for the guide page %j (%s)",
+      async (optionGuidePage, code) => {
+        const result = await http(running.baseUrl, "POST", "/admin/product-types", {
+          body: { code: uniqueCode(), name: { uk: "x" }, optionGuidePage },
+        });
+        expect(result.status).toBe(400);
+        expect(problem(result).errors).toEqual([
+          expect.objectContaining({ path: "optionGuidePage", code }),
+        ]);
+      },
+    );
 
     it("answers 400 invalid_type for a guide page that is not a string", async () => {
       const result = await http(running.baseUrl, "POST", "/admin/product-types", {
@@ -389,12 +395,27 @@ describe("admin product types API (real app, real Postgres)", () => {
       expect(kept.body).toMatchObject({ requiresShipping: false, optionGuidePage: "size-guide" });
       const cleared = await patch({ optionGuidePage: null });
       expect(cleared.body.optionGuidePage).toBeNull();
-      const invalid = await patch({ optionGuidePage: "Size Guide" });
-      expect(invalid.status).toBe(400);
-      expect(problem(invalid).errors).toEqual([
-        expect.objectContaining({ path: "optionGuidePage", code: "invalid_format" }),
-      ]);
     });
+
+    it.each(INVALID_GUIDE_PAGES)(
+      "answers 400 for the guide page %j (%s) and keeps the stored one",
+      async (optionGuidePage, code) => {
+        const type = await createType({ optionGuidePage: "size-guide" });
+        const result = await http(running.baseUrl, "PATCH", `/admin/product-types/${type.id}`, {
+          body: { optionGuidePage },
+        });
+        expect(result.status).toBe(400);
+        expect(problem(result).errors).toEqual([
+          expect.objectContaining({ path: "optionGuidePage", code }),
+        ]);
+        const after = await http<ProductTypeDetailResponse>(
+          running.baseUrl,
+          "GET",
+          `/admin/product-types/${type.id}`,
+        );
+        expect(after.body.optionGuidePage).toBe("size-guide");
+      },
+    );
 
     it("answers with the unchanged type for an empty body", async () => {
       const type = await createType();
