@@ -402,3 +402,16 @@ test("the sticky summary never runs past a short viewport: it scrolls on its own
   await summary.getByRole("list", { name: "About your purchase" }).scrollIntoViewIfNeeded();
   await expect(summary.getByRole("list", { name: "About your purchase" })).toBeInViewport();
 });
+
+test("the wheel over the sticky summary scrolls the page, not only over the left column (owner report 2026-11-13)", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto("/en/p/demo-t-shirt?opt.color=black&opt.size=m");
+  await waitForHydration(page);
+  const box = await page.locator("[data-product-summary]").boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.move((box?.x ?? 0) + (box?.width ?? 0) / 2, (box?.y ?? 0) + 40);
+  await page.mouse.wheel(0, 400);
+  await expect.poll(async () => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+});
