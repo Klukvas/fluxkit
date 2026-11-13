@@ -5,43 +5,93 @@ import { canAccess } from "../permissions";
 import type { RouteId } from "../router/paths";
 import { featureRouteById, routeById } from "../routes";
 
-/**
- * The side navigation as configuration (plan, "Theming and layout composition"): groups in order, each with a heading
- * message key and items that name a route. The label, path and permission of an item come from the route table, so the
- * navigation cannot show a link the route would refuse. A feature slice adds its one entry at the end of the group its
- * manifest names (`features/manifest.ts`, ADR 0049), shown only while the API lists the feature as enabled.
- */
+import type { ComponentType } from "react";
+import {
+  ExtensionIcon,
+  HomeIcon,
+  OrdersIcon,
+  ProductsIcon,
+  CustomersIcon,
+  PaymentsIcon,
+  CategoriesIcon,
+  BrandsIcon,
+  ProductTypesIcon,
+  AttributesIcon,
+  OptionsIcon,
+  BannersIcon,
+  SearchIcon,
+  ShippingIcon,
+  EmailIcon,
+  PersonalDataIcon,
+  AuditLogIcon,
+  AdministratorsIcon,
+  HelpIcon,
+  type IconProps,
+} from "@fluxkit/ui";
+
+export interface NavigationItemConfig {
+  routeId: RouteId;
+  icon: ComponentType<IconProps>;
+}
 export interface NavigationGroupConfig {
   id: NavigationGroupId;
-  headingKey: string;
-  items: readonly RouteId[];
+  headingKey?: string;
+  placement?: "main" | "bottom";
+  items: readonly NavigationItemConfig[];
 }
 
+/** Internal layout configuration; route definitions remain the source of paths and permissions. */
 export const NAVIGATION: readonly NavigationGroupConfig[] = [
   {
-    id: "catalog",
-    headingKey: "nav.group.catalog",
-    items: ["products", "attributes", "options", "productTypes", "brands", "categories", "search"],
+    id: "sales",
+    items: [
+      { routeId: "home", icon: HomeIcon },
+      { routeId: "orders", icon: OrdersIcon },
+      { routeId: "products", icon: ProductsIcon },
+      { routeId: "customers", icon: CustomersIcon },
+      { routeId: "payments", icon: PaymentsIcon },
+    ],
   },
-  // What the shop shows besides the catalog (plan 2026-11-05-admin-home-banners.md, D5); catalog.read, like the catalog.
-  { id: "storefront", headingKey: "nav.group.storefront", items: ["banners"] },
-  { id: "sales", headingKey: "nav.group.sales", items: ["orders", "customers", "payments"] },
+  {
+    id: "catalog",
+    headingKey: "nav.group.catalogSetup",
+    items: [
+      { routeId: "categories", icon: CategoriesIcon },
+      { routeId: "brands", icon: BrandsIcon },
+      { routeId: "productTypes", icon: ProductTypesIcon },
+      { routeId: "attributes", icon: AttributesIcon },
+      { routeId: "options", icon: OptionsIcon },
+    ],
+  },
+  {
+    id: "storefront",
+    headingKey: "nav.group.storefront",
+    items: [
+      { routeId: "banners", icon: BannersIcon },
+      { routeId: "search", icon: SearchIcon },
+    ],
+  },
   {
     id: "settings",
     headingKey: "nav.group.settings",
-    items: ["shipping", "email", "privacy", "auditLog", "users"],
+    items: [
+      { routeId: "shipping", icon: ShippingIcon },
+      { routeId: "email", icon: EmailIcon },
+      { routeId: "privacy", icon: PersonalDataIcon },
+      { routeId: "auditLog", icon: AuditLogIcon },
+      { routeId: "users", icon: AdministratorsIcon },
+    ],
   },
-  // Every signed-in role (the route's permission is the session's), so this group is never empty.
-  { id: "help", headingKey: "nav.group.help", items: ["help"] },
+  { id: "help", placement: "bottom", items: [{ routeId: "help", icon: HelpIcon }] },
 ];
 
 export interface NavigationItem {
   routeId: RouteId | FeatureRouteId;
+  icon: ComponentType<IconProps>;
   labelKey: string;
   href: string;
   permission: AdminOperationPermission;
 }
-
 /** A feature's entry (its manifest's `navigation`, with the path and permission of the route it names). */
 export interface FeatureNavigationEntry extends NavigationItem {
   routeId: FeatureRouteId;
@@ -54,6 +104,7 @@ export const FEATURE_NAVIGATION: readonly FeatureNavigationEntry[] = ADMIN_FEATU
   (feature) => {
     const route = featureRouteById(feature.navigation.routeId);
     return {
+      icon: ExtensionIcon,
       feature: feature.name,
       group: feature.navigation.group,
       routeId: route.id,
@@ -64,9 +115,7 @@ export const FEATURE_NAVIGATION: readonly FeatureNavigationEntry[] = ADMIN_FEATU
   },
 );
 
-export interface NavigationGroup {
-  id: NavigationGroupId;
-  headingKey: string;
+export interface NavigationGroup extends Omit<NavigationGroupConfig, "items"> {
   items: NavigationItem[];
 }
 
@@ -77,7 +126,13 @@ function featureItems(
 ): NavigationItem[] {
   return entries
     .filter((entry) => entry.group === group && enabledFeatures.includes(entry.feature))
-    .map(({ routeId, labelKey, href, permission }) => ({ routeId, labelKey, href, permission }));
+    .map(({ routeId, labelKey, href, permission }) => ({
+      routeId,
+      labelKey,
+      href,
+      permission,
+      icon: ExtensionIcon,
+    }));
 }
 
 /**
@@ -90,12 +145,12 @@ export function visibleNavigation(
   entries: readonly FeatureNavigationEntry[] = FEATURE_NAVIGATION,
 ): NavigationGroup[] {
   return NAVIGATION.map((group) => ({
-    id: group.id,
-    headingKey: group.headingKey,
+    ...group,
     items: [
-      ...group.items.map((id) => {
-        const route = routeById(id);
+      ...group.items.map((item) => {
+        const route = routeById(item.routeId);
         return {
+          ...item,
           routeId: route.id,
           labelKey: route.titleKey,
           href: route.path,

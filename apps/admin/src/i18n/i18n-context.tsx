@@ -36,7 +36,7 @@ export interface I18nValue {
 
 const I18nContext = createContext<I18nValue | null>(null);
 
-/** The browser's storage, read lazily: touching `window.localStorage` itself can throw when site data is blocked. */
+/** Shared language, sidebar and checklist storage, read lazily: touching `window.localStorage` itself can throw when site data is blocked. */
 export const browserStorage = (): StorageLike => window.localStorage;
 
 export type MessageFileLoader = (file: LazyFile, locale: Locale) => Promise<Messages>;

@@ -11,5 +11,8 @@
   "shell.contextHelp": "Довідка до цієї сторінки",
   "shell.menuOpen": "Меню",
   "shell.menuClose": "Закрити меню",
-  "shell.tableScrollHint": "Гортайте таблицю вбік, щоб побачити всі стовпці."
+  "shell.tableScrollHint": "Гортайте таблицю вбік, щоб побачити всі стовпці.",
+  "shell.collapsePanel": "Згорнути панель",
+  "shell.expandPanel": "Розгорнути панель",
+  "shell.userMenu": "Меню облікового запису"
 }

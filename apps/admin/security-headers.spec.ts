@@ -101,7 +101,7 @@ describe("the admin app has no cookie of its own and loads nothing from a third 
     expect(files.filter((file) => /document\.cookie/.test(readFileSync(file, "utf8")))).toEqual([]);
   });
 
-  it("keeps localStorage inside the language preference code (the language code is all it stores)", () => {
+  it("keeps localStorage references inside the shared language storage accessor and its documentation", () => {
     const users = files.filter((file) => /localStorage/.test(readFileSync(file, "utf8")));
     expect(users.map((file) => file.slice(file.indexOf("/src/")))).toEqual([
       "/src/i18n/i18n-context.tsx",

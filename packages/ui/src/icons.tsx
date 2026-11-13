@@ -203,3 +203,12 @@ export function ChevronIcon(props: IconProps): ReactElement {
     </Icon>
   );
 }
+
+/** A shared fallback for optional feature entries without a manifest icon. */
+export function ExtensionIcon(props: IconProps): ReactElement {
+  return (
+    <Icon {...props}>
+      <path d="M9 3v4H5v4H3v4h2v6h6v-2h4v2h6v-6h-4v-4h4V7h-6V3Z" />
+    </Icon>
+  );
+}

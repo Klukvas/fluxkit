@@ -4,6 +4,8 @@ import {
   DataTableScrollHint,
   LiveRegion,
   SideNav,
+  SidebarCollapseIcon,
+  SidebarExpandIcon,
   SkipLink,
   cn,
   type SideNavGroup,
@@ -27,6 +29,7 @@ import { FeatureRouteFallback, fallbackTitleKey } from "./feature-route-view";
 import { LanguageSwitch } from "./language-switch";
 import { isCurrentPath, visibleNavigation } from "./navigation";
 import { mayOpenRoute } from "./route-gate";
+import { useSidebarCollapsed } from "./use-sidebar-collapsed";
 import { UserMenu } from "./user-menu";
 
 /** What each route object carries for the shell (`router/route-objects.tsx`). */
@@ -51,6 +54,9 @@ export function isRouteHandle(value: unknown): value is RouteHandle {
 export interface ShellFrameProps {
   t: Translator;
   navigation: SideNavGroup[];
+  helpNavigation?: SideNavGroup[];
+  collapsed?: boolean;
+  onToggleCollapsed?: () => void;
   languageSwitch: ReactNode;
   userMenu: ReactNode;
   /** Announced while a route chunk loads. */
@@ -63,6 +69,7 @@ export interface ShellFrameProps {
 }
 
 /** The id of the navigation panel the small-screen Menu button opens and closes. */
+export const DESKTOP_NAVIGATION_PANEL_ID = "admin-navigation-desktop";
 export const NAVIGATION_PANEL_ID = "admin-navigation";
 /** The id of the header part with the language switch and the user menu, behind the same button below `md`. */
 export const ACCOUNT_PANEL_ID = "admin-account";
@@ -85,13 +92,117 @@ export function ContextHelpLink({ t, href }: { t: Translator; href: string }) {
   );
 }
 
-/**
- * The page frame: skip link, header (name, language, user), side navigation and `main`. Presentational; layout lives
- * here and in `navigation.ts` only, so a redesign does not touch the logic (AGENTS.md 2.2).
- */
+/** Both responsive panels share exactly the same links and muted current-item style. */
+function ShellNavigation({
+  t,
+  navigation,
+  helpNavigation = [],
+  collapsed = false,
+}: Pick<ShellFrameProps, "t" | "navigation" | "helpNavigation" | "collapsed">) {
+  const renderNav = (groups: SideNavGroup[], label: string) => (
+    <SideNav
+      label={label}
+      groups={groups}
+      collapsed={collapsed}
+      currentTone="muted"
+      renderLink={({ href, children, ...link }) => (
+        <Link to={href} {...link}>
+          {children}
+        </Link>
+      )}
+    />
+  );
+  return (
+    <>
+      <div className="min-h-0 flex-1 overflow-y-auto p-1">
+        {renderNav(navigation, t("shell.navLabel"))}
+      </div>
+      <div className="shrink-0 pt-4">{renderNav(helpNavigation, t("page.help.title"))}</div>
+    </>
+  );
+}
+
+function CollapseControl({
+  t,
+  collapsed,
+  onToggle,
+}: {
+  t: Translator;
+  collapsed: boolean;
+  onToggle?: () => void;
+}) {
+  return (
+    <Button
+      variant="secondary"
+      className="mt-2 w-full shrink-0 gap-3 px-3"
+      aria-expanded={!collapsed}
+      aria-controls={DESKTOP_NAVIGATION_PANEL_ID}
+      onClick={onToggle}
+    >
+      {collapsed ? <SidebarExpandIcon /> : <SidebarCollapseIcon />}
+      <span className={collapsed ? "sr-only" : undefined}>
+        {t(collapsed ? "shell.expandPanel" : "shell.collapsePanel")}
+      </span>
+    </Button>
+  );
+}
+
+function ShellHeader({
+  t,
+  menuOpen,
+  setMenuOpen,
+  menuButton,
+  languageSwitch,
+  userMenu,
+  onEscape,
+}: {
+  t: Translator;
+  menuOpen: boolean;
+  setMenuOpen: (open: boolean) => void;
+  menuButton: React.RefObject<HTMLButtonElement | null>;
+  languageSwitch: ReactNode;
+  userMenu: ReactNode;
+  onEscape: React.KeyboardEventHandler;
+}) {
+  return (
+    <header className="border-b border-border md:col-start-2">
+      <div className="flex flex-wrap items-center justify-between gap-4 px-4 py-3">
+        <Link to={PATHS.home} className="text-lg font-semibold text-foreground">
+          {t("app.name")}
+        </Link>
+        <Button
+          ref={menuButton}
+          variant="secondary"
+          className="md:hidden"
+          aria-expanded={menuOpen}
+          aria-controls={`${ACCOUNT_PANEL_ID} ${NAVIGATION_PANEL_ID}`}
+          onClick={() => setMenuOpen(!menuOpen)}
+        >
+          {t(menuOpen ? "shell.menuClose" : "shell.menuOpen")}
+        </Button>
+        <div
+          id={ACCOUNT_PANEL_ID}
+          className={cn(
+            "w-full flex-wrap items-center gap-4 md:flex md:w-auto",
+            menuOpen ? "flex" : "hidden",
+          )}
+          onKeyDown={onEscape}
+        >
+          {languageSwitch}
+          {userMenu}
+        </div>
+      </div>
+    </header>
+  );
+}
+
+/** Presentational frame; mobile always renders the expanded navigation. */
 export function ShellFrame({
   t,
   navigation,
+  helpNavigation = [],
+  collapsed = false,
+  onToggleCollapsed,
   languageSwitch,
   userMenu,
   navigating,
@@ -99,86 +210,53 @@ export function ShellFrame({
   navigationKey,
   children,
 }: ShellFrameProps) {
-  // Below `md` the navigation is behind a Menu button (it filled the whole first screen of a phone); from `md` it is always
-  // shown and the button is hidden. It closes when the page changes, on Escape (the focus goes back to the button) and with
-  // the button.
   const [menuOpen, setMenuOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     setMenuOpen(false);
   }, [navigationKey]);
+  const onEscape: React.KeyboardEventHandler = (event) => {
+    if (event.key === "Escape" && menuOpen) {
+      setMenuOpen(false);
+      menuButton.current?.focus();
+    }
+  };
+  const navProps = { t, navigation, helpNavigation };
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground md:grid md:admin-shell-grid">
       <SkipLink targetId="main">{t("shell.skipLink")}</SkipLink>
-      <header className="border-b border-border">
-        <div className="flex flex-wrap items-center justify-between gap-4 px-4 py-3">
-          <Link to={PATHS.home} className="text-lg font-semibold text-foreground">
-            {t("app.name")}
-          </Link>
-          <Button
-            ref={menuButton}
-            variant="secondary"
-            className="md:hidden"
-            aria-expanded={menuOpen}
-            aria-controls={`${ACCOUNT_PANEL_ID} ${NAVIGATION_PANEL_ID}`}
-            onClick={() => setMenuOpen((open) => !open)}
-          >
-            {t(menuOpen ? "shell.menuClose" : "shell.menuOpen")}
-          </Button>
-          {/* Below `md` the language and the signed-in admin's controls are behind the same Menu button as the navigation
-              (they took a third of a 390 px screen); one instance of each, only shown or hidden. */}
-          <div
-            id={ACCOUNT_PANEL_ID}
-            className={cn(
-              "w-full flex-wrap items-center gap-4 md:flex md:w-auto",
-              menuOpen ? "flex" : "hidden",
-            )}
-            onKeyDown={(event) => {
-              if (event.key === "Escape" && menuOpen) {
-                setMenuOpen(false);
-                menuButton.current?.focus();
-              }
-            }}
-          >
-            {languageSwitch}
-            {userMenu}
-          </div>
-        </div>
-      </header>
-      <div className="flex flex-col md:flex-row">
-        <aside
-          id={NAVIGATION_PANEL_ID}
-          className={cn(
-            "border-b border-border p-4 md:block md:w-64 md:shrink-0 md:border-e md:border-b-0",
-            menuOpen ? "block" : "hidden",
-          )}
-          onKeyDown={(event) => {
-            if (event.key === "Escape" && menuOpen) {
-              setMenuOpen(false);
-              menuButton.current?.focus();
-            }
-          }}
-        >
-          <SideNav
-            label={t("shell.navLabel")}
-            groups={navigation}
-            renderLink={({ href, children: label, ...link }) => (
-              <Link to={href} {...link}>
-                {label}
-              </Link>
-            )}
-          />
-        </aside>
-        <main id="main" tabIndex={-1} className="min-w-0 flex-1 p-4 md:p-6">
-          <LiveRegion visuallyHidden>{navigating ? t("shell.navigating") : null}</LiveRegion>
-          {contextHelp === undefined || contextHelp === null ? null : (
-            <div className="mb-2 flex justify-end">{contextHelp}</div>
-          )}
-          <DataTableScrollHint.Provider value={t("shell.tableScrollHint")}>
-            {children}
-          </DataTableScrollHint.Provider>
-        </main>
-      </div>
+      <ShellHeader
+        {...{ t, menuOpen, setMenuOpen, menuButton, languageSwitch, userMenu, onEscape }}
+      />
+      <aside
+        id={DESKTOP_NAVIGATION_PANEL_ID}
+        className={cn(
+          "sticky top-0 hidden h-dvh min-h-0 flex-col border-e border-border p-4 sidebar-safe-bottom md:col-start-1 md:row-start-1 md:row-span-2 md:flex",
+          collapsed ? "w-20" : "w-64",
+        )}
+      >
+        <ShellNavigation {...navProps} collapsed={collapsed} />
+        <CollapseControl t={t} collapsed={collapsed} onToggle={onToggleCollapsed} />
+      </aside>
+      <aside
+        id={NAVIGATION_PANEL_ID}
+        className={cn(
+          "flex-col border-b border-border p-4 md:hidden",
+          menuOpen ? "flex" : "hidden",
+        )}
+        onKeyDown={onEscape}
+      >
+        <ShellNavigation {...navProps} />
+      </aside>
+      <main id="main" tabIndex={-1} className="min-w-0 p-4 md:col-start-2 md:row-start-2 md:p-6">
+        <LiveRegion visuallyHidden>{navigating ? t("shell.navigating") : null}</LiveRegion>
+        {contextHelp === undefined || contextHelp === null ? null : (
+          <div className="mb-2 flex justify-end">{contextHelp}</div>
+        )}
+        <DataTableScrollHint.Provider value={t("shell.tableScrollHint")}>
+          {children}
+        </DataTableScrollHint.Provider>
+      </main>
     </div>
   );
 }
@@ -191,6 +269,7 @@ export function ShellFrame({
  */
 export function Shell() {
   const { t } = useI18n();
+  const sidebar = useSidebarCollapsed();
   const session = useSession();
   const location = useLocation();
   const matches = useMatches();
@@ -228,13 +307,12 @@ export function Shell() {
     allowed && handle !== undefined && handle.feature === undefined
       ? contextHelpFor(handle.routeId, new URLSearchParams(location.search).get("tab"))
       : null;
-  const groups: SideNavGroup[] = visibleNavigation(
-    me?.permissions ?? null,
-    shownFeatures(features.state),
-  ).map((group) => ({
+  const visibleGroups = visibleNavigation(me?.permissions ?? null, shownFeatures(features.state));
+  const groups: SideNavGroup[] = visibleGroups.map((group) => ({
     id: group.id,
-    heading: t(group.headingKey),
+    ...(group.headingKey ? { heading: t(group.headingKey) } : {}),
     items: group.items.map((item) => ({
+      icon: <item.icon />,
       id: item.routeId,
       label: t(item.labelKey),
       href: item.href,
@@ -248,7 +326,12 @@ export function Shell() {
         <UnsavedChangesContext.Provider value={unsaved}>
           <ShellFrame
             t={t}
-            navigation={groups}
+            navigation={groups.filter((_, index) => visibleGroups[index]?.placement !== "bottom")}
+            helpNavigation={groups.filter(
+              (_, index) => visibleGroups[index]?.placement === "bottom",
+            )}
+            collapsed={sidebar.collapsed}
+            onToggleCollapsed={sidebar.toggle}
             languageSwitch={<LanguageSwitch />}
             userMenu={<UserMenu />}
             navigating={navigation.state === "loading"}

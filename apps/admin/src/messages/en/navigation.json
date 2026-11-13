@@ -1,6 +1,5 @@
 {
   "nav.group.catalog": "Catalog",
-  "nav.group.sales": "Sales",
   "nav.group.settings": "Settings",
   "page.login.title": "Sign in",
   "page.home.title": "Start",
@@ -54,5 +53,6 @@
   "page.auditLog.title": "Audit log",
   "nav.group.help": "Help",
   "page.help.title": "Help",
-  "page.helpArticle.title": "Help article"
+  "page.helpArticle.title": "Help article",
+  "nav.group.catalogSetup": "Catalog setup"
 }

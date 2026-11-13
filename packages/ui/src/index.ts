@@ -82,6 +82,7 @@ export { TrustBar, type TrustBarItem, type TrustBarProps } from "./trust-bar";
 export { VisuallyHidden } from "./visually-hidden";
 
 export {
+  ExtensionIcon,
   HomeIcon,
   OrdersIcon,
   ProductsIcon,
