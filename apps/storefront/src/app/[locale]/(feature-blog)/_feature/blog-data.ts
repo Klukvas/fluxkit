@@ -1,7 +1,7 @@
 /**
- * The blog pages' reads, through `StoreData.featureRead` (the data cache for 60 s, tag `feature:blog`, never the last-good
- * copy: an unpublished post never stays visible through an outage). Pure over `FeatureData`; `blog-data.server.ts` binds it to
- * the running app.
+ * The blog pages' reads, through `StoreData.featureRead` (never the last-good copy: an unpublished post never stays visible
+ * through an outage). The list goes through the data cache for 60 s (tag `feature:blog`); a post does not (`loadBlogPost`).
+ * Pure over `FeatureData`; `blog-data.server.ts` binds it to the running app.
  */
 import { pageCountFor } from "../../../../lib/catalog-query";
 import { StoreUnavailableError } from "../../../../lib/store-data";
@@ -49,13 +49,17 @@ export async function loadBlogList(
 /**
  * One post, or `null` when the API answers `404` (unknown, draft, scheduled, not written in the locale, or a body that no
  * longer parses: one answer for all). Another 4xx throws; an outage throws `StoreUnavailableError` (the route's error view).
+ *
+ * Never through the Next data cache: it stores `200` answers only, so once a post is unpublished its revalidation (a `404`)
+ * would never replace the cached post, which would stay on the shop indefinitely (seen in the e2e suite on Next 16.4.3). The
+ * page and its `generateMetadata` share one read per request (`blog-data.server.ts`).
  */
 export async function loadBlogPost(
   data: FeatureData,
   locale: string,
   slug: string,
 ): Promise<BlogPost | null> {
-  const outcome = await data.read(GET_POST, getPostCall(locale, slug));
+  const outcome = await data.read(GET_POST, getPostCall(locale, slug), { noStore: true });
   if (outcome.ok) return outcome.data;
   if (outcome.status === 404) return null;
   throw new Error(`${GET_POST} answered ${String(outcome.status)} ${outcome.problem.code}.`);
