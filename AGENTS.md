@@ -48,7 +48,8 @@ Root scripts (always check `package.json` before using; do not invent commands):
   `pnpm check:env` (code reads no variable missing from `.env.example`), `pnpm test:e2e` (builds, then storefront and admin Playwright suites; see `apps/storefront/e2e/README.md`),
   `pnpm jobs:run-once` (builds, runs the scheduled jobs once), `pnpm search:reindex` (builds, rebuilds the search index),
   `pnpm feature-matrix <mode>`: `on`, `off`, `deleted`, `providers-on`, `providers-off`, `providers-deleted`, `providers-nova-post`, `providers-email-none`, `providers-email-fake`, `providers-email-resend`,
-  `providers-payment-none`, `providers-payment-fake`, `providers-payment-monobank`, `search-off`, `search-on` (`deleted` and `providers-deleted` only with `CI=true`, they remove files).
+  `providers-payment-none`, `providers-payment-fake`, `providers-payment-monobank`, `search-off`, `search-on` (`deleted` and `providers-deleted` only with `CI=true`, they remove files;
+  `on`, `off` and `deleted` cover the `example` and `blog` features, see the script's header).
 - App dev servers (no root `dev` yet): `pnpm --filter @fluxkit/storefront dev`, `pnpm --filter @fluxkit/admin dev` (run `pnpm build` once first so workspace packages exist).
 - Run the built API: `pnpm build && pnpm --filter @fluxkit/api start` (reads the root `.env`; variables already set in your shell take precedence).
 - Planned, added later: root `pnpm dev`. Until a script exists it is intentionally absent, not stubbed: a script that always passes would mask missing checks.
@@ -58,7 +59,7 @@ Root scripts (always check `package.json` before using; do not invent commands):
   `STOREFRONT_PUBLIC_URL`, `RESEND_API_KEY`; payments `PAYMENT_PROVIDERS_ENABLED`, `MONOBANK_TOKEN`; privacy `ORDER_CONTACT_RETENTION_DAYS`; search `SEARCH_ENABLED`, `MEILI_URL` (also read by the API),
   `MEILI_API_KEY`, `MEILI_INDEX_PREFIX`; storefront `STOREFRONT_FORWARD_CLIENT_ADDRESS`, `STOREFRONT_REQUIRE_LEGAL_TEXT` (build time only); admin dev server `ADMIN_DEV_API_URL`.
   Test only (fake providers): `FAKE_EMAIL_CAPTURE_FILE`, `FAKE_PAYMENT_ADOPT_WEBHOOKS`. E2E only: `E2E_DATABASE_URL`, `E2E_PORT`, `E2E_API_PORT`, `E2E_STOREFRONT_PORT`,
-  `E2E_STOREFRONT_UNFORWARDED_PORT`, `E2E_SEARCH`, `ADMIN_E2E_PORT`, `ADMIN_E2E_API_PORT`; visual comparison only (`scripts/visual-compare.sh` sets the two directories itself):
+  `E2E_STOREFRONT_UNFORWARDED_PORT`, `E2E_SEARCH`, `E2E_FEATURES`, `ADMIN_E2E_PORT`, `ADMIN_E2E_API_PORT`, `ADMIN_E2E_FEATURES`; visual comparison only (`scripts/visual-compare.sh` sets the two directories itself):
   `VISUAL_SNAPSHOT_DIR`, `VISUAL_COMPUTED_DIR`, `VISUAL_TOLERANCE` (`exact` or `ratio`).
 - Prettier covers code and config files, not Markdown. `check:boundaries` also fails if dependency-cruiser cruises zero modules.
 
