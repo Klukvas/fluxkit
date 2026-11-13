@@ -106,17 +106,25 @@ file, or ask upstream for an extension point (`AGENTS.md` section 17).
     fixture's texts merged over them, so the fork's own `custom.` keys still resolve there: a fork neither needs nor edits it.
 - Header: `apps/storefront/src/config/header.ts` (fork-owned; contract `docs/contracts/header-footer.md`). Without a code edit a fork can:
   reorder or leave out the blocks of the one header row (menu button, logo, navigation, search box, controls), reorder or leave out the
-  controls at the end (language, cart, account), set how many top-level categories show (0 to 12) and which links follow them
-  (message key plus storefront path; a new text goes into `apps/storefront/src/messages-extra/uk.json` and `apps/storefront/src/messages-extra/en.json` under `custom.`).
+  controls at the end (language, theme, cart, account), set how many top-level categories show (0 to 12) and which links follow them
+  (message key plus storefront path; a new text goes into `apps/storefront/src/messages-extra/uk.json` and `apps/storefront/src/messages-extra/en.json` under `custom.`),
+  and choose how the navigation shows from `xl` (`navigation.display`): `picker` (the template's default since round 4) makes the menu
+  button a "Categories" button from `xl` whose panel lists each category with up to 8 children in columns, then the links (the category
+  list is in the page once); `row` (also when left out) keeps the inline row that scrolls sideways. The `theme` control is the Light / Dark /
+  System menu (only while `showToggle` is true); below `sm` it moves into the menu's panel so a phone's row keeps room for the logo.
   Supported orders: the logo is required, `controls` (when listed) is the last block, menu and navigation go together, and the menu is
   either the first block shown on a phone (before the logo; the default) or the last one (after the logo, with no controls group: "logo
   left, menu right"); the list and the browser measurement are in `docs/contracts/header-footer.md`. Any other order fails the tests and,
   if they were skipped, every page (a bare 500). Very long category names can still make the menu wider than a 320 px phone (known limit).
 - Footer: `apps/storefront/src/config/footer.ts` (fork-owned, same contract): reorder or leave out the blocks (navigation, contacts,
   theme switch, copyright), add plain text lines from messages (for example the accepted payment methods), and order the link groups of
-  the navigation (shop pages, legal pages, the fork's own lists of internal paths), each with an optional small heading. Which shop pages are
+  the navigation (shop pages, legal pages, the fork's own lists of internal paths), each with an optional small heading, and pick the
+  `layout`: `columns` (the template's default since round 4: each link group a column named by its heading, "Customer service" / "Legal" for
+  the built-in groups when none is set, an own group needs a `headingKey`; the contacts a column; two columns on a phone, four from `lg`;
+  the other blocks and the "powered by" line in a bottom row) or `stack` (also when left out: one column, one navigation). Which shop pages are
   linked stays `inFooter` in `apps/storefront/src/config/shop-pages.ts`; the contacts are `apps/storefront/src/config/contacts.ts`; whether
-  the theme switch exists is `showToggle` in `apps/storefront/src/config/theme.ts` (the footer must list `themeSwitch` while it is true).
+  the theme switch exists is `showToggle` in `apps/storefront/src/config/theme.ts` (while it is true, the footer lists `themeSwitch` or
+  the header lists the `theme` control; the template does the latter).
 - Check (after `pnpm build`, section 0): `pnpm --filter @fluxkit/storefront test` (`config/header` and `config/footer` are checked by `apps/storefront/src/layout/header-layout.spec.ts`
   and `apps/storefront/src/layout/footer-layout.spec.ts`; an unknown block name fails `pnpm typecheck`). After changing either file (or `config/brand.ts`),
   delete the upstream-only, FORK-DELETABLE `apps/storefront/src/components/header-footer-defaults.upstream.spec.tsx` and its folder `apps/storefront/src/components/header-footer-defaults/`:
@@ -183,7 +191,7 @@ file, or ask upstream for an extension point (`AGENTS.md` section 17).
 - A local picture in a slot component goes through the internal `LocalPicture` (section 3, UI slots): no contract-safe way yet.
 - Mail has no logo; mail buttons keep the scale radius (`emailTheme.radius`).
 - Admin headings do not follow the heading roles; the admin shows its name as text (no image logo).
-- `theme-color` follows the theme of the rendered page: after the footer switch changes the theme in the browser, the colour updates on the next page.
+- `theme-color` follows the theme of the rendered page: after the theme switch changes the theme in the browser, the colour updates on the next page.
 - Forced-colours mode: an image logo keeps its own colours, but the page behind it becomes the system canvas (often black or white); a
   transparent logo whose marks vanish on that canvas disappears. Choose a logo that reads on both black and white, or use the light/dark pair.
   Not verified in a browser.
