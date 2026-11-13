@@ -541,6 +541,9 @@ export class CatalogSeeder {
         code: definition.code,
         name: definition.name,
         requiresShipping: definition.requiresShipping,
+        ...(definition.optionGuidePage === undefined
+          ? {}
+          : { optionGuidePage: definition.optionGuidePage }),
       }),
     );
     for (const [position, assignment] of definition.attributes.entries()) {
