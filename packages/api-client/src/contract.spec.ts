@@ -591,6 +591,7 @@ const productDetail: Shape<ProductDetail> = {
         },
       },
     },
+    optionGuidePage: { nullable: "string" },
   },
 };
 

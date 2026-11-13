@@ -209,6 +209,9 @@ export const storeProductDetailSchema = z.object({
   media: z.array(
     z.object({ url: z.string(), alt: nullableText, optionValueId: uuidSchema.nullable() }),
   ),
+  // The product type's guide page: a storefront shop-page slug or null. The storefront links it next to the option pickers
+  // only when it has that page enabled (plan 2026-11-13-product-type-guide-page).
+  optionGuidePage: z.string().nullable(),
 });
 
 export type StoreProductListItem = z.output<typeof storeProductListItemSchema>;

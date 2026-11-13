@@ -16,7 +16,9 @@ import { required } from "../../shared/rules.js";
 
 type ProductTypeRow = typeof productType.$inferSelect;
 type NewProductType = typeof productType.$inferInsert;
-type ProductTypeChanges = Partial<Pick<NewProductType, "name" | "requiresShipping">>;
+type ProductTypeChanges = Partial<
+  Pick<NewProductType, "name" | "requiresShipping" | "optionGuidePage">
+>;
 type AttributeRow = typeof attribute.$inferSelect;
 type AttributeOptionRow = typeof attributeOption.$inferSelect;
 type OptionRow = typeof option.$inferSelect;

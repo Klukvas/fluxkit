@@ -372,6 +372,7 @@ export class StoreService {
           alt: optionalText(entry.alt, locale),
           optionValueId: entry.optionValueId,
         })),
+      optionGuidePage: row.optionGuidePage,
     };
   }
 }

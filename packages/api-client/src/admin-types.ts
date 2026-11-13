@@ -1077,6 +1077,8 @@ export interface AdminProductType {
   code: string;
   name: LocalizedText;
   requiresShipping: boolean;
+  /** Slug of the storefront shop page linked next to the option pickers (a size guide), or `null`: none. */
+  optionGuidePage: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -1116,11 +1118,14 @@ export interface CreateAdminProductTypeBody {
   code: string;
   name: LocalizedText;
   requiresShipping?: boolean;
+  optionGuidePage?: string | null;
 }
 
 export interface UpdateAdminProductTypeBody {
   name?: LocalizedText;
   requiresShipping?: boolean;
+  /** `null` clears the guide page. */
+  optionGuidePage?: string | null;
 }
 
 export interface PutProductTypeAttributeBody {

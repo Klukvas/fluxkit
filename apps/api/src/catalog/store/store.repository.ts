@@ -61,6 +61,8 @@ export interface ProductDetailRow {
   publishedAt: Date | null;
   brandSlug: string | null;
   brandName: I18nText | null;
+  /** The product type's guide page slug (the storefront decides whether it has such a page). */
+  optionGuidePage: string | null;
 }
 
 /** One attribute assigned to a product type, with its select options (position, then code). */
@@ -304,8 +306,10 @@ export class StoreRepository {
         publishedAt: product.publishedAt,
         brandSlug: brand.slug,
         brandName: brand.name,
+        optionGuidePage: productType.optionGuidePage,
       })
       .from(product)
+      .innerJoin(productType, eq(productType.id, product.productTypeId))
       .leftJoin(brand, eq(brand.id, product.brandId))
       .where(
         and(

@@ -53,6 +53,7 @@ export class ProductTypesService {
         code: body.code,
         name: body.name,
         ...(body.requiresShipping === undefined ? {} : { requiresShipping: body.requiresShipping }),
+        ...(body.optionGuidePage === undefined ? {} : { optionGuidePage: body.optionGuidePage }),
       });
       return toProductTypeResponse(row);
     } catch (error) {
@@ -92,6 +93,7 @@ export class ProductTypesService {
     const changes = {
       ...(body.name === undefined ? {} : { name: body.name }),
       ...(body.requiresShipping === undefined ? {} : { requiresShipping: body.requiresShipping }),
+      ...(body.optionGuidePage === undefined ? {} : { optionGuidePage: body.optionGuidePage }),
     };
     const row =
       Object.keys(changes).length === 0

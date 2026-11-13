@@ -1,3 +1,4 @@
+import { SLUG_PATTERN, TEXT_LIMITS, validateSlug } from "@fluxkit/core";
 import { z } from "zod";
 import { timestampSchema, uuidSchema } from "../../../common/openapi-formats.js";
 import { paginationQuerySchema } from "../../../common/pagination.js";
@@ -10,17 +11,38 @@ import { i18nTextSchema } from "../../shared/i18n-validation.js";
 
 export const attributeLevelSchema = z.enum(["product", "variant"]);
 
-/** `POST /admin/product-types`. */
+/**
+ * Slug of the storefront shop page linked next to the option pickers (a size guide). The API cannot know the storefront's
+ * pages, so only the slug shape is checked; the storefront ignores a page it does not have or has switched off.
+ */
+const optionGuidePageSchema = z
+  .string()
+  // Refinements are invisible in the JSON schema, so the documented constraints are repeated as metadata.
+  .meta({ pattern: SLUG_PATTERN.source, maxLength: TEXT_LIMITS.slug })
+  .superRefine((slug, context) => {
+    const result = validateSlug(slug);
+    if (!result.ok) {
+      context.addIssue({
+        code: "custom",
+        message: `Invalid slug: ${result.reason}.`,
+        params: { code: result.reason },
+      });
+    }
+  });
+
+/** `POST /admin/product-types`. `optionGuidePage` omitted or `null`: no guide page. */
 export const createProductTypeSchema = z.strictObject({
   code: codeSchema,
   name: i18nTextSchema,
   requiresShipping: z.boolean().optional(),
+  optionGuidePage: optionGuidePageSchema.nullable().optional(),
 });
 
-/** `PATCH /admin/product-types/:id`. `code` is not accepted (400 unknown_field). */
+/** `PATCH /admin/product-types/:id`. `code` is not accepted (400 unknown_field); `optionGuidePage: null` clears it. */
 export const updateProductTypeSchema = z.strictObject({
   name: i18nTextSchema.optional(),
   requiresShipping: z.boolean().optional(),
+  optionGuidePage: optionGuidePageSchema.nullable().optional(),
 });
 
 export const listProductTypesQuerySchema = paginationQuerySchema;
@@ -42,6 +64,7 @@ export const productTypeResponseSchema = z.object({
   code: z.string(),
   name: i18nTextSchema,
   requiresShipping: z.boolean(),
+  optionGuidePage: z.string().nullable(),
   createdAt: timestampSchema,
   updatedAt: timestampSchema,
 });

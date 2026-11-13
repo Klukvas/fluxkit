@@ -31716,6 +31716,10 @@
                         "required": ["url", "alt", "optionValueId"],
                         "additionalProperties": false
                       }
+                    },
+                    "optionGuidePage": {
+                      "nullable": true,
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -31732,7 +31736,8 @@
                     "variants",
                     "price",
                     "availability",
-                    "media"
+                    "media",
+                    "optionGuidePage"
                   ],
                   "additionalProperties": false
                 }
@@ -36688,6 +36693,12 @@
                   },
                   "requiresShipping": {
                     "type": "boolean"
+                  },
+                  "optionGuidePage": {
+                    "nullable": true,
+                    "type": "string",
+                    "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+                    "maxLength": 160
                   }
                 },
                 "required": ["code", "name"],
@@ -36721,6 +36732,10 @@
                     "requiresShipping": {
                       "type": "boolean"
                     },
+                    "optionGuidePage": {
+                      "nullable": true,
+                      "type": "string"
+                    },
                     "createdAt": {
                       "type": "string",
                       "format": "date-time",
@@ -36732,7 +36747,15 @@
                       "description": "ISO 8601, UTC."
                     }
                   },
-                  "required": ["id", "code", "name", "requiresShipping", "createdAt", "updatedAt"],
+                  "required": [
+                    "id",
+                    "code",
+                    "name",
+                    "requiresShipping",
+                    "optionGuidePage",
+                    "createdAt",
+                    "updatedAt"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -36849,6 +36872,10 @@
                           "requiresShipping": {
                             "type": "boolean"
                           },
+                          "optionGuidePage": {
+                            "nullable": true,
+                            "type": "string"
+                          },
                           "createdAt": {
                             "type": "string",
                             "format": "date-time",
@@ -36865,6 +36892,7 @@
                           "code",
                           "name",
                           "requiresShipping",
+                          "optionGuidePage",
                           "createdAt",
                           "updatedAt"
                         ],
@@ -36978,6 +37006,10 @@
                     },
                     "requiresShipping": {
                       "type": "boolean"
+                    },
+                    "optionGuidePage": {
+                      "nullable": true,
+                      "type": "string"
                     },
                     "createdAt": {
                       "type": "string",
@@ -37228,6 +37260,7 @@
                     "code",
                     "name",
                     "requiresShipping",
+                    "optionGuidePage",
                     "createdAt",
                     "updatedAt",
                     "attributes",
@@ -37333,6 +37366,12 @@
                   },
                   "requiresShipping": {
                     "type": "boolean"
+                  },
+                  "optionGuidePage": {
+                    "nullable": true,
+                    "type": "string",
+                    "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+                    "maxLength": 160
                   }
                 },
                 "additionalProperties": false
@@ -37365,6 +37404,10 @@
                     "requiresShipping": {
                       "type": "boolean"
                     },
+                    "optionGuidePage": {
+                      "nullable": true,
+                      "type": "string"
+                    },
                     "createdAt": {
                       "type": "string",
                       "format": "date-time",
@@ -37376,7 +37419,15 @@
                       "description": "ISO 8601, UTC."
                     }
                   },
-                  "required": ["id", "code", "name", "requiresShipping", "createdAt", "updatedAt"],
+                  "required": [
+                    "id",
+                    "code",
+                    "name",
+                    "requiresShipping",
+                    "optionGuidePage",
+                    "createdAt",
+                    "updatedAt"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -37433,7 +37484,7 @@
             }
           }
         },
-        "summary": "Change a product type (name, requiresShipping; the code never changes)",
+        "summary": "Change a product type (name, requiresShipping, optionGuidePage; the code never changes)",
         "tags": ["admin-product-types"],
         "x-fluxkit-permission": "catalog.write"
       },

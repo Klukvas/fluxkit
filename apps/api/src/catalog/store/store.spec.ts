@@ -1068,7 +1068,23 @@ describe("store API (public, real app, real Postgres)", () => {
         ],
         price: { from: 1000, to: 1500, currency: "UAH" },
         availability: "in_stock",
+        optionGuidePage: null,
       });
+    });
+
+    // Plan 2026-11-13-product-type-guide-page: the product type's slug, as stored; the storefront decides whether it links it.
+    it("returns the guide page of the product's type", async () => {
+      await pool.query("update product_type set option_guide_page = 'size-guide' where id = $1", [
+        ids["type"],
+      ]);
+      try {
+        const product = await getOk<StoreProductDetail>(`/store/products/${slug("p1")}`);
+        expect(product.optionGuidePage).toBe("size-guide");
+      } finally {
+        await pool.query("update product_type set option_guide_page = null where id = $1", [
+          ids["type"],
+        ]);
+      }
     });
 
     it("resolves texts per field in en and falls back to uk only where en is missing", async () => {
@@ -1279,6 +1295,7 @@ describe("store API (public, real app, real Postgres)", () => {
           "description",
           "id",
           "media",
+          "optionGuidePage",
           "options",
           "price",
           "publishedAt",
