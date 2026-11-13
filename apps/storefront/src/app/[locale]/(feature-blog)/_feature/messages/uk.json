@@ -1,0 +1,15 @@
+{
+  "features.blog.nav": "Блог",
+  "features.blog.title": "Блог",
+  "features.blog.metaDescription": "Новини, поради та історії магазину.",
+  "features.blog.list.label": "Публікації",
+  "features.blog.empty.title": "Публікацій поки немає",
+  "features.blog.empty.description": "Зазирніть пізніше, а поки перегляньте каталог.",
+  "features.blog.empty.action": "До каталогу",
+  "features.blog.error": "Не вдалося завантажити публікації. Оновіть сторінку за хвилину.",
+  "features.blog.pagination.label": "Сторінки блогу",
+  "features.blog.pagination.previous": "Назад",
+  "features.blog.pagination.next": "Далі",
+  "features.blog.pagination.page": "Сторінка {page}",
+  "features.blog.back": "Усі публікації"
+}
