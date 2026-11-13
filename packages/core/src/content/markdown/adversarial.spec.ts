@@ -115,6 +115,28 @@ const ADVERSARIAL: readonly [string, string][] = [
   ["valid links", "[a](/x) "],
 ];
 
+/** A small deterministic generator (mulberry32), so a failing case is the same on every run. */
+function randomSource(seed: number): () => number {
+  let state = seed;
+  return () => {
+    state = (state + 0x6d2b79f5) | 0;
+    let mixed = Math.imul(state ^ (state >>> 15), 1 | state);
+    mixed = (mixed + Math.imul(mixed ^ (mixed >>> 7), 61 | mixed)) ^ mixed;
+    return ((mixed ^ (mixed >>> 14)) >>> 0) / 4_294_967_296;
+  };
+}
+
+const FUZZ_PIECES = [
+  ..."*_`[]()!\\#>-+.1 \t\n\r~|<a/:%",
+  "https://",
+  "/uk/",
+  "%0d",
+  "%E2%80%AE",
+  "\u202e",
+  "é",
+  "😀",
+];
+
 describe("parseMarkdown, adversarial input", () => {
   it.each(ADVERSARIAL)("%s: bounded output at the length limit", (_name, unit) => {
     expectBounded(parse(repeatTo(unit, MAX)));
@@ -133,6 +155,18 @@ describe("parseMarkdown, adversarial input", () => {
       expect(largeTime).toBeLessThan(1_000);
     },
   );
+
+  it("never throws and stays bounded on 2 000 random sources made of syntax characters", () => {
+    const random = randomSource(50);
+    for (let run = 0; run < 2_000; run += 1) {
+      const length = Math.floor(random() * 200);
+      let source = "";
+      for (let index = 0; index < length; index += 1) {
+        source += FUZZ_PIECES[Math.floor(random() * FUZZ_PIECES.length)] ?? "";
+      }
+      expectBounded(parse(source));
+    }
+  });
 
   it("refuses one character over the length limit, on line 1", () => {
     expect(parse("a".repeat(MAX)).ok).toBe(true);
