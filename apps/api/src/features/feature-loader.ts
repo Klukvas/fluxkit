@@ -2,6 +2,7 @@ import { access, readdir, readFile } from "node:fs/promises";
 import { join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import type { Type } from "@nestjs/common";
+import { MAX_FEATURE_NAME_LENGTH } from "@fluxkit/config";
 
 export interface LoadedFeature {
   name: string;
@@ -26,7 +27,8 @@ export const DEFAULT_FEATURES_DIR = fileURLToPath(
 
 const FEATURE_NAME = /^[a-z][a-z0-9-]*$/;
 
-async function readManifests(featuresDir: string): Promise<FeatureManifest[]> {
+/** Every feature package in `featuresDir` (manifests only, nothing imported); none when the folder does not exist. */
+export async function readManifests(featuresDir: string): Promise<FeatureManifest[]> {
   let entries: string[];
   try {
     entries = await readdir(featuresDir);
@@ -64,9 +66,9 @@ async function readManifests(featuresDir: string): Promise<FeatureManifest[]> {
     if (name === undefined) {
       continue;
     }
-    if (!FEATURE_NAME.test(name)) {
+    if (!FEATURE_NAME.test(name) || name.length > MAX_FEATURE_NAME_LENGTH) {
       throw new Error(
-        `Invalid feature name "${name}" in ${manifestPath}. Use lowercase letters, digits and dashes.`,
+        `Invalid feature name "${name}" in ${manifestPath}. Use lowercase letters, digits and dashes, at most ${MAX_FEATURE_NAME_LENGTH} characters.`,
       );
     }
     const duplicate = manifests.find((existing) => existing.name === name);

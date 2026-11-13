@@ -125,6 +125,14 @@ describe("loadFeatures", () => {
     );
   });
 
+  it("rejects a manifest name longer than 32 characters (its migrations table would not fit)", async () => {
+    const long = "a".repeat(33);
+    await writeFeature("long", long, "export const featureModule = class {};\n");
+    await expect(loadFeatures({ enabled: [long], featuresDir: dir })).rejects.toThrow(
+      /Invalid feature name "a{33}".*at most 32 characters/,
+    );
+  });
+
   it("names the file when a package.json cannot be parsed", async () => {
     await mkdir(join(dir, "broken"), { recursive: true });
     await writeFile(join(dir, "broken", "package.json"), "{ not json");

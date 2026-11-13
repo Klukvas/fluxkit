@@ -7,16 +7,25 @@ export const MIGRATIONS_SCHEMA = "drizzle";
 /** The core migrations table (Drizzle's default name). */
 export const CORE_MIGRATIONS_TABLE = "__drizzle_migrations";
 
+/** The prefix every feature migrations table starts with (for the test database reset). */
+export const FEATURE_MIGRATIONS_TABLE_PREFIX = "__drizzle_migrations_feature_";
+
 /**
  * The migrations table of one feature (ADR 0049): `drizzle.__drizzle_migrations_feature_<name>`, a dash of the name
  * written as an underscore (feature names are lowercase letters, digits and dashes, so the mapping is one to one).
  */
 export function featureMigrationsTable(featureName: string): string {
-  return `__drizzle_migrations_feature_${featureName.replaceAll("-", "_")}`;
+  const table = `${FEATURE_MIGRATIONS_TABLE_PREFIX}${featureName.replaceAll("-", "_")}`;
+  // Postgres silently cuts identifiers at 63 bytes; two long names could then share one table. FEATURES_ENABLED and the
+  // loader cap names at MAX_FEATURE_NAME_LENGTH, so this only fires for a caller that skipped them.
+  if (
+    !/^[a-z][a-z0-9_]*$/.test(featureName.replaceAll("-", "_")) ||
+    Buffer.byteLength(table) > 63
+  ) {
+    throw new Error(`Feature name "${featureName}" cannot name a migrations table (${table}).`);
+  }
+  return table;
 }
-
-/** The prefix every feature migrations table starts with (for the test database reset). */
-export const FEATURE_MIGRATIONS_TABLE_PREFIX = "__drizzle_migrations_feature_";
 
 export interface JournalEntry {
   tag: string;
