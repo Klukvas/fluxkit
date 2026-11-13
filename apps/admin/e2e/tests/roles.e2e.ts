@@ -17,6 +17,16 @@ test("the viewer browses the catalog read-only and is not allowed in orders", as
 }) => {
   await signIn("viewer");
   const nav = page.getByRole("navigation", { name: "Admin sections" });
+  for (const action of ["Collapse panel", "Expand panel"]) {
+    await expect(nav.getByRole("link", { name: "Start", exact: true })).toBeVisible();
+    await expect(nav.getByRole("link", { name: "Admin users" })).toHaveCount(0);
+    await expect(
+      page
+        .getByRole("navigation", { name: "Help", exact: true })
+        .getByRole("link", { name: "Help", exact: true }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: action, exact: true }).click();
+  }
   await expect(nav.getByRole("link", { name: "Products" })).toBeVisible();
   await expect(nav.getByRole("link", { name: "Categories" })).toBeVisible();
   // The Search status and synonym groups are read with catalog.read (the viewer's pages: `search.e2e.ts`).
@@ -117,6 +127,16 @@ test("the manager has no users area but manages shipping and email", async ({
 }) => {
   await signIn("manager");
   const nav = page.getByRole("navigation", { name: "Admin sections" });
+  for (const action of ["Collapse panel", "Expand panel"]) {
+    await expect(nav.getByRole("link", { name: "Start", exact: true })).toBeVisible();
+    await expect(nav.getByRole("link", { name: "Admin users" })).toHaveCount(0);
+    await expect(
+      page
+        .getByRole("navigation", { name: "Help", exact: true })
+        .getByRole("link", { name: "Help", exact: true }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: action, exact: true }).click();
+  }
   await expect(nav.getByRole("link", { name: "Shipping" })).toBeVisible();
   await expect(nav.getByRole("link", { name: "Email" })).toBeVisible();
   await expect(nav.getByRole("link", { name: "Orders" })).toBeVisible();

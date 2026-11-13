@@ -315,7 +315,7 @@ export const test = base.extend<Fixtures>({
       const { email, password } = CREDENTIALS[role];
       await AdminApi.signIn(target.context().request, email, password);
       await target.goto(`${SPA}/`);
-      await expect(target.getByRole("button", { name: "Sign out" })).toBeVisible();
+      await expect(target.getByRole("button", { name: "Account menu", exact: true })).toBeVisible();
       return target;
     });
   },
@@ -341,7 +341,7 @@ export const test = base.extend<Fixtures>({
       const { email, password } = CREDENTIALS[role];
       await AdminApi.signIn(context.request, email, password);
       await page.goto(`${SPA}/`);
-      await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Account menu", exact: true })).toBeVisible();
       return page;
     });
     for (const context of contexts) await context.close();

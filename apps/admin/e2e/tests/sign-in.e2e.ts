@@ -70,6 +70,7 @@ test("sign in with the form, land on the requested page, sign out", async ({ pag
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`${SPA}/orders$`));
   await expect(page.getByRole("heading", { level: 1, name: "Orders" })).toBeVisible();
+  await page.getByRole("button", { name: "Account menu", exact: true }).click();
   await expect(page.getByText(`Signed in as ${CREDENTIALS.manager.email}`)).toBeVisible();
 
   await page.getByRole("button", { name: "Sign out" }).click();

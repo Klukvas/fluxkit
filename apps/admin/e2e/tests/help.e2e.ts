@@ -11,8 +11,8 @@ import { expect, test } from "../support/fixtures.ts";
 
 async function openHelp(page: Page): Promise<void> {
   await page
-    .getByRole("navigation", { name: "Admin sections" })
-    .getByRole("link", { name: "Help" })
+    .getByRole("navigation", { name: "Help", exact: true })
+    .getByRole("link", { name: "Help", exact: true })
     .click();
   await expect(page).toHaveURL(new RegExp(`${SPA}/help$`));
   await expect(page.getByRole("heading", { level: 1, name: "Help" })).toBeFocused();
@@ -35,8 +35,8 @@ test("Help: open it from the navigation, search in English and Ukrainian, read a
   await expect(page).toHaveURL(/[?&]q=refund/);
   // The navigation's Help link drops `?q`: the box and the results follow the URL (review of PR 212).
   await page
-    .getByRole("navigation", { name: "Admin sections" })
-    .getByRole("link", { name: "Help" })
+    .getByRole("navigation", { name: "Help", exact: true })
+    .getByRole("link", { name: "Help", exact: true })
     .click();
   await expect(page).toHaveURL(new RegExp(`${SPA}/help$`));
   await expect(box).toHaveValue("");
