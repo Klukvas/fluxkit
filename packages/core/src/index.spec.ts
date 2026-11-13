@@ -321,6 +321,23 @@ describe("public entry point", () => {
     expect(core.BANNER_TONES).toEqual(["surface", "accent"]);
   });
 
+  it("exports the safe Markdown parser and its limits, not its internals (ADR 0050)", () => {
+    for (const name of ["parseMarkdown", "checkMarkdownLink", "markdownPlainText"] as const) {
+      expect(typeof core[name], name).toBe("function");
+    }
+    expect(core.MARKDOWN_LIMITS.maxNodes).toBe(20_000);
+    expect(core.MARKDOWN_LIMITS.maxSerializedBytes).toBe(262_144);
+    for (const internal of [
+      "parseInline",
+      "parseBlocks",
+      "MarkdownFailure",
+      "ParseBudget",
+      "EmphasisStack",
+    ]) {
+      expect(internal in core, internal).toBe(false);
+    }
+  });
+
   it("exports the new admin permissions", () => {
     for (const permission of [
       "orders.read",

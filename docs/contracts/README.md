@@ -13,6 +13,7 @@ Existing:
 - `events.md` - domain events (the outbox), the handler metadata key, the delivery rules and the order ports.
 - `email-templates.md` - mail templates: the template contract, the registration metadata, the override rule and the built-in keys.
 - `personal-data-export.md` - the personal data export document `fluxkit.personal-data-export/v1` (builder only; no route yet).
+- `markdown.md` - safe Markdown (blog plan E9, ADR 0050): the "Fluxkit Markdown" syntax, `parseMarkdown`, the `MarkdownDocument` AST, its error codes and limits, and the `MarkdownView` component of `@fluxkit/ui`.
 - `search.md` - catalog search: routes, facet keys, sort names, limits, the public data rule and what is not contract.
 - `slots.md` - storefront UI slots: the four server-only slots (`header.top`, `product-card.badges`, `product-card.actions`, `footer.columns`), their view-model props and the fork-owned `config/slots.tsx` (draft).
 - `theme-tokens.md` - design tokens.
