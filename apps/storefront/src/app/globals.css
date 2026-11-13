@@ -213,6 +213,14 @@
   .fk-sort-summary::-webkit-details-marker {
     display: none;
   }
+  /*
+   * The sort's panel (`sort-menu.tsx`), anchored at the summary's end: as wide as its longest sort and at least the summary,
+   * at most 72 spacing units and never wider than the screen less a 4-unit gutter on each side, so it stays on a 320 px phone.
+   */
+  .fk-sort-panel {
+    @apply absolute end-0 top-full z-30 mt-1 w-max min-w-full rounded-control border border-border bg-background p-1 shadow-overlay;
+    max-width: min(calc(var(--fk-space-unit) * 72), calc(100vw - var(--fk-space-unit) * 8));
+  }
   /* A bar fixed or stuck to the bottom of a phone screen keeps clear of the home indicator. */
   .fk-bottom-bar {
     padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0));
@@ -255,8 +263,10 @@ body {
 
 /*
  * Thin scrollbars in the theme's colours (plan 2026-11-13-storefront-ui-round-4 B): the page and every scrolling panel (filter
- * lists, the filter sheet, suggestion lists, the product summary). The thumb is `--color-border-input` on a `--color-background` track, the
- * pair the theme's contrast test already holds to 3:1 in every mode (`packages/theme/src/contrast.spec.ts`), so no new token.
+ * lists, the filter sheet, suggestion lists, the product summary). The thumb is `--color-border-input` on a `--color-background`
+ * track, the pair the theme's contrast test already holds to 3:1 in every mode (`packages/theme/src/contrast.spec.ts`), so no
+ * new token. The track is the page background colour ON PURPOSE, also in a panel with a `muted` background (it then shows a
+ * page-coloured track): any other track colour would be a pair that test does not check.
  * `scrollbar-color` is inherited from the root; `scrollbar-width` is not, hence the universal selector. In a base layer, so
  * a utility on an element still wins.
  */

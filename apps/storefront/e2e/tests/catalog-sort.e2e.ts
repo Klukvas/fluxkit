@@ -69,10 +69,12 @@ test("the sort opens by keyboard, a sort is chosen with Tab and Enter, and Escap
   );
 });
 
-test("the open panel fits a 320 px screen", async ({ page }) => {
+test("the open panel fits a 320 px screen next to the filters button", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 640 });
   // The panel is native (`<details>`): it opens the same before and after hydration.
   await page.goto("/uk/catalog");
+  // Below `lg` the sort shares its row with "Filters" (the layout where the panel has the least room).
+  await expect(page.getByRole("link", { name: "Фільтри", exact: true })).toBeVisible();
   const summary = page.getByRole("button", { name: /^Сортування / });
   await summary.click();
   const panel = page.locator("details").filter({ has: summary }).getByRole("list");

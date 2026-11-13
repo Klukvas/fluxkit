@@ -103,7 +103,7 @@ export function SortMenu({
           </span>
           <ChevronDownIcon className="fk-chevron ms-auto shrink-0" />
         </summary>
-        <ul className="absolute end-0 top-full z-30 mt-1 w-max min-w-full max-w-72 rounded-control border border-border bg-background p-1 shadow-overlay">
+        <ul className="fk-sort-panel">
           {choices.map((choice) => {
             const Icon = SORT_ICONS[choice.value];
             const isCurrent = choice.value === current.value;
