@@ -163,7 +163,7 @@ until both support it and `pnpm lint` and `pnpm check:boundaries` are verified; 
   /admin             # React SPA (Vite): admin areas; e2e in /e2e
 /packages
   /core              # pure domain rules (docs/files/core.md): catalog, pricing, inventory, cart, orders, auth, media, shipping, email, payments, privacy, search
-  /features          # optional modules, one package each (only the sample `_example` so far)
+  /features          # optional modules, one package each (only the sample `_example` so far); their UI slices live in the apps (2.1)
   /providers         # provider plugins: nova-post, resend (email), monobank (payments), test-only fakes `_fake`, `_fake-email`, `_fake-payment`
   /ui                # token-based component library (shared by storefront and admin)
   /theme             # design tokens + tests/guards
