@@ -99,8 +99,12 @@ export interface MarkdownDocument {
   readonly children: readonly MarkdownBlock[];
 }
 
-/** Why a link target is refused: the banner link rule's reasons, plus control and bidi characters (raw or percent-encoded). */
-export type MarkdownLinkRefusal = BannerLinkRefusal | "control_character" | "bidi_control";
+/**
+ * Why a link target is refused: the banner link rule's reasons, plus control, bidi control and invisible format characters
+ * (raw or percent-encoded).
+ */
+export type MarkdownLinkRefusal =
+  BannerLinkRefusal | "control_character" | "bidi_control" | "format_character";
 
 export type MarkdownErrorCode =
   /** NUL anywhere in the source. */

@@ -21,12 +21,27 @@ function isBidiControl(code: number): boolean {
   );
 }
 
+/**
+ * Invisible format characters (soft hyphen, zero-width space, joiners, word joiner, BOM, Mongolian vowel separator): the
+ * address would differ from what the admin sees (`exa\u00ADmple.com`).
+ */
+function isFormatCharacter(code: number): boolean {
+  return (
+    code === 0x00ad ||
+    (code >= 0x200b && code <= 0x200d) ||
+    code === 0x2060 ||
+    code === 0xfeff ||
+    code === 0x180e
+  );
+}
+
 function hasCharacter(text: string, matches: (code: number) => boolean): boolean {
   for (let index = 0; index < text.length; index += 1) {
     if (matches(text.charCodeAt(index))) return true;
   }
   return false;
 }
+
 /**
  * The same characters percent-encoded as UTF-8 (one decoding, like a browser): C0 and DEL (`%00`-`%1F`, `%7F`), C1 (`%C2%80`-
  * `%C2%9F`), the line and paragraph separators U+2028/U+2029, and the bidi controls above. Fixed-length alternatives only, so
@@ -34,11 +49,12 @@ function hasCharacter(text: string, matches: (code: number) => boolean): boolean
  */
 const ENCODED_CONTROL = /%(?:[01][0-9a-f]|7f|c2%[89][0-9a-f]|e2%80%a[89])/iu;
 const ENCODED_BIDI = /%(?:d8%9c|e2%80%(?:8[ef]|a[a-e])|e2%81%a[6-9])/iu;
+const ENCODED_FORMAT = /%(?:c2%ad|e2%80%8[b-d]|e2%81%a0|ef%bb%bf|e1%a0%8e)/iu;
 
 /**
  * The link rule of a Markdown body (ADR 0050): the home banner rule (`checkBannerLink`: a storefront path without `//`, dot
  * segments or a locale prefix, or an `https` address with a host and no credentials), with the scheme written exactly
- * `https://`, and no control or bidi control character, raw or percent-encoded.
+ * `https://`, and no control, bidi control or invisible format character, raw or percent-encoded.
  */
 export function checkMarkdownLink(href: string, locales: readonly string[]): MarkdownLinkResult {
   if (hasCharacter(href, isControl) || ENCODED_CONTROL.test(href)) {
@@ -46,6 +62,9 @@ export function checkMarkdownLink(href: string, locales: readonly string[]): Mar
   }
   if (hasCharacter(href, isBidiControl) || ENCODED_BIDI.test(href)) {
     return { ok: false, reason: "bidi_control" };
+  }
+  if (hasCharacter(href, isFormatCharacter) || ENCODED_FORMAT.test(href)) {
+    return { ok: false, reason: "format_character" };
   }
   if (href !== "" && !href.startsWith("/") && !href.startsWith("https://")) {
     return { ok: false, reason: "not_path_or_https" };

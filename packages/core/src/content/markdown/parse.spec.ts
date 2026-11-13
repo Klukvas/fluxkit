@@ -194,6 +194,7 @@ const CASES: readonly [string, string, MarkdownDocument][] = [
   ["a paragraph after a list", "- a\n\nb", doc(ul(li(p(text("a")))), p(text("b")))],
   ["code fence in a list item", "- ```\n  x\n  ```", doc(ul(li(pre("x"))))],
   ["four spaces of indentation are no code block", "    a", doc(p(text("a")))],
+  ["a leading BOM is text, so # after it is no heading", "﻿# x", doc(p(text("﻿# x")))],
   ["CRLF line ends", "a\r\nb\r\n\r\nc", doc(p(text("a\nb")), p(text("c")))],
   ["lone CR line ends", "## a\rb", doc(h(2, text("a")), p(text("b")))],
   ["bidi controls in text are kept", "a‮b⁦c", doc(p(text("a‮b⁦c")))],
@@ -284,6 +285,16 @@ const REFUSALS: readonly [string, string, MarkdownError][] = [
     "encoded U+2066 in a target",
     "[a](/x%e2%81%a6)",
     { code: "link_refused", line: 1, reason: "bidi_control" },
+  ],
+  [
+    "soft hyphen inside a host",
+    "[a](https://exa\u00admple.com)",
+    { code: "link_refused", line: 1, reason: "format_character" },
+  ],
+  [
+    "encoded zero-width space in a target",
+    "[a](/x%E2%80%8B)",
+    { code: "link_refused", line: 1, reason: "format_character" },
   ],
   [
     "refused link in a list item",

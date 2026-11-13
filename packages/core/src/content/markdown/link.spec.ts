@@ -79,6 +79,21 @@ const REFUSED: readonly [string, MarkdownLinkRefusal][] = [
   ["/catalog%E2%81%A6", "bidi_control"],
   ["/catalog%E2%81%A9", "bidi_control"],
   ["/catalog%D8%9C", "bidi_control"],
+  // Invisible format characters (review 2026-11-13): the address would differ from what the admin sees.
+  ["https://exa\u00admple.com", "format_character"],
+  ["/catalog\u200b", "format_character"],
+  ["/catalog\u200c", "format_character"],
+  ["/catalog\u200d", "format_character"],
+  ["/catalog\u2060", "format_character"],
+  ["/catalog\ufeff", "format_character"],
+  ["/catalog\u180e", "format_character"],
+  ["https://exa%C2%ADmple.com", "format_character"],
+  ["/catalog%e2%80%8b", "format_character"],
+  ["/catalog%E2%80%8C", "format_character"],
+  ["/catalog%E2%80%8D", "format_character"],
+  ["/catalog%E2%81%A0", "format_character"],
+  ["/catalog%EF%BB%BF", "format_character"],
+  ["/catalog%e1%a0%8e", "format_character"],
 ];
 
 describe("checkMarkdownLink", () => {
@@ -90,7 +105,7 @@ describe("checkMarkdownLink", () => {
     expect(checkMarkdownLink(href, LOCALES)).toEqual({ ok: false, reason });
   });
 
-  it("keeps percent-encoded characters that are neither controls nor bidi controls", () => {
+  it("keeps percent-encoded characters that are neither controls, bidi controls nor format characters", () => {
     // U+2028 / U+2029 are refused, their neighbours U+2027 and U+202F are not; U+2065 and U+206A border the isolates.
     for (const href of [
       "/a%E2%80%A7",
@@ -98,6 +113,12 @@ describe("checkMarkdownLink", () => {
       "/a%E2%81%A5",
       "/a%E2%81%AA",
       "/a%C2%A0",
+      // Neighbours of the format characters: U+00AC, U+200A, U+2061, U+FEFE, U+180F.
+      "/a%C2%AC",
+      "/a%E2%80%8A",
+      "/a%E2%81%A1",
+      "/a%EF%BB%BE",
+      "/a%E1%A0%8F",
       "/a%20b",
     ]) {
       expect(checkMarkdownLink(href, LOCALES), href).toEqual({ ok: true, kind: "path" });
