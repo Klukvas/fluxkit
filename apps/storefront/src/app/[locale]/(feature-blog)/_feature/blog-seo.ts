@@ -93,6 +93,16 @@ export function postAlternates(origin: string, locale: Locale, post: BlogPost) {
   });
 }
 
+/**
+ * The post's last change for crawlers: `updatedAt`, but never before `publishedAt`. The API stamps `updatedAt` before it sets the
+ * publish date of a first publish (milliseconds earlier), and a post scheduled ahead was last saved before it went live.
+ */
+export function postModifiedTime(post: Pick<BlogPost, "publishedAt" | "updatedAt">): string {
+  return Date.parse(post.updatedAt) < Date.parse(post.publishedAt)
+    ? post.publishedAt
+    : post.updatedAt;
+}
+
 /** `seoDescription`, else the excerpt, else the start of the body: plain text of at most 160 characters. */
 export function postDescription(post: BlogPost): string | undefined {
   return trimDescription(post.seoDescription ?? post.excerpt ?? documentText(post.content));
@@ -127,7 +137,7 @@ export function blogPostMetadata(input: BlogPostMetadataInput): Metadata {
       siteName: t("site.name"),
       type: "article",
       publishedTime: post.publishedAt,
-      modifiedTime: post.updatedAt,
+      modifiedTime: postModifiedTime(post),
       ...(coverUrl === null || post.cover === null
         ? brandImages(input.origin, t, input.ogImage)
         : {
@@ -189,7 +199,7 @@ export function blogPostingJsonLd(input: BlogPostingJsonLdInput): object {
     ...(description === undefined ? {} : { description }),
     ...(image === null ? {} : { image: [image] }),
     datePublished: post.publishedAt,
-    dateModified: post.updatedAt,
+    dateModified: postModifiedTime(post),
     inLanguage: input.locale,
     wordCount: wordCount(documentText(post.content)),
     url,

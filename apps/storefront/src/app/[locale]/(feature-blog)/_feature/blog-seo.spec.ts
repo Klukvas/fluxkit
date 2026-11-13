@@ -9,6 +9,7 @@ import {
   blogListMetadata,
   blogPostMetadata,
   blogPostingJsonLd,
+  postModifiedTime,
 } from "./blog-seo";
 
 const { uk, en } = messagesByLocale;
@@ -134,6 +135,33 @@ describe("blogPostMetadata", () => {
     });
     expect(brandOnly.openGraph).toMatchObject({
       images: [{ url: "https://shop.example/brand/og.png", alt: shopName }],
+    });
+  });
+});
+
+describe("postModifiedTime", () => {
+  it("is the last change, never before the publish date (first publish, a post scheduled ahead)", () => {
+    expect(postModifiedTime(post)).toBe(post.updatedAt);
+    const scheduled = {
+      publishedAt: "2026-12-01T00:00:00.000Z",
+      updatedAt: "2026-11-01T00:00:00.000Z",
+    };
+    expect(postModifiedTime(scheduled)).toBe(scheduled.publishedAt);
+    const stamped = {
+      ...post,
+      publishedAt: "2026-11-13T21:42:28.373Z",
+      updatedAt: "2026-11-13T21:42:28.370Z",
+    };
+    expect(
+      blogPostingJsonLd({ origin, locale: "uk", t, post: stamped, logo: textLogo }),
+    ).toMatchObject({
+      datePublished: stamped.publishedAt,
+      dateModified: stamped.publishedAt,
+    });
+    expect(
+      blogPostMetadata({ origin, locale: "uk", t, post: stamped, ogImage }).openGraph,
+    ).toMatchObject({
+      modifiedTime: stamped.publishedAt,
     });
   });
 });
