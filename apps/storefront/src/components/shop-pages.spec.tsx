@@ -2,6 +2,8 @@ import { createTranslator, type Translator } from "@fluxkit/ui";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { footerConfig } from "../config/footer";
+import { headerConfig } from "../config/header";
+import { headerHasThemeControl } from "../layout/header-layout";
 import { LEGAL_PLACEHOLDER_MARKER, legalPages, withoutLegalMarker } from "../config/legal";
 import { shopPages, type ShopPageConfig } from "../config/shop-pages";
 import { footerShopLinks } from "../layout/navigation";
@@ -18,9 +20,11 @@ import { StoreTrustBar } from "./trust-bar";
 // Independent of what a fork puts in `config/slots.tsx` (plan S1) and `config/footer.ts` (plan L3, for example the four-column
 // recipe without the navigation and contacts blocks): this spec checks the template's own footer, so both files are the
 // template defaults here (`test-support/template-defaults.ts`). Where the slots render, and that empty slots add nothing, is
-// `slot-places.spec.tsx`; filled slots and footer config, the fork run (`vitest.brand-fork.config.ts`).
+// `slot-places.spec.tsx`; filled slots and footer config, the fork run (`vitest.brand-fork.config.ts`). `config/header.ts` too:
+// the template's footer leaves the theme switch to the header's `theme` control (round 4), which the footer checks.
 vi.mock("../config/slots", () => import("../test-support/template-defaults"));
 vi.mock("../config/footer", () => import("../test-support/template-defaults"));
+vi.mock("../config/header", () => import("../test-support/template-defaults"));
 
 const { uk, en } = messagesByLocale;
 
@@ -210,7 +214,10 @@ describe("the footer", () => {
     expect(empty.match(/<ul/g)?.length ?? 0).toBe(
       (withShopPages.match(/<ul/g)?.length ?? 0) - (shopListShown ? 1 : 0),
     );
-    expect(empty).toContain('class="fk-theme-option"');
+    // The theme switch stays reachable: in the footer, or (the template since round 4) as the header's `theme` control.
+    const switchInFooter = footerConfig.blocks.includes("themeSwitch");
+    expect(empty.includes('class="fk-theme-option"')).toBe(switchInFooter);
+    expect(switchInFooter || headerHasThemeControl(headerConfig)).toBe(true);
   });
 });
 

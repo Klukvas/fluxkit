@@ -13,7 +13,8 @@ import type { SlotRegistry } from "../lib/slots";
  *   vi.mock("../config/footer", () => import("../test-support/template-defaults"));
  *
  * (The factory imports this module itself: a `vi.mock` call is hoisted above the spec's imports, so it cannot use an import.)
- * Upstream-owned; the copies here equal the files upstream ships, which upstream never edits after creating them. Each copy is
+ * Upstream-owned; the copies here equal the files upstream ships (upstream edits those only with a contract change, as the
+ * header and footer defaults in round 4, 2026-11-13; this copy changes in the same commit). Each copy is
  * compared with its real file by an UPSTREAM-ONLY spec (a fork deletes it once it changes that file, `docs/customization.md`
  * step 0): `headerConfig` and `footerConfig` by `components/header-footer-defaults.upstream.spec.tsx`, `slots` by
  * `config/slots.upstream.spec.ts`, `customCards` by `components/cards/custom.upstream.spec.ts`. Both fork runs
@@ -24,8 +25,9 @@ import type { SlotRegistry } from "../lib/slots";
 /** `config/header.ts` as the template ships it. */
 export const headerConfig: HeaderConfig = {
   blocks: ["menu", "logo", "navigation", "search", "controls"],
-  controls: ["language", "cart", "account"],
+  controls: ["language", "theme", "cart", "account"],
   navigation: {
+    display: "picker",
     categoryLimit: 6,
     links: [{ labelKey: "nav.catalog", href: "/catalog" }],
   },
@@ -33,7 +35,8 @@ export const headerConfig: HeaderConfig = {
 
 /** `config/footer.ts` as the template ships it. */
 export const footerConfig: FooterConfig = {
-  blocks: ["navigation", "contacts", "themeSwitch", "copyright"],
+  layout: "columns",
+  blocks: ["navigation", "contacts", "copyright"],
   navigation: {
     groups: [{ kind: "shopPages" }, { kind: "legal" }],
   },

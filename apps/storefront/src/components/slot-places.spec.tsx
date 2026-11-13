@@ -12,7 +12,8 @@ import type {
 } from "../lib/slots";
 import { summary } from "../lib/test-fixtures";
 // The template's footer composition, passed explicitly: the fork runs swap `config/footer.ts`.
-import { footerConfig } from "../test-support/template-defaults";
+import { headerHasThemeControl } from "../layout/header-layout";
+import { footerConfig, headerConfig } from "../test-support/template-defaults";
 import { resolveCard } from "./cards/registry";
 import { I18nProvider } from "./i18n-provider";
 import { SessionProvider } from "./session-provider";
@@ -65,7 +66,7 @@ function renderHeader(): string {
     renderToStaticMarkup(
       <I18nProvider locale="uk" messages={sentinelMessages}>
         <SessionProvider locale="uk">
-          <SiteHeader locale="uk" t={t} categories={[]} searchEnabled />
+          <SiteHeader locale="uk" t={t} categories={[]} searchEnabled themeMode="light" />
         </SessionProvider>
       </I18nProvider>,
     ),
@@ -92,6 +93,8 @@ function renderFooter(): string {
           year={2026}
           themeMode="light"
           showThemeSwitch
+          // The template's footer leaves the switch to the template header's `theme` control (round 4).
+          themeInHeader={headerHasThemeControl(headerConfig)}
           shopLinks={shopLinks}
           contacts={contacts}
           config={footerConfig}
@@ -174,7 +177,10 @@ describe("footer.columns", () => {
     const column =
       '<div data-column="">§footer.nav.label|§shopPages.about.title=/uk/about|legal|hello@example.com</div>';
     const filled = renderFooter();
-    expect(filled).toBe(insertBefore(empty, "<nav", `<div class="grid gap-6">${column}</div>`));
+    // The first child of the footer's container, in the `stack` and the `columns` layout alike.
+    const container = /^<footer class="fk-site-footer"><div [^>]*>/.exec(empty)?.[0];
+    if (container === undefined) throw new Error("no footer container");
+    expect(filled).toBe(insertAfter(empty, container, `<div class="grid gap-6">${column}</div>`));
   });
 
   it("lays out up to four columns side by side from the small breakpoint, more wrap into rows of four", () => {
