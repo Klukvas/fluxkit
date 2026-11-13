@@ -94,12 +94,12 @@ export function GridCard({ card, headingLevel: Heading, eager, locale, t }: Card
           <VisuallyHidden>{availability.text}</VisuallyHidden>
         ) : null}
       </div>
-      {card.purchase === null ? (
-        // Nothing to buy (the badge says why): the action's row stays, empty, so the prices of a row of cards share one line.
-        <div aria-hidden="true" className="min-h-11" />
-      ) : (
+      {/* The action's slot has one height in every card of a row, so the prices share one line: room for a label wrapped onto
+          two lines in the two-column phone grid (60 px), one line from `md` (44 px). Empty when there is nothing to buy (the
+          badge says why). */}
+      <div className="flex min-h-15 flex-col md:min-h-11">
         <CardPurchaseAction card={card} />
-      )}
+      </div>
       {availabilityBadge}
     </article>
   );

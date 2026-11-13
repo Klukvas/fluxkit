@@ -19,7 +19,10 @@ Accessibility rules every kind keeps (the built-in kinds are the reference): one
 the brand link above that layer, the price with `priceLabel`, availability as a badge only when `badge` is true (else visually hidden text),
 the heading level given by `headingLevel`, no action inside the product link. The purchase action (since 2026-11-13) is a sibling of the title link,
 above its layer (`relative z-10`), at least 44 px high, its name the visible label plus the product title (visually hidden). A product with several
-variants gets a second link to its page ("choose options"), the only other link to the product.
+variants gets a second link to its page ("choose options"), so such a card has TWO links to the same product page with different names:
+the title ("Demo Linen Shirt") and the action ("Choose options Demo Linen Shirt"); a test that finds the title link by name uses an exact
+match. The add button of a one-variant product is, until the island hydrates (and without a script), a link to the product page with the
+same words and size, so it never sits there disabled.
 
 Card slots (`docs/contracts/slots.md`, since PR-H): the built-in `grid` and `list` cards render the `product-card.badges` and
 `product-card.actions` slots of `config/slots.tsx`. A fork's own card kind (or an override of `grid` or `list` in `cards/custom.ts`) gets

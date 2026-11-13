@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { Failure } from "../lib/failure";
 import { cartOf } from "../lib/test-fixtures";
 import {
+  addOnce,
   CardAddButtonView,
   statusAfterAdd,
   type CardAddButtonViewProps,
@@ -16,6 +17,7 @@ const t = sentinelTranslator();
 function view(status: CardAddStatus, overrides: Partial<CardAddButtonViewProps> = {}) {
   const props: CardAddButtonViewProps = {
     title: "§mug",
+    href: "/uk/p/mug",
     status,
     ready: true,
     t,
@@ -45,21 +47,19 @@ describe("the card's add-to-cart button", () => {
     expect(leftoverText(html)).toBe("");
   });
 
-  it("is disabled before hydration, when a tap could not reach the cart yet", () => {
+  it("before hydration (and without a script) is a working link to the product page instead: one control, same words and size", () => {
     const { html } = view({ state: "idle" }, { ready: false });
-    expect(html).toContain('disabled=""');
-    expect(html).toContain('data-ready="false"');
+    expect(html).not.toContain("<button");
+    expect(html).toMatch(
+      /^<div class="relative z-10 flex flex-col"><a class="[^"]*min-h-11[^"]*" href="\/uk\/p\/mug"><span>§product\.addToCart<\/span> <span class="sr-only">§mug<\/span><\/a><p role="status" class="text-sm"><\/p><\/div>$/,
+    );
   });
 
-  it("while adding: says so, stays focusable (aria-disabled, aria-busy) and ignores a repeat", () => {
-    const onAdd = vi.fn();
-    const { html, props } = view({ state: "pending" }, { onAdd });
+  it("while adding: says so and stays focusable (aria-disabled, aria-busy, never disabled)", () => {
+    const { html } = view({ state: "pending" });
     expect(html).toContain('aria-disabled="true" aria-busy="true"');
     expect(html).not.toContain('disabled=""');
     expect(html).toContain("§product.card.adding");
-    const [button] = findElements(CardAddButtonView(props), (element) => element.type === Button);
-    (button?.props.onClick as () => void)();
-    expect(onAdd).not.toHaveBeenCalled();
   });
 
   it("adds on a click when idle", () => {
@@ -85,6 +85,35 @@ describe("the card's add-to-cart button", () => {
     );
     expect(html).toContain("<span>§product.addToCart</span>");
     expect(html).toContain('aria-disabled="false"');
+  });
+});
+
+describe("addOnce (the island's in-flight guard)", () => {
+  it("sends one add for two rapid clicks, and adds again once the first is answered", async () => {
+    let answer: () => void = () => undefined;
+    const add = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          answer = resolve;
+        }),
+    );
+    const inFlight = { current: false };
+    const first = addOnce(inFlight, add);
+    const second = addOnce(inFlight, add);
+    expect(add).toHaveBeenCalledTimes(1);
+    answer();
+    await Promise.all([first, second]);
+    expect(inFlight.current).toBe(false);
+    const third = addOnce(inFlight, add);
+    expect(add).toHaveBeenCalledTimes(2);
+    answer();
+    await third;
+  });
+
+  it("frees the guard when the add throws, and lets the error through", async () => {
+    const inFlight = { current: false };
+    await expect(addOnce(inFlight, () => Promise.reject(new Error("bug")))).rejects.toThrow("bug");
+    expect(inFlight.current).toBe(false);
   });
 });
 

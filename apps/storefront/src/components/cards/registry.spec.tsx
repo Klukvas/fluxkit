@@ -129,19 +129,19 @@ function LegacyProductCard({
           <VisuallyHidden>{t(availability.messageKey)}</VisuallyHidden>
         ) : null}
       </div>
-      {!purchasable ? (
-        <div aria-hidden="true" className="min-h-11" />
-      ) : product.defaultVariantId === null ? (
-        <Link
-          href={href}
-          className={`relative z-10 inline-flex min-h-11 w-full items-center justify-center rounded-control border border-border bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-muted ${focusRing}`}
-        >
-          <span>{t("product.card.chooseOptions")}</span>{" "}
-          <VisuallyHidden>{product.title}</VisuallyHidden>
-        </Link>
-      ) : (
-        <CardAddButton variantId={product.defaultVariantId} title={product.title} />
-      )}
+      <div className="flex min-h-15 flex-col md:min-h-11">
+        {!purchasable ? null : product.defaultVariantId === null ? (
+          <Link
+            href={href}
+            className={`relative z-10 inline-flex min-h-11 w-full items-center justify-center rounded-control border border-border bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-muted ${focusRing}`}
+          >
+            <span>{t("product.card.chooseOptions")}</span>{" "}
+            <VisuallyHidden>{product.title}</VisuallyHidden>
+          </Link>
+        ) : (
+          <CardAddButton variantId={product.defaultVariantId} title={product.title} href={href} />
+        )}
+      </div>
       {availability !== null && badgeShown ? (
         <Badge
           variant={availability.variant}

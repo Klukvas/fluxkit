@@ -2,10 +2,10 @@ import { VisuallyHidden } from "@fluxkit/ui";
 import Link from "next/link";
 import type { ProductCardModel } from "../../lib/product-card-model";
 import { CardAddButton } from "../card-add-button";
-import { focusRing } from "../styles";
+import { cardActionLink } from "../styles";
 
-/** The link twin of the card's secondary button: the same size and look, so both purchase kinds line up in a grid. */
-const chooseLinkClass = `relative z-10 inline-flex min-h-11 w-full items-center justify-center rounded-control border border-border bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-muted ${focusRing}`;
+/** Above the card's stretched title link, like the add button. */
+const chooseLinkClass = `relative z-10 ${cardActionLink}`;
 
 /**
  * The purchase action of the built-in cards (`card.purchase`, owner design 2026-11-13), a SIBLING of the card's stretched
@@ -17,7 +17,7 @@ export function CardPurchaseAction({ card }: { card: ProductCardModel }) {
   const { purchase } = card;
   if (purchase === null) return null;
   if (purchase.kind === "add") {
-    return <CardAddButton variantId={purchase.variantId} title={card.title} />;
+    return <CardAddButton variantId={purchase.variantId} title={card.title} href={card.href} />;
   }
   return (
     <Link href={card.href} className={chooseLinkClass}>
