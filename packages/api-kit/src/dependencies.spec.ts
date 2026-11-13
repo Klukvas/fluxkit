@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 const SOURCE_DIR = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_JSON = join(SOURCE_DIR, "..", "package.json");
+const API_PACKAGE_JSON = join(SOURCE_DIR, "..", "..", "..", "apps", "api", "package.json");
 
 const ALLOWED = new Set(["@nestjs/common", "@fluxkit/core"]);
 
@@ -36,12 +37,25 @@ describe("the API kit's dependencies", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("declares exactly those two at runtime", () => {
+  // Runtime dependencies, not peers: the production image installs with `pnpm install --prod`, which links neither a
+  // workspace package's peers nor its devDependencies, so a peer-only @nestjs/common was missing at start (deploy-smoke).
+  // Nest's own peers (reflect-metadata, rxjs) are listed at the API's versions so pnpm resolves the very same
+  // @nestjs/common directory as the API: one copy of Nest, one HttpException class.
+  it("declares @fluxkit/core and Nest (with Nest's peers, at the API's versions) at runtime, no peers", () => {
     const manifest = JSON.parse(readFileSync(PACKAGE_JSON, "utf8")) as {
       dependencies?: Record<string, string>;
       peerDependencies?: Record<string, string>;
     };
-    expect(manifest.dependencies).toEqual({ "@fluxkit/core": "workspace:*" });
-    expect(manifest.peerDependencies).toEqual({ "@nestjs/common": "12.2.0" });
+    const api = JSON.parse(readFileSync(API_PACKAGE_JSON, "utf8")) as {
+      dependencies: Record<string, string>;
+    };
+    expect(manifest.dependencies).toEqual({
+      "@fluxkit/core": "workspace:*",
+      "@nestjs/common": api.dependencies["@nestjs/common"],
+      "reflect-metadata": api.dependencies["reflect-metadata"],
+      rxjs: api.dependencies.rxjs,
+    });
+    expect(manifest.dependencies?.["@nestjs/common"]).toBe("12.2.0");
+    expect(manifest.peerDependencies).toBeUndefined();
   });
 });
