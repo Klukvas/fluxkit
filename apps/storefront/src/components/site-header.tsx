@@ -15,6 +15,7 @@ import {
   type NavigationCategory,
   type PanelAlign,
 } from "../layout/header-layout";
+import type { NavigationLink } from "../layout/navigation";
 import { renderSlot } from "../lib/slots";
 import { AccountLink } from "./account-link";
 import { BrandLogo } from "./brand-logo";
@@ -286,11 +287,14 @@ export function SiteHeader({
   themeMode,
   showThemeSwitch = themeConfig.showToggle,
   config = headerConfig,
+  featureLinks = [],
 }: {
   locale: Locale;
   t: Translator;
   categories: readonly NavigationCategory[] | null;
   searchEnabled: boolean;
+  /** The header links of the enabled feature slices (`features/registry.ts`), after the configured links; none by default. */
+  featureLinks?: readonly NavigationLink[];
   /** What `<html data-theme>` says (from the cookie or `config/theme.ts`); the theme control starts from it. */
   themeMode: ThemeMode;
   /** `showToggle` of `config/theme.ts`; a prop for tests. */
@@ -298,7 +302,14 @@ export function SiteHeader({
   /** `config/header.ts`; a prop for tests. */
   config?: HeaderConfig;
 }) {
-  const blocks = headerView(config, { locale, t, categories, searchEnabled, showThemeSwitch });
+  const blocks = headerView(config, {
+    locale,
+    t,
+    categories,
+    searchEnabled,
+    showThemeSwitch,
+    featureLinks,
+  });
   const context: HeaderContext = { locale, t, themeMode };
   const row = (
     <Container className="fk-header-row">{blocks.map((view) => block(view, context))}</Container>

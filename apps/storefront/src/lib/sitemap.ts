@@ -1,4 +1,7 @@
 import type { CategoryNode } from "@fluxkit/api-client";
+import type { Locale } from "@fluxkit/ui";
+import { featurePathProblem } from "../features/paths";
+import type { FeatureData, FeatureSitemapPage, RegisteredFeature } from "../features/types";
 import { MAX_API_OFFSET } from "./catalog-query";
 import { languageAlternates } from "./seo";
 import { SITEMAP_REVALIDATE_SECONDS, type StoreData } from "./store-data";
@@ -60,6 +63,38 @@ export async function collectSitemapProducts(
   );
 }
 
+/**
+ * The pages of the enabled feature slices (plan docs/plans/2026-11-13-blog.md, section 9), each feature asked once (in parallel)
+ * through its manifest's `sitemap`, in registry order. A disabled feature is not asked. A failed read throws (from the slice or
+ * `StoreData.featureRead`): a sitemap that silently lacks pages would hide them from search. A path that is not under one of
+ * the slice's own pages (`featurePathProblem`) throws too, naming the feature.
+ */
+export async function collectFeatureSitemapPages(
+  features: readonly RegisteredFeature[],
+  enabled: readonly string[],
+  context: { locale: Locale; data: (feature: string) => FeatureData },
+): Promise<FeatureSitemapPage[]> {
+  const asked = features.filter((entry) => enabled.includes(entry.feature.name));
+  const answers = await Promise.all(
+    asked.map(({ feature }) =>
+      feature.sitemap({ locale: context.locale, data: context.data(feature.name) }),
+    ),
+  );
+  return answers.flatMap((pages, index) => {
+    const entry = asked[index];
+    const name = entry?.feature.name ?? "";
+    return pages.map((page) => {
+      const problem = featurePathProblem(page.path, entry?.segments ?? []);
+      if (problem !== null) {
+        throw new Error(`The sitemap of feature "${name}" lists ${problem}.`);
+      }
+      return page.lastModified === undefined
+        ? { path: page.path }
+        : { path: page.path, lastModified: page.lastModified };
+    });
+  });
+}
+
 export interface SitemapEntry {
   url: string;
   lastModified?: string;
@@ -78,14 +113,20 @@ export interface BuildSitemapInput {
   products: readonly SitemapProduct[];
   /** Locale-less paths of the enabled shop pages (`config/shop-pages.ts`), listed after the catalog. */
   shopPages?: readonly string[];
+  /** The pages of the enabled feature slices (`collectFeatureSitemapPages`), listed after the shop pages. */
+  featurePages?: readonly FeatureSitemapPage[];
 }
 
-/** Home, catalog, the shop pages, categories and products, once per locale, each linking its other-locale variants. */
+/**
+ * Home, catalog, the shop pages, the feature pages, categories and products, once per locale, each linking its other-locale
+ * variants.
+ */
 export function buildSitemap(input: BuildSitemapInput): SitemapEntry[] {
   const pages: { path: string; lastModified?: string }[] = [
     { path: "" },
     { path: "/catalog" },
     ...(input.shopPages ?? []).map((path) => ({ path })),
+    ...(input.featurePages ?? []),
     ...flatten(input.categories).map((slug) => ({ path: `/c/${encodeURIComponent(slug)}` })),
     ...input.products.map((product) => ({
       path: `/p/${encodeURIComponent(product.slug)}`,

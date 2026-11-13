@@ -10,6 +10,7 @@ import { join } from "node:path";
 import config, {
   CUSTOM_MESSAGE_NAMESPACE,
   DEMO_CONTENT_FLAGS,
+  FEATURES_MESSAGE_NAMESPACE,
   LEGAL_MARKER,
   assertNoLegalPlaceholders,
   demoContentLeft,
@@ -17,6 +18,8 @@ import config, {
   readMergedMessages,
 } from "./next.config.js";
 import { LEGAL_PLACEHOLDER_MARKER } from "./src/config/legal";
+import { feature as fixtureFeature } from "./src/features/fixtures/app/[locale]/(feature-notebook)/_feature/feature";
+import { FEATURES_NAMESPACE, storefrontFeatures } from "./src/features/registry";
 import { buildLocaleMessages, messagesByLocale } from "./src/messages";
 import { CUSTOM_NAMESPACE } from "./src/messages/areas";
 
@@ -240,6 +243,7 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
   const masterMessages = join(import.meta.dirname, "src", "messages");
   const masterOverrides = join(import.meta.dirname, "src", "messages-overrides");
   const masterExtras = join(import.meta.dirname, "src", "messages-extra");
+  const masterApp = join(import.meta.dirname, "src", "app");
   const masterIdentity = join(import.meta.dirname, "src", "config", "legal-identity.json");
   const placeholderTextKeys = ["legal.privacy.intro", "legal.terms.intro", "legal.cookies.intro"];
   const filledIdentity = {
@@ -322,6 +326,7 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
         demoContentFile: clearedDemoFile,
         overridesDir: masterOverrides,
         extrasDir: masterExtras,
+        appDir: masterApp,
         ...options,
       });
     } catch (error) {
@@ -348,7 +353,7 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
   });
 
   it("reads the merged messages the app uses: the same texts as messagesByLocale (area files, extras, overrides)", () => {
-    const merged = readMergedMessages(masterMessages, masterExtras, masterOverrides);
+    const merged = readMergedMessages(masterMessages, masterExtras, masterOverrides, masterApp);
     expect(Object.keys(merged).sort()).toEqual(Object.keys(messagesByLocale).sort());
     for (const [language, messages] of Object.entries(merged)) {
       const values = Object.fromEntries(
@@ -540,6 +545,7 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
           messagesDir,
           overridesDir,
           extrasDir: masterExtras,
+          appDir: masterApp,
           identityFile: join(directory, "missing.json"),
           demoContentFile: clearedDemoFile,
         }),
@@ -558,6 +564,7 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
           messagesDir,
           overridesDir,
           extrasDir: masterExtras,
+          appDir: masterApp,
           identityFile,
           demoContentFile: clearedDemoFile,
         }),
@@ -579,6 +586,7 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
           messagesDir,
           overridesDir,
           extrasDir: masterExtras,
+          appDir: masterApp,
           identityFile,
           demoContentFile: clearedDemoFile,
         }),
@@ -625,6 +633,7 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
             extras[language] ?? {},
             overrides[language] ?? {},
             language,
+            storefrontFeatures,
           );
         let loaded: Record<string, Record<string, string>> | Error;
         try {
@@ -638,6 +647,7 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
             fixture.messagesDir,
             fixture.extrasDir,
             fixture.overridesDir,
+            masterApp,
           );
           guarded = Object.fromEntries(
             Object.entries(merged).map(([language, messages]) => [
@@ -721,7 +731,7 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
         { en: deliveryKyiv, uk: deliveryKyiv },
       );
       try {
-        const merged = readMergedMessages(messagesDir, extrasDir, overridesDir);
+        const merged = readMergedMessages(messagesDir, extrasDir, overridesDir, masterApp);
         expect(merged["en"]?.["custom.deliveryKyiv"]).toEqual({
           value: "Kyiv delivery",
           file: "messages-extra/en.json",
@@ -832,6 +842,7 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
         messagesDir: masterMessages,
         overridesDir: masterOverrides,
         extrasDir: masterExtras,
+        appDir: masterApp,
         identityFile: masterIdentity,
         demoContentFile: masterDemoContent,
       }),
@@ -916,5 +927,110 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
     vi.stubEnv("API_INTERNAL_URL", "http://127.0.0.1:3000");
     expect(() => config(PHASE_PRODUCTION_SERVER)).not.toThrow();
     expect(() => config(PHASE_DEVELOPMENT_SERVER)).not.toThrow();
+  });
+});
+
+describe("next.config legal guard, feature slice messages (plan 2026-11-13-blog.md, E6)", () => {
+  const messagesDir = join(import.meta.dirname, "src", "messages");
+  const extrasDir = join(import.meta.dirname, "src", "messages-extra");
+  const overridesDir = join(import.meta.dirname, "src", "messages-overrides");
+  /** The fixture slice `(feature-notebook)` (outside `src/app`, so not routed and not in the app's registry). */
+  const fixtureApp = join(import.meta.dirname, "src", "features", "fixtures", "app");
+
+  /** A scratch app folder holding one slice group with the given message files. */
+  function scratchApp(group: string, files: Record<string, Record<string, unknown>>): string {
+    const appDir = mkdtempSync(join(tmpdir(), "storefront-slices-"));
+    const messages = join(appDir, "[locale]", group, "_feature", "messages");
+    mkdirSync(messages, { recursive: true });
+    for (const [language, content] of Object.entries(files)) {
+      writeFileSync(join(messages, `${language}.json`), JSON.stringify(content));
+    }
+    return appDir;
+  }
+
+  function readObject(file: string): Record<string, string> {
+    return JSON.parse(readFileSync(file, "utf8")) as Record<string, string>;
+  }
+
+  it("names the same namespace as the app's registry", () => {
+    expect(FEATURES_MESSAGE_NAMESPACE).toBe(FEATURES_NAMESPACE);
+  });
+
+  it("merges a slice's texts after the area files, naming their file, as the app's loader does with the same slice", () => {
+    const merged = readMergedMessages(messagesDir, extrasDir, overridesDir, fixtureApp);
+    for (const language of ["uk", "en"] as const) {
+      expect(merged[language]?.["features.notebook.nav"]).toEqual({
+        value: fixtureFeature.messages[language]["features.notebook.nav"],
+        file: `app/[locale]/(feature-notebook)/_feature/messages/${language}.json`,
+      });
+      const values = Object.fromEntries(
+        Object.entries(merged[language] ?? {}).map(([key, entry]) => [key, entry.value]),
+      );
+      const areas = Object.fromEntries(
+        readdirSync(join(messagesDir, language)).map((file) => [
+          file,
+          readObject(join(messagesDir, language, file)),
+        ]),
+      );
+      expect(values, language).toEqual(
+        buildLocaleMessages(
+          areas,
+          readObject(join(extrasDir, `${language}.json`)),
+          readObject(join(overridesDir, `${language}.json`)),
+          language,
+          [fixtureFeature],
+        ),
+      );
+    }
+  });
+
+  it("refuses a slice text outside its namespace, an empty one, a missing locale file and a malformed slice name", () => {
+    const outside = scratchApp("(feature-notebook)", {
+      uk: { "site.name": "x" },
+      en: { "site.name": "x" },
+    });
+    const empty = scratchApp("(feature-notebook)", {
+      uk: { "features.notebook.nav": " " },
+      en: { "features.notebook.nav": "Notebook" },
+    });
+    const missing = scratchApp("(feature-notebook)", { uk: { "features.notebook.nav": "x" } });
+    const badName = scratchApp("(feature-Notebook)", { uk: {}, en: {} });
+    try {
+      expect(() => readMergedMessages(messagesDir, extrasDir, overridesDir, outside)).toThrow(
+        'Feature message "site.name" in app/[locale]/(feature-notebook)/_feature/messages/en.json is outside the feature\'s namespace "features.notebook."',
+      );
+      expect(() => readMergedMessages(messagesDir, extrasDir, overridesDir, empty)).toThrow(
+        /must be a non-empty string/,
+      );
+      expect(() => readMergedMessages(messagesDir, extrasDir, overridesDir, missing)).toThrow(
+        /feature messages file .*en\.json was not found/,
+      );
+      expect(() => readMergedMessages(messagesDir, extrasDir, overridesDir, badName)).toThrow(
+        /is not a feature slice name/,
+      );
+    } finally {
+      for (const directory of [outside, empty, missing, badName]) {
+        rmSync(directory, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it("lets a fork override a slice's text (the overrides apply over the merged slice texts)", () => {
+    const directory = mkdtempSync(join(tmpdir(), "storefront-overrides-"));
+    try {
+      for (const language of ["uk", "en"]) {
+        writeFileSync(
+          join(directory, `${language}.json`),
+          JSON.stringify({ "features.notebook.nav": `own ${language}` }),
+        );
+      }
+      const merged = readMergedMessages(messagesDir, extrasDir, directory, fixtureApp);
+      expect(merged["uk"]?.["features.notebook.nav"]).toEqual({
+        value: "own uk",
+        file: "messages-overrides/uk.json",
+      });
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 });

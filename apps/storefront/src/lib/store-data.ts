@@ -35,6 +35,11 @@ export const STORE_TAGS = {
   banners: "store:banners",
 } as const;
 
+/** The data cache tag of an optional feature's reads (`StoreData.featureRead`): `feature:<name>`. */
+export function featureTag(feature: string): string {
+  return `feature:${feature}`;
+}
+
 /** Most last-good responses kept in memory per server process (oldest dropped first). */
 const LAST_GOOD_LIMIT = 200;
 
@@ -71,6 +76,19 @@ export interface ReadOptions {
 type ProductListQuery = Omit<ListProductsOptions, "locale" | "signal" | "fetchOptions">;
 
 /**
+ * What a feature slice's read gets (`StoreData.featureRead`): the API origin, the `fetch` to use (a test's fake, else the global
+ * one) and the call options to pass on (the timeout signal and the Next data cache settings). The store client knows no
+ * feature route, so the slice sends its own request with these and answers a `StoreResult`.
+ */
+export interface FeatureCallContext {
+  baseUrl: string;
+  fetch: FetchLike;
+  options: CallOptions;
+}
+
+export type FeatureCall<T> = (context: FeatureCallContext) => Promise<StoreResult<T>>;
+
+/**
  * Whether a product list may enter the Next data cache. `next start` writes every cached answer to `.next/cache/fetch-cache`
  * and never deletes one, so the cache key space must be bounded: the brand filter is a free slug the visitor chooses (there
  * is no brand list to validate it against), so every distinct value would add a file. Everything else in a list URL is
@@ -91,6 +109,18 @@ export interface StoreData {
   getProduct(locale: string, slug: string): Promise<CatalogOutcome<ProductDetail>>;
   /** The home banners live now (`GET /store/banners`, ADR 0046): cached like the catalog, so a change shows up to 60 s late. */
   listBanners(locale: string, read?: ReadOptions): Promise<CatalogOutcome<HomeBannerList>>;
+  /**
+   * A read of an optional feature's store route (plan docs/plans/2026-11-13-blog.md, section 9): the same timeout, data cache
+   * (tag `feature:<name>`), logging and errors as the catalog reads, but NEVER the last-good copy: it neither records nor
+   * serves one, so content the shop took back (an unpublished post) never stays visible through an outage. Without an answer
+   * it throws `StoreUnavailableError`; a 4xx is returned as a failed outcome.
+   */
+  featureRead<T>(
+    feature: string,
+    operation: string,
+    call: FeatureCall<T>,
+    read?: ReadOptions,
+  ): Promise<CatalogOutcome<T>>;
 }
 
 export function createStoreData(dependencies: StoreDataDependencies): StoreData {
@@ -106,16 +136,18 @@ export function createStoreData(dependencies: StoreDataDependencies): StoreData 
     }
   }
 
+  /** `cacheKey` `null`: the read never enters nor uses the last-good copy (feature reads). */
   async function run<T>(
     operation: string,
-    cacheKey: string,
+    cacheKey: string | null,
     tag: string,
     read: ReadOptions,
-    call: (client: StoreClient, options: CallOptions) => Promise<StoreResult<T>>,
+    call: (client: StoreClient, options: CallOptions, baseUrl: string) => Promise<StoreResult<T>>,
   ): Promise<CatalogOutcome<T>> {
     await dependencies.beforeRequest?.();
+    const baseUrl = dependencies.baseUrl();
     const client = createStoreClient({
-      baseUrl: dependencies.baseUrl(),
+      baseUrl,
       ...(dependencies.fetch === undefined ? {} : { fetch: dependencies.fetch }),
     });
     const options: CallOptions = {
@@ -135,9 +167,9 @@ export function createStoreData(dependencies: StoreDataDependencies): StoreData 
 
     let failure: unknown;
     try {
-      const result = await call(client, options);
+      const result = await call(client, options, baseUrl);
       if (result.ok) {
-        remember(cacheKey, result.data);
+        if (cacheKey !== null) remember(cacheKey, result.data);
         return { ok: true, data: result.data, stale: false };
       }
       if (result.status < 500) {
@@ -148,7 +180,7 @@ export function createStoreData(dependencies: StoreDataDependencies): StoreData 
       failure = thrown;
     }
 
-    if (lastGood.has(cacheKey)) {
+    if (cacheKey !== null && lastGood.has(cacheKey)) {
       console.warn(
         `${operation} failed (${describe(failure)}); serving the last good response from memory.`,
       );
@@ -191,8 +223,14 @@ export function createStoreData(dependencies: StoreDataDependencies): StoreData 
       run("GET /store/banners", `banners:${locale}`, STORE_TAGS.banners, read, (client, options) =>
         client.listBanners({ ...options, locale }),
       ),
+    featureRead: (feature, operation, call, read = {}) =>
+      run(operation, null, featureTag(feature), read, (_client, options, baseUrl) =>
+        call({ baseUrl, fetch: dependencies.fetch ?? defaultFetch, options }),
+      ),
   };
 }
+
+const defaultFetch: FetchLike = (url, init) => globalThis.fetch(url, init);
 
 /** Longest cause chain written to a log line (also stops a cycle). */
 const MAX_CAUSE_DEPTH = 5;

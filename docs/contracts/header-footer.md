@@ -55,6 +55,19 @@ category name of about 30 characters makes the menu's dropdown (`w-max`) wider t
 
 The "powered by" line is not a block: it always closes the footer.
 
+## Feature links (since blog plan PR 4a, `docs/plans/2026-11-13-blog.md` E7; additive)
+
+An optional feature's storefront slice declares header and footer links in its manifest (`docs/contracts/README.md`, "Feature extension
+points"). While the feature is in `GET /store/config` `features`, they are added to what the config renders, without any edit of
+`config/header.ts` or `config/footer.ts`; without an enabled feature (or while the config cannot be read) the markup is byte for byte
+the config's (`header-footer-defaults.upstream.spec.tsx` stays green).
+
+| Place | Rule |
+|---|---|
+| Header | After `navigation.links`, wherever those show (the `menu` and `navigation` blocks, or the `picker`'s panel), in registry order (slice name). A header without any link gets its `menu`/`navigation` blocks from a feature link (when it lists them). |
+| Footer | Appended to the `shopPages` group; when the config lists no such group, a group of their own after the configured ones, headed `footer.group.more` ("Більше" / "More") in the `columns` layout and without a heading in `stack`. The `footer.columns` slot's `shopLinks` stay the shop pages only. |
+| Both | A feature link whose path the config (or that group) already links is left out: a fork's own entry keeps its place. No switch in v1: a fork that wants no link leaves the feature off; its label is a message a fork may override. |
+
 ## Checks (what a fork runs)
 
 `pnpm --filter @fluxkit/storefront test`: `layout/header-layout.spec.ts` and `layout/footer-layout.spec.ts` run `headerConfigProblems` /

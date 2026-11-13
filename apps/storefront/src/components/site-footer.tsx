@@ -207,6 +207,7 @@ export function SiteFooter({
   shopLinks = footerShopLinks,
   contacts = contactsView(),
   config = footerConfig,
+  featureLinks = [],
 }: {
   locale: Locale;
   t: Translator;
@@ -223,6 +224,8 @@ export function SiteFooter({
   contacts?: ContactsView;
   /** `config/footer.ts`; a prop for tests. */
   config?: FooterConfig;
+  /** The footer links of the enabled feature slices (`features/registry.ts`); none by default. */
+  featureLinks?: readonly NavigationLink[];
 }) {
   const blocks = footerView(config, {
     shopLinks,
@@ -230,6 +233,7 @@ export function SiteFooter({
     contacts,
     showThemeSwitch,
     themeInHeader,
+    featureLinks,
   });
   // The `footer.columns` slot (`config/slots.tsx`): its components as the columns of one grid, before the blocks. Empty, it
   // adds nothing to the list below (not even a `null`), so the footer's markup and React payload stay as without slots.

@@ -110,6 +110,36 @@ function readJsonObject(file: string): Record<string, unknown> {
 export const CUSTOM_MESSAGE_NAMESPACE = "custom";
 
 /**
+ * The namespace of the feature slices' texts (`FEATURES_NAMESPACE` in `src/features/registry.ts`; a spec keeps the two equal).
+ */
+export const FEATURES_MESSAGE_NAMESPACE = "features";
+
+/**
+ * The message files of the feature slices for one locale: `<appDir>/[locale]/(feature-<name>)/_feature/messages/<locale>.json`
+ * of every slice on disk, in name order (the generated registry's order, `scripts/generate-feature-registry.mjs`). A slice
+ * without the file of a locale, or a `(feature-...)` folder whose name is not a feature name, throws.
+ */
+export function featureMessageFiles(
+  appDir: string,
+  locale: string,
+): { name: string; file: string }[] {
+  const localeDir = resolve(appDir, "[locale]");
+  if (!existsSync(localeDir)) throw new Error(`${localeDir} was not found.`);
+  return readdirSync(localeDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && entry.name.startsWith("(feature-"))
+    .map((entry) => entry.name)
+    .sort()
+    .map((group) => {
+      const name = /^\(feature-([a-z][a-z0-9-]*)\)$/.exec(group)?.[1];
+      if (name === undefined)
+        throw new Error(`${resolve(localeDir, group)} is not a feature slice name.`);
+      const file = resolve(localeDir, group, "_feature", "messages", `${locale}.json`);
+      if (!existsSync(file)) throw new Error(`The feature messages file ${file} was not found.`);
+      return { name, file };
+    });
+}
+
+/**
  * One merged message: its text and the file it came from (`messages/en/legal.json`, `messages-extra/en.json`,
  * `messages-overrides/en.json`).
  */
@@ -120,11 +150,13 @@ export interface MergedMessage {
 
 /**
  * The messages the app renders, per locale, read in plain Node (this file cannot import `src/messages/index.ts`; a spec
- * keeps the two equal): every area file `<messagesDir>/<locale>/<area>.json`, then the fork's own `custom.` keys from
+ * keeps the two equal): every area file `<messagesDir>/<locale>/<area>.json`, then the texts of the feature slices under
+ * `<appDir>` (`features.<name>.` only, plan docs/plans/2026-11-13-blog.md, E6), then the fork's own `custom.` keys from
  * `<extrasDir>/<locale>.json`, then `<overridesDir>/<locale>.json` merged last (plan
  * docs/plans/2026-11-08-design-changeability.md, WP3; extras: owner decision 2026-11-09). Fails closed, so the release check
  * can never pass by reading nothing: no locale folder or an empty one, a flat `*.json` left at the top of `messagesDir` (the
- * pre-split layout; the app would ignore it), a key in two area files, a missing extras or overrides file, an extra key
+ * pre-split layout; the app would ignore it), a key in two area files, a feature message outside its namespace, already
+ * present or empty, a missing extras or overrides file, an extra key
  * outside `custom.` or one the base already has, an override key without a base message and an extra or override value that
  * is not a non-empty string all throw.
  */
@@ -132,6 +164,7 @@ export function readMergedMessages(
   messagesDir: string,
   extrasDir: string,
   overridesDir: string,
+  appDir: string,
 ): Record<string, Record<string, MergedMessage>> {
   const flat = readdirSync(messagesDir).filter((name) => name.endsWith(".json"));
   if (flat.length > 0) {
@@ -162,6 +195,25 @@ export function readMergedMessages(
           throw new Error(`Message key "${key}" is defined in both ${known.file} and ${file}.`);
         }
         merged[key] = { value, file };
+      }
+    }
+    // Same rules and messages as `applyFeatureMessages` in src/messages/index.ts: the app would refuse these at load.
+    for (const { name, file } of featureMessageFiles(appDir, locale)) {
+      const prefix = `${FEATURES_MESSAGE_NAMESPACE}.${name}.`;
+      const shown = `app/[locale]/(feature-${name})/_feature/messages/${locale}.json`;
+      for (const [key, value] of Object.entries(readJsonObject(file))) {
+        if (!key.startsWith(prefix) || key.length === prefix.length) {
+          throw new Error(
+            `Feature message "${key}" in ${shown} is outside the feature's namespace "${prefix}".`,
+          );
+        }
+        if (merged[key] !== undefined) {
+          throw new Error(`Feature message "${key}" in ${shown} already has a message.`);
+        }
+        if (typeof value !== "string" || value.trim() === "") {
+          throw new Error(`Feature message "${key}" in ${shown} must be a non-empty string.`);
+        }
+        merged[key] = { value, file: shown };
       }
     }
     // Same rules and messages as `applyExtras` in src/messages/index.ts: the app would refuse these extras at load.
@@ -218,6 +270,8 @@ export function assertNoLegalPlaceholders(options: {
   extrasDir: string;
   /** `src/messages-overrides`: a fork's `<locale>.json`, merged last. */
   overridesDir: string;
+  /** `src/app`: the feature slices' texts, `[locale]/(feature-<name>)/_feature/messages/<locale>.json`, merged after the area files. */
+  appDir: string;
   identityFile: string;
   /** `src/config/demo-content.json`: the shop pages, contacts, home texts and trust bar that are still demo copy. */
   demoContentFile: string;
@@ -235,7 +289,12 @@ export function assertNoLegalPlaceholders(options: {
   }
   const found: string[] = [];
   for (const messages of Object.values(
-    readMergedMessages(options.messagesDir, options.extrasDir, options.overridesDir),
+    readMergedMessages(
+      options.messagesDir,
+      options.extrasDir,
+      options.overridesDir,
+      options.appDir,
+    ),
   )) {
     for (const [key, { value, file }] of Object.entries(messages)) {
       if (key.startsWith("legal.") && typeof value === "string" && value.includes(LEGAL_MARKER)) {
@@ -290,6 +349,7 @@ export default function config(phase: string): NextConfig {
       messagesDir: resolve(process.cwd(), "src/messages"),
       extrasDir: resolve(process.cwd(), "src/messages-extra"),
       overridesDir: resolve(process.cwd(), "src/messages-overrides"),
+      appDir: resolve(process.cwd(), "src/app"),
       identityFile: resolve(process.cwd(), "src/config/legal-identity.json"),
       demoContentFile: resolve(process.cwd(), "src/config/demo-content.json"),
     });

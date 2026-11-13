@@ -7,11 +7,16 @@
     },
     "@fluxkit/storefront#build": {
       "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/generate-feature-registry.mjs"],
       "outputs": [".next/**", "!.next/cache/**"],
       "env": ["STOREFRONT_IMAGE_HOSTS", "STOREFRONT_REQUIRE_LEGAL_TEXT"]
     },
     "typecheck": {
       "dependsOn": ["^build"]
+    },
+    "@fluxkit/storefront#typecheck": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/generate-feature-registry.mjs"]
     },
     "test": {
       "dependsOn": ["^build"],

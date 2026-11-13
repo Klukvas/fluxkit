@@ -54,6 +54,9 @@ function fakes(answer: SearchOutcome | (() => Promise<SearchOutcome>)) {
     listBanners: async () => {
       throw new Error("not used");
     },
+    featureRead: async () => {
+      throw new Error("not used");
+    },
   };
   const search: SearchData = {
     async search(locale, query, read) {
