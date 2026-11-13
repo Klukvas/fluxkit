@@ -5,9 +5,9 @@ import { expect, test } from "../support/fixtures.ts";
 /**
  * The blog's storefront slice (plan docs/plans/2026-11-13-blog.md, PR 4b) against an API with the `blog` feature on: run with
  * `E2E_FEATURES=blog` (`e2e/README.md`). Posts are created through the admin API (the owner holds the catalog permissions);
- * the database starts without any. The storefront caches each blog read for 60 s (`CATALOG_REVALIDATE_SECONDS`) and nothing
- * revalidates by tag, so a page that was read before a change is reloaded until the change shows (`toPass`, like
- * `home-banners`), and a page is read for the first time only after the change it checks.
+ * the database starts without any. A post is read on every view (never through the Next data cache), so its page follows a
+ * publish and an unpublish at once and the test asserts that without retrying. The list and the sitemap are cached (60 s and
+ * 1 h), so each is read for the first time only after the change it checks; nothing here waits for a cache window.
  *
  * Covers on this stack are plain `http` media URLs, which the storefront never hands to the image optimizer (only `https`
  * hosts of `STOREFRONT_IMAGE_HOSTS`): the page shows the token placeholder, named by the alt text (`media-route.e2e.ts`).
@@ -75,7 +75,6 @@ test("a draft is a real 404; a published post renders with its metadata, JSON-LD
   page,
   admin,
 }, testInfo) => {
-  test.setTimeout(240_000);
   const suffix = `${String(testInfo.retry)}-${testInfo.testId
     .slice(0, 6)
     .toLowerCase()
@@ -102,11 +101,9 @@ test("a draft is a real 404; a published post renders with its metadata, JSON-LD
     }
 
     await admin.publishBlogPost(published.id);
-    // Asked before the publish, the post's own address may answer from the 60 s cache: reload until it renders.
-    await expect(async () => {
-      const response = await page.goto(`/uk/blog/${slug}`);
-      expect(response?.status()).toBe(200);
-    }).toPass({ timeout: 120_000, intervals: [3_000] });
+    // Asked (404) just before the publish: a post is never cached, so it renders on the very next view.
+    const live = await page.goto(`/uk/blog/${slug}`);
+    expect(live?.status()).toBe(200);
 
     const main = page.getByRole("main");
     await expect(main.getByRole("heading", { level: 1, name: "Догляд за льоном" })).toBeVisible();
@@ -149,10 +146,15 @@ test("a draft is a real 404; a published post renders with its metadata, JSON-LD
       inLanguage: "uk",
       url,
       mainEntityOfPage: { "@type": "WebPage", "@id": url },
+      author: { "@type": "Organization", url: `${E2E_ORIGIN}/` },
       publisher: { "@type": "Organization", url: `${E2E_ORIGIN}/` },
       image: [upload.url],
     });
-    expect(posting).not.toHaveProperty("author");
+    expect(posting["author"]).toEqual({
+      "@type": "Organization",
+      name: (posting["publisher"] as { name: string }).name,
+      url: `${E2E_ORIGIN}/`,
+    });
     expect(await jsonLd(page, "BreadcrumbList")).toMatchObject({
       itemListElement: [
         { position: 1 },
@@ -189,10 +191,9 @@ test("a draft is a real 404; a published post renders with its metadata, JSON-LD
     expect(sitemap).not.toContain(draft.slug);
 
     await admin.unpublishBlogPost(published.id);
-    await expect(async () => {
-      const response = await page.goto(`/uk/blog/${slug}`);
-      expect(response?.status()).toBe(404);
-    }).toPass({ timeout: 120_000, intervals: [3_000] });
+    // At once: a post read from a cache would stay on the shop after its unpublishing (Next keeps 200 answers only).
+    const gone = await page.goto(`/uk/blog/${slug}`);
+    expect(gone?.status()).toBe(404);
   } finally {
     await admin.deleteBlogPost(published.id);
     await admin.deleteBlogPost(draft.id);
