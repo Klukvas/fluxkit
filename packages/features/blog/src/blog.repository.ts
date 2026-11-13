@@ -39,7 +39,11 @@ function publicAt(now: Date): SQL {
   return and(eq(blogPost.status, "published"), lte(blogPost.publishedAt, now)) as SQL;
 }
 
-/** Has a non-blank title and body in `locale`: a public post is served only in the locales it is written in. */
+/**
+ * Has a non-blank title and body in `locale`: a public post is served only in the locales it is written in. `[:space:]` is
+ * narrower than JS `trim()` (no U+00A0, U+2028, U+FEFF...), so a text of only such characters would pass here; the publish
+ * check (`missingTranslations`, which trims) never lets one through the API.
+ */
 function writtenIn(locale: string): SQL {
   return sql`coalesce(${blogPost.title} ->> ${locale}, '') ~ '[^[:space:]]' and coalesce(${blogPost.body} ->> ${locale}, '') ~ '[^[:space:]]'`;
 }
@@ -167,7 +171,7 @@ export class BlogRepository {
 
   /**
    * The public posts for the sitemap, the newest first, at most `limit`, each with the locales (of `locales`, in that order)
-   * it is written in. The bodies stay in the database: only the check runs there.
+   * it is written in (the `writtenIn` check, its note applies). The bodies stay in the database: only the check runs there.
    */
   async publicSitemap(
     now: Date,

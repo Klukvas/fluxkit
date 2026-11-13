@@ -47,21 +47,25 @@ writes, `Cache-Control: no-store`. Store routes set no cookie and no `Cache-Cont
   `markdownCode` (the parser's `MarkdownErrorCode`) and, for `link_refused`, `reason`; `message` is `Line N: <code> (<reason>).`. A lone
   surrogate is `invalid_characters`.
 - `slug`: core slug pattern, at most 160 (`invalid_slug`); `empty_slug` when none can be generated from the title; unique for every locale
-  (`409 conflict`, `field: slug`). Locked once the post was first published (`409 rule_violation`, `rule: slug_locked`), also back in draft.
+  (`409 conflict`, `field: slug`). Locked as soon as the post has a publish date (`slugLocked: true`; `409 rule_violation`,
+  `rule: slug_locked`): after the first publish call, also when that publish only scheduled it and it was unpublished before going live,
+  and also back in draft.
 - Publish: needs a title and a body in every content locale (`409 rule_violation`, `rule: translation_incomplete`, `errors[]` with
   `translation_missing` at `title.<locale>` / `body.<locale>`); a PATCH of a published post is checked the same way. Every stored body must
   still parse. `publishedAt` in [2000-01-01, 2200-01-01) (`out_of_range`); without it the stored date, else now. Unpublish keeps the date,
-  so publishing again keeps it.
+  so publishing again keeps it. Publishing an already public post again with a future `publishedAt` reschedules it on purpose: it is
+  `scheduled` and off the store until that date.
 - Public = published and `publishedAt <= now`, served in a locale only when the post has a title and a body there. A store read parses the
   body again with the current rules: one that no longer parses answers `404` and the API logs the post id, locale, code and line. The list
   and the sitemap do not parse bodies, so they may still name such a post until it is fixed in the admin.
 - Cover: the upload is marked attached in the save's transaction before the row is written (`MEDIA_PORT`); an unknown id is `400
   validation_failed` with `upload_not_found` at `coverUploadId`. The foreign key (ON DELETE RESTRICT) keeps a used upload from being deleted.
-- No audit entry and no domain event (like banners and catalog edits). Rate limits: none on the store routes (the known launch blocker of
-  the plain catalog store routes).
+- No audit entry and no domain event (like banners and catalog edits).
 
-## Known limits
+## Limits
 
-- The API's JSON request body limit (100 kB, the Express default) is lower than two full-length bodies in a non-Latin script: a request
-  with two 40 000-character Cyrillic bodies answers `413` (one fits). As `body` is replaced as a whole map, a post cannot hold two such
-  bodies today (Latin text fits: one byte per character). Raising the limit for these routes is a core change, not made here.
+- Request size: `/admin/blog/posts` takes JSON bodies up to the API's admin content limit (content locales x 40 000 UTF-16 units x
+  6 bytes + 256 KiB, about 0.7 MB with two locales; `docs/contracts/api.md`, "Default deny for `/admin`"), so one save carries a
+  full-length body in every locale in any script. Larger answers `413`.
+- Rate limits: none on the store blog routes yet, the same known launch blocker as the other plain catalog store routes (`docs/HANDOFF.md`);
+  `GET /store/blog/sitemap` is the heaviest (up to 5 001 rows and a locale check per row, no body parse).

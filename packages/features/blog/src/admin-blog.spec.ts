@@ -305,6 +305,36 @@ describe("blog admin routes", () => {
       expect(again.body.publishedAt).toBe(date);
     });
 
+    it("reschedules a public post given a future date: it leaves the store until then (intentional)", async () => {
+      const created = await createComplete();
+      const live = await call<AdminPost>(blog, "POST", `${BASE}/${created.id}/publish`);
+      expect(live.body.state).toBe("published");
+      expect((await call(blog, "GET", `/store/blog/posts/${created.slug}`)).status).toBe(200);
+
+      const later = new Date(Date.now() + 86_400_000).toISOString();
+      const moved = await call<AdminPost>(blog, "POST", `${BASE}/${created.id}/publish`, {
+        publishedAt: later,
+      });
+      expect(moved.body).toMatchObject({
+        status: "published",
+        state: "scheduled",
+        publishedAt: later,
+      });
+      expect((await call(blog, "GET", `/store/blog/posts/${created.slug}`)).status).toBe(404);
+    });
+
+    it("locks the slug of a post that was only scheduled and unpublished before going live", async () => {
+      const created = await createComplete();
+      await call(blog, "POST", `${BASE}/${created.id}/publish`, {
+        publishedAt: new Date(Date.now() + 86_400_000).toISOString(),
+      });
+      const draft = await call<AdminPost>(blog, "POST", `${BASE}/${created.id}/unpublish`);
+      expect(draft.body).toMatchObject({ state: "draft", slugLocked: true });
+      const result = await call(blog, "PATCH", `${BASE}/${created.id}`, { slug: "never-live" });
+      expect(result.status).toBe(409);
+      expect(result.body).toMatchObject({ code: "rule_violation", rule: "slug_locked" });
+    });
+
     it("schedules with a future date and takes another date on request", async () => {
       const created = await createComplete();
       const future = new Date(Date.now() + 86_400_000).toISOString();
@@ -386,7 +416,11 @@ describe("blog admin routes", () => {
         "GET",
         `${BASE}?status=scheduled`,
       );
-      expect(scheduled.body.items.map((item) => item.id)).toEqual([soon.id]);
+      // Other tests leave scheduled posts too: the filter returns scheduled ones only, newest update first.
+      expect(scheduled.body.items[0]?.id).toBe(soon.id);
+      expect(new Set(scheduled.body.items.map((item) => item.state))).toEqual(
+        new Set(["scheduled"]),
+      );
       const second = await call<Paged<AdminPostSummary>>(blog, "GET", `${BASE}?limit=1&page=2`);
       expect(second.body.items.map((item) => item.id)).toEqual([live.id]);
     });
