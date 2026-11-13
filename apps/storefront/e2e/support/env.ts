@@ -117,7 +117,9 @@ export function apiEnvironment(env: Env = process.env): Env {
     STORE_COOKIE_SECURE: "false",
     ADMIN_COOKIE_SECURE: "false",
     TRUST_PROXY: "1",
-    FEATURES_ENABLED: "",
+    // The optional features of this run: none by default (the template's default, so every page renders as for a shop
+    // without features), `E2E_FEATURES=blog` for the blog's suite (`tests/blog.e2e.ts`).
+    FEATURES_ENABLED: E2E_FEATURES.join(","),
     // The test-only `fake` shipping provider (cities, pickup points, waybills; no network). With no shipping method
     // activated the shop behaves as before shipping existed, so the other scenarios do not notice it; the shipping scenarios
     // create their own methods and deactivate them afterwards (tests/shipping-*.e2e.ts).
@@ -165,6 +167,28 @@ export function apiEnvironment(env: Env = process.env): Env {
   if (key !== undefined) result["MEILI_API_KEY"] = key.key;
   return result;
 }
+
+/** A feature name of `FEATURES_ENABLED` (`packages/config/src/features.ts`). */
+const FEATURE_NAME = /^[a-z][a-z0-9-]{0,31}$/;
+
+/**
+ * `E2E_FEATURES` (comma-separated feature names, for example `blog`): the optional features the API of this run enables
+ * (`FEATURES_ENABLED`, also for the migration, so their tables exist). Empty or unset: none, the default that every file but
+ * a feature's own assumes. A malformed value throws before anything starts.
+ */
+export function parseE2eFeatures(value: string | undefined): readonly string[] {
+  const names = (value ?? "")
+    .split(",")
+    .map((name) => name.trim())
+    .filter((name) => name !== "");
+  const bad = names.find((name) => !FEATURE_NAME.test(name));
+  if (bad !== undefined) {
+    throw new Error(`E2E_FEATURES: "${bad}" is not a feature name (a-z, 0-9 and "-").`);
+  }
+  return [...new Set(names)].sort();
+}
+
+export const E2E_FEATURES = parseE2eFeatures(process.env["E2E_FEATURES"]);
 
 /** `E2E_SEARCH=off` runs the suite against an API with `SEARCH_ENABLED=false` (the default is on). */
 export const E2E_SEARCH_ENABLED = process.env["E2E_SEARCH"] !== "off";
