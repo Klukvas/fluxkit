@@ -2,6 +2,8 @@ import type { AdminOperationName, AdminOperationPermission } from "@fluxkit/api-
 import type { ComponentType } from "react";
 import { HomePage } from "./areas/home/home-page";
 import { LoginPage } from "./areas/auth/login-page";
+import type { FeatureRouteId } from "./features/manifest";
+import { ADMIN_FEATURES } from "./features/registry";
 import type { LazyFile } from "./messages";
 import { permissionOf } from "./permissions";
 import { PATHS, type RouteId } from "./router/paths";
@@ -499,6 +501,38 @@ export const ROUTES: readonly AppRoute[] = [
     ),
   ),
 ];
+
+/**
+ * A screen of an optional feature (ADR 0049, E8; `features/manifest.ts`): from its manifest, never from `PATHS` or
+ * `ADMIN_OPERATIONS` (the feature's routes are not in the core API document). It renders only when the API lists its
+ * feature in `GET /admin/config` `features` and the role has its permission (`layout/feature-gate.ts`).
+ */
+export interface FeatureAppRoute {
+  id: FeatureRouteId;
+  feature: string;
+  path: string;
+  permission: AdminOperationPermission;
+  titleKey: string;
+  page: RoutePage;
+}
+
+/** The screens of every feature slice of this build (none without a slice). */
+export const FEATURE_ROUTES: readonly FeatureAppRoute[] = ADMIN_FEATURES.flatMap((feature) =>
+  feature.routes.map((route) => ({
+    id: route.id,
+    feature: feature.name,
+    path: route.path,
+    permission: route.permission,
+    titleKey: route.titleKey,
+    page: { kind: "lazy", load: route.load } satisfies RoutePage,
+  })),
+);
+
+export function featureRouteById(id: FeatureRouteId): FeatureAppRoute {
+  const found = FEATURE_ROUTES.find((entry) => entry.id === id);
+  if (found === undefined) throw new Error(`No feature route "${id}".`);
+  return found;
+}
 
 export function routeById(id: RouteId): AppRoute {
   const found = ROUTES.find((entry) => entry.id === id);

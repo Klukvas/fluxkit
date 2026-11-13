@@ -9,7 +9,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { loadMessageFile, messagesWith, type LazyFile } from "../messages";
+import { messagesWith, type LazyFile } from "../messages";
+import { loadAnyMessageFile } from "./message-files";
 import { storeLocale, type StorageLike } from "./locale-preference";
 import {
   NO_FILES,
@@ -47,7 +48,7 @@ export type MessageFileLoader = (file: LazyFile, locale: Locale) => Promise<Mess
 export function I18nProvider({
   initial,
   children,
-  loadFile = loadMessageFile,
+  loadFile = loadAnyMessageFile,
 }: {
   initial: Locale;
   children: ReactNode;

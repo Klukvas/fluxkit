@@ -120,6 +120,27 @@ module.exports = {
       },
       to: { path: "^apps/api/src/search/" },
     },
+    {
+      name: "admin-must-not-import-feature-slices",
+      comment:
+        "The admin reaches a feature slice (apps/admin/src/features/<name>/, ADR 0049 E8) only through the registry " +
+        "(apps/admin/src/features/registry.ts, an import.meta.glob of ./*/feature.ts that this tool does not see; " +
+        "apps/admin/src/features/registry.spec.ts refuses any other glob). Deleting a slice folder must break nothing.",
+      severity: "error",
+      from: {
+        path: "^apps/admin/",
+        pathNot: "^apps/admin/src/features/([^/]+/|registry\\.ts$)",
+      },
+      to: { path: "^apps/admin/src/features/[^/]+/" },
+    },
+    {
+      name: "admin-feature-slices-must-not-import-each-other",
+      comment:
+        "An admin feature slice may use the admin app, never another slice (each is deleted on its own).",
+      severity: "error",
+      from: { path: "^apps/admin/src/features/([^/]+)/" },
+      to: { path: "^apps/admin/src/features/[^/]+/", pathNot: "^apps/admin/src/features/$1/" },
+    },
     { name: "no-circular", severity: "error", from: {}, to: { circular: true } },
   ],
   options: {
