@@ -90,6 +90,9 @@ ties and says why.
   `feature/product-type-guide-page`, its own short plan `docs/plans/2026-11-13-product-type-guide-page.md`.
 - Card add-to-cart: the recommended option, additive `defaultVariantId` in `ProductSummary` (API contract change approved). Branch
   `feature/card-add-to-cart`.
+- Header and footer defaults: the new template look (categories picker, theme control in the header, footer columns) is the owner's own
+  request of 2026-11-13 in chat. It changes the default look a fork gets when it never edited `config/header.ts` / `config/footer.ts`
+  (independent review, major 1); the CHANGELOG and a note in `docs/migrations/` say how a fork keeps the old look.
 - Blog: write its plan and have it reviewed first. Branch `docs/blog-plan`, `docs/plans/2026-11-13-blog.md`.
 
 ## Verification
