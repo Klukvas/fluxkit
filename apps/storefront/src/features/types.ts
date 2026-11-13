@@ -19,10 +19,15 @@ export interface FeatureNavigationLink {
   path: string;
 }
 
-/** A page of the sitemap: a plain storefront path without the locale; `lastModified` an ISO date when known. */
+/**
+ * A page of the sitemap: a plain storefront path without the locale; `lastModified` an ISO date when known. `locales`: the
+ * locales the page exists in (a post written in some languages only), listed and linked as alternates in those alone;
+ * absent, every locale.
+ */
 export interface FeatureSitemapPage {
   path: string;
   lastModified?: string;
+  locales?: readonly Locale[];
 }
 
 /** The reads of one feature (`StoreData.featureRead` bound to its name): never served from the last-good copy. */

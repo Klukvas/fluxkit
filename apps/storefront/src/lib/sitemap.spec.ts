@@ -287,4 +287,73 @@ describe("feature pages in the sitemap (plan 2026-11-13-blog.md, section 9)", ()
       },
     });
   });
+  it("lists a feature page that names its locales in those alone, with alternates and x-default among them", () => {
+    const input = {
+      origin: "https://shop.example",
+      locales: ["uk", "en"],
+      defaultLocale: "uk",
+      categories: [],
+      products: [],
+    };
+    const urls = buildSitemap({
+      ...input,
+      featurePages: [
+        { path: "/notebook/both", locales: ["en", "uk"] },
+        { path: "/notebook/english", lastModified: "2026-11-02", locales: ["en"] },
+        { path: "/notebook/none", locales: [] },
+      ],
+    }).slice(4);
+    expect(urls).toEqual([
+      {
+        url: "https://shop.example/uk/notebook/both",
+        alternates: {
+          languages: {
+            uk: "https://shop.example/uk/notebook/both",
+            en: "https://shop.example/en/notebook/both",
+            "x-default": "https://shop.example/uk/notebook/both",
+          },
+        },
+      },
+      {
+        url: "https://shop.example/en/notebook/both",
+        alternates: {
+          languages: {
+            uk: "https://shop.example/uk/notebook/both",
+            en: "https://shop.example/en/notebook/both",
+            "x-default": "https://shop.example/uk/notebook/both",
+          },
+        },
+      },
+      {
+        url: "https://shop.example/en/notebook/english",
+        lastModified: "2026-11-02",
+        alternates: {
+          languages: {
+            en: "https://shop.example/en/notebook/english",
+            "x-default": "https://shop.example/en/notebook/english",
+          },
+        },
+      },
+    ]);
+  });
+
+  it("passes a feature page's locales on and refuses one that is not a storefront locale", async () => {
+    const withLocales: StorefrontFeature = {
+      ...fixtureFeature,
+      sitemap: async () => [{ path: "/notebook/a", locales: ["en"] }],
+    };
+    expect(
+      await collectFeatureSitemapPages([entry(withLocales)], ["notebook"], {
+        locale: "uk",
+        data: dataOf([]),
+      }),
+    ).toEqual([{ path: "/notebook/a", locales: ["en"] }]);
+    const odd = {
+      ...fixtureFeature,
+      sitemap: async () => [{ path: "/notebook/a", locales: ["de"] }],
+    } as unknown as StorefrontFeature;
+    await expect(
+      collectFeatureSitemapPages([entry(odd)], ["notebook"], { locale: "uk", data: dataOf([]) }),
+    ).rejects.toThrow(`lists "/notebook/a" in "de", which is not a storefront locale`);
+  });
 });

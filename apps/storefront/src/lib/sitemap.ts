@@ -1,5 +1,5 @@
 import type { CategoryNode } from "@fluxkit/api-client";
-import type { Locale } from "@fluxkit/ui";
+import { isLocale, type Locale } from "@fluxkit/ui";
 import { featurePathProblem } from "../features/paths";
 import type { FeatureData, FeatureSitemapPage, RegisteredFeature } from "../features/types";
 import { MAX_API_OFFSET } from "./catalog-query";
@@ -88,9 +88,17 @@ export async function collectFeatureSitemapPages(
       if (problem !== null) {
         throw new Error(`The sitemap of feature "${name}" lists ${problem}.`);
       }
-      return page.lastModified === undefined
-        ? { path: page.path }
-        : { path: page.path, lastModified: page.lastModified };
+      const unknown = (page.locales ?? []).find((locale) => !isLocale(locale));
+      if (unknown !== undefined) {
+        throw new Error(
+          `The sitemap of feature "${name}" lists "${page.path}" in "${unknown}", which is not a storefront locale.`,
+        );
+      }
+      return {
+        path: page.path,
+        ...(page.lastModified === undefined ? {} : { lastModified: page.lastModified }),
+        ...(page.locales === undefined ? {} : { locales: page.locales }),
+      };
     });
   });
 }
@@ -118,11 +126,11 @@ export interface BuildSitemapInput {
 }
 
 /**
- * Home, catalog, the shop pages, the feature pages, categories and products, once per locale, each linking its other-locale
- * variants.
+ * Home, catalog, the shop pages, the feature pages, categories and products, once per locale (a feature page that names its
+ * locales: once per locale of those), each linking its other-locale variants.
  */
 export function buildSitemap(input: BuildSitemapInput): SitemapEntry[] {
-  const pages: { path: string; lastModified?: string }[] = [
+  const pages: { path: string; lastModified?: string; locales?: readonly string[] }[] = [
     { path: "" },
     { path: "/catalog" },
     ...(input.shopPages ?? []).map((path) => ({ path })),
@@ -133,13 +141,23 @@ export function buildSitemap(input: BuildSitemapInput): SitemapEntry[] {
       lastModified: product.publishedAt,
     })),
   ];
-  return pages.flatMap((page) =>
-    input.locales.map((locale) => {
+  return pages.flatMap((page) => {
+    // A page in some locales only (a feature page that names them) is listed and linked in those; its `x-default` is the
+    // default locale when the page has it, else the first of its locales.
+    const pageLocales =
+      page.locales === undefined
+        ? input.locales
+        : input.locales.filter((locale) => page.locales?.includes(locale) === true);
+    const pageDefault = pageLocales.includes(input.defaultLocale)
+      ? input.defaultLocale
+      : pageLocales[0];
+    if (pageDefault === undefined) return [];
+    return pageLocales.map((locale) => {
       const { canonical, languages } = languageAlternates({
         origin: input.origin,
         locale,
-        locales: input.locales,
-        defaultLocale: input.defaultLocale,
+        locales: pageLocales,
+        defaultLocale: pageDefault,
         path: page.path,
       });
       return {
@@ -147,6 +165,6 @@ export function buildSitemap(input: BuildSitemapInput): SitemapEntry[] {
         ...(page.lastModified === undefined ? {} : { lastModified: page.lastModified }),
         alternates: { languages },
       };
-    }),
-  );
+    });
+  });
 }
