@@ -333,6 +333,7 @@ describe("public entry point", () => {
       "MarkdownFailure",
       "ParseBudget",
       "EmphasisStack",
+      "runMarkdownParse",
     ]) {
       expect(internal in core, internal).toBe(false);
     }
