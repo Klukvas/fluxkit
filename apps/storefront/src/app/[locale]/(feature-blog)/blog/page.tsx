@@ -28,24 +28,30 @@ async function resolve({ params, searchParams }: BlogListProps) {
 export async function generateMetadata(props: BlogListProps): Promise<Metadata> {
   await requireFeature("blog");
   const { locale, page } = await resolve(props);
+  // The same read as the page's (once per request): the error state is `noindex`, a blog the API no longer has a 404.
+  const result = await getBlogList(locale, page);
+  if (result.kind === "not_found") notFound();
   return blogListMetadata({
     origin: await publicOrigin(),
     locale,
     t: createTranslator(messagesByLocale[locale], locale),
     page,
     ogImage: brand.ogImage,
+    unavailable: result.kind === "unavailable",
   });
 }
 
 /**
  * `/{locale}/blog?page=N`: the public posts, newest first. A bad `page` redirects to the repaired address and a page past the
- * last one to the last page, like the catalog. An outage shows the inline error, never a broken page.
+ * last one to the last page, like the catalog. An outage shows the inline error (`noindex`), never a broken page; an API that
+ * has no blog any more (switched off, the config's 60 s window not over yet) is a real 404.
  */
 export default async function BlogListPage(props: BlogListProps) {
   await requireFeature("blog");
   const { locale, page, canonical } = await resolve(props);
   if (!canonical) redirect(localizedHref(locale, blogListPath(page)));
   const result = await getBlogList(locale, page);
+  if (result.kind === "not_found") notFound();
   if (result.kind === "beyond_last_page") {
     redirect(localizedHref(locale, blogListPath(result.lastPage)));
   }

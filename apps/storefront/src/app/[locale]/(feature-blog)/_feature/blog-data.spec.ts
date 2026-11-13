@@ -51,6 +51,14 @@ describe("loadBlogList", () => {
     );
   });
 
+  it("is not found when the API has no blog route any more (switched off), with or without a problem body", async () => {
+    const plain404 = () =>
+      new Response("Not Found", { status: 404, headers: { "Content-Type": "text/plain" } });
+    for (const answer of [() => problemResponse(404, "not_found"), plain404]) {
+      expect(await loadBlogList(blogData([answer]), "uk", 1)).toEqual({ kind: "not_found" });
+    }
+  });
+
   it("shows the inline error on an outage or a broken answer, and throws on a refused request", async () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     for (const answer of [
@@ -81,6 +89,14 @@ describe("loadBlogPost", () => {
     await expect(
       loadBlogPost(blogData([() => problemResponse(400, "validation_failed")]), "uk", "x"),
     ).rejects.toThrow("GET /store/blog/posts/{slug} answered 400 validation_failed.");
+  });
+
+  it("refuses an answer for another slug as not found, and says so in the log", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    expect(await loadBlogPost(blogData([() => jsonResponse(post)]), "uk", "other-post")).toBeNull();
+    expect(error).toHaveBeenCalledWith(
+      'GET /store/blog/posts/{slug} answered the post "spring-care" for "other-post"; served as not found.',
+    );
   });
 
   it("never serves an earlier answer through an outage: a taken-back post is not shown from memory", async () => {

@@ -5,7 +5,7 @@ cover picture and its alt text, per content locale), keep them as drafts, publis
 them; the store API serves the public posts with their body as a parsed Markdown AST, never HTML. Plan: `docs/plans/2026-11-13-blog.md`
 (this package is its PR 3: the API part). The storefront pages (plan PR 4b, below) and the admin screens (PR 5) are separate slices.
 
-Posts are public shop content: never put personal data in them (no author, no names of staff or customers).
+Posts are public shop content: never put personal data in them (no personal author, no names of staff or customers).
 
 - Flag: `blog` in `FEATURES_ENABLED` (off by default; owner's answer 9 (a)). Off: no route (every `/store/blog/*` and `/admin/blog/*`
   answers `404` like an unknown path), no migration, no database write; `features` of `GET /store/config` and `GET /admin/config` lacks
@@ -34,17 +34,20 @@ files: `docs/files/storefront.md`). Shown only while `GET /store/config` `featur
 `404` and no page links them.
 
 - `/{locale}/blog?page=N`: the public posts written in the locale, newest first, 12 a page (cover in a 16:9 frame, title link, date,
-  excerpt); an empty state linking the catalog; an inline error while the API cannot be read. A bad `page` redirects to the repaired
+  excerpt); an empty state linking the catalog; an inline error while the API cannot be read (the page is then `noindex`); a real
+  `404` when the list route answers `404` (the feature was just switched off and the storefront's config copy is not 60 s old yet). A bad `page` redirects to the repaired
   address, one past the last page to the last page. Metadata: the list's canonical, hreflang for every locale, `noindex, follow` from
   page 2; JSON-LD `BreadcrumbList`.
 - `/{locale}/blog/{slug}`: one post (title, date, cover through `StoreImage`, the body through `MarkdownView`, a link back); a real `404`
   for anything the API does not serve in the locale. Metadata: `seoTitle ?? title`, `seoDescription ?? excerpt ??` the start of the
   body, the canonical and hreflang of the locales the post is written in only (`x-default` the default locale when it has it, else its
   first), Open Graph `article` with the publish and change times and the cover (else the brand's picture). JSON-LD `BlogPosting`
-  (headline at most 110 characters, `wordCount`, `inLanguage`; the shop as `Organization` publisher with its logo when the brand has a
-  picture, no author) and `BreadcrumbList`.
+  (headline at most 110 characters, `wordCount`, `inLanguage`, `image` the cover else the brand's social picture; the shop as
+  `Organization` author (name and address) and publisher (with its logo when the brand has a picture), no personal author) and
+  `BreadcrumbList`. A post whose answer names another slug is a 404 (logged).
 - Header and footer link "Блог" / "Blog" (`features.blog.nav`) to `/blog`; `/sitemap.xml` lists `/blog` and every public post in the
-  locales it is written in, with `updatedAt` (1 h cache; a truncated answer is logged).
+  locales it is written in, with `updatedAt` (1 h cache; a truncated answer is logged). So the sitemap may list a post for up to an
+  hour after it was unpublished; its page answers a real `404` at once. Dates are shown as the UTC calendar day.
 - Caching: the list through the Next data cache for 60 s (tag `feature:blog`); a post is read on every view (the data cache keeps `200`
   answers only, so a cached post would stay on the shop after it was unpublished). Never served from the in-memory last-good copy.
 - Texts: `_feature/messages/{uk,en}.json` (`features.blog.*`), overridable like any upstream text (`src/messages-overrides`).

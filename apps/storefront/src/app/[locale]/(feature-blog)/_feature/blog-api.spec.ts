@@ -64,6 +64,18 @@ describe("the blog's store calls", () => {
     expect(result).toMatchObject({ ok: false, status: 404, problem: { code: "not_found" } });
   });
 
+  it("takes a 404 without a problem body as not found, not as a broken answer", async () => {
+    const { context } = contextAnswering(
+      new Response("<html>404</html>", { status: 404, headers: { "Content-Type": "text/html" } }),
+    );
+    expect(await listPostsCall("uk", 1)(context)).toMatchObject({
+      ok: false,
+      status: 404,
+      problem: { status: 404, code: "not_found" },
+      retryAfter: null,
+    });
+  });
+
   it("reads the sitemap with its locales and the truncation flag", async () => {
     const body = {
       items: [

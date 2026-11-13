@@ -2,8 +2,8 @@
  * Metadata and JSON-LD of the blog pages, in the style of `lib/page-metadata.ts` and `lib/seo.ts`. Pure: the page passes the
  * public origin, the translator, the data and the brand pictures (`config/brand.ts`; tests pass their own). Every canonical and
  * hreflang URL is absolute. A post's alternates name only the locales it is written in (owner's answer 6: a post is served in
- * a locale only when it has a title and a body there). No author: the shop is the publisher (owner's answer 8, no personal
- * data in posts).
+ * a locale only when it has a title and a body there). The shop is the author and the publisher (owner's answer 8 (a): no
+ * personal author, no personal data in posts).
  */
 import { defaultLocale, locales, type Locale, type Translator } from "@fluxkit/ui";
 import type { Metadata } from "next";
@@ -39,11 +39,17 @@ export interface BlogListMetadataInput {
   page: number;
   /** `config/brand.ts` `ogImage`. */
   ogImage: BrandPicture | null;
+  /**
+   * The list could not be read (the inline error shows): `noindex, follow`, so a crawler never indexes the error state. The
+   * catalog has no such state (an outage there is the route's error view), so this is the blog's own rule.
+   */
+  unavailable?: boolean;
 }
 
 /**
  * The list: title and description from the messages, its own canonical (`?page=N` from page 2), hreflang for every locale,
- * `noindex, follow` from page 2 (the posts are reachable from page 1 and the sitemap, like `listingRobots`).
+ * `noindex, follow` from page 2 (the posts are reachable from page 1 and the sitemap, like `listingRobots`) and while the list
+ * is unavailable.
  */
 export function blogListMetadata(input: BlogListMetadataInput): Metadata {
   const { t, page } = input;
@@ -64,7 +70,7 @@ export function blogListMetadata(input: BlogListMetadataInput): Metadata {
     title,
     description,
     alternates,
-    ...(page > 1 ? { robots: { index: false, follow: true } } : {}),
+    ...(page > 1 || input.unavailable === true ? { robots: { index: false, follow: true } } : {}),
     openGraph: {
       title,
       description,
@@ -103,9 +109,16 @@ export function postModifiedTime(post: Pick<BlogPost, "publishedAt" | "updatedAt
     : post.updatedAt;
 }
 
+/** A text that says something, else `null`: an empty or blank text falls through the fallback chains below. */
+function filled(text: string | null): string | null {
+  return text === null || text.trim() === "" ? null : text;
+}
+
 /** `seoDescription`, else the excerpt, else the start of the body: plain text of at most 160 characters. */
 export function postDescription(post: BlogPost): string | undefined {
-  return trimDescription(post.seoDescription ?? post.excerpt ?? documentText(post.content));
+  return trimDescription(
+    filled(post.seoDescription) ?? filled(post.excerpt) ?? documentText(post.content),
+  );
 }
 
 export interface BlogPostMetadataInput {
@@ -122,7 +135,7 @@ export interface BlogPostMetadataInput {
  */
 export function blogPostMetadata(input: BlogPostMetadataInput): Metadata {
   const { t, post } = input;
-  const title = pageTitle(t, post.seoTitle ?? post.title);
+  const title = pageTitle(t, filled(post.seoTitle) ?? post.title);
   const description = postDescription(post);
   const alternates = postAlternates(input.origin, input.locale, post);
   const coverUrl = socialImageUrl(post.cover?.url);
@@ -184,14 +197,26 @@ export interface BlogPostingJsonLdInput {
   post: BlogPost;
   /** `config/brand.ts` `logo`. */
   logo: BrandLogo;
+  /** `config/brand.ts` `ogImage`: the `image` of a post without a cover, as in its Open Graph. */
+  ogImage: BrandPicture | null;
 }
 
-/** schema.org `BlogPosting` of a post; the shop (`site.name`) is the publisher, there is no author. */
+/**
+ * schema.org `BlogPosting` of a post; the shop (`site.name`) is the author and the publisher. `image`: the cover, else the brand's
+ * social picture, else none.
+ */
 export function blogPostingJsonLd(input: BlogPostingJsonLdInput): object {
   const { post } = input;
   const url = postAlternates(input.origin, input.locale, post).canonical;
   const description = postDescription(post);
-  const image = socialImageUrl(post.cover?.url);
+  const cover = socialImageUrl(post.cover?.url);
+  const image =
+    cover ?? (input.ogImage === null ? null : absoluteUrl(input.origin, input.ogImage.src));
+  const shop = shopOrganizationJsonLd({
+    origin: input.origin,
+    name: input.t("site.name"),
+    logo: input.logo,
+  });
   return {
     "@context": "https://schema.org",
     "@type": "BlogPosting",
@@ -204,11 +229,13 @@ export function blogPostingJsonLd(input: BlogPostingJsonLdInput): object {
     wordCount: wordCount(documentText(post.content)),
     url,
     mainEntityOfPage: { "@type": "WebPage", "@id": url },
-    publisher: shopOrganizationJsonLd({
-      origin: input.origin,
+    // The author is the shop by name and address; its logo belongs to the publisher (schema.org's publisher `logo`).
+    author: {
+      "@type": "Organization",
       name: input.t("site.name"),
-      logo: input.logo,
-    }),
+      url: absoluteUrl(input.origin, "/"),
+    },
+    publisher: shop,
   };
 }
 

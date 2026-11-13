@@ -300,6 +300,22 @@ async function getJson<T>(
     }
     return { ok: false, status, problem, retryAfter: response.headers.get("Retry-After") };
   }
+  if (status === 404) {
+    // A 404 without a problem body (a proxy, or the API between switching the feature off and the storefront's config
+    // window) still says the route or the post is not there: the page answers a 404, it is no outage. Built here, not read.
+    return {
+      ok: false,
+      status,
+      problem: {
+        type: "about:blank",
+        title: "Not Found",
+        status,
+        code: "not_found",
+        detail: `${operation} answered 404 without a problem body.`,
+      },
+      retryAfter: null,
+    };
+  }
   throw new InvalidBlogResponseError(
     `${operation}: unexpected answer ${String(status)} (${mediaType(response) || "no content type"}).`,
   );

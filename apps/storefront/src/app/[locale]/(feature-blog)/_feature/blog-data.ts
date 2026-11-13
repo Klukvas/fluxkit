@@ -20,10 +20,18 @@ export type BlogListResult =
   | { kind: "ok"; list: BlogPostList; pageCount: number }
   /** A page past the last one: the route redirects to the last page (page 1 of an empty blog). */
   | { kind: "beyond_last_page"; lastPage: number }
+  /**
+   * The API has no blog route (`404`): the feature was switched off and the storefront's copy of the config does not know yet
+   * (up to 60 s). The page answers a real 404, as it will once the config says so.
+   */
+  | { kind: "not_found" }
   /** The API cannot be read now (already logged by `StoreData`): the page shows its inline error. */
   | { kind: "unavailable" };
 
-/** One list page. A 4xx is a bug of this page (it sends only checked values) and throws: the route's error view. */
+/**
+ * One list page. A `404` is `not_found` (above); another 4xx is a bug of this page (it sends only checked values) and throws:
+ * the route's error view.
+ */
 export async function loadBlogList(
   data: FeatureData,
   locale: string,
@@ -36,6 +44,7 @@ export async function loadBlogList(
       throw error;
     });
   if (outcome === null) return { kind: "unavailable" };
+  if (!outcome.ok && outcome.status === 404) return { kind: "not_found" };
   if (!outcome.ok) {
     throw new Error(`${LIST_POSTS} answered ${String(outcome.status)} ${outcome.problem.code}.`);
   }
@@ -52,7 +61,8 @@ export async function loadBlogList(
  *
  * Never through the Next data cache: it stores `200` answers only, so once a post is unpublished its revalidation (a `404`)
  * would never replace the cached post, which would stay on the shop indefinitely (seen in the e2e suite on Next 16.4.3). The
- * page and its `generateMetadata` share one read per request (`blog-data.server.ts`).
+ * page and its `generateMetadata` share one read per request (`blog-data.server.ts`). An answer for another slug than the one
+ * asked for is refused as not found (logged): the page's canonical and breadcrumbs are built from the address.
  */
 export async function loadBlogPost(
   data: FeatureData,
@@ -60,7 +70,13 @@ export async function loadBlogPost(
   slug: string,
 ): Promise<BlogPost | null> {
   const outcome = await data.read(GET_POST, getPostCall(locale, slug), { noStore: true });
-  if (outcome.ok) return outcome.data;
+  if (outcome.ok) {
+    if (outcome.data.slug === slug) return outcome.data;
+    console.error(
+      `${GET_POST} answered the post "${outcome.data.slug}" for "${slug}"; served as not found.`,
+    );
+    return null;
+  }
   if (outcome.status === 404) return null;
   throw new Error(`${GET_POST} answered ${String(outcome.status)} ${outcome.problem.code}.`);
 }

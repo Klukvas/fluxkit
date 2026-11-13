@@ -25,7 +25,7 @@ Narrative, rendering findings and how-tos: `apps/storefront/README.md`. Rules: `
   first, 12 a page, a bad `page` redirected to the repaired address and one past the last to the last page, empty state, inline error on an
   outage; metadata with every locale's alternates, `noindex, follow` from page 2; `BreadcrumbList`), `blog/[slug]/page.tsx` (one post: a
   real 404 for a string that is not a slug and for any post the API does not serve in the locale; metadata with the alternates of the
-  post's locales only, Open Graph `article` with the cover; `BlogPosting` with the shop as publisher and no author, `BreadcrumbList`).
+  post's locales only, Open Graph `article` with the cover; `BlogPosting` with the shop as `Organization` author and publisher (no personal author), `BreadcrumbList`). A post whose answer names another slug is a 404 (logged). The list's error state is `noindex`; a `404` from the list route (the feature just switched off) is a real 404.
   Private `_feature/`: `feature.ts` (manifest: header and footer link `features.blog.nav` to `/blog`, `sitemap` from
   `GET /store/blog/sitemap` with each post's locales, 1 h cache, a warning when truncated; `blogSitemapPages`), `blog-api.ts` (pure: the
   three store calls for `StoreData.featureRead` and their checked answers, `parseMarkdownDocument` keeps unknown node types; imports types

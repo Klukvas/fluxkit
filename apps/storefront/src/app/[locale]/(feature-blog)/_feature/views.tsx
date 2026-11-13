@@ -41,10 +41,14 @@ function blogCrumbs(t: Translator, locale: Locale, title?: string): BreadcrumbIt
   ];
 }
 
+/**
+ * The publish date as a calendar day in UTC, like the other server-rendered dates (`legal-page.tsx`, `lib/attributes.ts`): the
+ * shop has no configured time zone, and the server's own zone must not decide the day a reader sees.
+ */
 function PublishedDate({ value, locale }: { value: string; locale: Locale }) {
   return (
     <p className={textStyles.meta}>
-      <time dateTime={value}>{formatDate(value, locale)}</time>
+      <time dateTime={value}>{formatDate(value, locale, { timeZone: "UTC" })}</time>
     </p>
   );
 }
@@ -110,7 +114,7 @@ export interface BlogListViewProps {
   locale: Locale;
   t: Translator;
   page: number;
-  result: Exclude<BlogListResult, { kind: "beyond_last_page" }>;
+  result: Extract<BlogListResult, { kind: "ok" | "unavailable" }>;
   imageHosts: readonly string[];
 }
 

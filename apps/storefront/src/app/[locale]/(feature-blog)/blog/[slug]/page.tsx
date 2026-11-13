@@ -48,7 +48,16 @@ export default async function BlogPostPage(props: BlogPostProps) {
   return (
     <>
       <BlogPostView locale={locale} t={t} post={post} imageHosts={imageHosts()} />
-      <JsonLd data={blogPostingJsonLd({ origin, locale, t, post, logo: brand.logo })} />
+      <JsonLd
+        data={blogPostingJsonLd({
+          origin,
+          locale,
+          t,
+          post,
+          logo: brand.logo,
+          ogImage: brand.ogImage,
+        })}
+      />
       <JsonLd data={blogBreadcrumbJsonLd({ origin, locale, t, post })} />
     </>
   );

@@ -58,6 +58,17 @@ describe("blogListMetadata", () => {
   });
 });
 
+describe("blogListMetadata while the list cannot be read", () => {
+  it("keeps the page's canonical but is noindex, follow, so the error state is never indexed", () => {
+    const meta = blogListMetadata({ origin, locale: "uk", t, page: 1, ogImage, unavailable: true });
+    expect(meta.robots).toEqual({ index: false, follow: true });
+    expect(meta.alternates?.canonical).toBe("https://shop.example/uk/blog");
+    expect(
+      blogListMetadata({ origin, locale: "uk", t, page: 1, ogImage, unavailable: false }).robots,
+    ).toBeUndefined();
+  });
+});
+
 describe("blogPostMetadata", () => {
   it("uses the title, the excerpt, the post's canonical, its locales and Open Graph article with the cover", () => {
     const meta = blogPostMetadata({ origin, locale: "uk", t, post, ogImage });
@@ -112,6 +123,20 @@ describe("blogPostMetadata", () => {
       ogImage,
     });
     expect(fromBody.description).toBe("Washing Wash it cold. See the catalog. Dry flat 30 °C");
+    // An empty or blank text falls through like a missing one.
+    const blank = blogPostMetadata({
+      origin,
+      locale: "uk",
+      t,
+      post: { ...post, seoTitle: " ", seoDescription: "", excerpt: "  " },
+      ogImage,
+    });
+    expect(blank.title).toBe(t("seo.pageTitle", { title: post.title, site: shopName }));
+    expect(blank.description).toBe("Washing Wash it cold. See the catalog. Dry flat 30 °C");
+    expect(
+      blogPostMetadata({ origin, locale: "uk", t, post: { ...post, seoDescription: "" }, ogImage })
+        .description,
+    ).toBe(post.excerpt);
   });
 
   it("uses the alt text of the post's title for a decorative cover, and the brand picture without a cover", () => {
@@ -153,7 +178,7 @@ describe("postModifiedTime", () => {
       updatedAt: "2026-11-13T21:42:28.370Z",
     };
     expect(
-      blogPostingJsonLd({ origin, locale: "uk", t, post: stamped, logo: textLogo }),
+      blogPostingJsonLd({ origin, locale: "uk", t, post: stamped, logo: textLogo, ogImage }),
     ).toMatchObject({
       datePublished: stamped.publishedAt,
       dateModified: stamped.publishedAt,
@@ -167,8 +192,8 @@ describe("postModifiedTime", () => {
 });
 
 describe("blogPostingJsonLd", () => {
-  it("describes the post with the shop as publisher and no author", () => {
-    expect(blogPostingJsonLd({ origin, locale: "uk", t, post, logo: textLogo })).toEqual({
+  it("describes the post with the shop as author and publisher", () => {
+    expect(blogPostingJsonLd({ origin, locale: "uk", t, post, logo: textLogo, ogImage })).toEqual({
       "@context": "https://schema.org",
       "@type": "BlogPosting",
       headline: post.title,
@@ -180,8 +205,26 @@ describe("blogPostingJsonLd", () => {
       wordCount: 11,
       url: "https://shop.example/uk/blog/spring-care",
       mainEntityOfPage: { "@type": "WebPage", "@id": "https://shop.example/uk/blog/spring-care" },
+      author: { "@type": "Organization", name: shopName, url: "https://shop.example/" },
       publisher: { "@type": "Organization", name: shopName, url: "https://shop.example/" },
     });
+  });
+
+  it("uses the brand's social picture as image without a cover, and none without either", () => {
+    const brandPicture = { src: "/brand/og.png", width: 1200, height: 630 } as const;
+    expect(
+      blogPostingJsonLd({
+        origin,
+        locale: "uk",
+        t,
+        post: { ...post, cover: null },
+        logo: textLogo,
+        ogImage: brandPicture,
+      }),
+    ).toMatchObject({ image: ["https://shop.example/brand/og.png"] });
+    expect(
+      blogPostingJsonLd({ origin, locale: "uk", t, post, logo: textLogo, ogImage: brandPicture }),
+    ).toMatchObject({ image: ["https://cdn.example.com/cover.webp"] });
   });
 
   it("caps the headline, adds the logo of an image brand and stays inert inside a script element", () => {
@@ -196,7 +239,8 @@ describe("blogPostingJsonLd", () => {
         light: { src: "/brand/logo.svg", width: 120, height: 32 },
         darkSafe: true,
       },
-    }) as { headline: string; publisher: { logo: unknown } };
+      ogImage,
+    }) as { headline: string; author: object; publisher: { logo: unknown } };
     expect(data.headline.length).toBeLessThanOrEqual(HEADLINE_MAX_LENGTH);
     expect(data).not.toHaveProperty("image");
     expect(data.publisher.logo).toEqual({
@@ -205,12 +249,14 @@ describe("blogPostingJsonLd", () => {
       width: 120,
       height: 32,
     });
+    expect(data.author).not.toHaveProperty("logo");
     const tagged = blogPostingJsonLd({
       origin,
       locale: "uk",
       t,
       post: { ...post, title: "</script><script>alert(1)</script>" },
       logo: textLogo,
+      ogImage,
     });
     expect(serializeJsonLd(tagged)).not.toContain("</script>");
   });

@@ -79,6 +79,15 @@ describe("BlogListView", () => {
   });
 });
 
+describe("the publish date", () => {
+  it("is the UTC calendar day, whatever the server's own time zone", () => {
+    // Late on 1 November in UTC is already 2 November east of it (Kyiv): the day must not follow the server's zone.
+    const late = { ...postSummary, publishedAt: "2026-11-01T23:30:00.000Z" };
+    const html = list({ kind: "ok", list: postList([late]), pageCount: 1 });
+    expect(html).toContain('<time dateTime="2026-11-01T23:30:00.000Z">November 1, 2026</time>');
+  });
+});
+
 describe("BlogPostView", () => {
   it("renders the title, the date, the eager cover, the body with locale links and a link back", () => {
     const html = renderToStaticMarkup(
