@@ -70,12 +70,14 @@ until both support it and `pnpm lint` and `pnpm check:boundaries` are verified; 
 ## 2. Core architecture principles
 
 ### 2.1 Feature modules (add/remove without breaking the rest)
-- Each optional feature lives in its own module/folder (e.g. `features/wishlist`, `features/reviews`, `features/coupons`).
+- Each optional feature lives in its own package (`packages/features/<name>`, e.g. wishlist, reviews, coupons). A feature with UI also has one slice folder
+  per app (storefront `apps/storefront/src/app/[locale]/(feature-<name>)/`, admin `apps/admin/src/features/<name>/`), found by that app's feature registry;
+  no other app code imports a slice, and slices never import each other (owner's decision 2026-11-13, `docs/plans/2026-11-13-blog.md`).
 - Core code must NEVER import from an optional feature directly. Features plug in through
   extension points: registry, config flags, events, slots, or hooks.
 - Every optional feature must be toggleable by a single config flag (`features.wishlist.enabled`).
   With the flag off: no UI, no routes, no API endpoints, no DB side effects at runtime.
-- Removing a feature = deleting its folder + its flag + its migration (documented in the feature's README). Check that this actually works when you add a feature.
+- Removing a feature = deleting its folders (the package and its app slices) + its flag + its migration (documented in the feature's README). Check that this actually works when you add a feature.
 - Mechanism (see `docs/contracts/config.md`): a feature package declares `"fluxkit": {"feature": "<name>"}` and exports `featureModule`; `apps/api` discovers and
   dynamically imports only enabled ones from `FEATURES_ENABLED`. Feature tests live inside the feature package so they disappear with it; core tests use a fixture feature.
 - Core = catalog, cart, checkout, orders, customers, admin basics. Everything else is a feature.
@@ -336,7 +338,7 @@ CI (`.github/workflows/ci.yml`) runs on every PR and on pushes to `main`; all jo
 
 - `verify`: lint, format check, type check, schema drift check, module boundary check, `pnpm check:env`, unit/integration tests (service containers: Postgres 17, Redis 8, Meilisearch v1.55.0).
 - `feature-matrix` (`scripts/feature-matrix.sh`): `on` (API started with `FEATURES_ENABLED=example`, route exists), `off` (404), `deleted`
-  (feature folder removed, lint/types/boundaries/tests still pass). Core must never depend on a feature. The other modes (section 1) check
+  (feature folders removed: the package and its app slices; lint/types/boundaries/tests still pass). Core must never depend on a feature. The other modes (section 1) check
   provider plugins (`providers-*`) and search (`search-off`: routes 404, no search table writes; `search-on`: seeds, reindexes against a real engine and finds the seeded product).
 - `policy`: `pnpm check:licenses` (policy in `scripts/license-policy.json`), `pnpm audit:prod` (fails on high severity in production dependencies),
   and `pnpm notices` (uploads `THIRD_PARTY_NOTICES.md` as an artifact; ship it with client deliveries).
