@@ -37,6 +37,11 @@ describe("cardDisplay (the plain view model every card kind renders)", () => {
       priceLabel: "§product.price.label",
       note: null,
       availability: { text: "§availability.in_stock", variant: "success", badge: false },
+      purchase: {
+        kind: "choose",
+        label: "§product.card.chooseOptions",
+        shortLabel: "§product.card.chooseShort",
+      },
     });
   });
 
@@ -137,5 +142,60 @@ describe("cardDisplay (the plain view model every card kind renders)", () => {
     expect(card.price).toBe("§catalog.price.from");
     expect(card.availability).toBeNull();
     expect(card.note).toBe("§search.card.dependsOnOption");
+  });
+});
+
+describe("cardDisplay: what the card offers to buy (owner design 2026-11-13)", () => {
+  const purchaseOf = (input: Partial<CardDisplayInput> & Pick<CardDisplayInput, "product">) =>
+    cardDisplay({ ...base, ...input }).purchase;
+  const oneVariant = (availability: "in_stock" | "low_stock" | "out_of_stock") =>
+    summary("mug", { defaultVariantId: "variant-mug" }, availability);
+
+  it("adds the only sellable variant from the card while it can be bought (in stock, low stock)", () => {
+    expect(purchaseOf({ product: oneVariant("in_stock") })).toEqual({
+      kind: "add",
+      variantId: "variant-mug",
+    });
+    expect(purchaseOf({ product: oneVariant("low_stock") })).toEqual({
+      kind: "add",
+      variantId: "variant-mug",
+    });
+  });
+
+  it("offers nothing for an out-of-stock product, with one variant or several", () => {
+    expect(purchaseOf({ product: oneVariant("out_of_stock") })).toBeNull();
+    expect(purchaseOf({ product: summary("shirt", {}, "out_of_stock") })).toBeNull();
+  });
+
+  it("links to the product page to choose when the product has several variants", () => {
+    expect(purchaseOf({ product: summary("shirt", {}, "low_stock") })).toEqual({
+      kind: "choose",
+      label: "§product.card.chooseOptions",
+      shortLabel: "§product.card.chooseShort",
+    });
+  });
+
+  it("follows a search hit's shown availability, and offers nothing while the index catches up", () => {
+    const matched = (availability: "in_stock" | "out_of_stock") =>
+      ({
+        kind: "matched",
+        price: { from: 2599, to: 2599, currency: "UAH" },
+        availability,
+        variantCount: 1,
+        linkQuery: "",
+      }) as const;
+    expect(purchaseOf({ product: oneVariant("in_stock"), offer: matched("in_stock") })).toEqual({
+      kind: "add",
+      variantId: "variant-mug",
+    });
+    expect(
+      purchaseOf({ product: oneVariant("in_stock"), offer: matched("out_of_stock") }),
+    ).toBeNull();
+    expect(
+      purchaseOf({
+        product: oneVariant("in_stock"),
+        offer: { kind: "catchingUp", linkQuery: "" },
+      }),
+    ).toBeNull();
   });
 });

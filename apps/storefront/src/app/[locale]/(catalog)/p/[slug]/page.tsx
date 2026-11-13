@@ -60,8 +60,9 @@ export default async function ProductPage(props: ProductProps) {
   const origin = await publicOrigin();
   const url = absoluteUrl(origin, localizedHref(locale, `/p/${encodeURIComponent(product.slug)}`));
   const homeHref = localizedHref(locale, "/");
-  // The size guide (by default) next to the option pickers; the island shows it only on a product with options.
-  const optionGuide = optionGuideLink(locale);
+  // The guide page the product type names (a size guide), when this storefront has it enabled; the island shows it only on a
+  // product with options.
+  const optionGuide = optionGuideLink(locale, product.optionGuidePage);
 
   const crumbs = [
     { label: t("breadcrumbs.home"), href: homeHref },

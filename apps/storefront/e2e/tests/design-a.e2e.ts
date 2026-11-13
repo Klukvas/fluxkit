@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Locator, Page } from "@playwright/test";
 import { expect, test, uniqueEmail } from "../support/fixtures.ts";
-import { rowValue, tabTo, waitForHydration } from "../support/flows.ts";
+import { rowValue, sortButton, tabTo, waitForHydration } from "../support/flows.ts";
 import { SHOP_NAME } from "../support/shop-name.ts";
 
 /**
@@ -275,7 +275,7 @@ test("nothing found: no filter panel, the categories as a way on, the spelling h
   await expect(page.getByRole("heading", { name: "Nothing found" })).toBeVisible();
   await expect(page.getByText(/Check the spelling/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Apply filters" })).toHaveCount(0);
-  await expect(page.getByRole("combobox", { name: "Sort by" })).toHaveCount(0);
+  await expect(sortButton(page)).toHaveCount(0);
   const categories = page.getByRole("navigation", { name: "Browse categories" });
   await expect(categories.getByRole("link", { name: "Clothing" })).toHaveAttribute(
     "href",
@@ -401,4 +401,17 @@ test("the sticky summary never runs past a short viewport: it scrolls on its own
   await expect(add).toBeInViewport();
   await summary.getByRole("list", { name: "About your purchase" }).scrollIntoViewIfNeeded();
   await expect(summary.getByRole("list", { name: "About your purchase" })).toBeInViewport();
+});
+
+test("the wheel over the sticky summary scrolls the page, not only over the left column (owner report 2026-11-13)", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto("/en/p/demo-t-shirt?opt.color=black&opt.size=m");
+  await waitForHydration(page);
+  const box = await page.locator("[data-product-summary]").boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.move((box?.x ?? 0) + (box?.width ?? 0) / 2, (box?.y ?? 0) + 40);
+  await page.mouse.wheel(0, 400);
+  await expect.poll(async () => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
 });

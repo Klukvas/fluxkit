@@ -243,6 +243,14 @@ describe("changing the selection", () => {
     expect(setSort({ ...empty, sort: "price_desc" }, null).sort).toBeNull();
   });
 
+  it("leaves the sort the API picks anyway out of the address (a sort link needs no redirect)", () => {
+    expect(setSort({ ...empty, sort: "price_asc" }, "newest").sort).toBeNull();
+    expect(setSort(empty, "relevance").sort).toBeNull();
+    expect(setSort({ ...empty, q: "x" }, "relevance").sort).toBeNull();
+    expect(setSort({ ...empty, q: "x" }, "newest").sort).toBe("newest");
+    expect(searchPath(setSort({ ...empty, q: "x", page: 4 }, "relevance"))).toBe("/search?q=x");
+  });
+
   it("clears the filters and the price but keeps the words and the sort", () => {
     const query: SearchQuery = {
       q: "x",

@@ -76,7 +76,8 @@ export class ProductTypesController {
 
   @Patch(":id")
   @ApiOperation({
-    summary: "Change a product type (name, requiresShipping; the code never changes)",
+    summary:
+      "Change a product type (name, requiresShipping, optionGuidePage; the code never changes)",
   })
   @ApiParam(ID_PARAM)
   @ApiZodBody(updateProductTypeSchema)

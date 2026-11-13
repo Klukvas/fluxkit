@@ -92,6 +92,13 @@
       "when": 1793904934919,
       "tag": "0012_banner",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1794568929098,
+      "tag": "0013_product_type_option_guide_page",
+      "breakpoints": true
     }
   ]
 }

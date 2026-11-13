@@ -9,6 +9,8 @@ export const productTypePresets: readonly SeedProductType[] = [
     code: "clothing",
     name: { uk: "Одяг", en: "Clothing" },
     requiresShipping: true,
+    // The storefront's size guide page links next to the colour and size pickers (the e2e checks it on `demo-t-shirt`).
+    optionGuidePage: "size-guide",
     optionCodes: ["color", "size"],
     attributes: [
       { attributeCode: "material", level: "product", isRequired: true },

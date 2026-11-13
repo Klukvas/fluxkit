@@ -142,3 +142,12 @@ export const WHOLE_PAGE_SELECTOR = "page.body";
 export function comparesViewportOnly(masks: readonly string[]): boolean {
   return masks.includes(WHOLE_PAGE_SELECTOR);
 }
+
+/**
+ * Whether an element shot is left out: its own selector is masked on that page. The mask would cover the whole shot, so the
+ * shot could only differ in its size, which a mask cannot declare (a card that gains a button grows taller). The element
+ * still has to exist; the page's full-page frame still compares everything around it.
+ */
+export function skipsElementShot(masks: readonly string[], selector: string): boolean {
+  return masks.includes(selector);
+}

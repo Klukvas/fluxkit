@@ -44,6 +44,11 @@ export interface SeedProductType {
   code: string;
   name: I18nText;
   requiresShipping: boolean;
+  /**
+   * Slug of the storefront shop page linked next to the option pickers (`size-guide` for clothing); omitted: none. Only set
+   * when the type is created (the runner never overwrites an existing type).
+   */
+  optionGuidePage?: string;
   attributes: readonly SeedProductTypeAttribute[];
   /** Option codes, in display order. Empty for a type whose products have a single default variant. */
   optionCodes: readonly string[];

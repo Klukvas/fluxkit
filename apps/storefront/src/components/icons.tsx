@@ -121,3 +121,63 @@ export function CategoryIcon(props: SVGProps<SVGSVGElement>) {
     </Icon>
   );
 }
+
+/**
+ * Sort icons (`sort-menu.tsx`): a sparkle (newest), arrows up and down (price low to high, high to low), a target (best
+ * match); 20 px beside the sort's own label, which names it.
+ */
+export function SparkleIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon width="20" height="20" {...props}>
+      <path d="M11 3c.6 4.2 2.8 6.4 7 7-4.2.6-6.4 2.8-7 7-.6-4.2-2.8-6.4-7-7 4.2-.6 6.4-2.8 7-7z" />
+      <path d="M19 16v5M16.5 18.5h5" />
+    </Icon>
+  );
+}
+
+export function ArrowUpIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon width="20" height="20" {...props}>
+      <path d="M12 20V4M6 10l6-6 6 6" />
+    </Icon>
+  );
+}
+
+export function ArrowDownIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon width="20" height="20" {...props}>
+      <path d="M12 4v16M6 14l6 6 6-6" />
+    </Icon>
+  );
+}
+
+export function TargetIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon width="20" height="20" {...props}>
+      <circle cx="12" cy="12" r="8" />
+      <circle cx="12" cy="12" r="4" />
+      <circle cx="12" cy="12" r="0.5" />
+    </Icon>
+  );
+}
+
+/**
+ * The header's theme control (`site-header.tsx`): a sun and a moon, both in the markup; `.fk-light-only` / `.fk-dark-only`
+ * (app/globals.css) show the one of the theme `<html data-theme>` resolves to, by CSS only (no flash in the system mode).
+ */
+export function SunIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+    </Icon>
+  );
+}
+
+export function MoonIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" />
+    </Icon>
+  );
+}

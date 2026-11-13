@@ -91,6 +91,7 @@ const productType: AdminProductTypeDetail = {
   code: "sample_type",
   name: { uk: "Тип", en: "Sample type" },
   requiresShipping: true,
+  optionGuidePage: null,
   createdAt: stamp,
   updatedAt: stamp,
   options: [

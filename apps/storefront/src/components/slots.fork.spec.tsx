@@ -68,7 +68,7 @@ const footer = renderToStaticMarkup(
 const header = renderToStaticMarkup(
   <I18nProvider locale={locale} messages={messages}>
     <SessionProvider locale={locale}>
-      <SiteHeader locale={locale} t={t} categories={[]} searchEnabled />
+      <SiteHeader locale={locale} t={t} categories={[]} searchEnabled themeMode="light" />
     </SessionProvider>
   </I18nProvider>,
 );

@@ -76,8 +76,8 @@ export interface ProductPurchaseViewProps {
   /** Server-rendered note under the trust bar (the delivery and returns note, `components/product-page-note.tsx`). */
   note?: ReactNode;
   /**
-   * A shop page next to the option pickers (the size guide by default, `productOptionGuide` of `config/shop-pages.ts`): its
-   * localized link and its title, translated on the server. Shown only on a product with options; `null` or absent: no link.
+   * A shop page next to the option pickers (the page the product type names, e.g. the size guide; `optionGuideLink` of
+   * `lib/shop-pages.ts`): its localized link and its title, translated on the server. Shown only on a product with options; `null` or absent: no link.
    */
   optionGuide?: { href: string; label: string } | null;
   /** Option values the address asks for (`?opt.<code>=<value>`, `selectionFromParams`); the page starts from them. */

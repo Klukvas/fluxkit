@@ -9,7 +9,7 @@ import {
   clientMarker,
 } from "../support/env.ts";
 import { expect, test } from "../support/fixtures.ts";
-import { waitForHydration } from "../support/flows.ts";
+import { chooseSort, sortButton, waitForHydration } from "../support/flows.ts";
 
 // Catalog and category pages with search on (search plan step 10a, rest; owner answer 3): the list, the facets and the sort
 // come from GET /store/search with the results page's URL state on the page's own path, and the page falls back to the SQL
@@ -36,7 +36,7 @@ test("the catalog lists through search: facets, sort and chips on its own addres
   await expect(page.getByRole("heading", { level: 1, name: "Catalog" })).toBeVisible();
   await expect(page.getByRole("complementary", { name: "Filters" })).toBeVisible();
   await expect(page.getByRole("group", { name: "Category" })).toBeVisible();
-  await expect(page.getByLabel("Sort by")).toHaveValue("newest");
+  await expect(sortButton(page)).toHaveAccessibleName("Sort by Newest");
   await expect(resultCount(page)).toHaveText(/^\d+ products$/);
   await waitForHydration(page);
   const total = await countOf(page);
@@ -59,7 +59,7 @@ test("the catalog lists through search: facets, sort and chips on its own addres
   expect(black).toBeLessThan(total);
   await expect(page.getByRole("list", { name: "Selected filters" })).toContainText("Color: Black");
 
-  await page.getByLabel("Sort by").selectOption("price_desc");
+  await chooseSort(page, "Price: high to low");
   await expect(page).toHaveURL(/\/en\/catalog\?f=opt\.color%3Ablack&sort=price_desc$/);
   // A filtered view is not indexed; its canonical is the plain list.
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
@@ -83,7 +83,7 @@ test("a category page filters by its category and offers no category facet; its 
   await expect(page.getByRole("heading", { level: 3, name: "Demo T-shirt" })).toHaveCount(0);
 
   await waitForHydration(page);
-  await page.getByLabel("Sort by").selectOption("price_asc");
+  await chooseSort(page, "Price: low to high");
   await expect(page).toHaveURL(/\/en\/c\/demo-tools\?sort=price_asc$/);
   await expect(page.getByRole("heading", { level: 3, name: "Demo T-shirt" })).toHaveCount(0);
 });

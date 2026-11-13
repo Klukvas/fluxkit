@@ -72,18 +72,21 @@ describe("SiteShell landmarks and accessibility", () => {
 
   it("labels every navigation landmark", () => {
     const navs = html.match(/<nav[^>]*>/g) ?? [];
-    // main (twice: inside the menu below `xl`, inline from `xl`; one is always display:none), locale switcher, footer
+    // main (ONCE: the "Categories" picker is the menu below `xl` too, round 4), locale switcher, the footer's two link groups
+    // (the `columns` layout: each a navigation named by its visible heading)
     expect(navs).toHaveLength(4);
-    for (const nav of navs) expect(nav).toMatch(/aria-label="§[^"]+"/);
+    for (const nav of navs) expect(nav).toMatch(/aria-label="§[^"]+"|aria-labelledby="[^"]+"/);
     const mains = navs.filter((nav) => nav.includes('aria-label="§nav.main.label"'));
-    expect(mains).toHaveLength(2);
+    expect(mains).toHaveLength(1);
+    // The picker's summary is named by its content: "Menu" below `xl` (visually hidden), "Categories" from `xl`.
     expect(html).toMatch(
-      /<details class="[^"]*xl:hidden[^"]*"><summary role="button" aria-expanded="false" aria-label="§nav\.menu"/,
+      /<details class="group relative shrink-0"><summary role="button" aria-expanded="false" class="fk-header-button">.*?§nav\.menu.*?§nav\.categories/,
     );
-    expect(html).toMatch(/<nav aria-label="§nav\.main\.label" class="hidden[^"]*xl:block/);
-    expect(html).toContain('aria-label="§nav.main.label"');
-    expect(html).toContain('aria-label="§footer.nav.label"');
     expect(html).toContain('aria-label="§locale.switcher.label"');
+    for (const nav of navs.filter((tag) => tag.includes("aria-labelledby"))) {
+      const id = /aria-labelledby="([^"]+)"/.exec(nav)?.[1] ?? "";
+      expect(html).toMatch(new RegExp(`<h2 id="${id}">§footer\\.group\\.[a-z]+</h2>`));
+    }
   });
 
   it("links categories (slug encoded) before the configured links, and the logo to the locale's home", () => {
@@ -136,9 +139,14 @@ describe("header and footer size (a loose sanity cap, ADR 0048)", () => {
   // `first-html` (the raw HTML: the form is not in a hidden segment and no loading view precedes it). These caps only catch
   // a runaway header or footer (every page carries them); a client fork may raise them with a reason.
   it("keeps the header under 8 000 bytes", () => {
+    // Four children each (the demo seed has up to four): the `picker` display shows them (round 4).
     const longNames = Array.from({ length: headerConfig.navigation.categoryLimit }, (_, index) => ({
       slug: `category-${String(index)}`,
       name: `§Category name ${String(index)}`,
+      children: Array.from({ length: 4 }, (_, child) => ({
+        slug: `category-${String(index)}-${String(child)}`,
+        name: `§Subcategory name ${String(index)}.${String(child)}`,
+      })),
     }));
     const html = renderToStaticMarkup(
       <SiteShell
@@ -154,7 +162,7 @@ describe("header and footer size (a loose sanity cap, ADR 0048)", () => {
       </SiteShell>,
     );
     const header = html.slice(html.indexOf("<header"), html.indexOf("</header>"));
-    expect(new TextEncoder().encode(header).length).toBeLessThan(8000); // 3 427 bytes on 2026-11-05 (six categories, no search box)
+    expect(new TextEncoder().encode(header).length).toBeLessThan(8000); // 3 427 bytes on 2026-11-05 (six categories, no search box); 6 969 on 2026-11-13 (round 4: the picker with four children each, the theme control and its phone copy)
   });
 
   it("keeps the footer under 4 000 bytes", () => {
@@ -172,8 +180,9 @@ describe("header and footer size (a loose sanity cap, ADR 0048)", () => {
       </SiteShell>,
     );
     const footer = html.slice(html.indexOf("<footer"), html.indexOf("</footer>"));
-    expect(footer).toContain('class="fk-theme-option"');
-    // 1 377 bytes on 2026-11-06 (shop pages, legal pages, contacts, theme switch).
+    expect(footer).toContain('class="fk-footer-grid"');
+    // 1 377 bytes on 2026-11-06 (shop pages, legal pages, contacts, theme switch); round 4 moved the switch to the header
+    // and added the column headings: 1 075 bytes on 2026-11-13.
     expect(new TextEncoder().encode(footer).length).toBeLessThan(4000);
   });
 });

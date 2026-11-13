@@ -7,7 +7,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
  * A header dropdown (the menu, the language and the account): a native `<details>` with its `<summary>` as the button, so it
  * opens and closes without a script (the storefront works before hydration). The script only adds what users expect of a
  * menu button: Escape closes it and gives the focus back to the summary, a click or a focus outside closes it, and it closes
- * after a navigation. The summary's accessible name is `label` (the visible content may be an icon); the panel holds plain
+ * after a navigation. The summary's accessible name is `label` (the visible content may be an icon) or its content; the panel holds plain
  * links and buttons in DOM order, so Tab walks through them.
  */
 export function HeaderDisclosure({
@@ -18,8 +18,11 @@ export function HeaderDisclosure({
   className = "",
   children,
 }: {
-  /** Accessible name of the summary (translated). */
-  label: string;
+  /**
+   * Accessible name of the summary (translated). Left out, the summary is named by its content: for a summary whose visible
+   * text changes by breakpoint (the categories picker), so the name always contains the text that is shown.
+   */
+  label?: string;
   /** What the summary shows: an icon, a flag, a short text. */
   summary: ReactNode;
   /** The side of the summary the panel is aligned with. */

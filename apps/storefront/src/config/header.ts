@@ -2,9 +2,17 @@
  * The header's composition: which blocks, in which order, the controls at the end of the row, the number of categories and the
  * links after them. FORK-OWNED: upstream creates this file once and never edits it again, so a client fork changes it without
  * merge conflicts (plan 2026-11-08-design-changeability.md, L3 and principle 6; contract `docs/contracts/header-footer.md`;
- * how-to `docs/customization.md`). The values below are the template's defaults and render exactly the header the template
- * rendered before this file existed. The types, the view and the checks are in `layout/header-layout.ts`; a wrong value fails
- * `layout/header-layout.spec.ts` (and the TypeScript build for an unknown block name).
+ * how-to `docs/customization.md`). The values below are the template's defaults; upstream edits them only together with
+ * `docs/contracts/header-footer.md` (round 4, 2026-11-13: the theme control and the "Categories" picker became the default;
+ * the header before it is `controls: ["language", "cart", "account"]` without `display`). The types, the view and the checks
+ * are in `layout/header-layout.ts`; a wrong value fails `layout/header-layout.spec.ts` (and the TypeScript build for an
+ * unknown block name).
+ *
+ * Controls: `language`, `theme` (the Light / Dark / System menu; only while `showToggle` of `config/theme.ts` is true; below
+ * `sm` it moves into the menu's panel when the header has a menu), `cart`, `account`. `navigation.display`: `row` (also when
+ * left out) shows the links inline from `xl`, a row that scrolls sideways; `picker` makes the menu button a "Categories"
+ * button from `xl` whose panel shows each category with its children in columns, then the links (the `navigation` block then
+ * renders nothing, it stays listed next to `menu`).
  *
  * Supported orders (anything else fails the check, also at render): `logo` is required; `controls`, when listed, is the LAST
  * block; `menu` and `navigation` go together; `menu` is either the first block shown on a phone (before `logo`, with only
@@ -39,8 +47,9 @@ import type { HeaderConfig } from "../layout/header-layout";
 
 export const headerConfig: HeaderConfig = {
   blocks: ["menu", "logo", "navigation", "search", "controls"],
-  controls: ["language", "cart", "account"],
+  controls: ["language", "theme", "cart", "account"],
   navigation: {
+    display: "picker",
     categoryLimit: 6,
     links: [{ labelKey: "nav.catalog", href: "/catalog" }],
   },

@@ -186,10 +186,17 @@ export interface ProductTypeFormValues {
   code: string;
   name: LocaleValues;
   requiresShipping: boolean;
+  /** Slug of the storefront page linked next to the option pickers (`size-guide`); empty: none. */
+  optionGuidePage: string;
 }
 
 export function emptyProductTypeForm(locales: readonly string[]): ProductTypeFormValues {
-  return { code: "", name: localeValuesFrom(null, locales), requiresShipping: true };
+  return {
+    code: "",
+    name: localeValuesFrom(null, locales),
+    requiresShipping: true,
+    optionGuidePage: "",
+  };
 }
 
 export function productTypeFormFrom(
@@ -200,7 +207,14 @@ export function productTypeFormFrom(
     code: type.code,
     name: localeValuesFrom(type.name, locales),
     requiresShipping: type.requiresShipping,
+    optionGuidePage: type.optionGuidePage ?? "",
   };
+}
+
+/** The guide page as the API takes it: a trimmed slug, or `null` for an empty field. */
+function optionGuidePageOf(values: ProductTypeFormValues): string | null {
+  const slug = values.optionGuidePage.trim();
+  return slug === "" ? null : slug;
 }
 
 export function validateProductTypeForm(
@@ -208,17 +222,24 @@ export function validateProductTypeForm(
   mode: FormMode,
   options: FormOptions,
 ): FormIssues {
-  return validateOptionForm(values, mode, options);
+  const slug = optionGuidePageOf(values);
+  const guideIssue =
+    slug === null || (SLUG_PATTERN.test(slug) && slug.length <= SLUG_MAX_LENGTH)
+      ? {}
+      : { optionGuidePage: issue("dict.error.slugFormat") };
+  return { ...validateOptionForm(values, mode, options), ...guideIssue };
 }
 
 export function productTypeCreateBody(
   values: ProductTypeFormValues,
   locales: readonly string[],
 ): CreateAdminProductTypeBody {
+  const optionGuidePage = optionGuidePageOf(values);
   return {
     code: values.code,
     name: localeMapFromValues(values.name, locales),
     requiresShipping: values.requiresShipping,
+    ...(optionGuidePage === null ? {} : { optionGuidePage }),
   };
 }
 
@@ -230,6 +251,7 @@ export function productTypePatchBody(
   const fields = (values: ProductTypeFormValues) => ({
     name: localeMapFromValues(values.name, locales),
     requiresShipping: values.requiresShipping,
+    optionGuidePage: optionGuidePageOf(values),
   });
   return diffForPatch(fields(initial), fields(current));
 }

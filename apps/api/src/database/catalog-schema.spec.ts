@@ -618,6 +618,33 @@ describe("catalog schema (real Postgres)", () => {
       }
     });
 
+    // Plan 2026-11-13-product-type-guide-page: a storefront shop-page slug, same rule as the other slugs, NULL allowed.
+    it("rejects an invalid product type guide page and accepts a slug or NULL", async () => {
+      for (const [index, slug] of invalidSlugs.entries()) {
+        await expectViolation(
+          () =>
+            insertId("product_type", {
+              code: `guide_bad_${index}`,
+              name: i18n("type"),
+              option_guide_page: slug,
+            }),
+          CHECK_VIOLATION,
+          "product_type_option_guide_page_check",
+        );
+      }
+      await insertId("product_type", {
+        code: "guide_slug",
+        name: i18n("type"),
+        option_guide_page: "size-guide",
+      });
+      await insertId("product_type", {
+        code: "guide_long",
+        name: i18n("type"),
+        option_guide_page: "a".repeat(160),
+      });
+      await insertId("product_type", { code: "guide_none", name: i18n("type") });
+    });
+
     it("accepts slugs at the boundaries (1 and 160 characters, digits, single hyphens)", async () => {
       await createBrand("a");
       await createBrand("a".repeat(160));

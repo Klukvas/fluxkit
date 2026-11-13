@@ -60,7 +60,9 @@ describe("the header's search box and the shop's search setting (availability ga
     // The header hands the setting to its view (plan L3), which drops the search block when it is off; the header's
     // configured blocks (`config/header.ts`) can only leave the box out, never force it in.
     const header = readFileSync(join(root, "components", "site-header.tsx"), "utf8");
-    expect(header).toMatch(/headerView\(config, \{ locale, t, categories, searchEnabled \}\)/);
+    expect(header).toMatch(
+      /headerView\(config, \{ locale, t, categories, searchEnabled, showThemeSwitch \}\)/,
+    );
     const view = readFileSync(join(root, "layout", "header-layout.ts"), "utf8");
     expect(view).toMatch(
       /case "search":\s*if \(input\.searchEnabled\) blocks\.push\(\{ kind: "search" \}\);/,

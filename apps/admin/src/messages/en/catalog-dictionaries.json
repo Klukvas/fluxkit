@@ -189,6 +189,8 @@
   "dict.productType.shipsNo": "Not shipped",
   "dict.productType.requiresShipping": "Products of this type are shipped",
   "dict.productType.requiresShippingHint": "Turn it off for digital goods: their variants do not track stock. Variants that already exist do not change.",
+  "dict.productType.optionGuidePage": "Guide page",
+  "dict.productType.optionGuidePageHint": "The address of a shop page linked next to the option choice of this type's products, e.g. size-guide for clothing. Leave it empty for no link. A page the shop does not have is not linked.",
   "dict.productType.emptyTitle": "No product types yet",
   "dict.productType.emptyBody": "A product type decides which attributes and options its products have. Create the first one.",
   "dict.productType.deleted": "The product type was deleted.",

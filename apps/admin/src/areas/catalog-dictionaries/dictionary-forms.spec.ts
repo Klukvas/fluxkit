@@ -139,11 +139,13 @@ describe("product type form", () => {
     code: "book",
     name: { uk: "Книга", en: "Book" },
     requiresShipping: true,
+    optionGuidePage: null,
     ...stamp,
   };
 
-  it("starts requiring shipping, like the API", () => {
+  it("starts requiring shipping, like the API, with no guide page", () => {
     expect(emptyProductTypeForm(locales).requiresShipping).toBe(true);
+    expect(emptyProductTypeForm(locales).optionGuidePage).toBe("");
   });
 
   it("validates like an option and builds both bodies with the exact API field name", () => {
@@ -152,7 +154,12 @@ describe("product type form", () => {
     ).toBe("dict.error.codeFormat");
     expect(
       productTypeCreateBody(
-        { code: "ebook", name: { uk: "Е-книга", en: "" }, requiresShipping: false },
+        {
+          code: "ebook",
+          name: { uk: "Е-книга", en: "" },
+          requiresShipping: false,
+          optionGuidePage: "",
+        },
         locales,
       ),
     ).toEqual({ code: "ebook", name: { uk: "Е-книга" }, requiresShipping: false });
@@ -163,6 +170,36 @@ describe("product type form", () => {
         requiresShipping: false,
       },
     );
+  });
+
+  // Plan 2026-11-13-product-type-guide-page: a storefront page slug, empty = none.
+  it("sends the guide page trimmed, clears it with null and checks its slug shape", () => {
+    const initial = productTypeFormFrom(type, locales);
+    expect(initial.optionGuidePage).toBe("");
+    expect(
+      productTypeCreateBody(
+        { ...emptyProductTypeForm(locales), code: "shirt", optionGuidePage: " size-guide " },
+        locales,
+      ).optionGuidePage,
+    ).toBe("size-guide");
+    expect(
+      productTypePatchBody(initial, { ...initial, optionGuidePage: "size-guide" }, locales),
+    ).toEqual({ optionGuidePage: "size-guide" });
+    const withGuide = productTypeFormFrom({ ...type, optionGuidePage: "size-guide" }, locales);
+    expect(withGuide.optionGuidePage).toBe("size-guide");
+    expect(
+      productTypePatchBody(withGuide, { ...withGuide, optionGuidePage: "  " }, locales),
+    ).toEqual({ optionGuidePage: null });
+    const valid = { ...initial, optionGuidePage: "fit-guide-2" };
+    expect(validateProductTypeForm(valid, "edit", options)["optionGuidePage"]).toBeUndefined();
+    for (const bad of ["Size Guide", "size_guide", "/size-guide", "a".repeat(161)]) {
+      expect(
+        validateProductTypeForm({ ...initial, optionGuidePage: bad }, "edit", options)[
+          "optionGuidePage"
+        ]?.key,
+        bad,
+      ).toBe("dict.error.slugFormat");
+    }
   });
 });
 

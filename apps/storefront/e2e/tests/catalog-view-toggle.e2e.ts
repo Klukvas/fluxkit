@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { E2E_SEARCH_ENABLED } from "../support/env.ts";
 import { expect, test } from "../support/fixtures.ts";
-import { openLanguageMenu, waitForHydration } from "../support/flows.ts";
+import { chooseSort, openLanguageMenu, waitForHydration } from "../support/flows.ts";
 
 // The list/grid switch of the product lists (plan 2026-11-08-design-changeability.md, L2/L5; owner decision 2026-11-08: shipped,
 // grid by default): `?view=list` renders the `list` card kind of the card registry, every filter, sort, page and language link
@@ -54,7 +54,7 @@ test("the switch shows the list view and every filter, sort and language link ke
   await page.getByRole("group", { name: "Brand" }).getByRole("checkbox").first().check();
   await page.getByRole("button", { name: "Apply filters" }).click();
   await expect(page).toHaveURL(/\/en\/catalog\?f=brand%3A[a-z0-9-]+&view=list$/);
-  await page.getByLabel("Sort by").selectOption("price_desc");
+  await chooseSort(page, "Price: high to low");
   await expect(page).toHaveURL(/\/en\/catalog\?f=brand%3A[a-z0-9-]+&sort=price_desc&view=list$/);
   await expect(viewGroup(page).getByRole("link", { name: "List" })).toHaveAttribute(
     "aria-current",

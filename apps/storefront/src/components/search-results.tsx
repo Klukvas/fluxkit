@@ -30,6 +30,7 @@ import {
   clearFilters,
   searchPath,
   setPage,
+  setSort,
   setView,
   type SearchQuery,
 } from "../lib/search-query";
@@ -42,8 +43,8 @@ import {
   SearchFilterForm,
   SearchPending,
   SearchResultsRegion,
-  SortSelect,
 } from "./search-island";
+import { SortMenu } from "./sort-menu";
 import { focusRing, linkButton } from "./styles";
 import { ViewToggle } from "./view-toggle";
 
@@ -274,12 +275,13 @@ export function FacetedResults({
                         : t("search.filters.withCount", { count: filterCount })
                     }
                   />
-                  <SortSelect
+                  <SortMenu
                     label={t("search.sort.label")}
                     selected={sorts.selected}
-                    options={sorts.options.map((value) => ({
+                    choices={sorts.options.map((value) => ({
                       value,
                       label: t(`search.sort.${value}`),
+                      href: pageHref(locale, setSort(query, value), basePath),
                     }))}
                   />
                 </div>

@@ -235,7 +235,9 @@ there (see "Admin").
   light's colours and shadows. The `system` block is a byte-for-byte copy of the dark block. `packages/theme/src/theme.spec.ts` enforces all
   three rules and that every `var(--fk-*)` in `tailwind.css` is defined in the light block. It is **opt-in**: no rule under the media query matches `:root`, so a page without
   `data-theme="system"` (the admin) never follows the device (`apps/admin/src/theme-isolation.spec.ts` checks the admin's built CSS).
-- `color-scheme` makes native controls, scrollbars and select popups follow the theme.
+- `color-scheme` makes native controls and select popups follow the theme, and scrollbars where an app sets no `scrollbar-color`. The storefront
+  colours its thin scrollbars from existing tokens (`border-input` thumb on a `background` track, a pair the contrast test holds to 3:1;
+  `apps/storefront/src/app/globals.css`); the admin keeps the native ones.
 - Mail stays light (`emailTheme` holds the storefront's effective light values; mail templates set `color-scheme: light`).
 - `@fluxkit/theme` exports `themeModes` (`light`, `dark`, `system`) and the type `ThemeMode` (additive).
 - The storefront's choice of mode: `apps/storefront/src/config/theme.ts` (`defaultMode`, `showToggle`) and the `fluxkit_theme` cookie

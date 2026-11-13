@@ -6,7 +6,9 @@
 // The frozen files pin the WHOLE markup, @fluxkit/ui classes (`Container`) and the islands' markup included: an intended
 // change there (a ui class, a header island) needs them regenerated, after checking the diff is the intended one:
 //   pnpm --filter @fluxkit/storefront exec vitest run src/components/header-footer-defaults.upstream.spec.tsx -u
-// A change to the header or footer composition itself must NOT be regenerated away: defaults stay byte for byte.
+// A change to the header or footer composition itself must NOT be regenerated away: defaults stay byte for byte, unless the
+// default VALUES change on purpose together with `docs/contracts/header-footer.md`, `test-support/template-defaults.ts` and
+// a `CHANGELOG.md` line (round 4, 2026-11-13: the header's theme control and "Categories" picker, the columns footer).
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { Locale } from "@fluxkit/ui";
@@ -75,6 +77,8 @@ function renderFrame(locale: Locale): { header: string; footer: string } {
           t={t}
           categories={frame.categories}
           searchEnabled={frame.searchEnabled}
+          themeMode={frame.themeMode}
+          showThemeSwitch
         />
         <SiteFooter
           locale={locale}

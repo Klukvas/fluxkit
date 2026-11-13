@@ -959,6 +959,7 @@ const productType: Shape<AdminProductType> = {
     code: "string",
     name: localized,
     requiresShipping: "boolean",
+    optionGuidePage: { nullable: "string" },
     createdAt: "string",
     updatedAt: "string",
   },
@@ -1410,10 +1411,19 @@ const body = {
     object: { label: { optional: localized }, position: { optional: "integer" } },
   } satisfies Shape<Admin.UpdateAdminOptionValueBody>,
   createProductType: {
-    object: { code: "string", name: localized, requiresShipping: { optional: "boolean" } },
+    object: {
+      code: "string",
+      name: localized,
+      requiresShipping: { optional: "boolean" },
+      optionGuidePage: { optional: { nullable: "string" } },
+    },
   } satisfies Shape<Admin.CreateAdminProductTypeBody>,
   updateProductType: {
-    object: { name: { optional: localized }, requiresShipping: { optional: "boolean" } },
+    object: {
+      name: { optional: localized },
+      requiresShipping: { optional: "boolean" },
+      optionGuidePage: { optional: { nullable: "string" } },
+    },
   } satisfies Shape<Admin.UpdateAdminProductTypeBody>,
   putProductTypeAttribute: {
     object: {

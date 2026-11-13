@@ -52,6 +52,15 @@ describe("catalog seed data", () => {
     expect(categories.every((category) => (category.children ?? []).length > 0)).toBe(true);
   });
 
+  // Plan 2026-11-13-product-type-guide-page: only clothing links the size guide (the e2e checks it on demo-t-shirt).
+  it("names the size guide as the guide page of clothing only", () => {
+    expect(productTypes.map((type) => [type.code, type.optionGuidePage ?? null])).toEqual([
+      ["clothing", "size-guide"],
+      ["hand_tool", null],
+      ["digital_product", null],
+    ]);
+  });
+
   it("has unique, well-formed codes and slugs", () => {
     expect(unique(attributes.map((attribute) => attribute.code))).toBe(true);
     expect(unique(options.map((option) => option.code))).toBe(true);

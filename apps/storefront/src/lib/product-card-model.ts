@@ -1,6 +1,6 @@
 import type { ProductSummary } from "@fluxkit/api-client";
 import type { BadgeVariant, Locale, Translator } from "@fluxkit/ui";
-import { availabilityDisplay } from "./availability";
+import { availabilityDisplay, canAddToCart } from "./availability";
 import { allowedImageUrl } from "./image-source";
 import { localizedHref } from "./locale-path";
 import { formatMoney } from "./money";
@@ -33,7 +33,18 @@ export interface ProductCardModel {
    * stays text for assistive technology. `null` while the search index catches up (no availability is claimed).
    */
   availability: { text: string; variant: BadgeVariant; badge: boolean } | null;
+  /**
+   * What the card offers to buy (owner design 2026-11-13), always next to the product link, never inside it:
+   * - `add`: the product's only sellable variant (`defaultVariantId` of the API), added to the cart from the card;
+   * - `choose`: several variants, so a link to the product page (`href`, with a search hit's options) where one is chosen;
+   *   `label` is its translated text;
+   * - `null`: nothing to buy here: the shown availability is out of stock, or unknown while the search index catches up.
+   */
+  purchase: CardPurchase;
 }
+
+export type CardPurchase =
+  { kind: "add"; variantId: string } | { kind: "choose"; label: string; shortLabel: string } | null;
 
 /** The price of a list item: one price, or "from <lowest>" when the variants differ. */
 export function listPriceLabel(
@@ -83,6 +94,16 @@ export function cardDisplay({
         ? offer.availability
         : null;
   const display = shown === null ? null : availabilityDisplay(shown);
+  const purchase: CardPurchase =
+    shown === null || !canAddToCart(shown)
+      ? null
+      : product.defaultVariantId === null
+        ? {
+            kind: "choose",
+            label: t("product.card.chooseOptions"),
+            shortLabel: t("product.card.chooseShort"),
+          }
+        : { kind: "add", variantId: product.defaultVariantId };
   const price = offer.kind === "matched" ? offer.price : product.price;
   const path = localizedHref(locale, `/p/${encodeURIComponent(product.slug)}`);
   const linkQuery = offer.kind === "product" ? "" : offer.linkQuery;
@@ -118,5 +139,6 @@ export function cardDisplay({
             variant: display.variant,
             badge: shown !== "in_stock",
           },
+    purchase,
   };
 }

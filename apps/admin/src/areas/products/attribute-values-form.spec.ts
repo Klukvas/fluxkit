@@ -96,6 +96,7 @@ function sampleType(): AdminProductTypeDetail {
     code: "sample_type",
     name: { uk: "Тип", en: "Type" },
     requiresShipping: true,
+    optionGuidePage: null,
     createdAt: "2026-10-19T10:00:00.000Z",
     updatedAt: "2026-10-19T10:00:00.000Z",
     options: [],

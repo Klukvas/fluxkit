@@ -142,7 +142,7 @@ export function SearchFilters({
   const open = openFacetKeys(facets, query, 2);
   return (
     <>
-      {/* The words go along, so a filter keeps them. The sort select (outside the form's box) joins by its `form` attribute. */}
+      {/* The words go along, so a filter keeps them. The sort's hidden field (`sort-menu.tsx`) joins by its `form` attribute. */}
       <input type="hidden" name="q" value={query.q} />
       {/* The list view goes along too (plan 2026-11-08 L5); the default grid writes nothing. */}
       {query.view === undefined ? null : <input type="hidden" name="view" value={query.view} />}

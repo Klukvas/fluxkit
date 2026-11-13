@@ -108,7 +108,10 @@ export async function storedAttempt(page: Page): Promise<string | null> {
  * instead of by the page's own code.
  */
 export async function waitForHydration(page: Page): Promise<void> {
-  await expect(page.getByRole("link", { name: /Cart.*\d+ items? in the cart/ })).toBeVisible();
+  // The cart count appears once the session provider has hydrated; its words follow the page's locale (en or uk).
+  await expect(
+    page.getByRole("link", { name: /Cart.*\d+ items? in the cart|Кошик.*\d+ товар\S* у кошику/ }),
+  ).toBeVisible();
 }
 
 /**
@@ -133,4 +136,26 @@ export function rowValue(region: Locator, label: string): Locator {
     .getByRole("term")
     .filter({ hasText: new RegExp(`^${label}$`) })
     .locator("xpath=following-sibling::*[1]");
+}
+
+/**
+ * The sort of a faceted list (`sort-menu.tsx`, plan 2026-11-13-storefront-ui-round-4 B): a disclosure whose summary is a button
+ * named by the visible "Sort by" text and the current sort ("Sort by Newest").
+ */
+export function sortButton(page: Page): Locator {
+  return page.getByRole("button", { name: /^Sort by / });
+}
+
+/** The sort's panel: its links, one per sort, the current one `aria-current`. */
+export function sortPanel(page: Page): Locator {
+  return page
+    .locator("details")
+    .filter({ has: sortButton(page) })
+    .getByRole("list");
+}
+
+/** Chooses a sort by its English name: opens the panel and follows that sort's link. */
+export async function chooseSort(page: Page, name: string): Promise<void> {
+  await sortButton(page).click();
+  await sortPanel(page).getByRole("link", { name, exact: true }).click();
 }

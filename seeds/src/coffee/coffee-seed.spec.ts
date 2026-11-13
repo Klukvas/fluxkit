@@ -83,6 +83,12 @@ describe("coffee demo dataset", () => {
     ).toBeGreaterThanOrEqual(5);
   });
 
+  // Plan 2026-11-13-product-type-guide-page: nothing in the coffee shop needs the clothing size guide (gift card values,
+  // volumes and pack sizes are not sizes to measure).
+  it("names no guide page on any product type", () => {
+    expect(productTypes.filter((type) => type.optionGuidePage !== undefined)).toEqual([]);
+  });
+
   it("has unique, well-formed codes, slugs and SKUs", () => {
     for (const code of [...attributes, ...options, ...productTypes].map((entity) => entity.code)) {
       expect(isValidCode(code), code).toBe(true);
@@ -313,8 +319,8 @@ describe("coffee demo dataset", () => {
   });
 
   describe("home banners", () => {
-    it("are two cards and one picture banner with an own en picture, fixed distinct ids", () => {
-      expect(banners.map((banner) => banner.layout)).toEqual(["card", "card", "image"]);
+    it("are three card banners, fixed distinct ids", () => {
+      expect(banners.map((banner) => banner.layout)).toEqual(["card", "card", "card"]);
       expect(unique(banners.map((banner) => banner.id))).toBe(true);
       for (const banner of banners) {
         expect(banner.id).toMatch(

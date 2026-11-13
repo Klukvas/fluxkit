@@ -30,7 +30,7 @@ test.describe("filtered cards from the matched variants", () => {
     await expect(tShirt.getByText(/from/)).toHaveCount(0);
     await expect(tShirt.getByText("Out of stock", { exact: true })).toBeVisible();
     await expect(tShirt.getByText("Price and stock depend on the option")).toHaveCount(0);
-    const link = tShirt.getByRole("link", { name: "Demo T-shirt" });
+    const link = tShirt.getByRole("link", { name: "Demo T-shirt", exact: true });
     await expect(link).toHaveAttribute("href", "/en/p/demo-t-shirt?opt.color=red&opt.size=l");
     await link.click();
     await expect(page).toHaveURL(/\/en\/p\/demo-t-shirt\?opt\.color=red&opt\.size=l$/);
@@ -49,7 +49,7 @@ test.describe("filtered cards from the matched variants", () => {
     await expect(tShirt.getByText(/UAH\s629\.00/)).toBeVisible();
     await expect(tShirt.getByText("In stock", { exact: true })).toBeVisible();
     // The best available, then the cheapest, then the first in the product's order: red S (18 in stock).
-    await expect(tShirt.getByRole("link", { name: "Demo T-shirt" })).toHaveAttribute(
+    await expect(tShirt.getByRole("link", { name: "Demo T-shirt", exact: true })).toHaveAttribute(
       "href",
       "/en/p/demo-t-shirt?opt.color=red&opt.size=s",
     );
@@ -68,7 +68,7 @@ test.describe("filtered cards from the matched variants", () => {
     await page.goto("/en/catalog?f=inStock%3Afalse");
     const tShirt = card(page, "Demo T-shirt");
     await expect(tShirt.getByText("Out of stock", { exact: true })).toBeVisible();
-    await expect(tShirt.getByRole("link", { name: "Demo T-shirt" })).toHaveAttribute(
+    await expect(tShirt.getByRole("link", { name: "Demo T-shirt", exact: true })).toHaveAttribute(
       "href",
       "/en/p/demo-t-shirt?opt.color=red&opt.size=l",
     );

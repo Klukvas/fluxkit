@@ -1,0 +1,2 @@
+ALTER TABLE "product_type" ADD COLUMN "option_guide_page" text;--> statement-breakpoint
+ALTER TABLE "product_type" ADD CONSTRAINT "product_type_option_guide_page_check" CHECK ("product_type"."option_guide_page" ~ '^[a-z0-9]+(-[a-z0-9]+)*$' AND char_length("product_type"."option_guide_page") <= 160);

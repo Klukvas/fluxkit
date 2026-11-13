@@ -15,6 +15,7 @@ import {
   ownExceptions,
   parseExceptions,
   screenshotMasks,
+  skipsElementShot,
 } from "./exceptions.ts";
 import {
   COMPUTED_PROPERTIES,
@@ -189,6 +190,12 @@ describe("parseExceptions", () => {
     expect(comparesViewportOnly(["home.hero", "page.body"])).toBe(true);
     expect(comparesViewportOnly(["home.hero", "footer.contentinfo"])).toBe(false);
     expect(comparesViewportOnly([])).toBe(false);
+  });
+
+  it("leaves out an element shot whose own selector is masked (only its size could differ), and only that one", () => {
+    expect(skipsElementShot(["card.article", "home.hero"], "card.article")).toBe(true);
+    expect(skipsElementShot(["home.hero"], "card.article")).toBe(false);
+    expect(skipsElementShot(["page.body"], "card.article")).toBe(false);
   });
 
   it("keeps only the entries a PR added (an inherited entry declares nothing, even with a new reason)", () => {

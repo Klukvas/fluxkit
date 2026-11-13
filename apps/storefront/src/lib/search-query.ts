@@ -407,8 +407,9 @@ export function setPrice(query: SearchQuery, price: SearchPrice | null): SearchQ
   return { ...query, price: open ? null : price, page: 1 };
 }
 
+/** The sort the API would pick anyway (`normalizeSort`) is left out, so a sort link needs no redirect. */
 export function setSort(query: SearchQuery, sort: SearchSort | null): SearchQuery {
-  return { ...query, sort, page: 1 };
+  return { ...query, sort: normalizeSort(sort, query.q), page: 1 };
 }
 
 /** Drops the facets and the price; the words and the sort stay. */

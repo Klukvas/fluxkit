@@ -144,7 +144,16 @@ export const noPersonalDataTables: Inventory = {
     "position",
     "created_at",
   ),
-  product_type: none("D24", "id", "code", "name", "requires_shipping", "created_at", "updated_at"),
+  product_type: none(
+    "D24",
+    "id",
+    "code",
+    "name",
+    "requires_shipping",
+    "option_guide_page",
+    "created_at",
+    "updated_at",
+  ),
   product_type_attribute: none(
     "D24",
     "product_type_id",

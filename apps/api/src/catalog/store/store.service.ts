@@ -70,6 +70,14 @@ function pricingOf(priced: ReadonlyMap<string, StoreVariantPricing>, variantId: 
   };
 }
 
+/**
+ * `defaultVariantId` of a list item: the only sellable variant, which a list can add to the cart as it is; `null` with
+ * several, where the shopper has to choose. Never decided by availability: the storefront judges whether it can be bought.
+ */
+export function defaultVariantIdOf(sellableIds: readonly string[]): string | null {
+  return sellableIds.length === 1 ? (sellableIds[0] ?? null) : null;
+}
+
 /** The list image: the first gallery image (no option pair), else the first image of any kind. */
 export function pickListImage(media: readonly ProductMediaRow[], locale: StoreLocale) {
   const chosen = media.find((entry) => entry.optionValueId === null) ?? media[0];
@@ -176,10 +184,11 @@ export class StoreService {
     ]);
     const pricedVariants = priceVariants(variants, levels, this.pricing);
     const items = rows.flatMap((row) => {
+      const sellableIds = variants
+        .filter((entry) => entry.productId === row.id && pricedVariants.has(entry.id))
+        .map((entry) => entry.id);
       const summary = summarizeProduct(
-        variants
-          .filter((entry) => entry.productId === row.id)
-          .flatMap((entry) => pricedVariants.get(entry.id) ?? []),
+        sellableIds.flatMap((id) => pricedVariants.get(id) ?? []),
         this.pricing.shopCurrency,
       );
       // The product lost its last sellable variant between the page query and this one: it is no longer for sale.
@@ -198,6 +207,7 @@ export class StoreService {
           ),
           publishedAt: publishedAtOf(row),
           ...summary,
+          defaultVariantId: defaultVariantIdOf(sellableIds),
         },
       ];
     });
@@ -372,6 +382,7 @@ export class StoreService {
           alt: optionalText(entry.alt, locale),
           optionValueId: entry.optionValueId,
         })),
+      optionGuidePage: row.optionGuidePage,
     };
   }
 }

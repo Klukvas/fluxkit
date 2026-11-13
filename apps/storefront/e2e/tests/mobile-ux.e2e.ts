@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Locator, Page } from "@playwright/test";
 import { expect, test, uniqueEmail } from "../support/fixtures.ts";
+import { sortButton } from "../support/flows.ts";
 import { SHOP_NAME } from "../support/shop-name.ts";
 
 /**
@@ -194,7 +195,7 @@ test("the filters open as a sheet: focus inside, Tab kept in, Escape returns, Ap
   await hydrated(page);
   const filters = page.getByRole("link", { name: "Filters", exact: true });
   // Next to the sort.
-  const sort = page.getByRole("combobox", { name: "Sort by" });
+  const sort = sortButton(page);
   expect(
     Math.abs(
       (await box(filters)).y +

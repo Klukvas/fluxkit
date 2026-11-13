@@ -628,6 +628,11 @@ export interface ProductSummary {
   publishedAt: string;
   price: PriceRange;
   availability: Availability;
+  /**
+   * The product's only sellable variant, to add to the cart from a list; `null` when it has several (choose on the product
+   * page). Set whatever its availability: an out-of-stock variant keeps its id here.
+   */
+  defaultVariantId: string | null;
 }
 
 /** The public sort names of `GET /store/search` (ADR 0034). */
@@ -765,6 +770,11 @@ export interface ProductDetail {
   price: PriceRange;
   availability: Availability;
   media: ProductMedia[];
+  /**
+   * The product type's guide page: a storefront shop-page slug, or `null`. The API does not know the storefront's pages; the
+   * storefront links it only when it has that page enabled.
+   */
+  optionGuidePage: string | null;
 }
 
 // ---- personal data export (ADR 0033 decision 7; docs/contracts/personal-data-export.md)

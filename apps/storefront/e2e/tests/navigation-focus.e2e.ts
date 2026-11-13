@@ -9,6 +9,8 @@ test("after a client-side navigation the focus is on the new page's heading (rev
   // The first page load does not move the focus.
   await expect(page.locator("main h1").first()).not.toBeFocused();
 
+  // The header's links are in the "Categories" picker since round 4 (the inline row is gone from the default header).
+  await page.getByRole("banner").getByRole("button", { name: "Categories", exact: true }).click();
   await page.getByRole("link", { name: "Catalog", exact: true }).first().click();
   await expect(page).toHaveURL(/\/en\/catalog$/);
   await expect(page.getByRole("heading", { level: 1 })).toBeFocused();

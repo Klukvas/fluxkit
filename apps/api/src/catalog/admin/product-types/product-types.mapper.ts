@@ -20,6 +20,7 @@ export function toProductTypeResponse(row: ProductTypeRow): ProductTypeResponse 
     code: row.code,
     name: row.name,
     requiresShipping: row.requiresShipping,
+    optionGuidePage: row.optionGuidePage,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

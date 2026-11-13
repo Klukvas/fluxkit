@@ -1,7 +1,7 @@
 import type { Locator, Page, Request } from "@playwright/test";
 import { E2E_SEARCH_ENABLED, E2E_STOREFRONT_UNFORWARDED_PORT } from "../support/env.ts";
 import { expect, test } from "../support/fixtures.ts";
-import { waitForHydration } from "../support/flows.ts";
+import { chooseSort, sortButton, sortPanel, waitForHydration } from "../support/flows.ts";
 
 // Catalog search, storefront side (search plan step 10a): the header box with suggestions, the results page, its facets, sort
 // and price, the states, and the per-address window of the API reached through the Next server. Runs against the real engine
@@ -164,7 +164,7 @@ test.describe("the results page", () => {
     await expect(page.getByRole("complementary", { name: "Filters" })).toBeVisible();
     await expect(page.getByRole("group", { name: "Brand" })).toBeVisible();
     await expect(page.getByRole("group", { name: /^Price, UAH$/ })).toBeVisible();
-    await expect(page.getByLabel("Sort by")).toHaveValue("relevance");
+    await expect(sortButton(page)).toHaveAccessibleName("Sort by Relevance");
     // Noindex, and a canonical that is the words alone.
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
@@ -182,10 +182,10 @@ test.describe("the results page", () => {
     const total = Number(((await resultCount(page).textContent()) ?? "").match(/\d+/)?.[0]);
     expect(total).toBeGreaterThan(3);
 
-    await page.getByLabel("Sort by").selectOption("price_desc");
+    await chooseSort(page, "Price: high to low");
     await expect(page).toHaveURL(/\/en\/search\?q=demo&sort=price_desc$/);
     await expect(resultCount(page)).toBeFocused();
-    await expect(page.getByLabel("Sort by")).toHaveValue("price_desc");
+    await expect(sortButton(page)).toHaveAccessibleName("Sort by Price: high to low");
 
     await page.getByRole("group", { name: "Price, UAH" }).getByLabel("From").fill("1000");
     await page.getByRole("button", { name: "Apply filters" }).click();
@@ -284,7 +284,8 @@ test.describe("the results page", () => {
   }) => {
     await page.goto("/en/search");
     await expect(page.getByRole("heading", { level: 1, name: "All products" })).toBeVisible();
-    await expect(page.getByLabel("Sort by").locator("option")).toHaveText([
+    await sortButton(page).click();
+    await expect(sortPanel(page).getByRole("link")).toHaveText([
       "Newest",
       "Price: low to high",
       "Price: high to low",

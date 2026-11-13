@@ -189,6 +189,8 @@
   "dict.productType.shipsNo": "Не доставляється",
   "dict.productType.requiresShipping": "Товари цього типу доставляються",
   "dict.productType.requiresShippingHint": "Вимкніть для цифрових товарів: їхні варіанти не ведуть облік залишків. Наявні варіанти не змінюються.",
+  "dict.productType.optionGuidePage": "Сторінка-підказка",
+  "dict.productType.optionGuidePageHint": "Адреса сторінки магазину, посилання на яку стоїть біля вибору варіанта товарів цього типу, наприклад size-guide для одягу. Залиште порожнім, щоб посилання не було. Сторінку, якої в магазині немає, не показують.",
   "dict.productType.emptyTitle": "Типів товару ще немає",
   "dict.productType.emptyBody": "Тип товару визначає, які атрибути й опції мають його товари. Створіть перший.",
   "dict.productType.deleted": "Тип товару видалено.",
