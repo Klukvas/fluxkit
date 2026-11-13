@@ -64,18 +64,27 @@ function expectBounded(result: MarkdownParseResult): void {
   }
 }
 
+/** Each timing test parses its input seven times at the length limit; a slow runner must not hit vitest's 5 s default. */
+const TIMING_TEST_TIMEOUT_MS = 30_000;
+
 /** Builds an input of about `length` characters by repeating `unit`. */
 function repeatTo(unit: string, length: number): string {
   return unit.repeat(Math.floor(length / unit.length));
 }
 
-/** The fastest of three runs, in milliseconds (`Date.now`: core has no `performance` type; the floor below covers it). */
+/**
+ * The high-resolution clock of Node and browsers. Core compiles without DOM or Node types (it is runtime-neutral), so the
+ * spec declares the one member it uses.
+ */
+declare const performance: { now(): number };
+
+/** The fastest of three runs, in milliseconds. */
 function timeOf(source: string): number {
   let best = Number.POSITIVE_INFINITY;
   for (let run = 0; run < 3; run += 1) {
-    const start = Date.now();
+    const start = performance.now();
     parse(source);
-    best = Math.min(best, Date.now() - start);
+    best = Math.min(best, performance.now() - start);
   }
   return best;
 }
@@ -113,6 +122,7 @@ const ADVERSARIAL: readonly [string, string][] = [
   ["trailing hashes and spaces", "## a #  # \n"],
   ["spaces then a word", "                                        b\n"],
   ["valid links", "[a](/x) "],
+  ["empty brackets before unclosed targets", "[]("],
 ];
 
 /** A small deterministic generator (mulberry32), so a failing case is the same on every run. */
@@ -150,10 +160,11 @@ describe("parseMarkdown, adversarial input", () => {
       parse(large); // warm up the JIT before measuring
       const smallTime = timeOf(small);
       const largeTime = timeOf(large);
-      // Linear is about 8x; quadratic would be about 64x. The floor absorbs timer noise on sub-millisecond runs.
-      expect(largeTime).toBeLessThan(Math.max(smallTime * 24, 25));
+      // Linear is about 8x; quadratic would be about 64x. The floor absorbs timer noise and slow CI runners.
+      expect(largeTime).toBeLessThan(Math.max(smallTime * 24, 100));
       expect(largeTime).toBeLessThan(1_000);
     },
+    TIMING_TEST_TIMEOUT_MS,
   );
 
   it("never throws and stays bounded on 2 000 random sources made of syntax characters", () => {

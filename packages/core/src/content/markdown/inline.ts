@@ -44,6 +44,21 @@ function countInline(nodes: readonly MarkdownInline[]): number {
   return count;
 }
 
+/** A link target without its backslash escapes (`\\)` is `)`); other backslashes stay. */
+function unescapeTarget(raw: string): string {
+  let href = "";
+  for (let index = 0; index < raw.length; index += 1) {
+    const char = raw.charAt(index);
+    if (char === "\\" && ASCII_PUNCTUATION.has(raw.charAt(index + 1))) {
+      href += raw.charAt(index + 1);
+      index += 1;
+    } else {
+      href += char;
+    }
+  }
+  return href;
+}
+
 /** One code point ending just before `index` ("" at the start). */
 function charBefore(text: string, index: number): string {
   if (index <= 0) return "";
@@ -71,6 +86,9 @@ class InlineParser {
   private line: number;
   private pending = "";
   private pendingLine: number;
+  /** The last `)` found by `closeParenthesisFrom`, and whether the rest of the text has none. */
+  private nextClose = -1;
+  private noCloseLeft = false;
 
   constructor(
     private readonly text: string,
@@ -267,28 +285,42 @@ class InlineParser {
   private linkTarget(start: number): { href: string; end: number } | null {
     const text = this.text;
     if (text.charAt(start) !== "(") return null;
+    // Cheap refusal first: no `)` within reach means no target, without scanning (a body full of `[](` stays fast).
+    const close = this.closeParenthesisFrom(start + 1);
+    if (close === -1 || close - start > MARKDOWN_LIMITS.maxLinkTargetLength) return null;
     let index = start + 1;
     while (text.charAt(index) === " " || text.charAt(index) === "\t") index += 1;
-    let href = "";
+    const targetStart = index;
     let depth = 0;
     while (index < text.length) {
       const char = text.charAt(index);
       if (char === " " || char === "\t" || char === "\n") break;
       if (char === ")" && depth === 0) break;
       if (char === "\\" && ASCII_PUNCTUATION.has(text.charAt(index + 1))) {
-        href += text.charAt(index + 1);
         index += 2;
       } else {
         if (char === "(") depth += 1;
         if (char === ")") depth -= 1;
-        href += char;
         index += 1;
       }
       if (index - start > MARKDOWN_LIMITS.maxLinkTargetLength) return null;
     }
+    const targetEnd = index;
     while (text.charAt(index) === " " || text.charAt(index) === "\t") index += 1;
     if (text.charAt(index) !== ")" || depth !== 0) return null;
-    return { href, end: index + 1 };
+    return { href: unescapeTarget(text.slice(targetStart, targetEnd)), end: index + 1 };
+  }
+
+  /**
+   * The first `)` at or after `from`. Link targets are tried left to right, so the last answer is reused while it still lies
+   * ahead: one pass over the text in all.
+   */
+  private closeParenthesisFrom(from: number): number {
+    if (this.nextClose !== -1 && this.nextClose >= from) return this.nextClose;
+    if (this.noCloseLeft) return -1;
+    this.nextClose = this.text.indexOf(")", from);
+    this.noCloseLeft = this.nextClose === -1;
+    return this.nextClose;
   }
 }
 
