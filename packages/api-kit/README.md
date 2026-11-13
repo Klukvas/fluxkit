@@ -2,7 +2,7 @@
 
 What a feature package may use from the API (ADR 0049; contract: `docs/contracts/README.md`, "Feature extension points"):
 `ProblemException`, `RequirePermission`, `AdminController` and the tokens `FEATURE_DATABASE`, `MEDIA_PORT`, `LOCALE_CONFIG`. Depends on
-`@nestjs/common` (peer) and `@fluxkit/core` only. File map: `docs/files/features.md`.
+`@nestjs/common` (a runtime dependency at the API's version, with its peers `reflect-metadata` and `rxjs`, so the production install has it) and `@fluxkit/core` only. File map: `docs/files/features.md`.
 
 - `.` (public entry) - the minimum set above. A contract: breaking it is a major release.
 - `./internal` - for `apps/api` only (problem tables, metadata keys, `PublicAdminRoute`, `AuthenticatedAdminRoute`,
