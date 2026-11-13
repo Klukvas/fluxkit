@@ -234,34 +234,24 @@ function bannerCoffeeBeans() {
   return { svg: c.toString(), width: 1280, height: 640 };
 }
 
-/** The picture banner: its words are drawn in (alt text in `seeds/src/coffee/banners.ts`). */
-function bannerEquipment(lines) {
-  const c = new Canvas(1280, 640);
-  c.add(
-    `<rect width="1280" height="640" fill="${c.linear(
-      [
-        [0, "#2a1c14"],
-        [1, "#4a3123"],
-      ],
-      { x2: 1, y2: 1 },
-    )}"/>`,
-    `<rect width="1280" height="640" fill="${c.radial(
-      [
-        [0, "#ffffff", 0.16],
-        [1, "#ffffff", 0],
-      ],
-      { cx: 0.76, cy: 0.45, r: 0.55 },
-    )}"/>`,
-    `<g transform="translate(620 30) scale(0.55)">`,
+/** Places a product drawing (1200 x 1200, standing on y = 1020 around x = 600) on the banner floor at `x`, scaled by `size`. */
+function onBannerFloor(canvas, x, size, draw) {
+  const start = canvas.body.length;
+  draw(canvas);
+  const drawn = canvas.body.splice(start);
+  canvas.add(
+    `<g transform="translate(${x} 540) scale(${size}) translate(-600 -1020)">`,
+    ...drawn,
+    "</g>",
   );
-  espressoMachine(c, 1, "#3a3b3f");
-  c.add(
-    `</g>`,
-    text(70, 250, lines[0], { size: 62, weight: 800, fill: "#fff6ea", anchor: "start" }),
-    text(70, 328, lines[1], { size: 62, weight: 800, fill: "#fff6ea", anchor: "start" }),
-    text(70, 410, lines[2], { size: 30, weight: 600, fill: "#e9c79a", anchor: "start" }),
-    text(70, 452, lines[3], { size: 30, weight: 600, fill: "#e9c79a", anchor: "start" }),
-  );
+}
+
+/** The equipment card banner: a grinder, a machine and a tamper on the studio floor, no words (the card's title says it). */
+function bannerEquipmentCard() {
+  const c = bannerCanvas(TINT.equipment);
+  onBannerFloor(c, 330, 0.5, (canvas) => grinder(canvas, "flat"));
+  onBannerFloor(c, 720, 0.6, (canvas) => espressoMachine(canvas, 1));
+  onBannerFloor(c, 1050, 0.46, (canvas) => tamper(canvas));
   return { svg: c.toString(), width: 1280, height: 640 };
 }
 
@@ -753,18 +743,5 @@ export const DRAWINGS = {
   /* home banners */
   "banner-coffee-to-go": bannerCoffeeToGo,
   "banner-coffee-beans": bannerCoffeeBeans,
-  "banner-equipment-uk": () =>
-    bannerEquipment([
-      "Обладнання",
-      "для кав'ярні",
-      "Кавомашини, кавомолки",
-      "та інструменти бариста",
-    ]),
-  "banner-equipment-en": () =>
-    bannerEquipment([
-      "Equipment",
-      "for your cafe",
-      "Coffee machines, grinders",
-      "and barista tools",
-    ]),
+  "banner-equipment": bannerEquipmentCard,
 };

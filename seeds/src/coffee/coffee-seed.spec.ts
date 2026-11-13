@@ -313,8 +313,8 @@ describe("coffee demo dataset", () => {
   });
 
   describe("home banners", () => {
-    it("are two cards and one picture banner with an own en picture, fixed distinct ids", () => {
-      expect(banners.map((banner) => banner.layout)).toEqual(["card", "card", "image"]);
+    it("are three card banners, fixed distinct ids", () => {
+      expect(banners.map((banner) => banner.layout)).toEqual(["card", "card", "card"]);
       expect(unique(banners.map((banner) => banner.id))).toBe(true);
       for (const banner of banners) {
         expect(banner.id).toMatch(

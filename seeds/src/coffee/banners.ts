@@ -1,8 +1,8 @@
 import type { SeedBanner } from "../types.js";
 
 /**
- * Home banners of the coffee demo (ADR 0046): two `card` banners and one `image` banner whose words are drawn in (an own
- * picture for `en`, the default one for every other locale), so both layouts and the per-locale picture show on a fresh demo.
+ * Home banners of the coffee demo (ADR 0046): three `card` banners in one row (owner, 2026-11-13: an `image` banner with its
+ * words drawn in looked broken next to two cards; the test fixture still shows the `image` layout and a per-locale picture).
  * Demo data: a shop replaces or deletes them in the admin (`/admin/banners`). Fixed ids, distinct from the test fixture's, so
  * both datasets can be seeded into one database. Pictures: `seeds/assets/coffee/banner-*.webp`
  * (`scripts/generate-coffee-images.mjs`).
@@ -39,14 +39,14 @@ export const coffeeBanners: readonly SeedBanner[] = [
   },
   {
     id: "5eedba22-0000-4000-8000-0000000c0f03",
-    layout: "image",
-    // The same words as in the picture (a screen reader does not read a picture).
-    imageAlt: {
-      uk: "Обладнання для кав'ярні. Кавомашини, кавомолки та інструменти бариста",
-      en: "Equipment for your cafe. Coffee machines, grinders and barista tools",
+    layout: "card",
+    title: { uk: "Обладнання для кав'ярні", en: "Equipment for your cafe" },
+    text: {
+      uk: "Кавомашини, кавомолки та інструменти бариста.",
+      en: "Coffee machines, grinders and barista tools.",
     },
-    image: "coffee/banner-equipment-uk.webp",
-    localeImages: [{ locale: "en", file: "coffee/banner-equipment-en.webp" }],
+    // No alt text: a decorative picture, the card's title names the link.
+    image: "coffee/banner-equipment.webp",
     link: "/c/equipment",
     tone: "surface",
   },
