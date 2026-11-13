@@ -6,7 +6,10 @@ import {
   isCacheableProductQuery,
   createStoreData,
   ensureLocalesSupported,
+  featureTag,
+  type FeatureCall,
 } from "./store-data";
+import type { ProblemDetails } from "@fluxkit/api-client";
 import { LocaleMismatchError } from "./locale-check";
 
 import { SERVER_READ_TIMEOUT_MS } from "./request-timeout";
@@ -392,5 +395,97 @@ describe("ensureLocalesSupported", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const { data } = setup(() => problem(400, "validation_failed"));
     await expect(ensureLocalesSupported(data, ["uk", "en"])).rejects.toThrow(/store\/config/);
+  });
+});
+
+describe("createStoreData feature reads (plan 2026-11-13-blog.md, section 9 and review finding 10)", () => {
+  type Pages = { items: string[] };
+
+  /** What a slice's read does: its own request with the context's fetch and options, answered as a `StoreResult`. */
+  const notebookPages: FeatureCall<Pages> = async ({ baseUrl, fetch, options }) => {
+    const response = await fetch(`${baseUrl}/store/notebook/pages?locale=uk`, {
+      method: "GET",
+      ...options.fetchOptions,
+      ...(options.signal === undefined ? {} : { signal: options.signal }),
+    });
+    const body: unknown = await response.json();
+    return response.ok
+      ? { ok: true, status: response.status, data: body as Pages }
+      : { ok: false, status: response.status, problem: body as ProblemDetails, retryAfter: null };
+  };
+
+  it("goes through the same request path: before-request hook, the API origin, a timeout signal, the cache tagged feature:<name>", async () => {
+    const { data, calls, events } = setup(() => json({ items: ["a"] }));
+    const outcome = await data.featureRead("notebook", "GET /store/notebook/pages", notebookPages, {
+      revalidateSeconds: SITEMAP_REVALIDATE_SECONDS,
+    });
+    expect(outcome).toEqual({ ok: true, data: { items: ["a"] }, stale: false });
+    expect(events).toEqual(["beforeRequest", "fetch"]);
+    expect(calls[0]?.url).toBe("http://api.internal:3000/store/notebook/pages?locale=uk");
+    expect(calls[0]?.init.signal).toBeInstanceOf(AbortSignal);
+    expect((calls[0]?.init as { next?: unknown }).next).toEqual({
+      revalidate: SITEMAP_REVALIDATE_SECONDS,
+      tags: ["store", featureTag("notebook")],
+    });
+    expect(featureTag("notebook")).toBe("feature:notebook");
+  });
+
+  it("never serves a last good copy: after an answer, an outage throws instead of showing what may have been taken back", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    let mode: "ok" | "network" | "503" = "ok";
+    const { data } = setup(() => {
+      if (mode === "network") throw new TypeError("fetch failed");
+      if (mode === "503") return problem(503, "service_unavailable");
+      return json({ items: ["published"] });
+    });
+    expect(await data.featureRead("notebook", "GET /store/notebook/pages", notebookPages)).toEqual({
+      ok: true,
+      data: { items: ["published"] },
+      stale: false,
+    });
+    for (mode of ["network", "503"] as const) {
+      await expect(
+        data.featureRead("notebook", "GET /store/notebook/pages", notebookPages),
+        mode,
+      ).rejects.toBeInstanceOf(StoreUnavailableError);
+    }
+    expect(warn).not.toHaveBeenCalled();
+    expect(error).toHaveBeenCalledWith(
+      expect.stringContaining("GET /store/notebook/pages failed and no cached response exists"),
+    );
+  });
+
+  it("returns a 4xx as a failed outcome (a page then answers its own 404)", async () => {
+    const { data } = setup(() => problem(404, "not_found"));
+    expect(
+      await data.featureRead("notebook", "GET /store/notebook/pages", notebookPages),
+    ).toMatchObject({
+      ok: false,
+      status: 404,
+      problem: { code: "not_found" },
+    });
+  });
+
+  it("never enters the last-good store: many feature reads do not push a catalog copy out of it", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    let down = false;
+    const { data } = setup((call) => {
+      if (down) throw new TypeError("fetch failed");
+      return call.url.includes("/store/notebook/")
+        ? json({ items: [] })
+        : json({ items: [{ id: "1" }] });
+    });
+    await data.listCategories("uk");
+    // More reads than the store keeps (200): were they recorded, the categories' copy would be dropped as the oldest.
+    for (let index = 0; index < 250; index += 1) {
+      await data.featureRead("notebook", "GET /store/notebook/pages", notebookPages);
+    }
+    down = true;
+    expect(await data.listCategories("uk")).toEqual({
+      ok: true,
+      data: { items: [{ id: "1" }] },
+      stale: true,
+    });
   });
 });
