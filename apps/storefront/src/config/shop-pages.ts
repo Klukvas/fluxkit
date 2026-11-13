@@ -318,9 +318,12 @@ export const productPageNote: {
 };
 
 /**
- * The shop page linked next to the option pickers of the product page (UX round 2, batch 3A item 7), with the chosen values.
- * Rule: every product that has options (a choice between variants) gets the link, whatever its options are called: the
- * storefront reads no option code (AGENTS 2.3, product structure is data-driven), so a colour-only product gets it too. The
- * link is left out while the page is not enabled; `null` switches it off.
+ * The FALLBACK for the shop page linked next to the option pickers of the product page (UX round 2, batch 3A item 7; plan
+ * 2026-11-13-product-type-guide-page). The page is chosen per PRODUCT TYPE in the admin (Product types, "Guide page": a slug
+ * such as `size-guide`, sent by the API as `optionGuidePage`), so a gift card with denominations gets no size guide while
+ * clothing does; the storefront still reads no option code (AGENTS 2.3). Rule: a product with options (a choice between
+ * variants) links its type's page while that page is enabled here; a type whose page is not enabled here gets no link; only
+ * a type that names NO page falls back to this value. `null` (the default): such types get no link. Setting `"size-guide"`
+ * gives the pre-2026-11-13 behaviour back for every type without a page of its own.
  */
-export const productOptionGuide: ShopPageSlug | null = "size-guide";
+export const productOptionGuide: ShopPageSlug | null = null;

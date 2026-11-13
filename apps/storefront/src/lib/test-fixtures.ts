@@ -64,6 +64,7 @@ export function product(overrides: Partial<ProductDetail> = {}): ProductDetail {
     media: [],
     price: { from: 1999, to: 1999, currency: "UAH" },
     availability: "in_stock",
+    optionGuidePage: null,
     ...overrides,
   };
 }

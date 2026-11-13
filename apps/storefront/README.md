@@ -649,8 +649,10 @@ Plan `docs/plans/2026-11-06-ux-repairs-3-storefront.md` (second round of the sim
   button stays disabled WITHOUT a hint; not a regression (before, a tap reloaded the page with nothing added). Pressing Enter in the quantity box
   before hydration is blocked too: the form has no enabled submit button, so the browser does not post it.
 - **Chosen values and the size guide** (`product-purchase.tsx`, `productChoice.*`): above the pickers "Обрано: Чорний, S" (the API's value names in
-  option order, joined by `product.bar.separator`, the same separator as the phone's buy bar; no plural). Rule for the guide link: every product with options (a choice between variants) links the
-  page of `productOptionGuide` (`size-guide`) while that page is enabled; no option code is read (AGENTS 2.3), so a colour-only product gets it too.
+  option order, joined by `product.bar.separator`, the same separator as the phone's buy bar; no plural). Rule for the guide link (plan `docs/plans/2026-11-13-product-type-guide-page.md`): a product with options (a choice between variants)
+  links the page its PRODUCT TYPE names (`optionGuidePage` of the store API, set in the admin) while that page is enabled here; a type whose page is not
+  enabled here gets no link; a type that names no page falls back to `productOptionGuide` of `config/shop-pages.ts` (`null` upstream: no link). No option
+  code is read (AGENTS 2.3). A gift card with denominations gets no size guide unless its type names one.
 
 ## Accessibility baseline (what was checked)
 

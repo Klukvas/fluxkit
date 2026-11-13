@@ -172,16 +172,25 @@ describe("shop pages config (config/shop-pages.ts)", () => {
     expect(productNoteView("en", null)).toBeNull();
   });
 
-  // UX round 2, batch 3A item 7: a link to the size guide next to the option pickers, data-driven (no option code is read).
-  it("links the option guide (the size guide by default) only while that page is enabled", () => {
-    expect(productOptionGuide).toBe("size-guide");
-    expect(optionGuideLink("uk")).toEqual({
+  // UX round 2, batch 3A item 7, then plan 2026-11-13-product-type-guide-page: the product type names the page (owner report:
+  // a gift card with denominations linked the size guide); no option code is read.
+  it("links the guide page the product type names, only while that page is enabled", () => {
+    expect(optionGuideLink("uk", "size-guide")).toEqual({
       slug: "size-guide",
       href: "/uk/size-guide",
       titleKey: "shopPages.sizeGuide.title",
     });
-    expect(optionGuideLink("en", "size-guide", [page("faq")])).toBeNull();
-    expect(optionGuideLink("en", null)).toBeNull();
+    expect(optionGuideLink("en", "faq")?.href).toBe("/en/faq");
+    // Not enabled here, or not a page this storefront knows: no link, and no fallback either (the type decided).
+    expect(optionGuideLink("en", "size-guide", null, [page("faq")])).toBeNull();
+    expect(optionGuideLink("en", "fit-guide", "size-guide")).toBeNull();
+  });
+
+  it("falls back to productOptionGuide (none upstream) only for a type that names no page", () => {
+    expect(productOptionGuide).toBeNull();
+    expect(optionGuideLink("uk", null)).toBeNull();
+    expect(optionGuideLink("uk", null, "size-guide")?.href).toBe("/uk/size-guide");
+    expect(optionGuideLink("uk", null, "size-guide", [page("faq")])).toBeNull();
   });
 
   it("links the trust bar's contact line to the contacts page", () => {

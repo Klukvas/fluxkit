@@ -195,13 +195,24 @@ export function productNoteView(
     : { titleKey: note.titleKey, summaryKey: note.summaryKey, links };
 }
 
-/** The link next to the option pickers (`productOptionGuide`), or `null` when it is switched off or its page is not enabled. */
+/**
+ * The link next to the option pickers of a product (plan 2026-11-13-product-type-guide-page). `typePage` is the product
+ * type's `optionGuidePage` from the API (a slug the API cannot check against this storefront): when it is set, it decides,
+ * and a slug that is not an enabled page here gives no link (never the fallback). When the type names no page, the fallback
+ * `productOptionGuide` of `config/shop-pages.ts` applies (`null` upstream: no link). `null` when there is nothing to link.
+ */
 export function optionGuideLink(
   locale: Locale,
-  guide: ShopPageSlug | null = productOptionGuide,
+  typePage: string | null,
+  fallback: ShopPageSlug | null = productOptionGuide,
   pages: readonly ShopPageConfig[] = shopPages,
 ): ShopPageLink | null {
-  return guide === null ? null : (shopPageLinks(locale, [guide], pages)[0] ?? null);
+  const slug = typePage ?? fallback;
+  if (slug === null) return null;
+  const page = pages.find((entry) => entry.slug === slug);
+  return page === undefined
+    ? null
+    : { slug: page.slug, href: localizedHref(locale, `/${page.slug}`), titleKey: page.titleKey };
 }
 
 /** Plain text to paragraphs: a blank line starts a new one; blank paragraphs are dropped. */
