@@ -121,3 +121,42 @@ export function CategoryIcon(props: SVGProps<SVGSVGElement>) {
     </Icon>
   );
 }
+
+/**
+ * Sort icons (`sort-menu.tsx`): a sparkle (newest), arrows up and down (price low to high, high to low), a target (best
+ * match); 20 px beside the sort's own label, which names it.
+ */
+export function SparkleIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon width="20" height="20" {...props}>
+      <path d="M11 3c.6 4.2 2.8 6.4 7 7-4.2.6-6.4 2.8-7 7-.6-4.2-2.8-6.4-7-7 4.2-.6 6.4-2.8 7-7z" />
+      <path d="M19 16v5M16.5 18.5h5" />
+    </Icon>
+  );
+}
+
+export function ArrowUpIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon width="20" height="20" {...props}>
+      <path d="M12 20V4M6 10l6-6 6 6" />
+    </Icon>
+  );
+}
+
+export function ArrowDownIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon width="20" height="20" {...props}>
+      <path d="M12 4v16M6 14l6 6 6-6" />
+    </Icon>
+  );
+}
+
+export function TargetIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon width="20" height="20" {...props}>
+      <circle cx="12" cy="12" r="8" />
+      <circle cx="12" cy="12" r="4" />
+      <circle cx="12" cy="12" r="0.5" />
+    </Icon>
+  );
+}

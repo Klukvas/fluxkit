@@ -285,10 +285,66 @@ describe("results page markup", () => {
     expect((html.match(/<label[^>]*>\s*<span>§search\.facet\.min<\/span>/g) ?? []).length).toBe(2);
   });
 
-  it("puts the sort select in the form by its form attribute, with the choice in force selected", () => {
-    expect(html).toMatch(/<select[^>]*form="search-filters"[^>]*name="sort"/);
-    expect(html).toContain('<option value="relevance" selected="">§search.sort.relevance</option>');
-    expect(html).toContain("§search.sort.price_asc");
+  it("puts the sort in the form by a hidden field's form attribute, with the choice in force", () => {
+    expect(html).toContain(
+      '<input type="hidden" form="search-filters" name="sort" value="relevance"/>',
+    );
+    expect(html).not.toContain("<select");
+  });
+
+  it("offers every sort as a link in a disclosure, the current one marked and shown in the summary with its icon", () => {
+    // The sort's disclosure (the facet groups are disclosures too: it is the one after the sort label).
+    const sort =
+      /<details class="group relative">.*?<\/details>/.exec(
+        html.slice(html.indexOf("§search.sort.label")),
+      )?.[0] ?? "";
+    const summary = /<summary[^>]*>.*?<\/summary>/.exec(sort)?.[0] ?? "";
+    // The summary is a button named by the visible "Sort by" text and the current sort (label in name).
+    expect(summary).toMatch(
+      /^<summary role="button" aria-expanded="false" aria-labelledby="[^"]+ [^"]+"/,
+    );
+    const [labelId, currentId] = (/aria-labelledby="([^" ]+) ([^"]+)"/.exec(summary) ?? []).slice(
+      1,
+    );
+    expect(html).toContain(`<span id="${labelId ?? "missing"}">§search.sort.label</span>`);
+    expect(summary).toContain(`id="${currentId ?? "missing"}"`);
+    expect(summary).toContain("§search.sort.relevance");
+    expect(summary).toMatch(/<svg[^>]*aria-hidden="true"/);
+    // Links, page 1, the API's default sort left out of the address; the words and the filters stay.
+    const links = [...sort.matchAll(/<a href="([^"]*)"([^>]*)>(.*?)<\/a>/g)];
+    expect(links.map((link) => link[1])).toEqual([
+      "/uk/search?q=lamp&amp;f=brand%3Azeta&amp;price=1000..",
+      "/uk/search?q=lamp&amp;f=brand%3Azeta&amp;price=1000..&amp;sort=newest",
+      "/uk/search?q=lamp&amp;f=brand%3Azeta&amp;price=1000..&amp;sort=price_asc",
+      "/uk/search?q=lamp&amp;f=brand%3Azeta&amp;price=1000..&amp;sort=price_desc",
+    ]);
+    expect(links.map((link) => /§search\.sort\.(\w+)/.exec(link[3] ?? "")?.[1])).toEqual([
+      "relevance",
+      "newest",
+      "price_asc",
+      "price_desc",
+    ]);
+    expect(links.map((link) => (link[2] ?? "").includes('aria-current="true"'))).toEqual([
+      true,
+      false,
+      false,
+      false,
+    ]);
+    // Each choice carries a decorative icon; the name is the text.
+    for (const link of links) expect(link[3]).toMatch(/^<svg[^>]*aria-hidden="true"/);
+  });
+
+  it("marks a chosen sort, keeps the filters and drops the page in the sort links", () => {
+    const sorted = render(ok({ page: 2, pageCount: 3, total: 50 }), {
+      query: { ...query, facets: ["brand:zeta"], sort: "price_desc", page: 2 },
+    });
+    expect(sorted).toContain(
+      '<input type="hidden" form="search-filters" name="sort" value="price_desc"/>',
+    );
+    expect(sorted).toMatch(
+      /<a href="\/uk\/search\?q=lamp&amp;f=brand%3Azeta&amp;sort=price_desc" aria-current="true"/,
+    );
+    expect(sorted).toContain('<a href="/uk/search?q=lamp&amp;f=brand%3Azeta"');
   });
 
   it("lists the chosen filters with a link that removes each one and one that clears them all", () => {

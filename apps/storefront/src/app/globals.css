@@ -206,6 +206,13 @@
   .fk-facet-summary::-webkit-details-marker {
     display: none;
   }
+  /* The sort's summary (`sort-menu.tsx`): looks like the field it replaced (44 px, the input border), no native marker. */
+  .fk-sort-summary {
+    @apply flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-control border border-border-input bg-background px-3 py-2 text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring;
+  }
+  .fk-sort-summary::-webkit-details-marker {
+    display: none;
+  }
   /* A bar fixed or stuck to the bottom of a phone screen keeps clear of the home indicator. */
   .fk-bottom-bar {
     padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0));

@@ -52,5 +52,29 @@
     "selector": "main.link",
     "property": "*",
     "reason": "plan 2026-11-11-ui-council-decisions, decision 3: the first link of main is now the breadcrumb Home link (text-sm, muted) instead of the account link of the privacy text"
+  },
+  {
+    "page": "catalog",
+    "selector": "results.toolbar",
+    "property": "screenshot",
+    "reason": "plan 2026-11-13-storefront-ui-round-4 B (council decision 5): the sort select becomes a disclosure whose summary shows the current sort's icon and name (same 44 px height); only the toolbar row is masked, the closed panel adds nothing below it"
+  },
+  {
+    "page": "search",
+    "selector": "results.toolbar",
+    "property": "screenshot",
+    "reason": "plan 2026-11-13-storefront-ui-round-4 B (council decision 5): the sort select becomes a disclosure whose summary shows the current sort's icon and name (same 44 px height); only the toolbar row is masked, the closed panel adds nothing below it"
+  },
+  {
+    "page": "en-catalog",
+    "selector": "results.toolbar",
+    "property": "screenshot",
+    "reason": "plan 2026-11-13-storefront-ui-round-4 B (council decision 5): the sort select becomes a disclosure whose summary shows the current sort's icon and name (same 44 px height); only the toolbar row is masked, the closed panel adds nothing below it"
+  },
+  {
+    "page": "catalog",
+    "selector": "form.select",
+    "property": "presence",
+    "reason": "plan 2026-11-13-storefront-ui-round-4 B (council decision 5): the catalog's only native select was the sort; it is now a disclosure of links, so no select is found in main"
   }
 ]

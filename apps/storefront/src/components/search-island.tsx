@@ -1,6 +1,6 @@
 "use client";
 
-import { Alert, Select, Spinner, textStyles, VisuallyHidden, type Locale } from "@fluxkit/ui";
+import { Alert, Spinner, textStyles, VisuallyHidden, type Locale } from "@fluxkit/ui";
 import { useRouter } from "next/navigation";
 import {
   createContext,
@@ -30,11 +30,10 @@ import { focusRing } from "./styles";
 /**
  * The few client parts of the results page (plan 2026-10-29-search.md, section 9). The page, the facet checkboxes and every
  * label are server markup passed in as children; these parts only add what a script is needed for:
- * - `SearchPending`: one `useTransition` for the filter form, the sort select and the results, so a change shows
+ * - `SearchPending`: one `useTransition` for the filter form, the sort and the results, so a change shows
  *   "updating" (dimmed, `aria-busy`) without moving anything, and the focus goes to the results heading when it is done;
  * - `SearchFilterForm`: the facet form is a plain GET form that works without a script. With one, the submit is checked in
  *   the browser (a bad price box is named, not sent) and navigates with the router, keeping the page's shell and focus;
- * - `SortSelect`: submits the form when the choice changes;
  * - `FiltersButton` and `FilterSheet`: below the `lg` width the panel is a full-screen modal sheet (mobile batch, review D-05).
  * Nothing here reads the API: the address is the state, the server renders it.
  */
@@ -181,7 +180,7 @@ export function SearchFilterForm({
   function onDraftChange(event: FormEvent<HTMLFormElement>): void {
     const form = event.currentTarget;
     const target = event.target;
-    // The sort select submits by itself; a change elsewhere is a draft until it is applied.
+    // The sort (`sort-menu.tsx`) submits by itself; a change elsewhere is a draft until it is applied.
     if (!(target instanceof HTMLElement) || target.getAttribute("name") === "sort") return;
     const controls = Array.from(form.elements).filter(
       (element): element is HTMLInputElement | HTMLSelectElement =>
@@ -279,38 +278,6 @@ export function SearchFilterForm({
       )}
       {children}
     </form>
-  );
-}
-
-export function SortSelect({
-  label,
-  options,
-  selected,
-}: {
-  label: string;
-  options: readonly { value: string; label: string }[];
-  selected: string;
-}) {
-  return (
-    <label className="flex min-w-0 flex-1 flex-col gap-1 text-foreground lg:flex-none lg:flex-row lg:flex-wrap lg:items-center lg:gap-2">
-      <span>{label}</span>
-      <Select
-        // The select belongs to the filter form (a form attribute), so one submit carries the sort and the filters.
-        form={SEARCH_FORM_ID}
-        name="sort"
-        defaultValue={selected}
-        className="w-auto"
-        onChange={(event) => {
-          event.currentTarget.form?.requestSubmit();
-        }}
-      >
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </Select>
-    </label>
   );
 }
 

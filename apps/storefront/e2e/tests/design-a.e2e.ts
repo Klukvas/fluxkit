@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Locator, Page } from "@playwright/test";
 import { expect, test, uniqueEmail } from "../support/fixtures.ts";
-import { rowValue, tabTo, waitForHydration } from "../support/flows.ts";
+import { rowValue, sortButton, tabTo, waitForHydration } from "../support/flows.ts";
 import { SHOP_NAME } from "../support/shop-name.ts";
 
 /**
@@ -275,7 +275,7 @@ test("nothing found: no filter panel, the categories as a way on, the spelling h
   await expect(page.getByRole("heading", { name: "Nothing found" })).toBeVisible();
   await expect(page.getByText(/Check the spelling/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Apply filters" })).toHaveCount(0);
-  await expect(page.getByRole("combobox", { name: "Sort by" })).toHaveCount(0);
+  await expect(sortButton(page)).toHaveCount(0);
   const categories = page.getByRole("navigation", { name: "Browse categories" });
   await expect(categories.getByRole("link", { name: "Clothing" })).toHaveAttribute(
     "href",
