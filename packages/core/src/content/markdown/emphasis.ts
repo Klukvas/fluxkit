@@ -1,4 +1,4 @@
-import { MarkdownFailure } from "./budget.js";
+import { MarkdownFailure, type WorkCounter } from "./budget.js";
 import type { Slot, SlotList } from "./inline-list.js";
 import { MARKDOWN_LIMITS } from "./limits.js";
 
@@ -34,7 +34,10 @@ const MULTIPLE = 3;
 export class EmphasisStack {
   top: Delimiter | null = null;
 
-  constructor(private readonly slots: SlotList) {}
+  constructor(
+    private readonly slots: SlotList,
+    private readonly work: WorkCounter,
+  ) {}
 
   push(run: DelimiterRun): void {
     const delimiter: Delimiter = { ...run, originalLength: run.length, prev: this.top, next: null };
@@ -55,6 +58,7 @@ export class EmphasisStack {
       delimiter !== null && delimiter !== bottom;
       delimiter = delimiter.prev
     ) {
+      this.work.count(1);
       first = delimiter;
     }
     return first;
@@ -70,6 +74,7 @@ export class EmphasisStack {
 
   private findOpener(closer: Delimiter, stopAt: Delimiter | null): Delimiter | null {
     for (let opener = closer.prev; opener !== null && opener !== stopAt; opener = opener.prev) {
+      this.work.count(1);
       if (
         opener.char === closer.char &&
         opener.canOpen &&
@@ -86,6 +91,7 @@ export class EmphasisStack {
     const used = opener.length >= 2 && closer.length >= 2 ? 2 : 1;
     opener.length -= used;
     closer.length -= used;
+    this.work.count(opener.length + closer.length);
     opener.slot.piece = { kind: "text", value: opener.char.repeat(opener.length) };
     closer.slot.piece = { kind: "text", value: closer.char.repeat(closer.length) };
     const { nodes, depth } = this.slots.take(opener.slot.next, closer.slot);
@@ -115,6 +121,7 @@ export class EmphasisStack {
     const openersBottom = new Map<string, Delimiter | null>();
     let closer = this.firstAbove(bottom);
     while (closer !== null) {
+      this.work.count(1);
       if (!closer.canClose) {
         closer = closer.next;
         continue;
@@ -137,6 +144,9 @@ export class EmphasisStack {
       if (!closer.canOpen) this.remove(closer);
       closer = next;
     }
-    while (this.top !== null && this.top !== bottom) this.remove(this.top);
+    while (this.top !== null && this.top !== bottom) {
+      this.work.count(1);
+      this.remove(this.top);
+    }
   }
 }

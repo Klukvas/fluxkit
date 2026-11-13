@@ -337,6 +337,12 @@ describe("parseMarkdown, refusals", () => {
     expect(refused("> - > - > a")).toEqual({ code: "too_deep", line: 1 });
   });
 
+  it("allows 32 levels of parentheses in a target and makes no link from 33", () => {
+    const nested = (levels: number): string => `/${"(".repeat(levels)}${")".repeat(levels)}`;
+    expect(parsed(`[a](${nested(32)})`)).toEqual(doc(p(link(nested(32), text("a")))));
+    expect(JSON.stringify(parsed(`[a](${nested(33)})`))).not.toContain('"link"');
+  });
+
   it("a raw line break, tab or space in a target makes no link (the text stays literal)", () => {
     for (const source of ["[a](/x\ny)", "[a](/x\ty)", "[a](/x y)", "[a](/x\r\ny)"]) {
       const document = parsed(source);

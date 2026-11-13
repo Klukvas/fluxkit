@@ -20,4 +20,6 @@ export const MARKDOWN_LIMITS = Object.freeze({
   maxSerializedBytes: 262_144,
   /** Characters scanned for one link target before giving up (the banner link rule's maximum length). */
   maxLinkTargetLength: 2_048,
+  /** Unescaped parentheses open inside one link target (CommonMark's reference parsers use the same 32). */
+  maxLinkTargetParentheses: 32,
 });

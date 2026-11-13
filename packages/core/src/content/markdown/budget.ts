@@ -12,11 +12,29 @@ export class MarkdownFailure extends Error {
   }
 }
 
+/**
+ * Where the parser reports its work: one unit per character visited or loop step taken. A plain integer sum, so the
+ * adversarial spec can assert linear work deterministically (wall-clock time depends on the runner).
+ */
+export interface WorkCounter {
+  count(steps: number): void;
+}
+
 /** Counts what one parse has produced so far and refuses the first block, node or link over its limit. */
-export class ParseBudget {
+export class ParseBudget implements WorkCounter {
   private blocks = 0;
   private nodes = 0;
   private links = 0;
+  private work = 0;
+
+  count(steps: number): void {
+    this.work += steps;
+  }
+
+  /** The work units counted so far (read by the internal `runMarkdownParse`, never by the public API). */
+  get steps(): number {
+    return this.work;
+  }
 
   /** A block node (list items included); also counts as a node. */
   block(line: number): void {
