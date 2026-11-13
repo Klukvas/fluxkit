@@ -6,6 +6,7 @@ import {
   comparesViewportOnly,
   parseExceptions,
   screenshotMasks,
+  skipsElementShot,
   type VisualException,
 } from "../support/visual/exceptions.ts";
 import { expect, test } from "../support/visual/fixture.ts";
@@ -70,6 +71,7 @@ for (const frame of screenshotFrames()) {
         for (const selector of ELEMENT_SHOT_SELECTORS) {
           const element = locate(page, selectorByName(selector));
           await expect(element, `${selector} must exist on ${frame.page.path}`).toHaveCount(1);
+          if (skipsElementShot(maskNamesFor(frame), selector)) continue;
           await expect(element).toHaveScreenshot(`${name}--${selector}.png`, {
             mask: masksFor(page, frame),
           });

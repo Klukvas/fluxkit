@@ -157,5 +157,47 @@
     "selector": "footer.contentinfo",
     "property": "screenshot",
     "reason": "plan 2026-11-13-storefront-ui-round-4, A: the footer in columns with headings, the theme switch moved to the header"
+  },
+  {
+    "page": "home",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "owner design 2026-11-13 (add to cart from a product card): every in-stock card gains an Add to cart button or a Choose options link under its price, so the cards and the page grow taller; the page is masked"
+  },
+  {
+    "page": "en-home",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "owner design 2026-11-13 (add to cart from a product card): every in-stock card gains an Add to cart button or a Choose options link under its price, so the cards and the page grow taller; the page is masked"
+  },
+  {
+    "page": "catalog",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "owner design 2026-11-13 (add to cart from a product card): every in-stock card gains an Add to cart button or a Choose options link under its price, so the cards and the page grow taller; the page is masked"
+  },
+  {
+    "page": "en-catalog",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "owner design 2026-11-13 (add to cart from a product card): every in-stock card gains an Add to cart button or a Choose options link under its price, so the cards and the page grow taller; the page is masked"
+  },
+  {
+    "page": "search",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "owner design 2026-11-13 (add to cart from a product card): every in-stock card gains an Add to cart button or a Choose options link under its price, so the cards and the page grow taller; the page is masked"
+  },
+  {
+    "page": "home",
+    "selector": "card.article",
+    "property": "screenshot",
+    "reason": "owner design 2026-11-13: the first home card gains its Choose options link and grows taller; its element shot is left out (a mask cannot declare a size), the full-page frames are masked by page.body"
+  },
+  {
+    "page": "home",
+    "selector": "main.button",
+    "property": "presence",
+    "reason": "owner design 2026-11-13: the home page's product row now has a button in main (a card's Add to cart)"
   }
 ]
