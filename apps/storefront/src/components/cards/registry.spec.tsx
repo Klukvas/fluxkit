@@ -129,7 +129,9 @@ function LegacyProductCard({
           <VisuallyHidden>{t(availability.messageKey)}</VisuallyHidden>
         ) : null}
       </div>
-      {!purchasable ? null : product.defaultVariantId === null ? (
+      {!purchasable ? (
+        <div aria-hidden="true" className="min-h-11" />
+      ) : product.defaultVariantId === null ? (
         <Link
           href={href}
           className={`relative z-10 inline-flex min-h-11 w-full items-center justify-center rounded-control border border-border bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-muted ${focusRing}`}
