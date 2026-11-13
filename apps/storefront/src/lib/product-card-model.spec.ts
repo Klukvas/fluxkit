@@ -37,7 +37,11 @@ describe("cardDisplay (the plain view model every card kind renders)", () => {
       priceLabel: "§product.price.label",
       note: null,
       availability: { text: "§availability.in_stock", variant: "success", badge: false },
-      purchase: { kind: "choose", label: "§product.card.chooseOptions" },
+      purchase: {
+        kind: "choose",
+        label: "§product.card.chooseOptions",
+        shortLabel: "§product.card.chooseShort",
+      },
     });
   });
 
@@ -167,6 +171,7 @@ describe("cardDisplay: what the card offers to buy (owner design 2026-11-13)", (
     expect(purchaseOf({ product: summary("shirt", {}, "low_stock") })).toEqual({
       kind: "choose",
       label: "§product.card.chooseOptions",
+      shortLabel: "§product.card.chooseShort",
     });
   });
 

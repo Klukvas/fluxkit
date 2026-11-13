@@ -7,6 +7,7 @@ import type { CartOutcome } from "../lib/cart-store";
 import { useI18n } from "./i18n-provider";
 import { useCart } from "./session-provider";
 import { cardActionLink } from "./styles";
+import { CardActionLabel } from "./card-action-label";
 
 /** How long the button reads "Added" before it offers to add again (the cart badge keeps the count). */
 export const CARD_ADDED_MS = 2500;
@@ -73,14 +74,16 @@ export function CardAddButtonView({
   onAdd,
 }: CardAddButtonViewProps) {
   const pending = status.state === "pending";
+  // Adding and Added are short in every locale; only the idle label has a phone version.
   const label = pending
-    ? t("product.card.adding")
+    ? { short: t("product.card.adding"), full: t("product.card.adding") }
     : status.state === "added"
-      ? t("product.card.added")
-      : t("product.addToCart");
+      ? { short: t("product.card.added"), full: t("product.card.added") }
+      : { short: t("product.card.addShort"), full: t("product.addToCart") };
   const name = (
     <>
-      <span>{label}</span> <VisuallyHidden>{title}</VisuallyHidden>
+      <CardActionLabel short={label.short} full={label.full} />{" "}
+      <VisuallyHidden>{title}</VisuallyHidden>
     </>
   );
   return (

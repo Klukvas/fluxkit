@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { ProductCardModel } from "../../lib/product-card-model";
 import { CardAddButton } from "../card-add-button";
 import { cardActionLink } from "../styles";
+import { CardActionLabel } from "../card-action-label";
 
 /** Above the card's stretched title link, like the add button. */
 const chooseLinkClass = `relative z-10 ${cardActionLink}`;
@@ -21,7 +22,8 @@ export function CardPurchaseAction({ card }: { card: ProductCardModel }) {
   }
   return (
     <Link href={card.href} className={chooseLinkClass}>
-      <span>{purchase.label}</span> <VisuallyHidden>{card.title}</VisuallyHidden>
+      <CardActionLabel short={purchase.shortLabel} full={purchase.label} />{" "}
+      <VisuallyHidden>{card.title}</VisuallyHidden>
     </Link>
   );
 }

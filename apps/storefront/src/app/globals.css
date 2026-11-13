@@ -159,7 +159,7 @@
     @apply flex flex-col gap-6;
   }
   .fk-footer-grid {
-    @apply grid grid-cols-2 gap-x-4 gap-y-6 lg:grid-cols-4;
+    @apply grid grid-cols-2 gap-x-4 gap-y-6 wrap-anywhere lg:grid-cols-4;
   }
   .fk-footer-grid > div {
     @apply flex flex-col gap-1;

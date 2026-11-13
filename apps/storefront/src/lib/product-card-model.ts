@@ -44,7 +44,7 @@ export interface ProductCardModel {
 }
 
 export type CardPurchase =
-  { kind: "add"; variantId: string } | { kind: "choose"; label: string } | null;
+  { kind: "add"; variantId: string } | { kind: "choose"; label: string; shortLabel: string } | null;
 
 /** The price of a list item: one price, or "from <lowest>" when the variants differ. */
 export function listPriceLabel(
@@ -98,7 +98,11 @@ export function cardDisplay({
     shown === null || !canAddToCart(shown)
       ? null
       : product.defaultVariantId === null
-        ? { kind: "choose", label: t("product.card.chooseOptions") }
+        ? {
+            kind: "choose",
+            label: t("product.card.chooseOptions"),
+            shortLabel: t("product.card.chooseShort"),
+          }
         : { kind: "add", variantId: product.defaultVariantId };
   const price = offer.kind === "matched" ? offer.price : product.price;
   const path = localizedHref(locale, `/p/${encodeURIComponent(product.slug)}`);

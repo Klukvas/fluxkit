@@ -27,6 +27,8 @@
   "product.adding": "Adding to the cart",
   "product.added": "Added to the cart.",
   "product.card.chooseOptions": "Choose options",
+  "product.card.chooseShort": "Options",
+  "product.card.addShort": "Add",
   "product.card.adding": "Adding…",
   "product.card.added": "Added",
   "product.added.dismiss": "Close the message",

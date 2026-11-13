@@ -18,6 +18,7 @@ import { cardDisplay, listPriceLabel, type ProductCardModel } from "../../lib/pr
 import type { CardOffer } from "../../lib/search-facets";
 import { summary } from "../../lib/test-fixtures";
 import { CardAddButton } from "../card-add-button";
+import { CardActionLabel } from "../card-action-label";
 import { ProductGrid } from "../product-grid";
 import { StoreImage } from "../store-image";
 import { focusRing } from "../styles";
@@ -129,13 +130,16 @@ function LegacyProductCard({
           <VisuallyHidden>{t(availability.messageKey)}</VisuallyHidden>
         ) : null}
       </div>
-      <div className="flex min-h-15 flex-col md:min-h-11">
+      <div className="flex min-h-11 flex-col">
         {!purchasable ? null : product.defaultVariantId === null ? (
           <Link
             href={href}
             className={`relative z-10 inline-flex min-h-11 w-full items-center justify-center rounded-control border border-border bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-muted ${focusRing}`}
           >
-            <span>{t("product.card.chooseOptions")}</span>{" "}
+            <CardActionLabel
+              short={t("product.card.chooseShort")}
+              full={t("product.card.chooseOptions")}
+            />{" "}
             <VisuallyHidden>{product.title}</VisuallyHidden>
           </Link>
         ) : (
@@ -446,7 +450,7 @@ describe.each(["grid", "list"])("the purchase action of the %s card", (kind) => 
     expect(html).not.toContain("data-add-stub");
     const choose = afterTitleLink(html);
     expect(choose).toMatch(
-      /<a class="relative z-10 [^"]*min-h-11[^"]*" href="\/uk\/p\/a"><span>§product\.card\.chooseOptions<\/span> <span class="sr-only">§a<\/span><\/a>/,
+      /<a class="relative z-10 [^"]*min-h-11[^"]*" href="\/uk\/p\/a"><span class="min-w-0 truncate"><span class="sm:hidden">§product\.card\.chooseShort<\/span><span class="max-sm:hidden">§product\.card\.chooseOptions<\/span><\/span> <span class="sr-only">§a<\/span><\/a>/,
     );
   });
 

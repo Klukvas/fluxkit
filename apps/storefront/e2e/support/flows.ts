@@ -108,7 +108,10 @@ export async function storedAttempt(page: Page): Promise<string | null> {
  * instead of by the page's own code.
  */
 export async function waitForHydration(page: Page): Promise<void> {
-  await expect(page.getByRole("link", { name: /Cart.*\d+ items? in the cart/ })).toBeVisible();
+  // The cart count appears once the session provider has hydrated; its words follow the page's locale (en or uk).
+  await expect(
+    page.getByRole("link", { name: /Cart.*\d+ items? in the cart|Кошик.*\d+ товар\S* у кошику/ }),
+  ).toBeVisible();
 }
 
 /**

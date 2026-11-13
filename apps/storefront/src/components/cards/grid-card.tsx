@@ -97,7 +97,7 @@ export function GridCard({ card, headingLevel: Heading, eager, locale, t }: Card
       {/* The action's slot has one height in every card of a row, so the prices share one line: room for a label wrapped onto
           two lines in the two-column phone grid (60 px), one line from `md` (44 px). Empty when there is nothing to buy (the
           badge says why). */}
-      <div className="flex min-h-15 flex-col md:min-h-11">
+      <div className="flex min-h-11 flex-col">
         <CardPurchaseAction card={card} />
       </div>
       {availabilityBadge}

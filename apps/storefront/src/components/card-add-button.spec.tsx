@@ -40,7 +40,7 @@ describe("the card's add-to-cart button", () => {
     const { html } = view({ state: "idle" });
     expect(html).toMatch(/^<div class="relative z-10 /);
     expect(html).toMatch(
-      /<button type="button" class="[^"]*min-h-11[^"]*" aria-disabled="false" aria-busy="false"><span>§product\.addToCart<\/span> <span class="sr-only">§mug<\/span><\/button>/,
+      /<button type="button" class="[^"]*min-h-11[^"]*" aria-disabled="false" aria-busy="false"><span class="min-w-0 truncate"><span class="sm:hidden">§product\.card\.addShort<\/span><span class="max-sm:hidden">§product\.addToCart<\/span><\/span> <span class="sr-only">§mug<\/span><\/button>/,
     );
     // The status region is there from the start (empty), so a later change is announced.
     expect(html).toContain('<p role="status" class="text-sm"></p>');
@@ -51,7 +51,7 @@ describe("the card's add-to-cart button", () => {
     const { html } = view({ state: "idle" }, { ready: false });
     expect(html).not.toContain("<button");
     expect(html).toMatch(
-      /^<div class="relative z-10 flex flex-col"><a class="[^"]*min-h-11[^"]*" href="\/uk\/p\/mug"><span>§product\.addToCart<\/span> <span class="sr-only">§mug<\/span><\/a><p role="status" class="text-sm"><\/p><\/div>$/,
+      /^<div class="relative z-10 flex flex-col"><a class="[^"]*min-h-11[^"]*" href="\/uk\/p\/mug"><span class="min-w-0 truncate"><span class="sm:hidden">§product\.card\.addShort<\/span><span class="max-sm:hidden">§product\.addToCart<\/span><\/span> <span class="sr-only">§mug<\/span><\/a><p role="status" class="text-sm"><\/p><\/div>$/,
     );
   });
 
@@ -72,7 +72,9 @@ describe("the card's add-to-cart button", () => {
 
   it("confirms an add in the button and announces it in the status region", () => {
     const { html } = view({ state: "added" });
-    expect(html).toContain("<span>§product.card.added</span>");
+    expect(html).toContain(
+      '<span class="min-w-0 truncate"><span class="sm:hidden">§product.card.added</span><span class="max-sm:hidden">§product.card.added</span></span>',
+    );
     expect(html).toContain(
       '<p role="status" class="text-sm"><span class="sr-only">§product.added</span></p>',
     );
@@ -83,7 +85,9 @@ describe("the card's add-to-cart button", () => {
     expect(html).toContain(
       '<p role="status" class="text-sm"><span class="mt-1 block text-danger">§errors.rule.variant_not_sellable</span></p>',
     );
-    expect(html).toContain("<span>§product.addToCart</span>");
+    expect(html).toContain(
+      '<span class="min-w-0 truncate"><span class="sm:hidden">§product.card.addShort</span><span class="max-sm:hidden">§product.addToCart</span></span>',
+    );
     expect(html).toContain('aria-disabled="false"');
   });
 });
