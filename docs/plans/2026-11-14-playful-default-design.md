@@ -1,6 +1,6 @@
 # Playful default design (concept 03)
 
-Status: owner-approved decisions (2026-11-14). Workstream A merged (PR 285), B merged (PR 284, test only), D merged (PR 291); C implemented, in review (PR 292).
+Status: A (PR 285), B (PR 284, test only), C (PR 292) and D (PR 291) merged and deployed (2026-11-14). Follow-up in progress: free-shipping progress in the drawer (decision 7).
 
 ## Goal
 
@@ -18,6 +18,8 @@ shimmer, button states) becomes generic, token-driven storefront behaviour that 
 | 4 | Font licence | **SIL OFL 1.1 approved for unmodified font files** (woff2) shipped with the template, OFL text kept in the third-party notices. Not for code packages. |
 | 5 | Light accent (asked after the WS-A review) | **Keep ochre** `#b17b15` with ink text as the light `accent`; the accent contrast rule stays. Butter `#ffd166` (1.32:1 on cream) may come back later only as decoration in WS-D. Owner, 2026-11-14: "Оставить охру". |
 | 6 | Font format (asked after the WS-A review) | **Lossless WOFF2 approved**: Rubik's official TTF converted to WOFF2 with every table unchanged (about 122 KB instead of 360 KB); font name Rubik kept (no Reserved Font Name), OFL text kept. Licence wording: unmodified or losslessly converted to WOFF2, font name unchanged. Owner, 2026-11-14: "Да, WOFF2". |
+| 7 | Free-shipping progress in the drawer (asked after C merged) | **Approved, additive**: a nullable store-API field with the cart's free-shipping threshold (lowest active `free_over` in the cart currency); the remainder is computed on the server. No migration. Owner, 2026-11-14: "Да, аддитивно". |
+| 8 | Subscription toggle of the concept | **Not now**: a feature package with pricing, recurring orders and payments; build it for a client who needs it, with its own plan. Owner, 2026-11-14: "Не сейчас". |
 
 Not part of this plan: the concept's "one-off / subscription -15%" toggle. Subscriptions do not exist; they would be a feature package
 that touches pricing (red zone, own plan). The demo copy stays the coffee seed's.

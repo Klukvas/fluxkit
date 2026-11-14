@@ -14,6 +14,16 @@
       "reason": "owner 2026-10-14: unmodified dynamically loaded binaries (next -> sharp); owner 2026-10-23: also sharp in apps/api, ADR 0028"
     },
     {
+      "package": "@img/sharp-libvips-darwin-arm64",
+      "license": "LGPL-3.0-or-later",
+      "reason": "owner 2026-10-14 approval of the unmodified, dynamically loaded prebuilt @img/sharp-libvips-* binaries (AGENTS.md section 16); the macOS (Apple silicon) build a developer Mac installs, never shipped by the Linux images"
+    },
+    {
+      "package": "@img/sharp-libvips-darwin-x64",
+      "license": "LGPL-3.0-or-later",
+      "reason": "owner 2026-10-14 approval of the unmodified, dynamically loaded prebuilt @img/sharp-libvips-* binaries (AGENTS.md section 16); the macOS (Intel) build a developer Mac installs, never shipped by the Linux images"
+    },
+    {
       "package": "caniuse-lite",
       "license": "CC-BY-4.0",
       "reason": "owner 2026-10-14: build-time browser data, keep attribution"
