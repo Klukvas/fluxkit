@@ -4,6 +4,7 @@ One line per user-visible or schema change.
 
 ## Unreleased
 
+- Storefront: a product card's prefixed price ("from UAH 1,299.00") wraps after its prefix instead of overflowing a two-column card at 360 px (`PriceText`, found by the playful home e2e).
 - Storefront: optional playful home hero decoration and CSS section reveals; template defaults opt in, existing configs keep their markup (plan 2026-11-14 WS-D).
 - Theme defaults: warm cream/ink palette, tomato actions, generous role radii and offset sticker shadows in light and dark (plan `docs/plans/2026-11-14-playful-default-design.md`).
 - Storefront: self-hosted Rubik variable font as the template body and display face; fork-owned fonts and overrides keep precedence; no font preload.

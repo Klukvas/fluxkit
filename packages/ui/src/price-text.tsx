@@ -39,7 +39,10 @@ export function PriceText({
   return (
     <span className={cn("inline-flex flex-wrap items-baseline gap-x-2 gap-y-1", className)}>
       {priceLabel ? <VisuallyHidden>{priceLabel}</VisuallyHidden> : null}
-      <span className="font-semibold whitespace-nowrap text-foreground tabular-nums">{price}</span>
+      {/* No `whitespace-nowrap`: a prefixed price ("from UAH 1,299.00") is wider than a two-column card at 360 px and may
+          break after its prefix; the amount itself never breaks (money formatting joins currency and number with a
+          non-breaking space). */}
+      <span className="font-semibold text-foreground tabular-nums">{price}</span>
       {compareAt ? (
         <>
           <VisuallyHidden>{compareAtLabel}</VisuallyHidden>
