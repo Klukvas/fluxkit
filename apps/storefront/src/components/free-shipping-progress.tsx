@@ -10,19 +10,22 @@ export function FreeShippingProgress({
   t,
   locale,
   exponent,
+  className = "",
 }: {
   freeShipping: Cart["freeShipping"];
   subtotal: Cart["subtotal"];
   t: Translator;
   locale: Locale;
   exponent: number;
+  /** Extra layout classes from the host (the cart page limits the width). */
+  className?: string;
 }) {
   const labelId = useId();
   if (freeShipping === null) {
     return null;
   }
   return (
-    <div className="flex flex-col gap-2 text-sm text-foreground tabular-nums">
+    <div className={`flex flex-col gap-2 text-sm text-foreground tabular-nums ${className}`}>
       <p id={labelId}>
         {freeShipping.remaining.amount === 0
           ? t("cart.freeShipping.reached")
