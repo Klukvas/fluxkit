@@ -3,7 +3,7 @@
 Read this first (Claude Code, Codex or a human). Rules live in `AGENTS.md`; decisions in `docs/adr/` (0001 to 0047, index in `docs/adr/README.md`); plans in `docs/plans/`.
 The long per-step history that used to live here is archived verbatim in `docs/HISTORY.md` (not current). Update this file in every PR that changes project state; keep it short and keep "Last updated" to one line.
 
-Last updated: 2026-11-14, provider packages install Nest at run time in the production image (guarded by a spec and `deploy-smoke`).
+Last updated: 2026-11-14, an unpublished product leaves its storefront page within 60 s (ADR 0051); provider packages install Nest at run time in the production image.
 
 ## 1. Current state
 

@@ -12,13 +12,15 @@ import {
   type StoreClient,
   type StoreResult,
 } from "@fluxkit/api-client";
+import { createFreshAnswerCache } from "./fresh-answer-cache";
 import { assertLocalesSupported } from "./locale-check";
 import { SERVER_READ_TIMEOUT_MS } from "./request-timeout";
 
 /**
  * Server-side reads of the public catalog (ADR 0026): the Next server calls the API directly at `API_INTERNAL_URL`, never
- * with cookies, always with `?locale=` from the route. Responses go through the Next data cache for this long. An internal
- * constant, not configuration: 60 seconds is the staleness the plan accepts for catalog pages (the cart is authoritative).
+ * with cookies, always with `?locale=` from the route. Responses go through the Next data cache for this long (the product
+ * detail through this module's own cache, see `getProduct`). An internal constant, not configuration: 60 seconds is the
+ * staleness the plan accepts for catalog pages (the cart is authoritative).
  */
 export const CATALOG_REVALIDATE_SECONDS = 60;
 
@@ -43,6 +45,12 @@ export function featureTag(feature: string): string {
 /** Most last-good responses kept in memory per server process (oldest dropped first). */
 const LAST_GOOD_LIMIT = 200;
 
+/** Most product answers (found or not found) kept in memory per server process (`getProduct`, least recently used dropped first). */
+const PRODUCT_ANSWER_LIMIT = 500;
+
+/** The API's answer for a product that is not on the shop (unknown, draft, archived, deleted or with no sellable variant). */
+const NOT_FOUND = 404;
+
 export type CatalogOutcome<T> =
   { ok: true; data: T; stale: boolean } | { ok: false; status: number; problem: ProblemDetails };
 
@@ -64,6 +72,8 @@ export interface StoreDataDependencies {
   fetch?: FetchLike;
   /** Longest a catalog read may take; `SERVER_READ_TIMEOUT_MS` by default. */
   readTimeoutMs?: number;
+  /** The clock of the product answer cache; `Date.now` by default. */
+  now?: () => number;
 }
 
 export interface ReadOptions {
@@ -106,6 +116,12 @@ export interface StoreData {
     options?: ProductListQuery,
     read?: ReadOptions,
   ): Promise<CatalogOutcome<ProductList>>;
+  /**
+   * One product, NOT through the Next data cache: that cache keeps `200` answers only, so an unpublished, archived or deleted
+   * product would stay on its page indefinitely (its revalidation's `404` is dropped). The answer, found or not found, is kept
+   * in this process for `CATALOG_REVALIDATE_SECONDS` instead (`fresh-answer-cache.ts`): the page follows a change within 60 s
+   * and a busy product still costs one API read a minute.
+   */
   getProduct(locale: string, slug: string): Promise<CatalogOutcome<ProductDetail>>;
   /** The home banners live now (`GET /store/banners`, ADR 0046): cached like the catalog, so a change shows up to 60 s late. */
   listBanners(locale: string, read?: ReadOptions): Promise<CatalogOutcome<HomeBannerList>>;
@@ -126,6 +142,13 @@ export interface StoreData {
 export function createStoreData(dependencies: StoreDataDependencies): StoreData {
   // Last good answers, for an outage after the Next data cache entry has expired. In memory, per process, not shared.
   const lastGood = new Map<string, unknown>();
+  const productAnswers = createFreshAnswerCache<CatalogOutcome<ProductDetail>>({
+    maxEntries: PRODUCT_ANSWER_LIMIT,
+    freshMs: CATALOG_REVALIDATE_SECONDS * 1000,
+    // A stale (last-good) copy is never kept: the next view asks the API again. A 404 is kept: it replaces the product.
+    isKept: (outcome) => (outcome.ok ? !outcome.stale : outcome.status === NOT_FOUND),
+    ...(dependencies.now === undefined ? {} : { now: dependencies.now }),
+  });
 
   function remember(key: string, data: unknown): void {
     lastGood.delete(key);
@@ -173,6 +196,8 @@ export function createStoreData(dependencies: StoreDataDependencies): StoreData 
         return { ok: true, data: result.data, stale: false };
       }
       if (result.status < 500) {
+        // The API says this no longer exists: a later outage must not bring the last good copy back (an unpublished product).
+        if (cacheKey !== null && result.status === NOT_FOUND) lastGood.delete(cacheKey);
         return { ok: false, status: result.status, problem: result.problem };
       }
       failure = new Error(`${operation} answered ${result.status} ${result.problem.code}`);
@@ -211,14 +236,20 @@ export function createStoreData(dependencies: StoreDataDependencies): StoreData 
         isCacheableProductQuery(query) ? read : { ...read, noStore: true },
         (client, options) => client.listProducts({ ...query, ...options, locale }),
       ),
-    getProduct: (locale, slug) =>
-      run(
-        "GET /store/products/{slug}",
-        `product:${locale}:${slug}`,
-        STORE_TAGS.products,
-        {},
-        (client, options) => client.getProduct(slug, { ...options, locale }),
-      ),
+    getProduct: async (locale, slug) => {
+      // Before the cache too: a cached answer must not let a product page render while Next prerenders.
+      await dependencies.beforeRequest?.();
+      const cacheKey = `product:${locale}:${slug}`;
+      return productAnswers.read(cacheKey, () =>
+        run(
+          "GET /store/products/{slug}",
+          cacheKey,
+          STORE_TAGS.products,
+          { noStore: true },
+          (client, options) => client.getProduct(slug, { ...options, locale }),
+        ),
+      );
+    },
     listBanners: (locale, read = {}) =>
       run("GET /store/banners", `banners:${locale}`, STORE_TAGS.banners, read, (client, options) =>
         client.listBanners({ ...options, locale }),
