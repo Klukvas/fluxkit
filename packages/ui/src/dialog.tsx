@@ -22,7 +22,7 @@ export interface DialogProps extends Omit<
 }
 
 // Separate string on purpose: the backdrop is not the surface behind the dialog's text (see the contrast scan).
-const backdrop = "backdrop:bg-foreground/50";
+const backdrop = "backdrop:bg-scrim";
 
 /**
  * Modal dialog on the native `<dialog>`: `showModal()` makes the rest of the page inert, traps the focus and gives

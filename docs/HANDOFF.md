@@ -3,9 +3,11 @@
 Read this first (Claude Code, Codex or a human). Rules live in `AGENTS.md`; decisions in `docs/adr/` (0001 to 0047, index in `docs/adr/README.md`); plans in `docs/plans/`.
 The long per-step history that used to live here is archived verbatim in `docs/HISTORY.md` (not current). Update this file in every PR that changes project state; keep it short and keep "Last updated" to one line.
 
-Last updated: 2026-11-14, the documented local checks pass on macOS (branch `fix/macos-local-checks`, in review); admin shell redesign PR 2 (buttons and page headers) in review (PR 294); playful default design workstream C (cart drawer and motion kit) merged (PR 292); playful home WS-D (PR 291: hero decoration, section reveals; card prices wrap after "from" at 360 px) merged; admin shell redesign PR 1 (sidebar with icons, PR 290) merged; the visual comparison is deterministic again (PR 293).
+Last updated: 2026-11-14, overlay scrim token added (branch `fix/scrim-token`, in review); the documented local checks pass on macOS (PR 296, merged); admin shell redesign PR 2 (buttons and page headers) in review (PR 294); playful default design workstream C (cart drawer and motion kit) merged (PR 292); playful home WS-D (PR 291: hero decoration, section reveals; card prices wrap after "from" at 360 px) merged; admin shell redesign PR 1 (sidebar with icons, PR 290) merged; the visual comparison is deterministic again (PR 293).
 
 ## 1. Current state
+
+- **Overlay backdrops (2026-11-14):** additive `--fk-color-scrim` (`#2b1a1280` light, `#09050380` dark/system) replaces foreground opacity in Drawer and Dialog; effective-value tests guard dimming, including fork overrides.
 
 - **Admin shell redesign PR 2 (buttons and page headers) in review:** additive Button ghost/icon and IconButton; shared PageHeader with one primary action at most, translated creation links and preserved destructive confirmations. PR 3 remains separate.
 
