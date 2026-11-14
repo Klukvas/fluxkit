@@ -3,7 +3,7 @@ import { createTranslator, type Locale } from "@fluxkit/ui";
 import { renderToStaticMarkup } from "react-dom/server";
 import { prerenderToNodeStream } from "react-dom/static";
 import { describe, expect, it, vi } from "vitest";
-import { homeSections } from "../config/home";
+import { homeSections, type HomeSection } from "../config/home";
 import { storeBannerViews } from "../lib/home-banners";
 import type { HomeSectionResult } from "../lib/home-data";
 import { category, summary } from "../lib/test-fixtures";
@@ -24,7 +24,8 @@ vi.mock("./cards/custom", () => import("../test-support/template-defaults"));
 
 // The DEFAULT home config (`config/home.ts`) as the home route renders it, against a frozen copy of its markup taken before
 // the per-section `width` and the `custom` kind existed (plan 2026-11-08-design-changeability.md, L4): with default settings
-// the page must stay byte for byte the same. UPSTREAM PINS: skipped (named so in the test names) once a fork changes its home
+// the page without WS-D decoration/reveal must stay byte for byte the same. The opted-in default has its own playful copies.
+// UPSTREAM PINS: skipped (named so in the test names) once a fork changes its home
 // composition or overrides texts, so reshaping the home page by config and new files never needs a test edit.
 
 const templateTexts = Object.keys(ukOverrides).length + Object.keys(enOverrides).length === 0;
@@ -65,12 +66,23 @@ const results: Readonly<Record<string, HomeSectionResult>> = {
   },
 };
 
-function renderDefault(locale: Locale): string {
+// Keep the pre-WS-D bytes as a separate compatibility guarantee, never overwrite those frozen files.
+const undecoratedSections: readonly HomeSection[] = homeSections.map(
+  ({ reveal: _reveal, ...section }) => {
+    void _reveal;
+    if (section.kind !== "hero") return section;
+    const { decoration: _decoration, ...hero } = section;
+    void _decoration;
+    return hero;
+  },
+);
+
+function renderDefault(locale: Locale, sections = homeSections): string {
   const t = createTranslator(messagesByLocale[locale], locale);
   // The frozen copy was taken with the route's `Container` around the sections; the sections now bring it themselves.
   return renderToStaticMarkup(
     <HomeSectionsView
-      sections={homeSections}
+      sections={sections}
       context={{ locale, t, imageHosts: ["cdn.example.com"] }}
       results={results}
     />,
@@ -78,11 +90,11 @@ function renderDefault(locale: Locale): string {
 }
 
 /** What the home route renders (`HomeSections`, streaming), fully resolved, without React's boundary comments. */
-async function renderPage(locale: Locale): Promise<string> {
+async function renderPage(locale: Locale, sections = homeSections): Promise<string> {
   const t = createTranslator(messagesByLocale[locale], locale);
   const { prelude } = await prerenderToNodeStream(
     <HomeSections
-      sections={homeSections}
+      sections={sections}
       context={{ locale, t, imageHosts: ["cdn.example.com"] }}
       load={(section) => Promise.resolve(results[section.id] ?? { status: "error" })}
     />,
@@ -106,9 +118,21 @@ describe.skipIf(!templatePage)(
   () => {
     for (const locale of ["uk", "en"] as const) {
       it(`renders byte for byte as the frozen copy (${locale})`, () => {
-        const html = renderDefault(locale);
+        const html = renderDefault(locale, undecoratedSections);
         expect(html.length).toBe(frozen(locale).length);
         expect(html).toBe(frozen(locale));
+      });
+
+      it(`streams the original bytes when options are omitted (${locale})`, async () => {
+        const html = await renderPage(locale, undecoratedSections);
+        expect(html.match(/<!--\$-->/g)).toHaveLength(2);
+        expect(html.replace(/<!--\/?\$-->/g, "")).toBe(frozen(locale));
+      });
+
+      it(`freezes the opted-in playful default (${locale})`, async () => {
+        await expect(renderDefault(locale)).toMatchFileSnapshot(
+          `./home-sections-frozen/playful.${locale}.txt`,
+        );
       });
 
       it(`streams the same markup on the route (${locale}): no new boundary, no loading view`, async () => {
@@ -117,7 +141,9 @@ describe.skipIf(!templatePage)(
         // product row stream (ADR 0048), nothing else waits behind a boundary or a loading view.
         expect(html.match(/<!--\$-->/g)).toHaveLength(2);
         expect(html).not.toContain('aria-busy="true"');
-        expect(html.replace(/<!--\/?\$-->/g, "")).toBe(frozen(locale));
+        const resolved = html.replace(/<!--\/?\$-->/g, "");
+        expect(resolved).toBe(renderDefault(locale));
+        await expect(resolved).toMatchFileSnapshot(`./home-sections-frozen/playful.${locale}.txt`);
       });
     }
   },

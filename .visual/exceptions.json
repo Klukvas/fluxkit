@@ -2137,5 +2137,38 @@
     "selector": "home.hero",
     "property": "screenshot",
     "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): every frame changes (palette, Rubik, radii, sticker shadows); computed styles above still guard each selector property by property and show no layout, padding or presence change; this element shot of the home page is left out"
+  },
+  {
+    "page": "en-home",
+    "selector": "home.hero",
+    "property": "screenshot",
+    "reason": "plan 2026-11-14-playful-default-design WS-D: opted-in hero adds static accent blob, circular sticker and marker underline; original layout and heading typography remain guarded by computed styles and undecorated frozen bytes."
+  },
+  {
+    "page": "home-390",
+    "selector": "home.hero",
+    "property": "screenshot",
+    "reason": "plan 2026-11-14-playful-default-design WS-D: opted-in hero adds static accent blob, circular sticker and marker underline; original layout and heading typography remain guarded by computed styles and undecorated frozen bytes."
+  },
+  {
+    "page": "home",
+    "theme": "light",
+    "selector": "home.hero",
+    "property": "screenshot",
+    "reason": "plan 2026-11-14-playful-default-design WS-D: opted-in hero adds static accent blob, circular sticker and marker underline on desktop and mobile; original layout and heading typography remain guarded by computed styles and undecorated frozen bytes."
+  },
+  {
+    "page": "home",
+    "theme": "dark",
+    "selector": "home.hero",
+    "property": "screenshot",
+    "reason": "plan 2026-11-14-playful-default-design WS-D: opted-in hero adds static accent blob, circular sticker and marker underline on desktop and mobile; original layout and heading typography remain guarded by computed styles and undecorated frozen bytes."
+  },
+  {
+    "page": "home",
+    "theme": "system",
+    "selector": "home.hero",
+    "property": "screenshot",
+    "reason": "plan 2026-11-14-playful-default-design WS-D: opted-in hero adds static accent blob, circular sticker and marker underline on desktop and mobile; original layout and heading typography remain guarded by computed styles and undecorated frozen bytes."
   }
 ]

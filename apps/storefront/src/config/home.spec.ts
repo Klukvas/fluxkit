@@ -89,6 +89,8 @@ function messageKeys(section: HomeSection): string[] {
         ...(section.sublineKey === undefined ? [] : [section.sublineKey]),
         ...(section.cta === undefined ? [] : [section.cta.labelKey]),
         ...(section.image?.altKey ? [section.image.altKey] : []),
+        ...(section.decoration?.highlightKey ? [section.decoration.highlightKey] : []),
+        ...(section.decoration?.sticker ? [section.decoration.sticker.textKey] : []),
       ];
     case "banners":
       return [section.titleKey, ...(section.source === "config" ? bannerKeys(section.items) : [])];
@@ -234,7 +236,13 @@ describe.skipIf(!isTemplateHomeComposition(homeSections))(
 
     it("shows the banners of the admin by default: one data section, read from the store API", () => {
       expect(bannerSections).toEqual([
-        { kind: "banners", source: "admin", id: "home-banners", titleKey: "home.banners.title" },
+        {
+          kind: "banners",
+          source: "admin",
+          id: "home-banners",
+          titleKey: "home.banners.title",
+          reveal: "fade-up",
+        },
       ]);
     });
 

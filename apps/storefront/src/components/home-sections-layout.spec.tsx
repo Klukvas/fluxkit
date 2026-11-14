@@ -265,3 +265,40 @@ describe("the streaming route with width and custom sections", () => {
     expect(html.replace(/<!--\/?\$-->/g, "")).toBe(render(sections));
   });
 });
+
+describe("reveals across home layouts", () => {
+  it("wraps custom and built-in sections inside their own frames, including empty custom content", () => {
+    const html = render([
+      { ...wide, reveal: "pop-in" },
+      { ...tiles, reveal: "fade-up" },
+      { ...strip, id: "nothing", name: "nothing", reveal: "fade-up" },
+    ]);
+    expect(html).toContain(
+      `${fullFirst}<div class="fk-home-reveal empty:hidden" data-home-reveal="pop-in"><section`,
+    );
+    expect(html).toContain(
+      `${contained}<div class="fk-home-reveal empty:hidden" data-home-reveal="fade-up"><section`,
+    );
+    expect(html).toContain(
+      `${contained}<div class="fk-home-reveal empty:hidden" data-home-reveal="fade-up"></div></div>`,
+    );
+  });
+  it("keeps a streamed data boundary inside its reveal wrapper", async () => {
+    const section = { ...tiles, reveal: "fade-up" as const };
+    const { prelude } = await prerenderToNodeStream(
+      <HomeSections
+        sections={[hero, section]}
+        context={context}
+        load={() => Promise.resolve(results.tiles as HomeSectionResult)}
+      />,
+      { progressiveChunkSize: Number.POSITIVE_INFINITY },
+    );
+    let html = "";
+    for await (const chunk of prelude) html += String(chunk);
+    expect(html).toContain('data-home-reveal="fade-up"><!--$--><section');
+    expect(html).toContain("</section><!--/$--></div>");
+    const skeleton = render([section], {});
+    expect(skeleton).toContain('data-home-reveal="fade-up"><section');
+    expect(skeleton).toContain('aria-busy="true"');
+  });
+});

@@ -89,6 +89,10 @@ file, or ask upstream for an extension point (`AGENTS.md` section 17).
 
 - Home page sections and their order: `apps/storefront/src/config/home.ts` (upstream-owned; `apps/storefront/README.md` "Layout composition is configuration").
   Contract: `docs/contracts/home-sections.md`.
+  - Optional motion: the hero's `decoration` selects `blob`, `sticker: { textKey }`, `highlightKey` and `popIn`; each section's
+    `reveal` is `"fade-up"` or `"pop-in"`. The template enables them; remove both fields to keep the old markup. Highlight and
+    sticker texts are `home.hero.*` keys in both home message files. A highlight must occur exactly in its locale's headline.
+    Reduced motion leaves static ornaments; browsers without view timelines show sections normally.
   - A section of the fork's own (for example a brand strip or a full-bleed hero): write a SERVER component in a new file (it receives
     `CustomSectionProps` from `apps/storefront/src/lib/custom-sections.ts`: id, heading id, locale, translator, first-on-page, width), register it by
     name in the fork-owned `apps/storefront/src/config/custom-sections.ts`, add `{ kind: "custom", id: "home-brands", name: "brandStrip" }` to `home.ts`

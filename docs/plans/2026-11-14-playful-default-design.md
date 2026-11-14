@@ -1,6 +1,6 @@
 # Playful default design (concept 03)
 
-Status: owner-approved decisions (2026-11-14). Workstream A merged (PR 285); B merged (PR 284, test only); C implemented, in review (PR); D in progress in its own session.
+Status: owner-approved decisions (2026-11-14). Workstream A merged (PR 285), B merged (PR 284, test only), D merged (PR 291); C implemented, in review (PR 292).
 
 ## Goal
 

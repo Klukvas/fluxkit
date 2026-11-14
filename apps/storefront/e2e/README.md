@@ -132,3 +132,16 @@ CI: job `visual` (`.github/workflows/ci.yml`), after the cheap `visual-gate`, on
 ## Not covered
 
 Automated accessibility checks (`@axe-core/playwright`, MPL-2.0, not approved yet), other browsers and viewports, a payment page of a real provider or a real card (the fake provider only), real email delivery (the fake provider only), the `emailDelivery=false` pages, the admin app, `next dev`.
+
+## Frozen home defaults (WS-D, 2026-11-14)
+
+`src/components/home-sections-default.spec.tsx` retains the pre-options `default.uk.txt` / `default.en.txt` byte checks, rendering
+`homeSections` with only `decoration` and `reveal` stripped. Never regenerate those files for a motion change. The opted-in default
+has separate `playful.uk.txt` / `playful.en.txt` file snapshots (static view and fully resolved streaming must agree).
+After an intentional upstream default change, update `lib/home-template-default.ts` with the config, then run
+`pnpm --filter @fluxkit/storefront exec vitest run src/components/home-sections-default.spec.tsx -u`, inspect the actual frozen diff,
+and run again without `-u`. The template-composition and text-override skip guards still apply to forks. Do not use snapshot updates
+in read-only QA. Declare intentional visual differences separately in `.visual/exceptions.json` and run the visual harness above.
+
+`tests/playful-home.e2e.ts` checks both locales at desktop and 360 px (including dark), ornaments and highlight, opaque LCP picture,
+reveal wrappers and CLS < 0.05 before/after ready with `support/layout-shift.ts`; reduced motion has no hero or reveal animations.
