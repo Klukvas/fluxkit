@@ -32,7 +32,7 @@ export function FreeShippingProgress({
       </p>
       {freeShipping.threshold.amount === 0 ? null : (
         <progress
-          className="fk-progress w-full"
+          className="fk-progress w-full rounded-control"
           aria-labelledby={labelId}
           value={subtotal.amount}
           max={freeShipping.threshold.amount}
