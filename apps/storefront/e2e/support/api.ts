@@ -301,6 +301,16 @@ export class AdminApi {
     await json(await this.context.delete(`/admin/banners/${id}`, { headers: CSRF }), [204, 404]);
   }
 
+  /** `POST /admin/products/{id}/unpublish` (docs/api/catalog.md): an active product back to draft. */
+  async unpublishProduct(id: string): Promise<void> {
+    await json(await this.context.post(`/admin/products/${id}/unpublish`, { headers: CSRF }), 200);
+  }
+
+  /** `POST /admin/products/{id}/publish`: a draft product live again (its preconditions are checked again). */
+  async publishProduct(id: string): Promise<void> {
+    await json(await this.context.post(`/admin/products/${id}/publish`, { headers: CSRF }), 200);
+  }
+
   async setPrice(productId: string, variantId: string, amount: number): Promise<void> {
     await json(
       await this.context.put(`/admin/products/${productId}/variants/${variantId}/prices/UAH`, {
