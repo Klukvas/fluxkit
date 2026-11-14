@@ -217,6 +217,14 @@ test("privacy: the owner exports a guest's data, sees what blocks an open order 
   // known exactly (one event), which is what proves the filtered list is shown. The address changes before the list does,
   // so reading "the first rows" right after the URL could read the unfiltered list that is about to be replaced.
   await main.getByLabel("Action", { exact: true }).selectOption({ label: "Personal data erased" });
+  await main
+    .getByLabel("Id of what it concerns", { exact: true })
+    .fill("00000000-0000-4000-8000-000000000000");
+  await main.getByRole("button", { name: "Apply" }).click();
+  await expect(page).toHaveURL(
+    /\/audit\?action=privacy\.erased&targetId=00000000-0000-4000-8000-000000000000$/,
+  );
+  // Text typed right after an apply must survive the remount of the form.
   await main.getByLabel("Id of what it concerns", { exact: true }).fill(closedRequestId);
   await main.getByRole("button", { name: "Apply" }).click();
   await expect(page).toHaveURL(
@@ -245,6 +253,25 @@ test("privacy: the owner exports a guest's data, sees what blocks an open order 
     expect(decodeURIComponent(request.url)).not.toContain(openEmail);
     expect(decodeURIComponent(request.url)).not.toContain(closedEmail);
   }
+});
+
+test("privacy: the request filter keeps the focus on its status select", async ({
+  page,
+  signIn,
+}) => {
+  await signIn("owner");
+  await page.goto(`${SPA}/privacy`);
+  const filter = page.getByRole("form", { name: "Filter the requests" });
+  const status = filter.getByRole("combobox", { name: "Status", exact: true });
+  await status.focus();
+  await status.selectOption({ label: "Completed" });
+  await expect(page).toHaveURL(/\?status=completed$/);
+  await expect(status).toBeFocused();
+  await expect(status).toHaveValue("completed");
+  await status.selectOption({ label: "Any status" });
+  await expect(page).not.toHaveURL(/[?&]status=/);
+  await expect(status).toBeFocused();
+  await expect(status).toHaveValue("");
 });
 
 test("privacy: the audit log loads older events on request", async ({
