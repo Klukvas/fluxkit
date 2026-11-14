@@ -11,6 +11,44 @@ const OPTIONAL_DISPLAY = new RegExp(
   `((?:^|;)${CSS_SPACE}font-display${CSS_SPACE}:${CSS_SPACE})optional(?=${CSS_SPACE}(?:;|$))|${CSS_OPAQUE}`,
   "gi",
 );
+const URL_SOURCE = new RegExp(`${CSS_OPAQUE}|((?<![-\\w\\\\\u0080-\uffff])url\\()`, "gi");
+
+export type VisualFontFace = {
+  family: string;
+  weight: string;
+  style: string;
+  status: FontFaceLoadStatus;
+};
+
+export type VisualFontRule = { family: string; src: string };
+
+function normalizedFamily(family: string): string {
+  return family
+    .trim()
+    .replace(/^(["'])([\s\S]*)\1$/, "$2")
+    .toLowerCase();
+}
+
+function hasUrlSource(src: string): boolean {
+  // Quoted local() names may themselves contain "url("; only a function token counts.
+  return [...src.matchAll(URL_SOURCE)].some((match) => match[1] !== undefined);
+}
+
+/** Missing local() aliases legitimately fall through the font stack; requested URL fonts must settle before comparison. */
+export function unsettledWebFonts(
+  faces: readonly VisualFontFace[],
+  rules: readonly VisualFontRule[],
+): VisualFontFace[] {
+  const webFamilies = new Set(
+    rules.filter((rule) => hasUrlSource(rule.src)).map((rule) => normalizedFamily(rule.family)),
+  );
+  // A family shared by URL and local-only rules is conservatively checked: faces expose no source provenance.
+  return faces.filter(
+    (face) =>
+      webFamilies.has(normalizedFamily(face.family)) &&
+      (face.status === "loading" || face.status === "error"),
+  );
+}
 
 /**
  * The comparison measures settled typography. With `optional`, a cold context may keep fallback metrics for the

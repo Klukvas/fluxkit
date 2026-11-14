@@ -1,5 +1,73 @@
 import { describe, expect, it } from "vitest";
-import { blockOptionalFontDisplay } from "./fonts.ts";
+import { blockOptionalFontDisplay, unsettledWebFonts, type VisualFontFace } from "./fonts.ts";
+
+describe("unsettledWebFonts", () => {
+  const face: VisualFontFace = {
+    family: "rubik",
+    weight: "300 900",
+    style: "normal",
+    status: "error",
+  };
+  const webRule = { family: "rubik", src: 'url("rubik.woff2") format("woff2")' };
+
+  it.each(["error", "loading"] as const)("rejects URL faces with status %s", (status) => {
+    const unsettled = { ...face, status };
+    expect(unsettledWebFonts([unsettled], [webRule])).toEqual([unsettled]);
+  });
+
+  it.each(["loaded", "unloaded"] as const)("accepts URL faces with status %s", (status) => {
+    expect(unsettledWebFonts([{ ...face, status }], [webRule])).toEqual([]);
+  });
+
+  it.each(["error", "loading"] as const)(
+    "accepts missing local-only aliases with status %s",
+    (status) => {
+      const local = { ...face, family: "rubik Fallback", status };
+      expect(
+        unsettledWebFonts([local], [webRule, { family: local.family, src: 'local("Arial")' }]),
+      ).toEqual([]);
+    },
+  );
+
+  it("matches quoted and case-varied families without collapsing internal whitespace", () => {
+    const quoted = { ...face, family: "  'RuBiK Family'  " };
+    expect(unsettledWebFonts([quoted], [{ ...webRule, family: ' "rubik family" ' }])).toEqual([
+      quoted,
+    ]);
+    expect(unsettledWebFonts([quoted], [{ ...webRule, family: "rubik  family" }])).toEqual([]);
+  });
+
+  it("checks mixed local and URL sources, including uppercase URL tokens", () => {
+    expect(
+      unsettledWebFonts([face], [{ ...webRule, src: 'local("Arial"), URL("rubik.woff2")' }]),
+    ).toEqual([face]);
+  });
+
+  it("conservatively checks all unsettled faces of a family shared by URL and local rules", () => {
+    const localFace = { ...face, weight: "400", style: "italic" };
+    expect(
+      unsettledWebFonts([face, localFace], [webRule, { family: "rubik", src: 'local("Arial")' }]),
+    ).toEqual([face, localFace]);
+  });
+
+  it("ignores unrelated families without special-casing the word Fallback", () => {
+    const fallback = { ...face, family: "rubik Fallback" };
+    expect(unsettledWebFonts([face, fallback], [{ ...webRule, family: fallback.family }])).toEqual([
+      fallback,
+    ]);
+  });
+
+  it.each([
+    'local("Name url(fake)")',
+    "local('Name URL(fake)')",
+    String.raw`local("Name \"url(fake)")`,
+    'local("Arial") /* url(fake) */',
+    "noturl(fake)",
+    "custom-url(fake)",
+  ])("ignores URL lookalikes in %s", (src) => {
+    expect(unsettledWebFonts([face], [{ ...webRule, src }])).toEqual([]);
+  });
+});
 
 describe("blockOptionalFontDisplay", () => {
   it("rewrites minified Next font faces without changing utilities or custom properties", () => {
