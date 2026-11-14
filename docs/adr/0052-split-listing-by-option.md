@@ -1,6 +1,6 @@
 # 0052. Split catalog listings by an option value
 
-Status: Proposed (2026-11-14).
+Status: Accepted (2026-11-14, owner approved all three open questions of the plan in chat: "Да на все").
 
 Owner direction: 2026-11-14, option 2 (one card per visual option value). Detailed proposal and approval questions:
 [split-listing plan](../plans/2026-11-14-split-listing-by-option.md). No implementation is included.
@@ -21,7 +21,7 @@ Owner direction: 2026-11-14, option 2 (one card per visual option value). Detail
 - Product-page preselection already uses `?opt.<optionCode>=<valueCode>` (`lib/variant-matcher.ts`), not search's `f=opt.<code>:<value>`.
 - SQL fallback and home lists currently page products. ADR 0040's shared search cache uses product totals to bound page reads.
 
-## Decision (proposed)
+## Decision
 
 ### 1. One data-driven split axis
 
@@ -88,7 +88,7 @@ Owner direction: 2026-11-14, option 2 (one card per visual option value). Detail
   newest order (add group tie-breaker). Decisions 2–4's cache, forwarding and failure rules remain; cache identity gains grouping mode.
 - ADR 0005's facet problem stays resolved as in 0034: exact variant/group option counts are not introduced. No old ADR is edited.
 
-## AGENTS.md 2.3 wording change proposal (owner applies after approval)
+## AGENTS.md 2.3 wording change (approved by the owner, applied 2026-11-14)
 
 - Replace “Catalog filters operate on variants and group results by product. Search runs through a search index, not ad-hoc SQL JOINs.”
   with: “Catalog filters operate on variants. Storefront listings group by product plus the value of the product type's single option
@@ -96,7 +96,7 @@ Owner direction: 2026-11-14, option 2 (one card per visual option value). Detail
   through a search index, not ad-hoc SQL JOINs; the plain SQL list and fallback use the same listing groups.”
 - Clarify the first Product bullet's parenthesis from “card, SEO, reviews, categories” to “content, SEO, reviews, categories;
   one or more listing cards”. This does not move purchasability from Variant to Product or to a listing card.
-- This ADR proposes policy text only; it does not change AGENTS.md or authorize implementation.
+- Applied to AGENTS.md 2.3 in the same PR as this ADR's acceptance (PR 306).
 
 ## Consequences
 

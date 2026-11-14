@@ -1,9 +1,9 @@
 # Split catalog listings by an option value
 
-Status: Proposed, awaiting owner approval.
+Status: Approved by the owner on 2026-11-14 (all three open questions: "Да на все"). Next: step 1.
 
 Owner input: 2026-11-14, option 2 (one card per visual option value). Architecture proposal: [ADR 0052](../adr/0052-split-listing-by-option.md).
-This change contains planning documents only. Schema, API contracts and the AGENTS.md wording below require approval before implementation.
+Approval covers the schema (migration 0014 incl. `search_index_state.build_rebuild_key`), the opt-in `groupBy=listing` contract, ADR 0052 (Accepted) and the AGENTS.md 2.3 wording (applied in PR 306).
 
 ## Goal and scope
 
@@ -213,13 +213,13 @@ This change contains planning documents only. Schema, API contracts and the AGEN
   Split-demo differences require scoped review. Do not automatically regenerate frozen screenshots/markup to hide differences.
 - Each implementation PR updates relevant `docs/files/{api,core,storefront,admin,seeds}.md` entries if responsibilities/files change,
   `CHANGELOG.md` for schema/user-visible behaviour, and `docs/HANDOFF.md` with accurate approval/completion state.
-  Add a fork/upgrade note under `docs/migrations/`; no new `.env.example` field is needed. Accept ADR 0052 only after owner approval.
+  Add a fork/upgrade note under `docs/migrations/`; no new `.env.example` field is needed. ADR 0052 accepted on 2026-11-14.
 
 ## PR-sized implementation steps (every PR independently green)
 
 | Step | Owned scope | Green/rollout boundary |
 |---|---|---|
-| 0. Approval | This plan, ADR 0052 and its index row; owner resolves questions below and separately updates AGENTS.md | No implementation or accepted-status claims before approval. |
+| 0. Approval (done 2026-11-14) | This plan, ADR 0052 and its index row, AGENTS.md 2.3 wording (PR 306) | Owner answered yes to all questions below. |
 | 1. Data/admin contract | Schema + 0014 up/down/metadata, inventory, product-type assignment API/client, pure grouping rules, transactional search marks and tests/docs | Defaults all false; no admin control or demo activation yet; existing store behaviour unchanged. |
 | 2. Store/search capability | Group-aware SQL/hydration, optional `groupBy`, summary fields, document v4/settings/indexer, search matching/readiness, contracts/OpenAPI and real-service tests | Product mode remains default; old storefront remains valid. New listing search uses 503/fallback until rebuild; verify real v3 → v4 transition. |
 | 3. Storefront consumer | Card model/keys/links, all visible list reads and caches, home/fallback, messages, unit/e2e/visual and fork docs | Deploy after step 2; all-false data renders the old catalog. Exercise splitting with isolated test-created assignments. |
@@ -237,7 +237,7 @@ This change contains planning documents only. Schema, API contracts and the AGEN
   document rules. Do not run old/new indexer versions concurrently against one live index. A DB rollback alone does not restore indexes.
 - Missing value images use the general image/placeholder; splitting does not imply every variant needs a duplicate media upload.
 
-## OPEN QUESTIONS for the owner
+## Owner questions (all answered yes, 2026-11-14)
 
 1. Approve **one split option per product type**, the default-false column, partial unique index and reversible 0014 migration
    (which also adds `search_index_state.build_rebuild_key`, see "Inherited builds")?
