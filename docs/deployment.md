@@ -31,7 +31,7 @@ api ──MEILI_URL=http://meilisearch:7700──▶ meilisearch (Community Edit
 volumes: postgres-data, meili-data, media (MEDIA_DIR), acme-webroot
 ```
 
-- Only the edge publishes ports. The API's `/docs`, `/docs-json` and `/health` are not routed (they answer the storefront's 404); the owner's decision on Swagger in production stays open, the default is "not public".
+- Only the edge publishes ports. The API's `/docs`, `/docs-json` and `/health` are not routed (they answer the storefront's 404); Swagger UI in production is not public (owner's decision 2026-11-14, `docs/plans/2026-11-14-swagger-in-production.md`): keep it unrouted.
 - **Meilisearch is part of the example** (catalog search, ADR 0034; image pinned to the version CI tests, `MEILI_ENV=production`). It is reachable only by the API on the Compose network; the browser never talks to it. `api` waits for it to be healthy even with search off, so a broken engine stops the boot instead of failing later. The index is rebuilt from Postgres, so `meili-data` is a cache, not a backup target.
 - **Redis is not part of the example on purpose**: `REDIS_URL` is parsed but no running code uses Redis or BullMQ (only the spike specs; `grep` for `redisUrl`, `ioredis`, `bullmq` outside specs, 2026-11-04). It comes with the queue or shared rate-limit plan, and runs then under the approved AGPLv3 exception (`docs/dependencies.md`).
 - **Run exactly one `api` container.** The rate limits, the login throttle, the shipping caches, the mail pacing and the local media disk are per process (ADR 0009, 0016, 0028; shipping step 6). Two instances double every limit and split the uploaded files. The scheduler (jobs 1 to 14, `docs/api/jobs.md`) runs inside that one API under a Postgres lock; there is no worker image. With `SCHEDULER_ENABLED=false` run `node dist/jobs/run-once.js` from a host cron (`docker compose ... run --rm api node dist/jobs/run-once.js`) instead.
@@ -306,7 +306,7 @@ The test server's scripts and timers for these points are described in `docs/pla
 - [ ] Backups of Postgres and the media volume scheduled and a restore tested.
 - [ ] Search: `infra/meilisearch.env` written (master key generated), the scoped key made, `SEARCH_ENABLED=true`, `GET /store/config` says `search: true`, a product found after the index is built; the engine's port is not published.
 - [ ] `FEATURES_ENABLED` decided; for each enabled feature the `migrate` log shows its migrations, `GET /store/config` lists it in `features` and its pages answer (section "Optional features").
-- [ ] Swagger UI decision (not routed by the example).
+- [ ] Swagger UI stays unrouted: `/docs` and `/docs-json` answer 404 through the edge (owner's decision 2026-11-14).
 - [ ] Launch blockers in `docs/HANDOFF.md` reviewed (privacy plan before the EU launch). The catalog reads of `/store/*` are limited per address (`catalogRead`) only when `TRUST_PROXY` is right (above), the API is reachable only through the edge, and the storefront's `API_INTERNAL_URL` points at the API itself (the Compose value), not at the public edge.
 - [ ] The Docker images' own licences reviewed before images are handed to a client (below).
 
