@@ -33,8 +33,12 @@ const dist = join(import.meta.dirname, "dist");
  * UX repairs batch 3B (the phone header behind the Menu button, the table scroll hint callout, the date format line in the
  * eager `common` messages): 439 651 raw, 131 228 gzip before (349 bytes of headroom left) and 440 412 raw, 131 421 gzip
  * after; the raw budget moves to 445 000 (the gzip budget, the one that reaches the browser, is unchanged).
+ * Blog PR 5 (the admin feature registry E8: the registry, the enabled-features read and gate of the shell, feature routes and
+ * navigation entries, plus the blog's manifest; the blog's screens and messages are lazy chunks): 441 990 raw, 131 840 gzip
+ * before and 447 298 raw, 133 774 gzip after; the raw budget moves to 450 000 (the gzip budget is unchanged, about 1.2 KB
+ * left: the next shell-level change will need a decision).
  */
-const INITIAL_JS_BUDGET = { raw: 445_000, gzip: 135_000 };
+const INITIAL_JS_BUDGET = { raw: 450_000, gzip: 135_000 };
 
 /** Every lazily loaded area module of the route table. */
 const AREA_MODULES = [
@@ -200,6 +204,46 @@ describe("message chunks", () => {
         const values = Object.values(messages).filter(
           (value) => value.length > 20 && !eagerValues.has(value),
         );
+        expect(values.length, source).toBeGreaterThan(5);
+        for (const value of values) {
+          expect(
+            initialCode.includes(JSON.stringify(value).slice(1, -1)),
+            `${source}: ${value}`,
+          ).toBe(false);
+        }
+      }
+    }
+  });
+});
+
+describe("feature slices (ADR 0049, E8)", () => {
+  const slices = readdirSync(join(import.meta.dirname, "src", "features"), {
+    withFileTypes: true,
+  })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name);
+
+  it("puts only each slice's manifest into the initial JavaScript: its screens and messages are lazy chunks", () => {
+    const initial = initialChunks();
+    const initialFiles = new Set([...initial].map((key) => manifest[key]?.file));
+    const initialCode = [...initialFiles]
+      .filter((file): file is string => file !== undefined && file.endsWith(".js"))
+      .map((file) => readFileSync(join(dist, file), "utf8"))
+      .join("\n");
+    for (const slice of slices) {
+      const keys = Object.keys(manifest).filter((key) => key.startsWith(`src/features/${slice}/`));
+      const lazy = keys.filter((key) => manifest[key]?.isDynamicEntry === true);
+      expect(lazy.length, `${slice}: lazy chunks`).toBeGreaterThanOrEqual(3);
+      for (const key of lazy) {
+        expect(initialFiles.has(manifest[key]?.file), `${key} is loaded on start`).toBe(false);
+      }
+      for (const locale of ["uk", "en"] as const) {
+        const source = `src/features/${slice}/messages/${locale}.json`;
+        expect(manifest[source]?.isDynamicEntry, source).toBe(true);
+        const messages = JSON.parse(
+          readFileSync(join(import.meta.dirname, source), "utf8"),
+        ) as Record<string, string>;
+        const values = Object.values(messages).filter((value) => value.length > 20);
         expect(values.length, source).toBeGreaterThan(5);
         for (const value of values) {
           expect(

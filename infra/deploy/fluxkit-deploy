@@ -9,6 +9,14 @@
 # Order: lock, unpack, pull every image (a missing image changes nothing), backup, switch FLUXKIT_IMAGE_TAG and
 # /opt/fluxkit/current, start. When the new release does not become healthy, the previous one is started again; that
 # cannot undo a migration the new release ran (the old API refuses a newer database: restore the backup).
+#
+# Optional features (docs/deployment.md, "Optional features"): to switch one on, add its name to FEATURES_ENABLED in the env
+# file, then deploy; the start below runs `migrate` (same env file, so the feature's migrations too) before the API, which
+# refuses to start while an enabled feature's migrations are missing. A failed feature migration fails the release like any
+# migration; the env file restored for the previous release is the one edited before this run (the feature still on), so
+# remove the name by hand if the previous release cannot start either. Switching one off is removing the name and deploying;
+# its tables stay. Removing its data means running its .down.sql by hand before any core down (docs/deployment.md); this
+# script never runs a down migration.
 set -euo pipefail
 
 FLUXKIT_ROOT=${FLUXKIT_ROOT:-/opt/fluxkit}

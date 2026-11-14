@@ -1,9 +1,16 @@
 #!/usr/bin/env bash
 # Feature and provider matrix (AGENTS.md section 18).
 # Usage: scripts/feature-matrix.sh on|off|deleted|providers-on|providers-off|providers-deleted|providers-nova-post|providers-email-fake|providers-email-none|providers-email-resend|providers-payment-fake|providers-payment-none|providers-payment-monobank|search-on|search-off
-#   on      build, start the API with FEATURES_ENABLED=example, expect /health and /example/ping
-#   off     build, start the API with no features, expect /health and 404 on /example/ping
-#   deleted remove packages/features/_example, reinstall, then lint, typecheck, boundaries and tests must pass (destructive: CI only)
+#   on      build, migrate and start the API with FEATURES_ENABLED=example,blog: expect /health, /example/ping, the blog's
+#           table and migrations table, `features` ["blog","example"] in GET /store/config, the blog's store routes (200, an
+#           unknown post 404) and its admin routes with their permissions (every one 401 signed out, where an unknown /admin
+#           path is 404; a viewer reads the list 200 and is refused a write 403)
+#   off     build, migrate and start the API with no features on a database never migrated with the blog: expect /health, 404
+#           on /example/ping and on every blog route (store and admin), no feature in `features`, and neither the `blog_post`
+#           table nor `drizzle.__drizzle_migrations_feature_blog` after the migration and after the API ran (no DB side effects)
+#   deleted remove the feature packages (packages/features/_example and blog) with the blog's storefront and admin slices and
+#           e2e files (the blog README's removal steps), reinstall, generate the storefront registry again (it must name no
+#           blog), then lint, typecheck, boundaries and tests (which build every app) must pass (destructive: CI only)
 # No mode deletes the features AND the providers: the table guard of apps/api/src/privacy/inventory/source-guards.spec.ts
 # needs files in at least one of the two roots to be a real scan.
 # The provider modes do the same for the test-only shipping provider packages/providers/_fake (ADR 0029 decision 8). Their
@@ -76,6 +83,42 @@ await client.end();
 ' | tail -n 1
 }
 
+# One value from the database (the first column of the first row), read with the API package's pg: db_value "<sql>".
+db_value() {
+  pnpm --silent --filter @fluxkit/api exec node --input-type=module -e '
+import pg from "pg";
+const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
+await client.connect();
+const { rows } = await client.query(process.argv[1]);
+console.log(String(Object.values(rows[0])[0]));
+await client.end();
+' "$1" | tail -n 1
+}
+
+# "<blog_post> <the blog's migrations table>", each "present" or "absent".
+blog_tables() {
+  db_value "select concat_ws(' ',
+    case when to_regclass('public.blog_post') is null then 'absent' else 'present' end,
+    case when to_regclass('drizzle.__drizzle_migrations_feature_blog') is null then 'absent' else 'present' end)"
+}
+
+# expect_status <code> <method> <path> [curl args...]: the API must answer with that status.
+expect_status() {
+  local expected="$1" method="$2" path="$3"
+  shift 3
+  local code
+  code="$(curl -s -o /dev/null -w '%{http_code}' -X "$method" "$@" "http://127.0.0.1:${port}${path}")"
+  echo "$method $path -> HTTP $code"
+  [ "$code" = "$expected" ] || { echo "expected $expected on $method $path" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
+}
+
+# The blog's routes (docs/api/features-blog.md); the id is any well-formed uuid, the slug any slug.
+blog_store_paths=("/store/blog/posts?locale=uk" "/store/blog/posts/matrix-post?locale=uk" "/store/blog/sitemap")
+blog_id=00000000-0000-4000-8000-000000000000
+blog_admin_routes=("GET /admin/blog/posts" "GET /admin/blog/posts/${blog_id}" "POST /admin/blog/posts"
+  "PATCH /admin/blog/posts/${blog_id}" "POST /admin/blog/posts/${blog_id}/publish"
+  "POST /admin/blog/posts/${blog_id}/unpublish" "DELETE /admin/blog/posts/${blog_id}")
+
 # Calls the engine with the master key: meili_master <method> <path> [json body]; prints the answer.
 meili_master() {
   : "${MEILI_URL:?MEILI_URL must be set}" "${MEILI_MASTER_KEY:?MEILI_MASTER_KEY must be set}"
@@ -114,21 +157,81 @@ run_api() {
 
 case "$mode" in
   on)
-    run_api "example"
+    # Enabling a feature (docs/deployment.md): the same FEATURES_ENABLED for the migration and the API, the migration first
+    # (the API refuses to start while an enabled feature's migrations are missing).
+    pnpm build
+    FEATURES_ENABLED=example,blog node apps/api/dist/database/migrate.js
+    tables="$(blog_tables)"
+    echo "blog tables after the migration: $tables"
+    [ "$tables" = "present present" ] || { echo "expected blog_post and its migrations table with the blog enabled" >&2; exit 1; }
+    run_api "example,blog"
     body="$(curl -fsS "http://127.0.0.1:${port}/example/ping")"
     echo "example/ping -> $body"
     echo "$body" | grep -q '"feature":"example"' || { echo "expected the example feature route" >&2; exit 1; }
+    config="$(curl -fsS "http://127.0.0.1:${port}/store/config")"
+    echo "store/config -> $config"
+    echo "$config" | grep -qF '"features":["blog","example"]' || { echo "expected both enabled features in GET /store/config" >&2; exit 1; }
+    expect_status 200 GET "/store/blog/posts?locale=uk"
+    expect_status 200 GET "/store/blog/sitemap"
+    expect_status 404 GET "/store/blog/posts/matrix-post?locale=uk"
+    # Signed out, every admin route is 401; an unknown /admin path is 404, so this shows the routes exist and are guarded.
+    for route in "${blog_admin_routes[@]}"; do
+      expect_status 401 "${route%% *}" "${route#* }" -H 'X-Fluxkit-CSRF: 1'
+    done
+    # A viewer (catalog.read only) reads the list and is refused a write (catalog.write).
+    jar="$(mktemp)"
+    viewer_password="matrix-viewer-$(date +%s)-0123456789"
+    ADMIN_PASSWORD="$viewer_password" node apps/api/dist/auth/create-admin.js --email matrix-viewer@fluxkit.test --role viewer
+    expect_status 200 POST /admin/auth/login -c "$jar" -H 'Content-Type: application/json' -H 'X-Fluxkit-CSRF: 1' \
+      --data "{\"email\":\"matrix-viewer@fluxkit.test\",\"password\":\"${viewer_password}\"}"
+    expect_status 200 GET /admin/blog/posts -b "$jar"
+    expect_status 403 POST /admin/blog/posts -b "$jar" -H 'Content-Type: application/json' -H 'X-Fluxkit-CSRF: 1' \
+      --data '{"title":{"uk":"Matrix"}}'
+    rm -f "$jar"
     ;;
   off)
+    # The proof needs a database the blog never touched (CI: a fresh service container).
+    tables="$(blog_tables)"
+    [ "$tables" = "absent absent" ] || { echo "run 'off' on a database never migrated with the blog (found: $tables)" >&2; exit 1; }
+    pnpm build
+    FEATURES_ENABLED='' node apps/api/dist/database/migrate.js
+    tables="$(blog_tables)"
+    echo "blog tables after the migration: $tables"
+    [ "$tables" = "absent absent" ] || { echo "the migration without the blog created its tables ($tables)" >&2; exit 1; }
     run_api ""
     code="$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:${port}/example/ping")"
     echo "example/ping -> HTTP $code"
     [ "$code" = "404" ] || { echo "expected 404 with the feature disabled" >&2; exit 1; }
+    config="$(curl -fsS "http://127.0.0.1:${port}/store/config")"
+    echo "store/config -> $config"
+    echo "$config" | grep -qF '"features":[]' || { echo "expected no enabled feature in GET /store/config" >&2; exit 1; }
+    for path in "${blog_store_paths[@]}"; do
+      expect_status 404 GET "$path"
+    done
+    for route in "${blog_admin_routes[@]}"; do
+      expect_status 404 "${route%% *}" "${route#* }" -H 'X-Fluxkit-CSRF: 1'
+    done
+    # Give the scheduler's first tick a moment to run before the tables are checked again.
+    sleep 3
+    tables="$(blog_tables)"
+    echo "blog tables after the API ran: $tables"
+    [ "$tables" = "absent absent" ] || { echo "the API without the blog created its tables ($tables)" >&2; exit 1; }
     ;;
   deleted)
     [ "${CI:-}" = "true" ] || { echo "refusing to delete files outside CI (set CI=true on a throwaway copy)" >&2; exit 1; }
-    rm -rf packages/features/_example
+    # The blog README's removal steps: the package, its storefront and admin slices and their e2e files. Nothing else of the
+    # template may need them.
+    rm -rf packages/features/_example packages/features/blog \
+      "apps/storefront/src/app/[locale]/(feature-blog)" apps/admin/src/features/blog \
+      apps/storefront/e2e/tests/blog.e2e.ts apps/storefront/e2e/tests/blog-off.e2e.ts apps/admin/e2e/tests/blog.e2e.ts
     pnpm install --no-frozen-lockfile
+    # The storefront's registry comes from the slices on disk (its prebuild, pretypecheck and pretest below run this too).
+    node scripts/generate-feature-registry.mjs
+    # A missing or foreign file must fail too: `! grep` alone would pass on grep's "no such file" exit code.
+    grep -q "generatedFeatures" apps/storefront/src/features/registry.generated.ts \
+      || { echo "the storefront registry was not generated" >&2; exit 1; }
+    ! grep -qi "blog" apps/storefront/src/features/registry.generated.ts \
+      || { echo "the generated storefront registry still names the blog" >&2; cat apps/storefront/src/features/registry.generated.ts >&2; exit 1; }
     pnpm lint
     pnpm typecheck
     pnpm check:boundaries
