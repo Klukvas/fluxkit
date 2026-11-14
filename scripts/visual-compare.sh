@@ -90,7 +90,8 @@ if [ -f "$declared" ]; then
     git -C "$root" show "$merge_base:.visual/exceptions.json" >"$report/exceptions.inherited.json"
     inherited=(--inherited "$report/exceptions.inherited.json")
   fi
-  node --experimental-strip-types "$harness_cli" --own-exceptions "$declared" "${inherited[@]}" --write "$effective" ||
+  # Bash 3.2 + set -u needs guarded expansion for empty arrays.
+  node --experimental-strip-types "$harness_cli" --own-exceptions "$declared" ${inherited[@]+"${inherited[@]}"} --write "$effective" ||
     harness_error "reading .visual/exceptions.json"
 else
   echo "[]" >"$effective"
@@ -139,8 +140,9 @@ VISUAL_COMPUTED_DIR="$out/current/computed-styles" VISUAL_SNAPSHOT_DIR="$out/bas
   run_visual "$root" computed-styles || harness_error "recording this tree's computed styles"
 
 computed_exit=0
+# Bash 3.2 + set -u needs guarded expansion for empty arrays.
 node --experimental-strip-types "$harness_cli" "$out/baseline/computed-styles" "$out/current/computed-styles" \
-  --exceptions "$effective" --report "$report" "${strict[@]}" || computed_exit=$?
+  --exceptions "$effective" --report "$report" ${strict[@]+"${strict[@]}"} || computed_exit=$?
 case "$computed_exit" in
   0) echo "pass" >"$report/computed-styles.status" ;;
   1) echo "fail" >"$report/computed-styles.status" ;;
