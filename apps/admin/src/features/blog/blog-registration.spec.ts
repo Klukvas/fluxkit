@@ -1,3 +1,4 @@
+import { ExtensionIcon } from "@fluxkit/ui";
 import { ROLE_PERMISSIONS } from "@fluxkit/core";
 import { describe, expect, it } from "vitest";
 import { FEATURE_NAVIGATION, visibleNavigation } from "../../layout/navigation";
@@ -26,8 +27,9 @@ describe("the blog's admin manifest", () => {
     ]);
   });
 
-  it("adds Blog after Home banners in the Storefront group, for every role that reads the catalog", () => {
+  it("adds Blog after Home banners and Search in the Storefront group, for every role that reads the catalog", () => {
     expect(FEATURE_NAVIGATION.find((entry) => entry.feature === "blog")).toEqual({
+      icon: ExtensionIcon,
       feature: "blog",
       group: "storefront",
       routeId: "feature.blog.list",
@@ -42,7 +44,7 @@ describe("the blog's admin manifest", () => {
       expect(
         storefront?.items.map((item) => item.routeId),
         role,
-      ).toEqual(["banners", "feature.blog.list"]);
+      ).toEqual(["banners", "search", "feature.blog.list"]);
     }
     // Without the feature in GET /admin/config the entry is not there.
     expect(

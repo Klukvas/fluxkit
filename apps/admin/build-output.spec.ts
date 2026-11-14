@@ -12,7 +12,7 @@ import { ADMIN_BASE_PATH } from "./src/router/base-path";
  * Checks of the BUILT SPA (`vite build`, run by `pnpm build`; the root `pnpm test` builds first). Without `dist/` this
  * fails instead of skipping: an unchecked build must not pass. Plan step 4b: no inline script (the CSP has
  * `script-src 'self'`), no external URL, every asset under the base path, one chunk per area, an entry budget, no zod,
- * the UI language as the only storage use.
+ * one shared browser preference/checklist storage accessor.
  */
 
 const dist = join(import.meta.dirname, "dist");
@@ -37,8 +37,11 @@ const dist = join(import.meta.dirname, "dist");
  * navigation entries, plus the blog's manifest; the blog's screens and messages are lazy chunks): 441 990 raw, 131 840 gzip
  * before and 447 298 raw, 133 774 gzip after; the raw budget moves to 450 000 (the gzip budget is unchanged, about 1.2 KB
  * left: the next shell-level change will need a decision).
+ * Admin shell redesign PR 1 (icons, collapsed sidebar, top-layer tooltips and account disclosure): 447 298 raw, 133 774
+ * gzip before and 456 996 raw, 136 998 gzip after (Node 22, entry plus static imports, gzip level 9; 3 chunks); both caps
+ * are exceeded, so raw moves to 461 600 and gzip to 138 400 (about measured size plus 1 %, orchestrator decision).
  */
-const INITIAL_JS_BUDGET = { raw: 450_000, gzip: 135_000 };
+const INITIAL_JS_BUDGET = { raw: 461_600, gzip: 138_400 };
 
 /** Every lazily loaded area module of the route table. */
 const AREA_MODULES = [
@@ -262,13 +265,14 @@ describe("bundle content", () => {
   });
 
   // One accessor (`browserStorage` in `i18n-context.tsx`); the help checklist reaches storage through it, so the word
-  // appears once, in the chunk that holds the language key.
-  it("uses localStorage once, through the one storage accessor of the UI language", () => {
+  // appears once, in the chunk that holds both preference keys.
+  it("uses localStorage once, through the shared preference/checklist storage accessor", () => {
     const uses = scripts.flatMap((name) =>
       [...asset(name).matchAll(/localStorage/g)].map(() => name),
     );
     expect(uses).toHaveLength(1);
     expect(asset(uses[0] as string)).toContain(LOCALE_STORAGE_KEY);
+    expect(asset(uses[0] as string)).toContain("fluxkit.admin.sidebarCollapsed");
   });
 
   it("touches sessionStorage only inside react-router (its view-transition read; the SPA writes nothing there)", () => {

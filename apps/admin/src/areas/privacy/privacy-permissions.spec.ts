@@ -49,7 +49,7 @@ describe("the Privacy area and the audit log per role", () => {
     const ids = (permissions: readonly string[]) =>
       visibleNavigation(permissions).flatMap((group) => group.items.map((item) => item.routeId));
     // Help is shown to every signed-in admin (knowledge base plan).
-    expect(ids(["privacy.manage"])).toEqual(["privacy", "help"]);
+    expect(ids(["privacy.manage"])).toEqual(["home", "privacy", "help"]);
     expect(ids(["customers.read", "customers.write", "orders.read", "email.manage"])).not.toContain(
       "privacy",
     );

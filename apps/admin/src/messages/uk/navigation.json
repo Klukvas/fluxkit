@@ -1,6 +1,6 @@
 {
-  "nav.group.catalog": "Каталог",
   "nav.group.sales": "Продажі",
+  "nav.group.catalog": "Каталог",
   "nav.group.settings": "Налаштування",
   "page.login.title": "Вхід",
   "page.home.title": "Головна",
@@ -54,5 +54,6 @@
   "page.auditLog.title": "Журнал дій",
   "nav.group.help": "Довідка",
   "page.help.title": "Довідка",
-  "page.helpArticle.title": "Стаття довідки"
+  "page.helpArticle.title": "Стаття довідки",
+  "nav.group.catalogSetup": "Налаштування каталогу"
 }

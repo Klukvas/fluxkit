@@ -1,3 +1,4 @@
+import { HomeIcon } from "@fluxkit/ui";
 import { Children, isValidElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -161,6 +162,40 @@ describe("shell frame", () => {
     "/products",
   );
 
+  it("associates the desktop collapse control and separates Help in both responsive forms", () => {
+    const markup = renderInRouter(
+      <ShellFrame
+        t={t}
+        collapsed
+        onToggleCollapsed={noop}
+        navigation={[
+          { id: "daily", items: [{ id: "home", label: "§home", href: "/", icon: <HomeIcon /> }] },
+        ]}
+        helpNavigation={[
+          {
+            id: "help",
+            items: [{ id: "help", label: "§help", href: "/help", icon: <HomeIcon /> }],
+          },
+        ]}
+        languageSwitch={null}
+        userMenu={null}
+        navigating={false}
+      >
+        <p>§page</p>
+      </ShellFrame>,
+    );
+    expect(markup).toContain('id="admin-navigation-desktop"');
+    expect(markup).toContain('aria-expanded="false" aria-controls="admin-navigation-desktop"');
+    expect(markup).toContain("§shell.expandPanel");
+    expect(markup.match(/aria-label="§page.help.title"/g)).toHaveLength(2);
+    const desktop = markup.split('id="admin-navigation-desktop"')[1]?.split("</aside>")[0] ?? "";
+    const mobile = markup.split('id="admin-navigation"')[1]?.split("</aside>")[0] ?? "";
+    expect(desktop).toContain('<span class="sr-only">§home</span>');
+    expect(mobile).not.toContain('<span class="sr-only">§home</span>');
+    expect(mobile).not.toContain("§shell.expandPanel");
+    expectNoHardcodedText(markup);
+  });
+
   it("has a skip link to main, a header, the navigation landmark and main", () => {
     expect(html.indexOf('href="#main"')).toBeGreaterThan(-1);
     expect(html.indexOf('href="#main"')).toBeLessThan(html.indexOf("<header"));
@@ -197,7 +232,7 @@ describe("shell frame", () => {
 
   it("contains no hardcoded text", () => {
     // The email is data, not UI text.
-    expectNoHardcodedText(html.replace("admin@example.com", ""));
+    expectNoHardcodedText(html.replace("admin@example.com", "").replace("AD", ""));
   });
 });
 
