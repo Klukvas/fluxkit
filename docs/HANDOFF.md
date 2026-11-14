@@ -90,6 +90,15 @@ Fluxkit is a white-label e-commerce template: TypeScript monorepo, NestJS + Driz
 7. Auth follow-ups, each with its own plan: session token rotation (plan `docs/plans/2026-11-14-session-token-rotation.md`, approved 2026-11-14), Redis-backed login throttle and the in-memory reset and verification limits (part of the multi-instance plan), two-factor (no plan yet).
 8. Smaller follow-ups from the reviews: plan `docs/plans/2026-11-14-review-followups.md` (approved 2026-11-14: docs drift, tests for surviving mutations, store required text and X-Powered-By, migration `0014` for the `reserved` upper bound; the C5 lock deferred). Dependabot: #219 to #223 replaced by one grouped update (Nest 12.4.2); watch for new ones.
 
+Deferred by the owner (2026-11-14), not started:
+- C5: lock the attribute facts during product and variant attribute writes (`docs/plans/2026-11-14-review-followups.md`, D).
+- Periodic session token rotation (`docs/plans/2026-11-14-session-token-rotation.md`, R4).
+- Two-factor authentication (no plan yet).
+- Rate limits for the blog routes and page-view limits at the edge (found by the launch-blockers work).
+- Object storage for media (needed before running the API on several hosts; multi-instance plan, section 7).
+- Contract changes waiting for a decision: writable `variant.title` (6a); admin page size and admin `?categoryId` with descendants (6f, 6g; ADR 0053 records today's behaviour).
+- Nest 12.5.0 (the grouped update stays on 12.4.2 for now).
+
 ## 3. Owner-only actions
 
 Agents must not do these (AGENTS.md is the owner's file) or cannot (keys, contracts, lawyers).
