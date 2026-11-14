@@ -251,3 +251,13 @@ Notes:
 - `workflow_dispatch` with `sha` needs the full commit hash: a short one fails in `actions/checkout` ("A branch or tag with the name ... could not be found"). Empty `sha` deploys the head of `main`.
 - The old `178-104-79-222.sslip.io` certificate is still in `/etc/letsencrypt` and renewed by the timer; `http://178-104-79-222.sslip.io/...` redirects to `https://fluxkitcore.com/...`, `https://178-104-79-222.sslip.io` now shows a name warning.
 - `www` redirect (2026-11-13, owner's request): the `www` record is **Proxied** at Cloudflare and a Redirect Rule ("Redirect www to fluxkitcore.com", `https://www.fluxkitcore.com/*` to `https://fluxkitcore.com/${1}`, 301, query string kept) answers at Cloudflare, so shop traffic never reaches the host through Cloudflare and `TRUST_PROXY` stays 1. `http://www...` is proxied to the edge's port 80, which redirects to `https://fluxkitcore.com` and serves the ACME webroot: `certbot renew --cert-name fluxkitcore.com --dry-run` succeeded with `www` proxied. Undo: delete the rule, set the record back to DNS only. The bare domain stays DNS only.
+
+## 18. Proxy hops of the test server (2026-11-14, desk check, nothing changed on the host)
+
+Launch blocker `TRUST_PROXY` (HANDOFF section 2 item 5), checked against this plan and `docs/deployment.md` "Proxy hops"; the host was not contacted.
+
+- Path of a shopper: client -> `fluxkitcore.com` (Cloudflare **DNS only**, so no Cloudflare hop; `dig` on 2026-11-14: one `A` record `178.104.79.222`, **no `AAAA`**) -> nginx edge in Docker (published 80/443; IPv4 is DNAT-ed, so nginx sees the client address) -> `api`, or -> `storefront` -> `api` for the search results page. `www` is answered by a Cloudflare Redirect Rule and never reaches the host (section 17).
+- Hops: **1**, so `TRUST_PROXY=1` (sections 5 and 12, step A4) is right; `STOREFRONT_FORWARD_CLIENT_ADDRESS=true` (section 5 and step A4, ADR 0038) is needed and safe because only the edge publishes ports.
+- The IPv6 caveat of `docs/deployment.md` (all IPv6 clients behind `docker-proxy` share one window) does not apply while the domain has no `AAAA` record; adding one brings it back.
+- Not verified: the values in `/etc/fluxkit/production.env` today (the owner's check: step 1 of `docs/deployment.md` "Checking per-address limits") and the per-address windows from two networks (steps 2 and 3 there, the owner's action).
+- If `www` or the bare domain is ever switched to **Proxied**, the chain gets a Cloudflare hop: `TRUST_PROXY=2`, the edge must append (`$proxy_add_x_forwarded_for`), and nginx must accept connections from Cloudflare's ranges only, otherwise a client that reaches the host directly chooses its key.

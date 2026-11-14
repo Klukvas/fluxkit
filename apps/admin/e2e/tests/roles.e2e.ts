@@ -16,6 +16,17 @@ test("the viewer browses the catalog read-only and is not allowed in orders", as
   guard,
 }) => {
   await signIn("viewer");
+  const workspace = page.getByRole("region", { name: "Overview", exact: true });
+  await expect(workspace.getByRole("link")).toHaveCount(2);
+  await expect(workspace.getByRole("link", { name: /Draft products/ })).toBeVisible();
+  await expect(workspace.getByRole("link", { name: /Active products/ })).toBeVisible();
+  for (const label of ["Orders awaiting payment", "Paid orders awaiting fulfilment", "Customers"]) {
+    await expect(workspace.getByRole("link", { name: new RegExp(label) })).toHaveCount(0);
+  }
+  await expect(page.getByRole("region", { name: "Quick actions", exact: true })).toHaveCount(0);
+  for (const name of ["New product", "Orders to process", "Customers"]) {
+    await expect(page.getByRole("main").getByRole("link", { name, exact: true })).toHaveCount(0);
+  }
   const nav = page.getByRole("navigation", { name: "Admin sections" });
   for (const action of ["Collapse panel", "Expand panel"]) {
     await expect(nav.getByRole("link", { name: "Start", exact: true })).toBeVisible();
@@ -126,6 +137,22 @@ test("the manager has no users area but manages shipping and email", async ({
   guard,
 }) => {
   await signIn("manager");
+  const workspace = page.getByRole("region", { name: "Overview", exact: true });
+  await expect(workspace.getByRole("link")).toHaveCount(5);
+  for (const label of [
+    "Orders awaiting payment",
+    "Paid orders awaiting fulfilment",
+    "Customers",
+    "Draft products",
+    "Active products",
+  ]) {
+    await expect(workspace.getByRole("link", { name: new RegExp(label) })).toBeVisible();
+  }
+  const actions = page.getByRole("region", { name: "Quick actions", exact: true });
+  await expect(actions.getByRole("link")).toHaveCount(3);
+  for (const name of ["New product", "Orders to process", "Customers"]) {
+    await expect(actions.getByRole("link", { name, exact: true })).toBeVisible();
+  }
   const nav = page.getByRole("navigation", { name: "Admin sections" });
   for (const action of ["Collapse panel", "Expand panel"]) {
     await expect(nav.getByRole("link", { name: "Start", exact: true })).toBeVisible();
