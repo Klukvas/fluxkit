@@ -188,16 +188,22 @@ describe("findWaybill", () => {
     expect(stub.of("listShipments")).toHaveLength(2);
   });
 
-  it(`gives up after ${String(NOVA_POST_FIND_MAX_PAGES)} pages with a failure, never null`, async () => {
-    for (let i = 1; i <= NOVA_POST_FIND_MAX_PAGES * 100 + 50; i += 1) {
-      stub.addShipment({ clientOrder: `BUSY-${String(i)}`, createdAt: at(29 - i / 1000) });
-    }
-    const { provider } = providerOn(stub);
-    expect(await provider.findWaybill({ clientReference: "7K3M-9QX2", ...window }, live())).toEqual(
-      { ok: false, reason: "unavailable", providerCodes: ["scan_limit"] },
-    );
-    expect(stub.of("listShipments")).toHaveLength(NOVA_POST_FIND_MAX_PAGES);
-  });
+  // About 0.1 s alone, but it builds 1 050 shipments and makes ten HTTP round trips to the stub, and with every package's tests
+  // running in parallel on a CI runner it took 5.07 s once (the default limit is 5 s). The limit covers that load, not a hang.
+  it(
+    `gives up after ${String(NOVA_POST_FIND_MAX_PAGES)} pages with a failure, never null`,
+    { timeout: 20_000 },
+    async () => {
+      for (let i = 1; i <= NOVA_POST_FIND_MAX_PAGES * 100 + 50; i += 1) {
+        stub.addShipment({ clientOrder: `BUSY-${String(i)}`, createdAt: at(29 - i / 1000) });
+      }
+      const { provider } = providerOn(stub);
+      expect(
+        await provider.findWaybill({ clientReference: "7K3M-9QX2", ...window }, live()),
+      ).toEqual({ ok: false, reason: "unavailable", providerCodes: ["scan_limit"] });
+      expect(stub.of("listShipments")).toHaveLength(NOVA_POST_FIND_MAX_PAGES);
+    },
+  );
 
   it("refuses to choose between two shipments with our reference (a repeated create, H22)", async () => {
     stub.addShipment({ clientOrder: "7K3M-9QX2", createdAt: at(0) });

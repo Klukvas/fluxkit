@@ -73,6 +73,7 @@
 - `deadlock-retry.ts` - `retryOnDeadlock`: runs a whole transaction once more after `40P01`, then answers `503 service_unavailable`; logs the SQLSTATE only.
 - `problem.ts` also holds the checkout problems (`cartEmpty`, `cartChanged(cart)`, `checkoutRefused(errors)`, `idempotencyKeyReused`, `tooManyOpenOrders`, `serviceUnavailable`, and for shipping `shippingMethodRequired`, `shippingNotApplicable`, `shippingChanged(shipping)`, `shippingProviderUnavailable(retryAfter)`) and the `members` extension of a problem body (the `cart` of `cart_changed`, the `shipping` of `shipping_changed`).
 - `*.spec.ts` - unit tests for the filter, pipe, pagination, Postgres error mapping and transaction helper.
+- `workspace-runtime-dependencies.spec.ts` - repository guard: every package under `packages/` whose non-spec source imports `@nestjs/common` lists it with `reflect-metadata` and `rxjs` as runtime dependencies at this app's versions, never as peers (the production image installs with `--prod`); asserts it found the API kit and every provider and feature package on disk.
 
 ## Auth (`src/auth/`)
 

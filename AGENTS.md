@@ -339,15 +339,15 @@ Everything else the agent decides itself and mentions in the report. Do not ask 
 CI (`.github/workflows/ci.yml`) runs on every PR and on pushes to `main`; all jobs must pass before merge:
 
 - `verify`: lint, format check, type check, schema drift check, module boundary check, `pnpm check:env`, unit/integration tests (service containers: Postgres 17, Redis 8, Meilisearch v1.55.0).
-- `feature-matrix` (`scripts/feature-matrix.sh`): `on` (API started with `FEATURES_ENABLED=example`, route exists), `off` (404), `deleted`
-  (feature folders removed: the package and its app slices; lint/types/boundaries/tests still pass). Core must never depend on a feature. The other modes (section 1) check
+- `feature-matrix` (`scripts/feature-matrix.sh`): `on` (`FEATURES_ENABLED=example,blog`: the blog's migration runs, routes exist, `features` lists them), `off` (404, no blog tables), `deleted`
+  (every feature's folders removed: the package and its app slices; lint/types/boundaries/tests still pass). Core must never depend on a feature. The other modes (section 1) check
   provider plugins (`providers-*`) and search (`search-off`: routes 404, no search table writes; `search-on`: seeds, reindexes against a real engine and finds the seeded product).
 - `policy`: `pnpm check:licenses` (policy in `scripts/license-policy.json`), `pnpm audit:prod` (fails on high severity in production dependencies),
   and `pnpm notices` (uploads `THIRD_PARTY_NOTICES.md` as an artifact; ship it with client deliveries).
 - `docs` (PRs only, `scripts/check-docs.mjs`): changed controllers need `docs/api/` updates, schema/migration changes need `CHANGELOG.md`, new packages need `docs/files/`,
   renamed design tokens need `docs/contracts/theme-tokens.md`. `openapi.json` freshness is enforced by a test.
   Changes to `apps/storefront/src/config/{brand,catalog,header,footer,slots}.ts` or `.tsx` need a change under `docs/contracts/` (rule self-tested on every run, `--self-test`).
-- `e2e`: `pnpm test:e2e` (Playwright, Chromium) against real Postgres, Redis and Meilisearch.
+- `e2e`: `pnpm test:e2e` (Playwright, Chromium) against real Postgres, Redis and Meilisearch, with no feature on; then the blog specs of both suites with the blog on (`E2E_FEATURES=blog`, `ADMIN_E2E_FEATURES=blog`).
 - `visual` (behind `visual-gate`; runs for a PR labelled `visual-check`, a PR touching the theme, the UI library, the storefront source or the harness, and on manual runs): `bash scripts/visual-compare.sh <base-ref>`
   compares computed styles (zero tolerance, per-PR `.visual/exceptions.json`) and screenshots of the storefront against the merge-base (`apps/storefront/e2e/README.md`, "Visual comparison").
 - `compose`: `infra/docker-compose.yml` starts and every service becomes healthy.

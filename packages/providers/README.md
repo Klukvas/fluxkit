@@ -2,6 +2,8 @@
 
 Payment, shipping and email provider plugins, one package per provider (`packages/providers/<name>`). Core must never import from here, and neither may `apps/*`: `apps/api` imports only the enabled providers, dynamically (ADR 0029 decision 8).
 
+Every provider package lists `@nestjs/common`, `reflect-metadata` and `rxjs` under `dependencies` at the API's exact versions, never as peers: the production image installs with `pnpm install --prod`, which links no peer of a workspace package (guard `apps/api/src/common/workspace-runtime-dependencies.spec.ts`).
+
 ## Shipping provider convention
 - `package.json` declares `"fluxkit": { "provider": "<code>", "kind": "shipping" }`. The code (`SHIPPING_PROVIDER_CODE_PATTERN`, for example `nova_post`) is what `SHIPPING_PROVIDERS_ENABLED` names; the folder name is irrelevant.
 - `main` (default `dist/index.js`) exports `providerModule`, a Nest module.
