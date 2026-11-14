@@ -309,6 +309,7 @@ Everything else the agent decides itself and mentions in the report. Do not ask 
 - Also approved by the owner on 2026-10-14, each for ONE specific case: **LGPL-3.0-or-later** for the unmodified, dynamically loaded prebuilt `@img/sharp-libvips-*` binaries
   (Next.js image optimization and, since 2026-10-23, `sharp` in `apps/api`, ADR 0028; never copy or modify their code; keep the notices), and **CC-BY-4.0** for the `caniuse-lite` browser-data package (keep attribution).
   Any other LGPL/GPL-family or CC-BY package still needs its own approval. Third-party notices must be shipped with a client delivery.
+- Approved by the owner on 2026-11-14: **SIL OFL 1.1** for unmodified font files shipped with the template (the Rubik variable TTF in `apps/storefront/src/lib/fonts/`, as published by Google Fonts; OFL text kept next to it and in the third-party notices); not for code packages.
 - External services run as separate unmodified processes (Docker Compose) are tracked in `docs/dependencies.md` with an explicit decision.
   Approved exception: **Redis 8+ under AGPLv3** (legal sign-off given by the owner's lawyer, 2026-10-14). We run it unmodified and never
   fork or patch it. If the license choice or how we ship it changes, re-confirm with legal.
