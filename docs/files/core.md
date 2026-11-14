@@ -52,6 +52,20 @@ The API (`apps/api`) reads facts from the database, calls these functions inside
 - `src/content/banner-content.ts` - `checkBannerContent` (layout rules with `validateI18nText`), `checkBannerImageLocales`, `resolveBannerPicture`, `checkBannerOrder`, `checkBannerCount`.
 - `src/content/*.spec.ts` - the case tables (link, window boundaries, layouts); the link table is the one the storefront parity spec copies.
 
+## Safe Markdown (ADR 0050, blog plan E9, `src/content/markdown/`)
+
+- `src/content/markdown/index.ts` - barrel: exports `parseMarkdown`, `checkMarkdownLink`, `markdownPlainText`, `MARKDOWN_LIMITS` and the AST and error types only; the modules below without an export there are internal.
+- `src/content/markdown/types.ts` - the AST (`MarkdownDocument`, `MarkdownBlock`, `MarkdownInline`, ...), `MarkdownErrorCode`, `MarkdownError`, `MarkdownParseResult`, `MarkdownLinkRefusal`. Public contract (`docs/contracts/markdown.md`).
+- `src/content/markdown/limits.ts` - `MARKDOWN_LIMITS` (40 000 characters, 2 000 blocks, nesting 4, lists 2, inline nesting 4, 300 links, 20 000 nodes, 256 KB serialized, link target scan 2 048).
+- `src/content/markdown/parse.ts` - `parseMarkdown(source, {locales})`, the public entry; `run-parse.ts` (internal, not exported) - `runMarkdownParse`: length and NUL checks, the block parse, the serialized size cap, the first refusal with its line, and the work in steps (the adversarial spec's linearity check). Must never produce HTML.
+- `src/content/markdown/link.ts` - `checkMarkdownLink(href, locales)`: `checkBannerLink` plus an exact `https://` scheme and no control, bidi control or invisible format character, raw or percent-encoded.
+- `src/content/markdown/plain-text.ts` - `markdownPlainText(document)` (blocks separated by a blank line); `inline-text.ts` - the inline part (also the empty link text check).
+- `src/content/markdown/source.ts` - line splitting (`\r\n`, `\r`, `\n`), prefix tab expansion, the line of an offset, blank and indent helpers.
+- `src/content/markdown/block-syntax.ts` - recognizers of one line's block start (fence, ATX heading, thematic break, quote, list marker) and the paragraph interruption rule; hand-written scans, no backtracking expression.
+- `src/content/markdown/blocks.ts` - the block parser (containers with lazy continuation lines, depth and list depth checks).
+- `src/content/markdown/inline.ts` - the inline parser of one paragraph or heading (escapes, code spans, delimiter runs, brackets and link targets, hard breaks); `emphasis.ts` - CommonMark's process emphasis with `openers_bottom`; `backtick-runs.ts` - the code span closer index; `inline-list.ts` - the linked list of pieces; `budget.ts` - block, node, link and work counters and `MarkdownFailure`.
+- `src/content/markdown/*.spec.ts` - `parse.spec.ts` (case table per node and refusals with lines), `link.spec.ts` (link targets, raw and encoded controls, bidi controls and format characters), `plain-text.spec.ts`, `adversarial.spec.ts` (linear work by the step counter, a one-second backstop and output caps at the length limit, every limit, a seeded fuzz run).
+
 ## Admin authentication rules (ADR 0009)
 
 Pure decisions only: no hashing, no cookies, no random numbers, no clock (`now` is a parameter). The API does the I/O (scrypt, sessions, database) and calls these.

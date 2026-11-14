@@ -49,6 +49,13 @@ export {
   type LocaleTextFieldLocale,
   type LocaleTextFieldProps,
 } from "./locale-text-field";
+export { MarkdownView, type MarkdownViewLinkProps, type MarkdownViewProps } from "./markdown-view";
+export type {
+  MarkdownViewBlock,
+  MarkdownViewDocument,
+  MarkdownViewInline,
+  MarkdownViewListItem,
+} from "./markdown-view-types";
 export { OptionPicker, type OptionPickerProps, type OptionPickerValue } from "./option-picker";
 export { Pagination, pageItems, type PaginationProps } from "./pagination";
 export { PriceText, type PriceDiscount, type PriceTextProps } from "./price-text";
