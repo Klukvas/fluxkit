@@ -25,6 +25,7 @@ interface Item {
   title: string;
   price: { from: number; to: number };
   availability: string;
+  defaultVariantId: string | null;
 }
 interface Facet {
   key: string;
@@ -60,6 +61,8 @@ describe("store search routes (real Postgres, real Meilisearch)", () => {
   let world: StockWorld;
   let shirt: { id: string; slug: string };
   let tee: { id: string; slug: string };
+  let teeVariantId: string;
+  let shirtVariantIds: Record<string, string>;
   let brandA: string;
   let brandB: string;
   let adminId: string;
@@ -190,6 +193,8 @@ describe("store search routes (real Postgres, real Meilisearch)", () => {
       [shirtProduct.id],
     );
     const prices: Record<string, number> = { s: 2000, m: 3000, l: 4000 };
+    shirtVariantIds = Object.fromEntries(variants.rows.map((row) => [row.code, row.id]));
+    expect(Object.keys(shirtVariantIds).sort()).toEqual(["l", "m", "s"]);
     for (const row of variants.rows) {
       await pool.query("insert into price (variant_id, currency, amount) values ($1, 'UAH', $2)", [
         row.id,
@@ -202,6 +207,7 @@ describe("store search routes (real Postgres, real Meilisearch)", () => {
 
     // A T-shirt of brand B, sold out.
     const teeVariant = await world.variant({ onHand: 0 });
+    teeVariantId = teeVariant.variantId;
     await call("PATCH", `/admin/products/${teeVariant.productId}`, {
       title: { uk: "Футболка бавовняна", en: "Cotton tee" },
       brandId: idOf(brandB),
@@ -258,6 +264,57 @@ describe("store search routes (real Postgres, real Meilisearch)", () => {
       [brandB, "Stanley", 1],
     ]);
     expect(result.body.price).toEqual({ min: 1000, max: 4000 });
+  });
+
+  it("hydrates defaultVariantId from current sellable variants in Postgres without syncing the index", async () => {
+    const path = "/store/search?locale=en";
+    const initial = await get(path);
+    expect(initial.status, JSON.stringify(initial.body)).toBe(200);
+    expect(initial.body.items.map((item) => item.id).sort()).toEqual([shirt.id, tee.id].sort());
+    for (const item of initial.body.items) {
+      expect(item).toHaveProperty("defaultVariantId");
+    }
+    expect(initial.body.items.find((item) => item.id === tee.id)).toMatchObject({
+      availability: "out_of_stock",
+      defaultVariantId: teeVariantId,
+    });
+    expect(initial.body.items.find((item) => item.id === shirt.id)?.defaultVariantId).toBeNull();
+
+    const otherVariantIds = [shirtVariantIds["m"], shirtVariantIds["l"]];
+    // listItemsByIds bypasses the ADR 0040 catalog list cache: the same request must see SQL changes immediately.
+    // Leave the index untouched so only Postgres can supply the updated default variant.
+    try {
+      await pool.query("update variant set is_active = false where id = any($1::uuid[])", [
+        otherVariantIds,
+      ]);
+      const inactive = await get(path);
+      expect(inactive.status, JSON.stringify(inactive.body)).toBe(200);
+      expect(inactive.body.items.find((item) => item.id === shirt.id)?.defaultVariantId).toBe(
+        shirtVariantIds["s"],
+      );
+
+      await pool.query("update variant set is_active = true where id = any($1::uuid[])", [
+        otherVariantIds,
+      ]);
+      await pool.query(
+        "delete from price where variant_id = any($1::uuid[]) and currency = 'UAH'",
+        [otherVariantIds],
+      );
+      const unpriced = await get(path);
+      expect(unpriced.status, JSON.stringify(unpriced.body)).toBe(200);
+      expect(unpriced.body.items.find((item) => item.id === shirt.id)?.defaultVariantId).toBe(
+        shirtVariantIds["s"],
+      );
+    } finally {
+      await pool.query("update variant set is_active = true where id = any($1::uuid[])", [
+        otherVariantIds,
+      ]);
+      await pool.query(
+        `insert into price (variant_id, currency, amount) values ($1, 'UAH', 3000), ($2, 'UAH', 4000)
+         on conflict (variant_id, currency) do nothing`,
+        otherVariantIds,
+      );
+    }
   });
 
   it("keeps the other values of a selected product facet visible with exact counts (disjunctive)", async () => {
