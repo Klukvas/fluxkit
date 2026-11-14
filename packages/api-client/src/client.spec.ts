@@ -50,6 +50,7 @@ const EMPTY_CART: Cart = {
   itemCount: 0,
   purchasable: true,
   requiresShipping: false,
+  freeShipping: null,
   notices: [],
 };
 

@@ -83,10 +83,11 @@ describe("design guard, token-only color classes", () => {
   it("knows the color token names", () => {
     expect(colorNames.has("primary")).toBe(true);
     expect(colorNames.has("ring")).toBe(true);
+    expect(colorNames.has("scrim")).toBe(true);
   });
 
   it("accepts token colors, sizes and state variants", () => {
-    const source = `"bg-primary text-sm text-primary-foreground/80 border-t-border ring-2 ring-ring hover:bg-muted shadow-card"`;
+    const source = `"bg-primary text-sm text-primary-foreground/80 border-t-border ring-2 ring-ring hover:bg-muted shadow-card bg-scrim backdrop:bg-scrim"`;
     expect(nonTokenColorClasses(source)).toEqual([]);
   });
 

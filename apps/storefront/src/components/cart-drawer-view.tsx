@@ -26,6 +26,7 @@ import { allowedImageUrl } from "../lib/image-source";
 import { localizedHref } from "../lib/locale-path";
 import { formatMoney } from "../lib/money";
 import { CartDrawerQuantity, type DrawerQuantityProps } from "./cart-drawer-quantity";
+import { FreeShippingProgress } from "./free-shipping-progress";
 import { StoreImage } from "./store-image";
 import { focusRing, linkButton, secondaryLinkButton } from "./styles";
 
@@ -95,6 +96,13 @@ export function CartDrawerView({
       footer={
         cart !== null && cart.lines.length > 0 ? (
           <div className="flex flex-col gap-3">
+            <FreeShippingProgress
+              freeShipping={cart.freeShipping}
+              subtotal={cart.subtotal}
+              t={t}
+              locale={locale}
+              exponent={exponent}
+            />
             <dl className="flex justify-between gap-3 tabular-nums">
               <dt>{t("cart.summary.subtotal")}</dt>
               <dd>{money(cart.subtotal)}</dd>

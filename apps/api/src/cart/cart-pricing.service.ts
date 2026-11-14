@@ -1,6 +1,9 @@
 import { Inject, Injectable } from "@nestjs/common";
 import {
   cartLineStockHint,
+  decideFreeShippingProgress,
+  type FreeShippingMethod,
+  SHIPPING_METHOD_KINDS,
   createMoney,
   isVariantSellable,
   priceCart,
@@ -26,6 +29,9 @@ import { optionalText, requiredText } from "../catalog/store/store.serializer.js
 import { PRICING_CONFIG, type PricingConfig } from "../common/pricing-config.js";
 import type { DbExecutor } from "../common/transaction.js";
 import { ProblemException, type FieldError } from "../common/problem.js";
+import { z } from "zod";
+import { ShippingProviderRegistry } from "../shipping/registry/index.js";
+import { CartRepository } from "./cart.repository.js";
 import type { CartResponse } from "./cart.schemas.js";
 
 /** What the cart needs to know about the variant a shopper adds or changes. */
@@ -51,6 +57,7 @@ export interface PricedCart {
   /** What core was given, in `present` order (the cart read prices it again without an overflowing line). */
   readonly inputs: readonly PricedLineInput[];
   readonly result: PriceCartResult;
+  readonly shippingMethods: readonly FreeShippingMethod[];
 }
 
 /** `pickLineImage` needs a locale only for the alt text, which an order does not keep. */
@@ -66,6 +73,7 @@ export function emptyCart(shopCurrency: PricingConfig["shopCurrency"]): CartResp
     itemCount: 0,
     purchasable: false,
     requiresShipping: false,
+    freeShipping: null,
     notices: [],
   };
 }
@@ -109,6 +117,8 @@ export class CartPricingService {
   constructor(
     @Inject(StoreRepository) private readonly store: StoreRepository,
     @Inject(PRICING_CONFIG) private readonly pricing: PricingConfig,
+    @Inject(CartRepository) private readonly carts: CartRepository,
+    @Inject(ShippingProviderRegistry) private readonly providers: ShippingProviderRegistry,
   ) {}
 
   emptyCart(): CartResponse {
@@ -212,6 +222,17 @@ export class CartPricingService {
       };
     });
     const result = priceCart(this.pricing.shopCurrency, inputs);
+    const shippingMethods: readonly FreeShippingMethod[] =
+      present.length > 0
+        ? (await this.carts.listActiveShippingMethods(executor)).map((row) => ({
+            kind: z.enum(SHIPPING_METHOD_KINDS).parse(row.kind),
+            isActive: row.isActive,
+            currency: row.currency,
+            pricing: row.pricing,
+            providerEnabled:
+              row.providerCode === null || this.providers.get(row.providerCode) !== undefined,
+          }))
+        : [];
     const labelsByVariant = new Map<string, VariantOptionLabelRow[]>();
     for (const label of labels) {
       labelsByVariant.set(label.variantId, [
@@ -229,6 +250,7 @@ export class CartPricingService {
       levels,
       inputs,
       result,
+      shippingMethods,
     };
   }
 
@@ -278,6 +300,7 @@ export class CartPricingService {
     if (!result.ok) {
       throw this.unpriceable(result, present);
     }
+    const requiresShipping = this.requiresShipping(result, rowsById);
     return {
       lines: result.lines.map((line) => {
         const row = rowsById.get(line.variantId);
@@ -332,20 +355,29 @@ export class CartPricingService {
       total: result.subtotal,
       itemCount: result.itemCount,
       purchasable: result.purchasable,
-      requiresShipping: shippingAddressRequired(
-        // The same core rule as the checkout, over the lines that can be bought (an unavailable line has no total and
-        // makes the checkout answer cart_changed before it looks at the address). The flag comes from the variant row
-        // this pass already read, so it costs no statement.
-        result.lines.flatMap((line) => {
-          const row = rowsById.get(line.variantId);
-          if (row === undefined) {
-            throw new Error(`Priced line ${line.variantId} has no variant row`);
-          }
-          return line.lineTotal === null ? [] : [{ requiresShipping: row.requiresShipping }];
-        }),
-      ),
+      requiresShipping,
+      freeShipping: requiresShipping
+        ? decideFreeShippingProgress({
+            methods: context.shippingMethods,
+            shopCurrency: this.pricing.shopCurrency,
+            subtotal: result.subtotal,
+          })
+        : null,
       notices: [],
     };
+  }
+
+  private requiresShipping(
+    result: Extract<PriceCartResult, { ok: true }>,
+    rowsById: ReadonlyMap<string, CartVariantRow>,
+  ): boolean {
+    return shippingAddressRequired(
+      result.lines.flatMap((line) => {
+        const row = rowsById.get(line.variantId);
+        if (row === undefined) throw new Error(`Priced line ${line.variantId} has no variant row`);
+        return line.lineTotal === null ? [] : [{ requiresShipping: row.requiresShipping }];
+      }),
+    );
   }
 
   /**

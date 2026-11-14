@@ -26,6 +26,10 @@ import { JobsRunner } from "./jobs-runner.js";
 const NOW = new Date("2025-03-01T12:00:00.000Z");
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
+const UNLINK_DIRECTORY_ERROR: Partial<Record<NodeJS.Platform, string>> = {
+  linux: "EISDIR",
+  darwin: "EPERM",
+};
 
 interface Seeded {
   id: string;
@@ -251,10 +255,16 @@ describe("delete-abandoned-uploads (real Postgres, real temp MEDIA_DIR, injected
     });
 
     it("a file that cannot be deleted is left and counted; the rest of the page and the run go on", async () => {
+      const unlinkDirectoryError = UNLINK_DIRECTORY_ERROR[process.platform];
+      if (unlinkDirectoryError === undefined) {
+        throw new Error(
+          `Add the unlink directory error code for ${process.platform} to UNLINK_DIRECTORY_ERROR`,
+        );
+      }
       const before = await seed({ ageMs: 5 * DAY });
       const stuck = await seed({ ageMs: 4 * DAY, file: false });
       const after = await seed({ ageMs: 3 * DAY });
-      // A directory where the file should be: a real unlink failure (EISDIR) from the real driver.
+      // A directory where the file should be: a real unlink failure with a platform-dependent code.
       await mkdir(stuck.path, { recursive: true });
       const result = await deleteAbandonedUploads(deps(), NOW);
       expect(result).toEqual({ deleted: 3, truncated: false, fileErrors: 1 });
@@ -264,7 +274,7 @@ describe("delete-abandoned-uploads (real Postgres, real temp MEDIA_DIR, injected
       const warnings = vi.mocked(Logger.prototype.error).mock.calls.map((call) => String(call[0]));
       const logged = warnings.filter((line) => line.includes(stuck.key));
       expect(logged).toHaveLength(1);
-      expect(logged[0]).toContain("EISDIR");
+      expect(logged[0]).toContain(unlinkDirectoryError);
       // The code and the key only: no path of the server, no message text.
       expect(logged[0]).not.toContain(media.mediaDir);
       expect(logged[0]).not.toMatch(/illegal operation|directory/i);

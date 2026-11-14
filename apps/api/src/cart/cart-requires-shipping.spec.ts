@@ -231,6 +231,7 @@ describe("cart API: requiresShipping", () => {
           "notices",
           "purchasable",
           "requiresShipping",
+          "freeShipping",
           "subtotal",
           "total",
         ].sort(),

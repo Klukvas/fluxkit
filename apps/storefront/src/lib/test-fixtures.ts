@@ -134,6 +134,7 @@ export function cartOf(lines: CartLine[], overrides: Partial<Cart> = {}): Cart {
     itemCount: lines.reduce((count, line) => count + line.quantity, 0),
     purchasable: lines.length > 0,
     requiresShipping: true,
+    freeShipping: null,
     notices: [],
     ...overrides,
   };

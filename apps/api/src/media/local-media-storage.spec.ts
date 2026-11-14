@@ -1,4 +1,6 @@
+import { existsSync } from "node:fs";
 import {
+  chmod,
   mkdtemp,
   mkdir,
   readdir,
@@ -61,10 +63,27 @@ describe("LocalMediaStorage (ADR 0028 decisions 6 and 7)", () => {
       await expect(LocalMediaStorage.open(join(root, "file"))).rejects.toThrow(/not a directory/);
     });
 
-    it("refuses a directory it cannot write (probe file)", async () => {
-      // /proc is a directory nobody can create files in, not even root.
-      await expect(LocalMediaStorage.open("/proc")).rejects.toThrow(/not writable/);
-    });
+    it.runIf(process.platform === "linux" && existsSync("/proc/self"))(
+      "refuses a directory it cannot write, even as root (Linux /proc; runs only where /proc exists)",
+      async () => {
+        // /proc is a directory nobody can create files in, not even root.
+        await expect(LocalMediaStorage.open("/proc")).rejects.toThrow(/not writable/);
+      },
+    );
+
+    it.skipIf(process.getuid?.() === 0)(
+      "refuses a directory it cannot write (read-only directory; skipped as root, who bypasses mode bits)",
+      async () => {
+        const dir = join(root, "read-only");
+        await mkdir(dir);
+        try {
+          await chmod(dir, 0o555);
+          await expect(LocalMediaStorage.open(dir)).rejects.toThrow(/not writable/);
+        } finally {
+          await chmod(dir, 0o755);
+        }
+      },
+    );
 
     it("creates .tmp (mode 0750) and leaves no probe file behind", async () => {
       await LocalMediaStorage.open(root);

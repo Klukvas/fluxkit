@@ -119,6 +119,10 @@ Plan `docs/plans/2026-11-14-playful-default-design.md`, workstream C. Storefront
 - **Add button morph:** the card and product page add buttons use `ActionButton` (idle, loading with the `Loader` dots, done with a check for `CARD_ADDED_MS` / `PRODUCT_ADDED_MS`, 2.5 s). The labels share one grid cell, so the width never jumps; while loading the button keeps the focus (`aria-disabled`, `aria-busy`).
 - **Motion rules:** every duration and easing is a `--fk-motion-*` token (`packages/ui/src/motion.css`, imported by `app/globals.css` before the fork's overrides; the admin does not import it yet). Reduced motion zeroes the durations (theme) and `motion.css` also switches every keyframe animation off (the infinite loader and shimmer included). `components/motion-guard.spec.ts` fails on a raw time value, `cubic-bezier()` or a raw colour in `globals.css` or `motion.css`; the theme's design guard refuses inline `style` and arbitrary motion classes.
 
+## Free-shipping progress (2026-11-14, plan `docs/plans/2026-11-14-free-shipping-progress.md`)
+
+- `components/free-shipping-progress.tsx`: the drawer footer and the cart-page summary show the cart's server `freeShipping` (`docs/api/cart.md`): "{amount} more for free delivery" with the server `remaining`, and a native `<progress value={subtotal} max={threshold}>` (the element clamps; the browser does no money arithmetic). `remaining` 0 shows the reached text (no bar for a threshold of 0). Nothing for `null` or an empty cart. Styled by `.fk-progress` in `@fluxkit/ui/motion.css` (tokens; the fill transition uses `--fk-motion-*` and is off under reduced motion).
+
 ## SEO
 
 - `generateMetadata` per page (`lib/page-metadata.ts`): title `"<page> — <site>"` (`seo.pageTitle`, with "(Page N)" on later pages), description (product and category descriptions are trimmed plain text, 160 characters, cut at a word), canonical and `alternates.languages` for every locale plus `x-default` (the default locale) from `STOREFRONT_PUBLIC_URL`, Open Graph title, description, URL, site name and the first media image.
