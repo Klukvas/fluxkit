@@ -9,3 +9,4 @@ export * from "./quote.js";
 export * from "./reasons.js";
 export * from "./selection.js";
 export * from "./shipment-status.js";
+export * from "./free-shipping.js";

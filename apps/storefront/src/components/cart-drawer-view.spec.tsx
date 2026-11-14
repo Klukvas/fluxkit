@@ -29,6 +29,23 @@ function props(state: CartState): CartDrawerViewProps {
 const ready = (cart = cartOf([])): CartState => ({ ...initialCartState, status: "ready", cart });
 
 describe("CartDrawerView", () => {
+  it("shows server free-shipping progress in the footer only for non-empty carts", () => {
+    const freeShipping = {
+      threshold: { amount: 5000, currency: "UAH" },
+      remaining: { amount: 1234, currency: "UAH" },
+    };
+    const cart = cartOf([cartLine("drawer")], { freeShipping });
+    const html = renderToStaticMarkup(<CartDrawerView {...props(ready(cart))} />);
+    expect(html).toContain("12.34");
+    expect(html).toContain("more for free delivery");
+    expect(html).toContain("<progress");
+    expect(html.indexOf("<progress")).toBeLessThan(html.indexOf("Subtotal"));
+    for (const hidden of [cartOf([], { freeShipping }), cartOf([cartLine("drawer")])]) {
+      const hiddenHtml = renderToStaticMarkup(<CartDrawerView {...props(ready(hidden))} />);
+      expect(hiddenHtml).not.toContain("<progress");
+      expect(hiddenHtml).not.toContain("more for free delivery");
+    }
+  });
   it("keeps a status region and labels the modal during loading", () => {
     const html = renderToStaticMarkup(<CartDrawerView {...props(initialCartState)} />);
     expect(html).toContain('role="status"');

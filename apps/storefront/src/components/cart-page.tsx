@@ -54,6 +54,7 @@ import {
 } from "../lib/quantity-autosave";
 import { useI18n } from "./i18n-provider";
 import { useCart } from "./session-provider";
+import { FreeShippingProgress } from "./free-shipping-progress";
 import { StoreImage } from "./store-image";
 import { focusRing, linkButton } from "./styles";
 
@@ -519,6 +520,15 @@ export function CartPageView({
                 <dd>{formatMoney(cart.subtotal, exponent, locale)}</dd>
               </div>
             </dl>
+            {/* As wide as the summary list above, not the page; renders nothing (no gap) without a threshold. */}
+            <FreeShippingProgress
+              freeShipping={cart.freeShipping}
+              subtotal={cart.subtotal}
+              t={t}
+              locale={locale}
+              exponent={exponent}
+              className="max-w-sm"
+            />
             {/* The full list of the lines that block the checkout stays in the page; the sticky bar below only counts them
                 and links to the first, so it stays short on a phone (review M1 of PR 216). */}
             {block === "stock" ? (

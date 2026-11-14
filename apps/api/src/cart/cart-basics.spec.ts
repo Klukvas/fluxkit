@@ -76,6 +76,7 @@ describe("cart API: lazy creation, cookie and line rules", () => {
         itemCount: 0,
         purchasable: false,
         requiresShipping: false,
+        freeShipping: null,
         notices: [],
       });
       expect(result.headers.getSetCookie()).toEqual([]);
