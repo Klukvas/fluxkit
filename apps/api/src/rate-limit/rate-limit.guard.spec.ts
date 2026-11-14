@@ -23,6 +23,12 @@ class ProbeController {
     return "ok";
   }
 
+  @Post("catalog")
+  @RateLimit("catalogRead")
+  catalog(): string {
+    return "ok";
+  }
+
   @Post("free")
   free(): string {
     return "ok";
@@ -154,6 +160,83 @@ describe("RateLimitGuard keyed by the admin user (mediaUpload, ADR 0028)", () =>
     );
     expect(() => guard.canActivate(uploadContext("10.0.0.1", undefined))).not.toThrow(
       ProblemException,
+    );
+  });
+});
+
+describe("RateLimitGuard counting only proxied requests (catalogRead)", () => {
+  /** A request as Express sees it: `trust proxy` hops and the addresses taken from `X-Forwarded-For` (`request.ips`). */
+  function catalogContext(request: {
+    ip: string;
+    ips: string[];
+    trustProxy: unknown;
+  }): ExecutionContext {
+    const expressRequest = {
+      ip: request.ip,
+      ips: request.ips,
+      app: {
+        get: (setting: string) => (setting === "trust proxy" ? request.trustProxy : undefined),
+      },
+    };
+    return {
+      getHandler: () => ProbeController.prototype.catalog,
+      getClass: () => ProbeController,
+      switchToHttp: () => ({ getRequest: () => expressRequest }),
+    } as unknown as ExecutionContext;
+  }
+
+  const throughEdge = (address: string) =>
+    catalogContext({ ip: address, ips: [address], trustProxy: 1 });
+
+  it("allows 300 reads a minute per forwarded address, then 429 with Retry-After 60", () => {
+    const guard = build();
+    for (let attempt = 1; attempt <= 300; attempt += 1) {
+      expect(guard.canActivate(throughEdge("203.0.113.1")), `attempt ${attempt}`).toBe(true);
+    }
+    let thrown: unknown;
+    try {
+      guard.canActivate(throughEdge("203.0.113.1"));
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(ProblemException);
+    expect((thrown as ProblemException).headers["Retry-After"]).toBe("60");
+    expect(guard.canActivate(throughEdge("203.0.113.2"))).toBe(true);
+  });
+
+  it("does not count a request that bypassed the trusted proxies (the storefront's own server reads)", () => {
+    const guard = build();
+    const internal = catalogContext({ ip: "172.18.0.5", ips: [], trustProxy: 1 });
+    for (let attempt = 0; attempt < 1_000; attempt += 1) {
+      expect(guard.canActivate(internal)).toBe(true);
+    }
+  });
+
+  it("counts every request by its socket address when no proxy is trusted", () => {
+    const guard = build();
+    const direct = catalogContext({ ip: "127.0.0.1", ips: [], trustProxy: 0 });
+    for (let attempt = 0; attempt < 300; attempt += 1) {
+      guard.canActivate(direct);
+    }
+    expect(() => guard.canActivate(direct)).toThrow(ProblemException);
+  });
+
+  it("counts the request when trust proxy is not a hop count (an unknown setting fails closed)", () => {
+    const guard = build();
+    const unusual = catalogContext({ ip: "10.1.1.1", ips: [], trustProxy: "loopback" });
+    for (let attempt = 0; attempt < 300; attempt += 1) {
+      guard.canActivate(unusual);
+    }
+    expect(() => guard.canActivate(unusual)).toThrow(ProblemException);
+  });
+
+  it("does not share the window with the search window or another address limit", () => {
+    const guard = build();
+    for (let attempt = 0; attempt < 300; attempt += 1) {
+      guard.canActivate(throughEdge("203.0.113.9"));
+    }
+    expect(guard.canActivate(contextFor(ProbeController.prototype.limited, "203.0.113.9"))).toBe(
+      true,
     );
   });
 });
