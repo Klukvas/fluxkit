@@ -1,6 +1,9 @@
 import type { ThemeMode } from "@fluxkit/theme";
 import { SkipLink, type Locale, type Messages, type Translator } from "@fluxkit/ui";
 import type { ReactNode } from "react";
+import { CartDrawerProvider } from "./cart-drawer-provider";
+import { CartDrawerSettings } from "./cart-drawer-settings";
+import { ToastProvider } from "./toast-provider";
 import { MAIN_CONTENT_ID, type NavigationLink } from "../layout/navigation";
 import { pickClientMessages } from "../lib/client-messages";
 import { I18nProvider } from "./i18n-provider";
@@ -49,27 +52,31 @@ export function SiteShell({
   return (
     <I18nProvider locale={locale} messages={pickClientMessages(messages)}>
       <SessionProvider locale={locale}>
-        <RouteFocus />
-        <SkipLink targetId={MAIN_CONTENT_ID}>{t("skip.content")}</SkipLink>
-        <SiteHeader
-          locale={locale}
-          t={t}
-          categories={categories}
-          searchEnabled={searchEnabled}
-          themeMode={themeMode}
-          featureLinks={featureLinks.header}
-        />
-        <main id={MAIN_CONTENT_ID} tabIndex={-1} className="flex-1 focus:outline-none">
-          <SessionNotices />
-          {children}
-        </main>
-        <SiteFooter
-          locale={locale}
-          t={t}
-          year={year}
-          themeMode={themeMode}
-          featureLinks={featureLinks.footer}
-        />
+        <ToastProvider>
+          <CartDrawerProvider drawer={<CartDrawerSettings />}>
+            <RouteFocus />
+            <SkipLink targetId={MAIN_CONTENT_ID}>{t("skip.content")}</SkipLink>
+            <SiteHeader
+              locale={locale}
+              t={t}
+              categories={categories}
+              searchEnabled={searchEnabled}
+              themeMode={themeMode}
+              featureLinks={featureLinks.header}
+            />
+            <main id={MAIN_CONTENT_ID} tabIndex={-1} className="flex-1 focus:outline-none">
+              <SessionNotices />
+              {children}
+            </main>
+            <SiteFooter
+              locale={locale}
+              t={t}
+              year={year}
+              themeMode={themeMode}
+              featureLinks={featureLinks.footer}
+            />
+          </CartDrawerProvider>
+        </ToastProvider>
       </SessionProvider>
     </I18nProvider>
   );

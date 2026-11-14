@@ -1,4 +1,4 @@
-import { Button } from "@fluxkit/ui";
+import { ActionButton } from "@fluxkit/ui";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import type { Failure } from "../lib/failure";
@@ -39,9 +39,14 @@ describe("the card's add-to-cart button", () => {
   it("is a real button above the card's link layer, named with the label and the product title, 44 px high", () => {
     const { html } = view({ state: "idle" });
     expect(html).toMatch(/^<div class="relative z-10 /);
-    expect(html).toMatch(
-      /<button type="button" class="[^"]*min-h-11[^"]*" aria-disabled="false" aria-busy="false"><span class="min-w-0 truncate"><span class="sm:hidden">§product\.card\.addShort<\/span><span class="max-sm:hidden">§product\.addToCart<\/span><\/span> <span class="sr-only">§mug<\/span><\/button>/,
+    const [button] = findElements(
+      CardAddButtonView(view({ state: "idle" }).props),
+      (element) => element.type === ActionButton,
     );
+    expect(button?.props.state).toBe("idle");
+    expect(button?.props.accessibleSuffix).toBe("§mug");
+    expect(html).toContain('type="button"');
+    expect(html).toContain("min-h-11");
     // The status region is there from the start (empty), so a later change is announced.
     expect(html).toContain('<p role="status" class="text-sm"></p>');
     expect(leftoverText(html)).toBe("");
@@ -57,38 +62,40 @@ describe("the card's add-to-cart button", () => {
 
   it("while adding: says so and stays focusable (aria-disabled, aria-busy, never disabled)", () => {
     const { html } = view({ state: "pending" });
-    expect(html).toContain('aria-disabled="true" aria-busy="true"');
+    expect(html).toContain('aria-disabled="true"');
+    expect(html).toContain('aria-busy="true"');
     expect(html).not.toContain('disabled=""');
     expect(html).toContain("§product.card.adding");
+    expect(html).toContain('<span class="sr-only"> §mug</span>');
   });
 
   it("adds on a click when idle", () => {
     const onAdd = vi.fn();
     const { props } = view({ state: "idle" }, { onAdd });
-    const [button] = findElements(CardAddButtonView(props), (element) => element.type === Button);
-    (button?.props.onClick as () => void)();
+    const [button] = findElements(
+      CardAddButtonView(props),
+      (element) => element.type === ActionButton,
+    );
+    (button?.props.onClick as (event: unknown) => void)({ currentTarget: {} });
     expect(onAdd).toHaveBeenCalledTimes(1);
   });
 
   it("confirms an add in the button and announces it in the status region", () => {
     const { html } = view({ state: "added" });
-    expect(html).toContain(
-      '<span class="min-w-0 truncate"><span class="sm:hidden">§product.card.added</span><span class="max-sm:hidden">§product.card.added</span></span>',
-    );
+    expect(html).toContain("§product.card.added");
     expect(html).toContain(
       '<p role="status" class="text-sm"><span class="sr-only">§product.added</span></p>',
     );
   });
 
-  it("shows a failure in words in the status region, and lets the shopper try again", () => {
+  it("keeps failure text out of the card (the island uses the toast stack) and offers retry", () => {
     const { html } = view({ state: "failed", messageKey: "errors.rule.variant_not_sellable" });
-    expect(html).toContain(
-      '<p role="status" class="text-sm"><span class="mt-1 block text-danger">§errors.rule.variant_not_sellable</span></p>',
-    );
+    expect(html).not.toContain("§errors.rule.variant_not_sellable");
+    expect(html).toContain('<p role="status" class="text-sm"></p>');
     expect(html).toContain(
       '<span class="min-w-0 truncate"><span class="sm:hidden">§product.card.addShort</span><span class="max-sm:hidden">§product.addToCart</span></span>',
     );
-    expect(html).toContain('aria-disabled="false"');
+    expect(html).not.toContain('aria-disabled="true"');
   });
 });
 

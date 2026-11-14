@@ -17,6 +17,8 @@ test("a shopper registers with a guest cart, checks out as a customer and finds 
   await page.goto("/en/p/demo-e-book");
   await waitForHydration(page);
   await page.getByRole("button", { name: "Add to cart" }).click();
+  await expect(page.getByRole("dialog", { name: /^Cart/ })).toBeVisible();
+  await page.keyboard.press("Escape");
   await expect(page.getByRole("link", { name: /Cart.*1 item in the cart/ })).toBeVisible();
 
   // The account icon's menu (2026-11-02): a guest gets "Sign in" and "Register".
@@ -39,6 +41,10 @@ test("a shopper registers with a guest cart, checks out as a customer and finds 
   await expect(page.getByText("Your carts were merged")).toHaveCount(0);
 
   await page.getByRole("link", { name: /^Cart/ }).first().click();
+  await page
+    .getByRole("dialog", { name: /^Cart/ })
+    .getByRole("link", { name: "View cart", exact: true })
+    .click();
   await page.getByRole("link", { name: "Checkout" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Checkout" })).toBeVisible();
   await expect(
@@ -92,7 +98,7 @@ test("signing in merges the guest cart into the account cart and shows the merge
   await waitForHydration(page);
   await page.getByLabel("Quantity", { exact: true }).fill("600");
   await page.getByRole("button", { name: "Add to cart" }).click();
-  await expect(page.getByText("Added to the cart.")).toBeVisible();
+  await expect(page.getByRole("dialog", { name: /^Cart/ })).toBeVisible();
 
   await page.goto("/en/account/login");
   await waitForHydration(page);
@@ -112,6 +118,10 @@ test("signing in merges the guest cart into the account cart and shows the merge
 
   // Gone for good: not on the next page, not after a reload.
   await page.getByRole("link", { name: /^Cart/ }).first().click();
+  await page
+    .getByRole("dialog", { name: /^Cart/ })
+    .getByRole("link", { name: "View cart", exact: true })
+    .click();
   await expect(page.getByRole("spinbutton", { name: "Quantity of Demo Screwdriver" })).toHaveValue(
     "999",
   );

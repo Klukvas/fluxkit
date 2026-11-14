@@ -6,7 +6,7 @@ import { SHOP_NAME } from "../support/shop-name.ts";
 
 /**
  * The mobile batch of the UX review (plan `docs/plans/2026-11-03-storefront-mobile-ux.md`), on a 390 x 844 touch screen
- * unless a test says otherwise: a sticky one-row header, the product page's buy bar and "added" toast, the filter sheet, the
+ * unless a test says otherwise: a sticky one-row header, the product page's buy bar and cart drawer, the filter sheet, the
  * cart's and the checkout's sticky bottom bars, the checkout summary above the form, the order page's heading and link
  * callout, tap-target sizes, no horizontal scroll, and no hydration error on any of these pages.
  */
@@ -123,18 +123,17 @@ test("without a script the search icon shows the search row (:target), and the b
   await context.close();
 });
 
-test("the 'added' toast steps aside while the search row is open (review m1 of PR 216)", async ({
-  page,
-}) => {
+test("the cart drawer closes before the header search row is used", async ({ page }) => {
   await page.goto("/en/p/demo-hoodie");
   await hydrated(page);
-  await page.getByTestId("buy-bar").getByText("Add to cart", { exact: true }).click();
-  await expect(page.getByText("Added to the cart.")).toBeVisible();
+  await page.getByTestId("buy-bar").locator("button").last().click();
+  const drawer = page.getByRole("dialog", { name: /^Cart/ });
+  await expect(drawer).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(drawer).toBeHidden();
   await page.getByRole("banner").getByRole("link", { name: "Search", exact: true }).click();
   const searchBox = page.getByRole("combobox", { name: "Search products" });
-  // Well inside the toast's own 8 s on screen: it must step aside at once, not time out.
   await expect(searchBox).toBeFocused({ timeout: 2000 });
-  await expect(page.getByText("Added to the cart.")).toBeHidden({ timeout: 2000 });
   const hit = await searchBox.evaluate((element) => {
     const rect = element.getBoundingClientRect();
     return document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2) === element;
@@ -142,7 +141,7 @@ test("the 'added' toast steps aside while the search row is open (review m1 of P
   expect(hit).toBe(true);
 });
 
-test("the product page's buy bar shows while the add button is out of view, adds, and a toast links to the cart (D-02)", async ({
+test("the product page's buy bar shows while the add button is out of view, adds, and the drawer links to the cart (D-02)", async ({
   page,
 }) => {
   const errors = collectErrors(page);
@@ -155,20 +154,20 @@ test("the product page's buy bar shows while the add button is out of view, adds
   await expect(bar).toHaveAttribute("aria-hidden", "true");
   await expect(bar).toBeVisible();
   await expect(bar).toContainText("Black, S");
-  const barAdd = bar.getByText("Add to cart", { exact: true });
+  const barAdd = bar.locator("button").last();
   expect((await box(barAdd)).height).toBeGreaterThanOrEqual(44);
   expect((await box(barAdd)).width).toBeGreaterThan(300);
 
   await barAdd.click();
-  // The toast is fixed on a phone; its status region (the live region) holds it.
-  const toast = page.getByRole("status").filter({ hasText: "Added to the cart." });
-  await expect(toast.getByText("Added to the cart.")).toBeVisible();
-  await expect(toast.getByRole("link", { name: "Go to the cart" })).toBeInViewport();
+  const drawer = page.getByRole("dialog", { name: /^Cart/ });
+  await expect(drawer).toBeVisible();
+  await expect(drawer.getByRole("link", { name: "View cart", exact: true })).toBeInViewport();
+  await page.keyboard.press("Escape");
+  await expect(drawer).toBeHidden();
+  await expect(barAdd).toBeFocused();
   await expect(
     page.getByRole("banner").getByRole("link", { name: /1 item in the cart/ }),
   ).toBeVisible();
-  await toast.getByRole("button", { name: "Close the message" }).click();
-  await expect(page.getByText("Added to the cart.")).toBeHidden();
 
   // The inline button in view: the bar goes away; it is full width and 48 px on a phone.
   await inline.scrollIntoViewIfNeeded();
@@ -178,6 +177,9 @@ test("the product page's buy bar shows while the add button is out of view, adds
   // Keyboard: the button keeps the focus while it adds (review A1).
   await inline.focus();
   await page.keyboard.press("Enter");
+  await expect(drawer).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(drawer).toBeHidden();
   await expect(
     page.getByRole("banner").getByRole("link", { name: /2 items in the cart/ }),
   ).toBeVisible();

@@ -378,7 +378,9 @@ test("on a phone the buy bar says 'Out of stock' for a sold-out variant, like th
   await waitForHydration(page);
   await expect(page.getByRole("button", { name: "Out of stock" })).toBeDisabled();
   const bar = page.locator(".fk-bottom-bar.fixed");
-  await expect(bar.locator("button").last()).toHaveText("Out of stock");
+  await expect(bar.locator("button").last().locator('[data-visible="true"]')).toHaveText(
+    "Out of stock",
+  );
   await expect(bar.locator("button").last()).toBeDisabled();
 });
 

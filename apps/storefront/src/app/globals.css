@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "@fluxkit/theme/tokens.css";
 @import "@fluxkit/theme/tailwind.css";
+@import "@fluxkit/ui/motion.css";
 /* Fork-owned token overrides, empty upstream, LAST so their rules win over tokens.css (docs/contracts/theme-tokens.md). */
 @import "@fluxkit/theme/brand-overrides.css";
 /* Tailwind must also scan the shared UI library for class names. */
@@ -262,17 +263,6 @@
     html:has(.fk-sticky-bottom) {
       scroll-padding-bottom: 9rem;
     }
-  }
-  /*
-   * The product page's "Added" toast (`product-purchase.tsx`) steps aside while the header's search row is open: on a phone it
-   * sits where the opened row is (review m1 of PR 216). Its display is set here, not by a utility, so this rule can hide it.
-   */
-  .fk-toast {
-    @apply flex;
-  }
-  body:has(.fk-header-search.fk-open) .fk-toast,
-  body:has(.fk-header-search:target) .fk-toast {
-    display: none;
   }
   /*
    * The filter panel (`FilterSheet` in `search-island.tsx`): a sidebar from `lg`; below it hidden until "Filters" opens it as a

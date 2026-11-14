@@ -29,10 +29,9 @@ test("a guest buys a T-shirt from the home page and manages the order through it
     "DEMO-T-SHIRT-WHITE-M",
   );
   await page.getByRole("button", { name: "Add to cart" }).click();
-  await expect(page.getByRole("status").getByText("Added to the cart.")).toBeVisible();
-  await expect(page.getByRole("link", { name: /Cart.*1 item in the cart/ })).toBeVisible();
-
-  await page.getByRole("link", { name: "Go to the cart" }).click();
+  const drawer = page.getByRole("dialog", { name: /^Cart/ });
+  await expect(drawer).toBeVisible();
+  await drawer.getByRole("link", { name: "View cart", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Cart" })).toBeVisible();
   const line = page.getByRole("list", { name: "Items in the cart" }).locator(":scope > li");
   await expect(line).toHaveCount(1);

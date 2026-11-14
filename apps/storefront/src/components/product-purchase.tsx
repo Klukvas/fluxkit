@@ -1,21 +1,10 @@
 "use client";
 
 import type { ProductDetail } from "@fluxkit/api-client";
-import {
-  Alert,
-  Badge,
-  Button,
-  OptionPicker,
-  PriceText,
-  QuantityInput,
-  textStyles,
-  type Locale,
-  type Translator,
-} from "@fluxkit/ui";
+import { Alert, Badge, PriceText, textStyles, type Locale, type Translator } from "@fluxkit/ui";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
-  MAX_LINE_QUANTITY,
   MIN_LINE_QUANTITY,
   addQuantityRefusal,
   addRoom,
@@ -29,34 +18,25 @@ import { formatMoney } from "../lib/money";
 import { buyBarShown, selectionSummary } from "../lib/mobile-ux";
 import { galleryFor, type GalleryItem } from "../lib/product-media";
 import {
-  chosenValue,
   findVariant,
-  hasOptionPicker,
   initialSelection,
-  isValueAvailable,
-  isValueSoldOut,
-  selectValue,
   selectedValueIds,
   selectionQuery,
   type Selection,
 } from "../lib/variant-matcher";
 import { useI18n } from "./i18n-provider";
 import { useCart } from "./session-provider";
-import { StoreImage } from "./store-image";
-import { CloseIcon } from "./icons";
+import { useCartDrawer } from "./cart-drawer-provider";
 import { SelectedSkuProvider } from "./selected-sku";
 import { StoreTrustBar } from "./trust-bar";
 import { PHONE_QUERY, StickyBuyBar, useInView, useMediaQuery } from "./sticky-buy-bar";
 import { focusRing } from "./styles";
-
-type AddStatus =
-  | { state: "idle" }
-  | { state: "pending" }
-  | { state: "added" }
-  | { state: "failed"; messageKey: string; values?: Readonly<Record<string, number>> };
+import { ProductPurchaseGallery } from "./product-purchase-gallery";
+import { ProductPurchaseForm, type AddStatus } from "./product-purchase-form";
 
 const QUANTITY_LIMIT_KEY = "errors.rule.quantity_limit";
-const LIMIT_NOTE_ID = "product-quantity-limit";
+/** Reading time for the successful add label; unrelated to motion duration. */
+export const PRODUCT_ADDED_MS = 2500;
 
 type PurchaseProduct = Pick<
   ProductDetail,
@@ -75,10 +55,7 @@ export interface ProductPurchaseViewProps {
   children?: ReactNode;
   /** Server-rendered note under the trust bar (the delivery and returns note, `components/product-page-note.tsx`). */
   note?: ReactNode;
-  /**
-   * A shop page next to the option pickers (the page the product type names, e.g. the size guide; `optionGuideLink` of
-   * `lib/shop-pages.ts`): its localized link and its title, translated on the server. Shown only on a product with options; `null` or absent: no link.
-   */
+  /** Localized guide link next to the option pickers; absent means no link. */
   optionGuide?: { href: string; label: string } | null;
   /** Option values the address asks for (`?opt.<code>=<value>`, `selectionFromParams`); the page starts from them. */
   preferredSelection?: Selection;
@@ -86,23 +63,17 @@ export interface ProductPurchaseViewProps {
   onSelectionChange?: (selection: Selection) => void;
   /** Quantity and stock hint per variant id in the cart (`cartLineFacts`); `null` or absent while the cart is not known. */
   cartLines?: ReadonlyMap<string, CartLineFacts> | null;
-  /** Adds to the cart: the island passes the cart store's `add` (the answer replaces the shared cart and tells the header badge). */
+  /** Successful adds open the drawer with the exact inline or phone-bar button as its focus-return target. */
+  onAdded?: (opener: HTMLElement | null) => void;
+  /** Adds through the shared cart store; prices and counts remain server answers. */
   onAddToCart: (input: { variantId: string; quantity: number }) => Promise<
     | { status: "added" }
-    /**
-     * `cartQuantity`: the variant's quantity in the cart as the island READ IT AGAIN after a `quantity_limit` answer
-     * (another tab may have changed it); absent when it was not re-read.
-     */
+    /** Cart quantity freshly re-read after a quantity_limit answer; absent when no re-read was made. */
     | { status: "failed"; messageKey: string; cartQuantity?: number }
   >;
 }
 
-/**
- * The product page's interactive block: gallery, title, price, availability, the option picker, quantity and the
- * add-to-cart button. Options and values come from the API (`product.options`), the variant from the pure matcher in
- * `lib/variant-matcher.ts`; nothing here knows what an option is called. The result of an add is announced through a
- * `role="status"` region that is always mounted (a live region only announces changes to a region that already exists).
- */
+/** Purchase island state; API-driven options and variants, with an always-mounted status region for add outcomes. */
 export function ProductPurchaseView({
   product,
   gallery,
@@ -113,6 +84,7 @@ export function ProductPurchaseView({
   children,
   note,
   onAddToCart,
+  onAdded,
   preferredSelection,
   onSelectionChange,
   cartLines = null,
@@ -131,11 +103,10 @@ export function ProductPurchaseView({
   useEffect(() => {
     setReady(true);
   }, []);
-  // The "Added" toast is shown until it is dismissed, the choice changes or it times out (the cart badge keeps the count).
-  const [toastOpen, setToastOpen] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const addButtonRef = useRef<HTMLButtonElement>(null);
-  const toastRef = useRef<HTMLDivElement>(null);
+  const pendingOpener = useRef<HTMLButtonElement | null>(null);
+  const inFlight = useRef(false);
   // The bar exists on phones only: no second, hidden copy of the price and the button on wider screens.
   const phone = useMediaQuery(PHONE_QUERY);
   const ctaInView = useInView(addButtonRef, phone);
@@ -182,25 +153,26 @@ export function ProductPurchaseView({
     : chosen;
 
   useEffect(() => {
-    // On a phone the toast covers the page: hidden after a while unless the shopper is in it (the cart badge keeps the
-    // count). From `md` it is a line in place, as before, and stays.
-    if (!toastOpen || !phone) return;
-    const id = window.setTimeout(() => {
-      if (!toastRef.current?.contains(document.activeElement)) setToastOpen(false);
-    }, 8000);
+    if (status.state !== "added") return;
+    const id = window.setTimeout(() => setStatus({ state: "idle" }), PRODUCT_ADDED_MS);
     return () => window.clearTimeout(id);
-  }, [toastOpen, phone]);
+  }, [status]);
 
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
-    if (variant === null || !purchasable || pending) return;
+    if (variant === null || !purchasable || inFlight.current) return;
+    const submitter = (event.nativeEvent as SubmitEvent).submitter;
+    const opener =
+      pendingOpener.current ??
+      (submitter instanceof HTMLElement ? submitter : addButtonRef.current);
+    pendingOpener.current = null;
     const refusal = addQuantityRefusal(shownQuantity, inCart);
     if (refusal !== null) {
       setStatus({ state: "failed", messageKey: refusal.messageKey, values: refusal.values });
       return;
     }
+    inFlight.current = true;
     setStatus({ state: "pending" });
-    setToastOpen(false);
     try {
       const outcome = await onAddToCart({ variantId: variant.id, quantity: shownQuantity });
       // The API's `quantity_limit` does not know what the shopper sees: name the cart's quantity, but only the one read
@@ -209,7 +181,7 @@ export function ProductPurchaseView({
         outcome.status === "failed" && outcome.messageKey === QUANTITY_LIMIT_KEY
           ? quantityLimitRefusal(shownQuantity, outcome.cartQuantity)
           : null;
-      if (outcome.status === "added") setToastOpen(true);
+      if (outcome.status === "added") onAdded?.(opener);
       setStatus(
         outcome.status === "added"
           ? { state: "added" }
@@ -221,6 +193,8 @@ export function ProductPurchaseView({
       // The store reports every failure the shopper can act on as an outcome; a throw is a bug. Free the button, stay loud.
       setStatus({ state: "failed", messageKey: "errors.generic" });
       throw error;
+    } finally {
+      inFlight.current = false;
     }
   }
 
@@ -238,41 +212,14 @@ export function ProductPurchaseView({
       {/* Phones: gallery, summary, details. `md`: two columns, details below. From `lg` (review D-08): gallery and details on
           the left (7 of 12), the summary on the right (5 of 12), sticky while the left column scrolls. */}
       <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-12 lg:gap-x-10">
-        <div
-          role="group"
-          aria-label={t("product.gallery.label")}
-          className="flex flex-col gap-3 lg:col-span-7"
-        >
-          <StoreImage
-            key={current.src ?? "placeholder"}
-            src={current.src}
-            alt={current.alt ?? product.title}
-            width={960}
-            height={960}
-            sizes="(min-width: 768px) 50vw, 100vw"
-            eager
-          />
-          {images.length > 1 ? (
-            <ul className="flex flex-wrap gap-2">
-              {images.map((item, index) => (
-                <li key={`${index}-${item.src ?? "placeholder"}`}>
-                  <button
-                    type="button"
-                    aria-label={t("product.gallery.show", {
-                      index: index + 1,
-                      total: images.length,
-                    })}
-                    aria-pressed={index === activeImage}
-                    onClick={() => setActiveImage(index)}
-                    className={`block w-16 rounded-media border-2 ${index === activeImage ? "border-primary" : "border-border"} ${focusRing}`}
-                  >
-                    <StoreImage src={item.src} alt="" width={96} height={96} sizes="64px" />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </div>
+        <ProductPurchaseGallery
+          current={current}
+          images={images}
+          activeImage={activeImage}
+          title={product.title}
+          t={t}
+          onImage={setActiveImage}
+        />
 
         <div
           data-product-summary=""
@@ -335,161 +282,40 @@ export function ProductPurchaseView({
             </Badge>
           </div>
 
-          <form
-            ref={formRef}
-            method="post"
+          <ProductPurchaseForm
+            {...{
+              product,
+              t,
+              locale,
+              chosen,
+              selection,
+              optionGuide,
+              otherOnSale,
+              shownQuantity,
+              room,
+              pending,
+              atLimit,
+              purchasable,
+              ready,
+              soldOut,
+              inCart,
+              stock,
+              status,
+              formRef,
+              addButtonRef,
+            }}
             onSubmit={submit}
-            noValidate
-            className="flex flex-col gap-4"
-          >
-            {/* The chosen values in words (UX round 2, batch 3A item 7): the page starts from the first sellable variant, and a
-                checked radio alone was easy to miss. API names only, in option order; no plural, so one message fits every count. */}
-            {hasOptionPicker(product) && chosen !== "" ? (
-              <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                <p id="product-chosen" className="text-sm text-foreground">
-                  {t("productChoice.selected", { values: chosen })}
-                </p>
-                {optionGuide === null ? null : (
-                  <Link
-                    href={optionGuide.href}
-                    className={`inline-flex min-h-6 items-center text-sm text-foreground underline underline-offset-4 ${focusRing}`}
-                  >
-                    {optionGuide.label}
-                  </Link>
-                )}
-              </div>
-            ) : null}
-            {hasOptionPicker(product)
-              ? product.options.map((option) => (
-                  <OptionPicker
-                    key={option.id}
-                    name={`${product.id}-${option.code}`}
-                    legend={option.name}
-                    values={option.values.map((value) => ({
-                      value: value.code,
-                      label: value.name,
-                      disabled: !isValueAvailable(product, selection, option.code, value.code),
-                      soldOut: isValueSoldOut(product, selection, option.code, value.code),
-                    }))}
-                    soldOutLabel={t("product.soldOut")}
-                    selected={chosenValue(selection, option.code) ?? null}
-                    onChange={(valueCode) => {
-                      const next = selectValue(product, selection, option.code, valueCode);
-                      setSelection(next);
-                      onSelectionChange?.(next);
-                      setActiveImage(0);
-                      setStatus({ state: "idle" });
-                      setToastOpen(false);
-                    }}
-                  />
-                ))
-              : null}
-            {otherOnSale && hasOptionPicker(product) ? (
-              <p className="text-sm text-muted-foreground">{t("product.soldOut.hint")}</p>
-            ) : null}
-
-            <div className="flex flex-col gap-2">
-              <div className="flex flex-wrap items-center gap-3">
-                <QuantityInput
-                  id="product-quantity"
-                  label={t("product.quantity.label")}
-                  decreaseLabel={t("product.quantity.decrease")}
-                  increaseLabel={t("product.quantity.increase")}
-                  min={MIN_LINE_QUANTITY}
-                  max={Math.max(MIN_LINE_QUANTITY, room)}
-                  value={shownQuantity}
-                  onChange={(next) => {
-                    setQuantity(next);
-                    if (status.state === "failed") setStatus({ state: "idle" });
-                  }}
-                  disabled={pending || atLimit}
-                />
-                {/* Full width and 48 px on phones (review N8). While adding it stays enabled for the focus (`aria-disabled`,
-                    review A1): a disabled button drops the keyboard focus to the page body; `submit` ignores a repeat. */}
-                <Button
-                  ref={addButtonRef}
-                  type="submit"
-                  disabled={!purchasable || !ready}
-                  aria-disabled={pending}
-                  data-ready={ready ? undefined : "false"}
-                  className="min-h-12 w-full aria-disabled:opacity-50 sm:min-h-11 sm:w-auto lg:min-h-12 lg:flex-1"
-                  aria-describedby={
-                    atLimit ? `product-availability ${LIMIT_NOTE_ID}` : "product-availability"
-                  }
-                >
-                  {pending
-                    ? t("product.adding")
-                    : soldOut
-                      ? t("availability.out_of_stock")
-                      : t("product.addToCart")}
-                </Button>
-              </div>
-              <noscript>
-                <p className="text-sm text-muted-foreground">{t("productReady.noScript")}</p>
-              </noscript>
-              {atLimit && stock !== null ? (
-                <p id={LIMIT_NOTE_ID} className="flex flex-wrap gap-x-2 text-sm text-foreground">
-                  <span>
-                    {/* No count, or 0 (a default location without stock): "more than the shop has", never "only 0". */}
-                    {stock.available === null || stock.available === 0
-                      ? t("product.quantity.stockShort", { count: inCart })
-                      : t.plural("product.quantity.stockLimit", stock.available, {
-                          inCart,
-                        })}
-                  </span>
-                  <Link
-                    href={localizedHref(locale, "/cart")}
-                    className={`inline-flex min-h-6 items-center underline underline-offset-4 ${focusRing}`}
-                  >
-                    {t("product.viewCart")}
-                  </Link>
-                </p>
-              ) : atLimit ? (
-                <p id={LIMIT_NOTE_ID} className="text-sm text-foreground">
-                  {t("product.quantity.atLimit", {
-                    count: inCart,
-                    max: MAX_LINE_QUANTITY,
-                    room: 0,
-                  })}
-                </p>
-              ) : inCart > 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  {t("product.quantity.inCart", { count: inCart })}
-                </p>
-              ) : null}
-              <div role="status" className="flex flex-col gap-2">
-                {status.state === "pending" ? <p>{t("product.adding")}</p> : null}
-                {status.state === "added" ? (
-                  // The confirmation as a toast (review D-02): on phones fixed under the sticky header, from `md` in place.
-                  // It stays in this always mounted status region, so it is announced, and next in the tab order.
-                  <div
-                    ref={toastRef}
-                    hidden={!toastOpen}
-                    className="fk-toast z-40 items-center gap-3 rounded-overlay border border-border bg-background p-3 text-foreground shadow-overlay max-md:fixed max-md:inset-x-4 max-md:top-20"
-                  >
-                    <span className="flex-1">{t("product.added")}</span>
-                    <Link
-                      href={localizedHref(locale, "/cart")}
-                      className={`inline-flex min-h-11 items-center font-medium underline underline-offset-4 ${focusRing}`}
-                    >
-                      {t("product.viewCart")}
-                    </Link>
-                    <button
-                      type="button"
-                      aria-label={t("product.added.dismiss")}
-                      onClick={() => setToastOpen(false)}
-                      className={`inline-flex size-11 items-center justify-center rounded-control hover:bg-muted ${focusRing}`}
-                    >
-                      <CloseIcon />
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-              {status.state === "failed" ? (
-                <Alert variant="danger">{t(status.messageKey, status.values)}</Alert>
-              ) : null}
-            </div>
-          </form>
+            onSelection={(next) => {
+              setSelection(next);
+              onSelectionChange?.(next);
+              setActiveImage(0);
+              setStatus({ state: "idle" });
+            }}
+            onQuantity={(next) => {
+              setQuantity(next);
+              if (status.state === "failed") setStatus({ state: "idle" });
+            }}
+          />
           <StoreTrustBar t={t} locale={locale} />
           {note}
         </div>
@@ -509,21 +335,21 @@ export function ProductPurchaseView({
           quantity={shownQuantity}
           min={MIN_LINE_QUANTITY}
           max={Math.max(MIN_LINE_QUANTITY, room)}
-          canAdd={purchasable && !pending}
-          addLabel={
-            pending
-              ? t("product.adding")
-              : soldOut
-                ? t("availability.out_of_stock")
-                : t("product.addToCart")
-          }
+          canAdd={purchasable && ready && !pending}
+          state={pending ? "loading" : status.state === "added" ? "done" : "idle"}
+          loadingLabel={t("product.adding")}
+          doneLabel={t("product.card.added")}
+          addLabel={soldOut ? t("availability.out_of_stock") : t("product.addToCart")}
           decreaseLabel={t("product.quantity.decrease")}
           increaseLabel={t("product.quantity.increase")}
           onQuantity={(next) => {
             setQuantity(next);
             if (status.state === "failed") setStatus({ state: "idle" });
           }}
-          onAdd={() => formRef.current?.requestSubmit()}
+          onAdd={(opener) => {
+            pendingOpener.current = opener;
+            formRef.current?.requestSubmit();
+          }}
         />
       ) : null}
     </>
@@ -536,6 +362,7 @@ export function ProductPurchase(
 ) {
   const { locale, t } = useI18n();
   const { state, store } = useCart();
+  const drawer = useCartDrawer();
   const { product } = props;
   // Only a new cart answer changes the quantities; busy marks and announcements do not.
   const cart = state.cart;
@@ -546,6 +373,7 @@ export function ProductPurchase(
       locale={locale}
       t={t}
       cartLines={cartLines}
+      onAdded={drawer.open}
       onSelectionChange={(selection) => {
         // The choice lives in the address (review SQ-05): a reload, a shared link and the language switch keep it. Next's
         // router follows `history.replaceState`, so the language links pick up the new query.
