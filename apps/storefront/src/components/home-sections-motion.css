@@ -5,6 +5,13 @@
   overflow: clip;
 }
 
+/* The decorations are positioned and come later in the DOM: without this they would paint over the text column where the
+   blob overhangs the gap between the columns. */
+.fk-home-hero > div:first-child {
+  position: relative;
+  z-index: 1;
+}
+
 /* A hero without a picture still reserves a corner for an optional sticker before first paint. */
 .fk-home-hero:has(> .fk-home-sticker) > div:first-child {
   min-block-size: calc(var(--fk-space-unit) * 28);
@@ -28,7 +35,9 @@
 
 .fk-home-blob {
   position: absolute;
-  inset: -8% -8%;
+  /* The inline overhang stays inside the hero's column gap (gap-6) at every width, so it never reaches the text. */
+  inset-block: -8%;
+  inset-inline: -4%;
   clip-path: ellipse(48% 46% at 48% 52%);
   background: color-mix(in oklab, var(--fk-color-accent) 45%, var(--fk-color-background));
   transform: rotate(-6deg);
