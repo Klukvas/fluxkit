@@ -39,7 +39,7 @@
     "@fluxkit/seeds": "workspace:*",
     "@fluxkit/theme": "workspace:*",
     "@nestjs/common": "12.2.0",
-    "@nestjs/core": "12.2.0",
+    "@nestjs/core": "12.3.2",
     "@nestjs/platform-express": "12.2.0",
     "@nestjs/swagger": "12.0.4",
     "bullmq": "6.4.2",
