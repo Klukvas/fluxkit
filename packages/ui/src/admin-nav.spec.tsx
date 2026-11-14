@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
+import { HomeIcon } from "./icons";
 import { FilterBar } from "./filter-bar";
 import { SideNav, type SideNavGroup } from "./side-nav";
 import { first, render, tags, text } from "./test-helpers";
@@ -17,6 +18,39 @@ const groups: SideNavGroup[] = [
 ];
 
 describe("SideNav", () => {
+  it("opts into muted current items, hidden names and labelled group separators", () => {
+    const iconGroups = groups.map((group) => ({
+      ...group,
+      items: group.items.map((item) => ({ ...item, icon: <HomeIcon /> })),
+    }));
+    const markup = render(
+      <SideNav label="Main" groups={iconGroups} collapsed currentTone="muted" />,
+    );
+    expect(first(markup, "a").attributes.class).toContain("bg-muted text-foreground");
+    expect(markup).not.toContain("bg-primary");
+    expect(markup).toContain('<span class="sr-only">Products</span>');
+    expect(first(markup, "svg").attributes["aria-hidden"]).toBe("true");
+    expect(first(markup, "h2").attributes.class).toContain("sr-only");
+    expect(first(markup, "ul").attributes["aria-labelledby"]).toBe(
+      first(markup, "h2").attributes.id,
+    );
+    expect(markup).toContain('aria-hidden="true" class="mb-2 border-t border-border"');
+    expect(markup).toContain('popover="manual"');
+  });
+
+  it("keeps missing-icon labels visible and heading ids unique across responsive instances", () => {
+    const markup = render(
+      <>
+        <SideNav label="A" groups={groups} collapsed />
+        <SideNav label="B" groups={groups} />
+      </>,
+    );
+    const ids = tags(markup, "h2").map((heading) => heading.attributes.id);
+    expect(new Set(ids).size).toBe(2);
+    expect(markup).not.toContain('<span class="sr-only">Products</span>');
+    expect(markup).not.toContain('popover="manual"');
+  });
+
   it("is a labelled nav with a list of links per group", () => {
     const markup = render(<SideNav label="Main" groups={groups} />);
     expect(first(markup, "nav").attributes["aria-label"]).toBe("Main");

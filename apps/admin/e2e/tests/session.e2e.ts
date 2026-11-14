@@ -83,12 +83,14 @@ test("sign-out asks before unsaved input is discarded: from the header and from 
   await english.fill(`Leave ${u} typed`);
   const leave = page.getByRole("alertdialog", { name: "Leave this page?" });
 
+  await page.getByRole("button", { name: "Account menu", exact: true }).click();
   // The header's sign-out asks first; "Stay" keeps the session and the input.
   await page.getByRole("banner").getByRole("button", { name: "Sign out" }).click();
   await expect(leave).toBeVisible();
   await expect(leave.getByRole("button", { name: "Stay" })).toBeFocused();
   await leave.getByRole("button", { name: "Stay" }).click();
   await expect(leave).toBeHidden();
+  await expect(page.getByRole("banner").getByRole("button", { name: "Sign out" })).toBeFocused();
   await expect(english).toHaveValue(`Leave ${u} typed`);
   expect((await page.request.get("/admin/auth/me")).status()).toBe(200);
 

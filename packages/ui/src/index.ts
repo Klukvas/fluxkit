@@ -80,3 +80,30 @@ export { Textarea, type TextareaProps } from "./textarea";
 export { textStyles } from "./styles";
 export { TrustBar, type TrustBarItem, type TrustBarProps } from "./trust-bar";
 export { VisuallyHidden } from "./visually-hidden";
+
+export {
+  ExtensionIcon,
+  HomeIcon,
+  OrdersIcon,
+  ProductsIcon,
+  CustomersIcon,
+  PaymentsIcon,
+  CategoriesIcon,
+  BrandsIcon,
+  ProductTypesIcon,
+  AttributesIcon,
+  OptionsIcon,
+  BannersIcon,
+  SearchIcon,
+  ShippingIcon,
+  EmailIcon,
+  PersonalDataIcon,
+  AuditLogIcon,
+  AdministratorsIcon,
+  HelpIcon,
+  SidebarCollapseIcon,
+  SidebarExpandIcon,
+  PlusIcon,
+  ChevronIcon,
+  type IconProps,
+} from "./icons";

@@ -20,6 +20,7 @@ import { Pagination } from "./pagination";
 import { PriceText } from "./price-text";
 import { ProductImage } from "./product-image";
 import { QuantityInput } from "./quantity-input";
+import { HomeIcon } from "./icons";
 import { SideNav } from "./side-nav";
 import { SkipLink } from "./skip-link";
 import { Spinner } from "./spinner";
@@ -225,6 +226,22 @@ const cases: [string, ReactElement][] = [
           id: "g",
           heading: s("group"),
           items: [{ id: "i", label: s("item"), href: "/x", current: true }],
+        },
+      ]}
+    />,
+  ],
+  [
+    "SideNav collapsed muted",
+    <SideNav
+      key="uc"
+      label={s("nav")}
+      collapsed
+      currentTone="muted"
+      groups={[
+        {
+          id: "g",
+          heading: s("group"),
+          items: [{ id: "i", label: s("item"), href: "/x", current: true, icon: <HomeIcon /> }],
         },
       ]}
     />,

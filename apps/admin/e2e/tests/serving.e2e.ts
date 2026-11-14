@@ -141,7 +141,7 @@ test("an area chunk that cannot be loaded (a deployment replaced it) shows the e
   await expect(main.getByRole("heading", { level: 1, name: "Something went wrong" })).toBeVisible();
   await expect(main.getByRole("button", { name: "Reload the page" })).toBeVisible();
   // The shell stays: header and navigation are usable, another area opens.
-  await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Account menu", exact: true })).toBeVisible();
   await expect.poll(logged, "the failure is logged once").toBe(1);
   await navigation.getByRole("link", { name: "Products" }).click();
   await expect(main.getByRole("heading", { level: 1, name: "Products" })).toBeVisible();
@@ -151,7 +151,7 @@ test("an area chunk that cannot be loaded (a deployment replaced it) shows the e
   await page.route(`**${chunkUrl}`, (route) => route.fulfill({ status: 404, body: "" }));
   await page.goto(`${SPA}/orders`);
   await expect(main.getByRole("heading", { level: 1, name: "Something went wrong" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Account menu", exact: true })).toBeVisible();
   await expect.poll(logged, "the failure is logged once").toBe(2);
 
   // The chunk is back: the reload button loads the page.
