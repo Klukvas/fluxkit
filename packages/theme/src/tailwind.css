@@ -33,6 +33,11 @@
   --shadow-card: var(--fk-shadow-card);
   --shadow-raised: var(--fk-shadow-raised);
   --shadow-overlay: var(--fk-shadow-overlay);
+  --ease-standard: var(--fk-motion-ease-standard);
+  --ease-emphasized: var(--fk-motion-ease-emphasized);
+  --ease-spring: var(--fk-motion-ease-spring);
+  --default-transition-duration: var(--fk-motion-duration-fast);
+  --default-transition-timing-function: var(--fk-motion-ease-standard);
   --spacing: var(--fk-space-unit);
   --text-xs: var(--fk-font-size-xs);
   --text-xs--line-height: var(--fk-line-height-xs);
@@ -50,4 +55,19 @@
   --text-3xl--line-height: var(--fk-line-height-3xl);
   --text-4xl: var(--fk-font-size-4xl);
   --text-4xl--line-height: var(--fk-line-height-4xl);
+}
+
+@utility duration-fast {
+  --tw-duration: var(--fk-motion-duration-fast);
+  transition-duration: var(--fk-motion-duration-fast);
+}
+
+@utility duration-base {
+  --tw-duration: var(--fk-motion-duration-base);
+  transition-duration: var(--fk-motion-duration-base);
+}
+
+@utility duration-slow {
+  --tw-duration: var(--fk-motion-duration-slow);
+  transition-duration: var(--fk-motion-duration-slow);
 }

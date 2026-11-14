@@ -190,14 +190,1952 @@
   },
   {
     "page": "home",
-    "selector": "card.article",
-    "property": "screenshot",
-    "reason": "owner design 2026-11-13: the first home card gains its Choose options link and grows taller; its element shot is left out (a mask cannot declare a size; listed as an annotation in the screenshots report) and the full-page frames are masked by page.body; the card styling stays guarded by the computed styles (card.article, card.title, card.badge, zero tolerance)"
-  },
-  {
-    "page": "home",
     "selector": "main.button",
     "property": "presence",
     "reason": "owner design 2026-11-13: the home page's product row now has a button in main (a card's Add to cart)"
+  },
+  {
+    "page": "*",
+    "selector": "button.primary",
+    "property": "background-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "button.primary",
+    "property": "border-bottom-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "button.primary",
+    "property": "border-bottom-left-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "button.primary",
+    "property": "border-bottom-right-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "button.primary",
+    "property": "border-left-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "button.primary",
+    "property": "border-right-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "button.primary",
+    "property": "border-top-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "button.primary",
+    "property": "border-top-left-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "button.primary",
+    "property": "border-top-right-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "button.primary",
+    "property": "color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "button.primary",
+    "property": "font-family",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the template font Rubik (lib/template-fonts.ts) replaces the system stack for body and headings"
+  },
+  {
+    "page": "*",
+    "selector": "button.primary",
+    "property": "outline-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the focus ring follows the new primary (tomato)"
+  },
+  {
+    "page": "*",
+    "selector": "button.secondary",
+    "property": "background-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "button.secondary",
+    "property": "border-bottom-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "button.secondary",
+    "property": "border-bottom-left-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "button.secondary",
+    "property": "border-bottom-right-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "button.secondary",
+    "property": "border-left-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "button.secondary",
+    "property": "border-right-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "button.secondary",
+    "property": "border-top-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "button.secondary",
+    "property": "border-top-left-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "button.secondary",
+    "property": "border-top-right-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "button.secondary",
+    "property": "color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "button.secondary",
+    "property": "font-family",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the template font Rubik (lib/template-fonts.ts) replaces the system stack for body and headings"
+  },
+  {
+    "page": "*",
+    "selector": "button.secondary",
+    "property": "outline-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the focus ring follows the new primary (tomato)"
+  },
+  {
+    "page": "*",
+    "selector": "card.article",
+    "property": "background-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "card.article",
+    "property": "border-bottom-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "card.article",
+    "property": "border-bottom-left-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "card.article",
+    "property": "border-bottom-right-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "card.article",
+    "property": "border-left-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "card.article",
+    "property": "border-right-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "card.article",
+    "property": "border-top-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "card.article",
+    "property": "border-top-left-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "card.article",
+    "property": "border-top-right-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "card.article",
+    "property": "color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "card.article",
+    "property": "font-family",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the template font Rubik (lib/template-fonts.ts) replaces the system stack for body and headings"
+  },
+  {
+    "page": "*",
+    "selector": "card.article",
+    "property": "outline-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the focus ring follows the new primary (tomato)"
+  },
+  {
+    "page": "*",
+    "selector": "card.badge",
+    "property": "background-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "card.badge",
+    "property": "border-bottom-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "card.badge",
+    "property": "border-bottom-left-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "card.badge",
+    "property": "border-bottom-right-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "card.badge",
+    "property": "border-left-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "card.badge",
+    "property": "border-right-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "card.badge",
+    "property": "border-top-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "card.badge",
+    "property": "border-top-left-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "card.badge",
+    "property": "border-top-right-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "card.badge",
+    "property": "box-shadow",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): offset ink sticker shadows (no blur) replace the soft elevation shadows"
+  },
+  {
+    "page": "*",
+    "selector": "card.badge",
+    "property": "color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "card.badge",
+    "property": "font-family",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the template font Rubik (lib/template-fonts.ts) replaces the system stack for body and headings"
+  },
+  {
+    "page": "*",
+    "selector": "card.badge",
+    "property": "outline-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the focus ring follows the new primary (tomato)"
+  },
+  {
+    "page": "*",
+    "selector": "card.title",
+    "property": "border-bottom-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "card.title",
+    "property": "border-left-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "card.title",
+    "property": "border-right-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "card.title",
+    "property": "border-top-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "card.title",
+    "property": "color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "card.title",
+    "property": "font-family",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the template font Rubik (lib/template-fonts.ts) replaces the system stack for body and headings"
+  },
+  {
+    "page": "*",
+    "selector": "card.title",
+    "property": "outline-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the focus ring follows the new primary (tomato)"
+  },
+  {
+    "page": "*",
+    "selector": "cart.checkout-bar",
+    "property": "background-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "cart.checkout-bar",
+    "property": "border-bottom-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "cart.checkout-bar",
+    "property": "border-left-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "cart.checkout-bar",
+    "property": "border-right-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "cart.checkout-bar",
+    "property": "border-top-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "cart.checkout-bar",
+    "property": "color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "cart.checkout-bar",
+    "property": "font-family",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the template font Rubik (lib/template-fonts.ts) replaces the system stack for body and headings"
+  },
+  {
+    "page": "*",
+    "selector": "cart.checkout-bar",
+    "property": "outline-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the focus ring follows the new primary (tomato)"
+  },
+  {
+    "page": "*",
+    "selector": "feedback.status",
+    "property": "background-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "feedback.status",
+    "property": "border-bottom-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "feedback.status",
+    "property": "border-bottom-left-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "feedback.status",
+    "property": "border-bottom-right-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "feedback.status",
+    "property": "border-left-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "feedback.status",
+    "property": "border-right-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "feedback.status",
+    "property": "border-top-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "feedback.status",
+    "property": "border-top-left-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "feedback.status",
+    "property": "border-top-right-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "feedback.status",
+    "property": "color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "feedback.status",
+    "property": "font-family",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the template font Rubik (lib/template-fonts.ts) replaces the system stack for body and headings"
+  },
+  {
+    "page": "*",
+    "selector": "feedback.status",
+    "property": "outline-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the focus ring follows the new primary (tomato)"
+  },
+  {
+    "page": "*",
+    "selector": "footer.contentinfo",
+    "property": "border-bottom-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "footer.contentinfo",
+    "property": "border-left-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "footer.contentinfo",
+    "property": "border-right-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "footer.contentinfo",
+    "property": "border-top-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "footer.contentinfo",
+    "property": "color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "footer.contentinfo",
+    "property": "font-family",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the template font Rubik (lib/template-fonts.ts) replaces the system stack for body and headings"
+  },
+  {
+    "page": "*",
+    "selector": "footer.contentinfo",
+    "property": "outline-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the focus ring follows the new primary (tomato)"
+  },
+  {
+    "page": "*",
+    "selector": "footer.link",
+    "property": "border-bottom-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "footer.link",
+    "property": "border-bottom-left-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "footer.link",
+    "property": "border-bottom-right-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "footer.link",
+    "property": "border-left-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "footer.link",
+    "property": "border-right-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "footer.link",
+    "property": "border-top-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "footer.link",
+    "property": "border-top-left-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "footer.link",
+    "property": "border-top-right-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "footer.link",
+    "property": "color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "footer.link",
+    "property": "font-family",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the template font Rubik (lib/template-fonts.ts) replaces the system stack for body and headings"
+  },
+  {
+    "page": "*",
+    "selector": "footer.link",
+    "property": "outline-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the focus ring follows the new primary (tomato)"
+  },
+  {
+    "page": "*",
+    "selector": "form.checkbox",
+    "property": "border-bottom-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "form.checkbox",
+    "property": "border-left-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "form.checkbox",
+    "property": "border-right-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "form.checkbox",
+    "property": "border-top-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "form.checkbox",
+    "property": "color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "form.checkbox",
+    "property": "font-family",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the template font Rubik (lib/template-fonts.ts) replaces the system stack for body and headings"
+  },
+  {
+    "page": "*",
+    "selector": "form.checkbox",
+    "property": "outline-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the focus ring follows the new primary (tomato)"
+  },
+  {
+    "page": "*",
+    "selector": "form.radio",
+    "property": "border-bottom-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "form.radio",
+    "property": "border-left-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "form.radio",
+    "property": "border-right-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "form.radio",
+    "property": "border-top-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "form.radio",
+    "property": "color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "form.radio",
+    "property": "font-family",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the template font Rubik (lib/template-fonts.ts) replaces the system stack for body and headings"
+  },
+  {
+    "page": "*",
+    "selector": "form.radio",
+    "property": "outline-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the focus ring follows the new primary (tomato)"
+  },
+  {
+    "page": "*",
+    "selector": "form.select",
+    "property": "background-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "form.select",
+    "property": "border-bottom-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "form.select",
+    "property": "border-bottom-left-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "form.select",
+    "property": "border-bottom-right-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "form.select",
+    "property": "border-left-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "form.select",
+    "property": "border-right-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "form.select",
+    "property": "border-top-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "form.select",
+    "property": "border-top-left-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "form.select",
+    "property": "border-top-right-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "form.select",
+    "property": "color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "form.select",
+    "property": "font-family",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the template font Rubik (lib/template-fonts.ts) replaces the system stack for body and headings"
+  },
+  {
+    "page": "*",
+    "selector": "form.select",
+    "property": "outline-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the focus ring follows the new primary (tomato)"
+  },
+  {
+    "page": "*",
+    "selector": "form.textbox",
+    "property": "background-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "form.textbox",
+    "property": "border-bottom-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "form.textbox",
+    "property": "border-bottom-left-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "form.textbox",
+    "property": "border-bottom-right-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "form.textbox",
+    "property": "border-left-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "form.textbox",
+    "property": "border-right-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "form.textbox",
+    "property": "border-top-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "form.textbox",
+    "property": "border-top-left-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "form.textbox",
+    "property": "border-top-right-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "form.textbox",
+    "property": "color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "form.textbox",
+    "property": "font-family",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the template font Rubik (lib/template-fonts.ts) replaces the system stack for body and headings"
+  },
+  {
+    "page": "*",
+    "selector": "form.textbox",
+    "property": "outline-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the focus ring follows the new primary (tomato)"
+  },
+  {
+    "page": "*",
+    "selector": "header.banner",
+    "property": "background-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "header.banner",
+    "property": "border-bottom-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "header.banner",
+    "property": "border-left-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "header.banner",
+    "property": "border-right-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "header.banner",
+    "property": "border-top-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "header.banner",
+    "property": "color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "header.banner",
+    "property": "font-family",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the template font Rubik (lib/template-fonts.ts) replaces the system stack for body and headings"
+  },
+  {
+    "page": "*",
+    "selector": "header.banner",
+    "property": "outline-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the focus ring follows the new primary (tomato)"
+  },
+  {
+    "page": "*",
+    "selector": "header.button",
+    "property": "border-bottom-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "header.button",
+    "property": "border-bottom-left-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "header.button",
+    "property": "border-bottom-right-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "header.button",
+    "property": "border-left-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "header.button",
+    "property": "border-right-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "header.button",
+    "property": "border-top-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "header.button",
+    "property": "border-top-left-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "header.button",
+    "property": "border-top-right-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "header.button",
+    "property": "color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "header.button",
+    "property": "font-family",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the template font Rubik (lib/template-fonts.ts) replaces the system stack for body and headings"
+  },
+  {
+    "page": "*",
+    "selector": "header.button",
+    "property": "outline-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the focus ring follows the new primary (tomato)"
+  },
+  {
+    "page": "*",
+    "selector": "header.first-link",
+    "property": "border-bottom-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "header.first-link",
+    "property": "border-bottom-left-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "header.first-link",
+    "property": "border-bottom-right-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "header.first-link",
+    "property": "border-left-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "header.first-link",
+    "property": "border-right-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "header.first-link",
+    "property": "border-top-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "header.first-link",
+    "property": "border-top-left-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "header.first-link",
+    "property": "border-top-right-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "header.first-link",
+    "property": "color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "header.first-link",
+    "property": "font-family",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the template font Rubik (lib/template-fonts.ts) replaces the system stack for body and headings"
+  },
+  {
+    "page": "*",
+    "selector": "header.first-link",
+    "property": "outline-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the focus ring follows the new primary (tomato)"
+  },
+  {
+    "page": "*",
+    "selector": "header.search-button",
+    "property": "background-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "header.search-button",
+    "property": "border-bottom-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "header.search-button",
+    "property": "border-bottom-left-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "header.search-button",
+    "property": "border-bottom-right-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "header.search-button",
+    "property": "border-left-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "header.search-button",
+    "property": "border-right-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "header.search-button",
+    "property": "border-top-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "header.search-button",
+    "property": "border-top-left-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "header.search-button",
+    "property": "border-top-right-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "header.search-button",
+    "property": "color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "header.search-button",
+    "property": "font-family",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the template font Rubik (lib/template-fonts.ts) replaces the system stack for body and headings"
+  },
+  {
+    "page": "*",
+    "selector": "header.search-button",
+    "property": "outline-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the focus ring follows the new primary (tomato)"
+  },
+  {
+    "page": "*",
+    "selector": "header.search-input",
+    "property": "background-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "header.search-input",
+    "property": "border-bottom-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "header.search-input",
+    "property": "border-bottom-left-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "header.search-input",
+    "property": "border-bottom-right-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "header.search-input",
+    "property": "border-left-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "header.search-input",
+    "property": "border-right-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "header.search-input",
+    "property": "border-top-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "header.search-input",
+    "property": "border-top-left-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "header.search-input",
+    "property": "border-top-right-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "header.search-input",
+    "property": "color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "header.search-input",
+    "property": "font-family",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the template font Rubik (lib/template-fonts.ts) replaces the system stack for body and headings"
+  },
+  {
+    "page": "*",
+    "selector": "header.search-input",
+    "property": "outline-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the focus ring follows the new primary (tomato)"
+  },
+  {
+    "page": "*",
+    "selector": "home.banner-card",
+    "property": "border-bottom-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "home.banner-card",
+    "property": "border-left-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "home.banner-card",
+    "property": "border-right-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "home.banner-card",
+    "property": "border-top-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "home.banner-card",
+    "property": "color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "home.banner-card",
+    "property": "font-family",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the template font Rubik (lib/template-fonts.ts) replaces the system stack for body and headings"
+  },
+  {
+    "page": "*",
+    "selector": "home.banner-card",
+    "property": "outline-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the focus ring follows the new primary (tomato)"
+  },
+  {
+    "page": "*",
+    "selector": "home.hero",
+    "property": "background-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "home.hero",
+    "property": "border-bottom-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "home.hero",
+    "property": "border-bottom-left-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "home.hero",
+    "property": "border-bottom-right-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "home.hero",
+    "property": "border-left-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "home.hero",
+    "property": "border-right-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "home.hero",
+    "property": "border-top-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "home.hero",
+    "property": "border-top-left-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "home.hero",
+    "property": "border-top-right-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "home.hero",
+    "property": "color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "home.hero",
+    "property": "font-family",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the template font Rubik (lib/template-fonts.ts) replaces the system stack for body and headings"
+  },
+  {
+    "page": "*",
+    "selector": "home.hero",
+    "property": "outline-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the focus ring follows the new primary (tomato)"
+  },
+  {
+    "page": "*",
+    "selector": "home.hero-picture",
+    "property": "border-bottom-left-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "home.hero-picture",
+    "property": "border-bottom-right-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "home.hero-picture",
+    "property": "border-top-left-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "home.hero-picture",
+    "property": "border-top-right-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "home.hero-picture",
+    "property": "font-family",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the template font Rubik (lib/template-fonts.ts) replaces the system stack for body and headings"
+  },
+  {
+    "page": "*",
+    "selector": "home.trust-bar",
+    "property": "background-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "home.trust-bar",
+    "property": "border-bottom-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "home.trust-bar",
+    "property": "border-bottom-left-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "home.trust-bar",
+    "property": "border-bottom-right-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "home.trust-bar",
+    "property": "border-left-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "home.trust-bar",
+    "property": "border-right-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "home.trust-bar",
+    "property": "border-top-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "home.trust-bar",
+    "property": "border-top-left-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "home.trust-bar",
+    "property": "border-top-right-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "home.trust-bar",
+    "property": "color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "home.trust-bar",
+    "property": "font-family",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the template font Rubik (lib/template-fonts.ts) replaces the system stack for body and headings"
+  },
+  {
+    "page": "*",
+    "selector": "home.trust-bar",
+    "property": "outline-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the focus ring follows the new primary (tomato)"
+  },
+  {
+    "page": "*",
+    "selector": "main.breadcrumb-link",
+    "property": "border-bottom-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "main.breadcrumb-link",
+    "property": "border-bottom-left-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "main.breadcrumb-link",
+    "property": "border-bottom-right-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "main.breadcrumb-link",
+    "property": "border-left-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "main.breadcrumb-link",
+    "property": "border-right-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "main.breadcrumb-link",
+    "property": "border-top-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "main.breadcrumb-link",
+    "property": "border-top-left-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "main.breadcrumb-link",
+    "property": "border-top-right-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "main.breadcrumb-link",
+    "property": "color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "main.breadcrumb-link",
+    "property": "font-family",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the template font Rubik (lib/template-fonts.ts) replaces the system stack for body and headings"
+  },
+  {
+    "page": "*",
+    "selector": "main.breadcrumb-link",
+    "property": "outline-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the focus ring follows the new primary (tomato)"
+  },
+  {
+    "page": "*",
+    "selector": "main.button",
+    "property": "background-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "main.button",
+    "property": "border-bottom-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "main.button",
+    "property": "border-bottom-left-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "main.button",
+    "property": "border-bottom-right-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "main.button",
+    "property": "border-left-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "main.button",
+    "property": "border-right-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "main.button",
+    "property": "border-top-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "main.button",
+    "property": "border-top-left-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "main.button",
+    "property": "border-top-right-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "main.button",
+    "property": "color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "main.button",
+    "property": "font-family",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the template font Rubik (lib/template-fonts.ts) replaces the system stack for body and headings"
+  },
+  {
+    "page": "*",
+    "selector": "main.button",
+    "property": "outline-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the focus ring follows the new primary (tomato)"
+  },
+  {
+    "page": "*",
+    "selector": "main.h1",
+    "property": "border-bottom-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "main.h1",
+    "property": "border-left-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "main.h1",
+    "property": "border-right-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "main.h1",
+    "property": "border-top-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "main.h1",
+    "property": "color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "main.h1",
+    "property": "font-family",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the template font Rubik (lib/template-fonts.ts) replaces the system stack for body and headings"
+  },
+  {
+    "page": "*",
+    "selector": "main.h1",
+    "property": "outline-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the focus ring follows the new primary (tomato)"
+  },
+  {
+    "page": "*",
+    "selector": "main.h2",
+    "property": "border-bottom-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "main.h2",
+    "property": "border-left-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "main.h2",
+    "property": "border-right-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "main.h2",
+    "property": "border-top-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "main.h2",
+    "property": "color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "main.h2",
+    "property": "font-family",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the template font Rubik (lib/template-fonts.ts) replaces the system stack for body and headings"
+  },
+  {
+    "page": "*",
+    "selector": "main.h2",
+    "property": "outline-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the focus ring follows the new primary (tomato)"
+  },
+  {
+    "page": "*",
+    "selector": "main.h3",
+    "property": "border-bottom-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "main.h3",
+    "property": "border-left-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "main.h3",
+    "property": "border-right-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "main.h3",
+    "property": "border-top-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "main.h3",
+    "property": "color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "main.h3",
+    "property": "font-family",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the template font Rubik (lib/template-fonts.ts) replaces the system stack for body and headings"
+  },
+  {
+    "page": "*",
+    "selector": "main.h3",
+    "property": "outline-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the focus ring follows the new primary (tomato)"
+  },
+  {
+    "page": "*",
+    "selector": "main.link",
+    "property": "background-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "main.link",
+    "property": "border-bottom-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "main.link",
+    "property": "border-bottom-left-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "main.link",
+    "property": "border-bottom-right-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "main.link",
+    "property": "border-left-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "main.link",
+    "property": "border-right-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "main.link",
+    "property": "border-top-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "main.link",
+    "property": "border-top-left-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "main.link",
+    "property": "border-top-right-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "main.link",
+    "property": "color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "main.link",
+    "property": "font-family",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the template font Rubik (lib/template-fonts.ts) replaces the system stack for body and headings"
+  },
+  {
+    "page": "*",
+    "selector": "main.link",
+    "property": "outline-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the focus ring follows the new primary (tomato)"
+  },
+  {
+    "page": "*",
+    "selector": "page.body",
+    "property": "background-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "page.body",
+    "property": "border-bottom-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "page.body",
+    "property": "border-left-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "page.body",
+    "property": "border-right-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "page.body",
+    "property": "border-top-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "page.body",
+    "property": "color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "page.body",
+    "property": "font-family",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the template font Rubik (lib/template-fonts.ts) replaces the system stack for body and headings"
+  },
+  {
+    "page": "*",
+    "selector": "page.body",
+    "property": "outline-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the focus ring follows the new primary (tomato)"
+  },
+  {
+    "page": "*",
+    "selector": "price.text",
+    "property": "border-bottom-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "price.text",
+    "property": "border-left-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "price.text",
+    "property": "border-right-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "price.text",
+    "property": "border-top-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "price.text",
+    "property": "color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "price.text",
+    "property": "font-family",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the template font Rubik (lib/template-fonts.ts) replaces the system stack for body and headings"
+  },
+  {
+    "page": "*",
+    "selector": "price.text",
+    "property": "outline-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the focus ring follows the new primary (tomato)"
+  },
+  {
+    "page": "*",
+    "selector": "product.badge",
+    "property": "background-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "product.badge",
+    "property": "border-bottom-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "product.badge",
+    "property": "border-bottom-left-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "product.badge",
+    "property": "border-bottom-right-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "product.badge",
+    "property": "border-left-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "product.badge",
+    "property": "border-right-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "product.badge",
+    "property": "border-top-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "product.badge",
+    "property": "border-top-left-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "product.badge",
+    "property": "border-top-right-radius",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): larger role radii (control/card/overlay 1.5rem, panel/media 1rem, sm 0.375rem)"
+  },
+  {
+    "page": "*",
+    "selector": "product.badge",
+    "property": "color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "product.badge",
+    "property": "font-family",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the template font Rubik (lib/template-fonts.ts) replaces the system stack for body and headings"
+  },
+  {
+    "page": "*",
+    "selector": "product.badge",
+    "property": "outline-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the focus ring follows the new primary (tomato)"
+  },
+  {
+    "page": "*",
+    "selector": "product.summary",
+    "property": "border-bottom-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "product.summary",
+    "property": "border-left-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "product.summary",
+    "property": "border-right-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "product.summary",
+    "property": "border-top-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "product.summary",
+    "property": "color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "product.summary",
+    "property": "font-family",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the template font Rubik (lib/template-fonts.ts) replaces the system stack for body and headings"
+  },
+  {
+    "page": "*",
+    "selector": "product.summary",
+    "property": "outline-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the focus ring follows the new primary (tomato)"
+  },
+  {
+    "page": "*",
+    "selector": "results.toolbar",
+    "property": "border-bottom-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "results.toolbar",
+    "property": "border-left-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "results.toolbar",
+    "property": "border-right-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "results.toolbar",
+    "property": "border-top-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): border and border-input take the warm palette"
+  },
+  {
+    "page": "*",
+    "selector": "results.toolbar",
+    "property": "color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): cream/ink/tomato palette and its derived dark theme replace the neutral colour tokens"
+  },
+  {
+    "page": "*",
+    "selector": "results.toolbar",
+    "property": "font-family",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the template font Rubik (lib/template-fonts.ts) replaces the system stack for body and headings"
+  },
+  {
+    "page": "*",
+    "selector": "results.toolbar",
+    "property": "outline-color",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): the focus ring follows the new primary (tomato)"
+  },
+  {
+    "page": "*",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): every frame changes (palette, Rubik, radii, sticker shadows); computed styles above still guard each selector property by property and show no layout, padding or presence change; whole page masked, frames turn into viewport frames"
+  },
+  {
+    "page": "home",
+    "selector": "header.banner",
+    "property": "screenshot",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): every frame changes (palette, Rubik, radii, sticker shadows); computed styles above still guard each selector property by property and show no layout, padding or presence change; this element shot of the home page is left out"
+  },
+  {
+    "page": "home",
+    "selector": "footer.contentinfo",
+    "property": "screenshot",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): every frame changes (palette, Rubik, radii, sticker shadows); computed styles above still guard each selector property by property and show no layout, padding or presence change; this element shot of the home page is left out"
+  },
+  {
+    "page": "home",
+    "selector": "card.article",
+    "property": "screenshot",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): every frame changes (palette, Rubik, radii, sticker shadows); computed styles above still guard each selector property by property and show no layout, padding or presence change; this element shot of the home page is left out"
+  },
+  {
+    "page": "home",
+    "selector": "home.hero",
+    "property": "screenshot",
+    "reason": "plan 2026-11-14-playful-default-design WS-A (owner decision 1: playful look is the new master default): every frame changes (palette, Rubik, radii, sticker shadows); computed styles above still guard each selector property by property and show no layout, padding or presence change; this element shot of the home page is left out"
   }
 ]

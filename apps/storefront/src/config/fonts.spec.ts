@@ -9,6 +9,7 @@ import { fontVariableClasses } from "../lib/font-classes";
 // (`default is not a function`) and take the whole storefront unit suite down.
 const srcRoot = fileURLToPath(new URL("../", import.meta.url));
 const fontsFile = "config/fonts.ts";
+const templateFontsFile = "lib/template-fonts.ts";
 
 function sources(dir: string): string[] {
   return readdirSync(dir).flatMap((entry) => {
@@ -76,12 +77,14 @@ describe("shop fonts (config/fonts.ts, plan 2026-11-08-design-changeability.md T
     ).toContain("next/font/google is refused");
   });
 
-  it("imports next/font only from config/fonts.ts (self-hosted fonts only: CSP)", () => {
+  it("imports next/font only from config/fonts.ts and lib/template-fonts.ts (self-hosted fonts only: CSP)", () => {
     const files = sources(srcRoot).map((file) => relative(srcRoot, file).split("\\").join("/"));
     expect(files).toContain(fontsFile);
     const offenders = files.filter(
       (file) =>
-        file !== fontsFile && nextFontImport.test(readFileSync(join(srcRoot, file), "utf8")),
+        file !== fontsFile &&
+        file !== templateFontsFile &&
+        nextFontImport.test(readFileSync(join(srcRoot, file), "utf8")),
     );
     expect(offenders).toEqual([]);
     expect(nextFontImport.test(`import localFont from "next/font/local";`)).toBe(true);
@@ -90,8 +93,22 @@ describe("shop fonts (config/fonts.ts, plan 2026-11-08-design-changeability.md T
 
   it("puts the fonts' variable classes on <html> in the root layout, once", () => {
     const layout = readFileSync(join(srcRoot, "app/[locale]/layout.tsx"), "utf8");
-    expect(layout).toMatch(/<html\b[^>]*className=\{fontVariableClasses\(fonts\)\}/);
+    expect(layout).toMatch(
+      /<html\b[^>]*className=\{fontVariableClasses\(\[\.\.\.templateFonts,\s*\.\.\.fonts\]\)\}/,
+    );
     expect(layout.match(/fontVariableClasses\(/g)).toHaveLength(1);
+  });
+
+  it("reads the template font as text only and requires one local font with a variable and no preload", () => {
+    const source = readFileSync(join(srcRoot, templateFontsFile), "utf8");
+    expect(source).toMatch(/^import localFont from "next\/font\/local";/m);
+    expect(source.match(/\blocalFont\(\{/g)).toHaveLength(1);
+    expect(source).toMatch(/variable:\s*["']--font-(?:[a-z0-9-])+["']/);
+    expect(source).toMatch(/preload:\s*false/);
+    expect(source).toMatch(/export const templateFonts:\s*readonly ShopFont\[\]/);
+    expect(source).not.toMatch(/next\/font\/google/);
+    const thisSpec = readFileSync(fileURLToPath(import.meta.url), "utf8");
+    expect(thisSpec).not.toMatch(/^import[^;]*from\s+["'][^"']*template-fonts["']/m);
   });
 
   it("renders no class without fonts and joins the variable classes of several", () => {

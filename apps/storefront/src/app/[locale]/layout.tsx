@@ -14,6 +14,7 @@ import { brandIconsMetadata, brandThemeColor } from "../../lib/brand";
 import { fontVariableClasses } from "../../lib/font-classes";
 import { headerSearchEnabled } from "../../lib/search-data.server";
 import { navigationCategories } from "../../lib/store-data.server";
+import { templateFonts } from "../../lib/template-fonts";
 import { resolveThemeMode, THEME_COOKIE } from "../../lib/theme-mode";
 import { messagesByLocale } from "../../messages";
 import "../globals.css";
@@ -85,8 +86,12 @@ export default async function LocaleLayout({
   };
 
   return (
-    // The fonts' `variable` classes (`config/fonts.ts`; none in the template, then no attribute) sit on <html>, where the tokens are.
-    <html lang={locale} data-theme={themeMode} className={fontVariableClasses(fonts)}>
+    // Template font variables come first, then the fork's config/fonts.ts variables, on the root where tokens resolve.
+    <html
+      lang={locale}
+      data-theme={themeMode}
+      className={fontVariableClasses([...templateFonts, ...fonts])}
+    >
       <body className="flex min-h-screen flex-col bg-background text-foreground">
         <SiteShell
           locale={locale}
