@@ -112,22 +112,23 @@ expect(contrastRatio(
 - This runs on both real and filled-fork configs; existing effective-set checks cover storefront dark/system palettes too. No change to `tokens.css`, `tailwind.css` or the theme-token contract.
 - Icon API: each named function has `(props: IconProps): ReactElement`; `export type IconProps = Pick<SVGProps<SVGSVGElement>, "className">`. Size comes from `size-6` by default and token-based caller classes; geometry stays in 24×24 coordinates.
 - Internal SVG primitive fixes `viewBox="0 0 24 24"`, `stroke="currentColor"`, `fill="none"`, line caps/joins, consistent stroke width, `aria-hidden="true"`, `focusable="false"`; callers cannot override accessibility or stroke invariants.
-- Names: `HomeIcon`, `OrdersIcon`, `ProductsIcon`, `CustomersIcon`, `PaymentsIcon`, `CategoriesIcon`, `BrandsIcon`, `ProductTypesIcon`, `AttributesIcon`, `OptionsIcon`, `BannersIcon`, `SearchIcon`, `ShippingIcon`, `EmailIcon`, `PersonalDataIcon`, `AuditLogIcon`, `AdministratorsIcon`, `HelpIcon`, `SidebarCollapseIcon`, `SidebarExpandIcon`, `PlusIcon`, `ChevronIcon`.
+- Names: `HomeIcon`, `OrdersIcon`, `ProductsIcon`, `CustomersIcon`, `PaymentsIcon`, `CategoriesIcon`, `BrandsIcon`, `ProductTypesIcon`, `AttributesIcon`, `OptionsIcon`, `BannersIcon`, `SearchIcon`, `ShippingIcon`, `EmailIcon`, `PersonalDataIcon`, `AuditLogIcon`, `AdministratorsIcon`, `HelpIcon`, `SidebarCollapseIcon`, `SidebarExpandIcon`, `PlusIcon`, `ChevronIcon`, `ExtensionIcon`.
 - Collapse/expand directional artwork mirrors through `rtl:` transforms; Chevron points down by default. Named exports enable unused Plus and other later icons to tree-shake. One file replaces the icon family per client fork.
 
 ### Navigation configuration and shell
 
-- Config types: `NavigationItemConfig = { routeId: RouteId; icon: ComponentType<IconProps> }`; `NavigationGroupConfig = { id: string; headingKey?: string; placement?: "main" | "bottom"; items: readonly NavigationItemConfig[] }`; `NAVIGATION: readonly NavigationGroupConfig[]`. Absent placement means main.
+- Config types: `NavigationItemConfig = { routeId: RouteId; icon: ComponentType<IconProps> }`; `NavigationGroupConfig = { id: NavigationGroupId; headingKey?: string; placement?: "main" | "bottom"; items: readonly NavigationItemConfig[] }`; `NAVIGATION: readonly NavigationGroupConfig[]`. Absent placement means main.
 - Filtered groups preserve optional heading/placement; items carry the icon component plus existing route-derived label/path/permission. Shell instantiates icons and only translates a defined heading key.
 
 | Group id | Heading key | Route ids in order | Placement |
 |---|---|---|---|
-| `daily` | absent | `home`, `orders`, `products`, `customers`, `payments` | main |
+| `sales` | absent | `home`, `orders`, `products`, `customers`, `payments` | main |
 | `catalog` | `nav.group.catalogSetup` | `categories`, `brands`, `productTypes`, `attributes`, `options` | main |
 | `storefront` | `nav.group.storefront` | `banners`, `search` | main |
 | `settings` | `nav.group.settings` | `shipping`, `email`, `privacy`, `auditLog`, `users` | main |
 | `help` | absent | `help` | bottom |
 
+- The headingless daily group keeps the contract id `sales`; feature entries naming `sales` join it after the core items. Feature entries use `ExtensionIcon`; the manifest has no `icon` field. Such a field is a possible later contract addition, not part of PR 1.
 - `visibleNavigation` filters every item via `routeById`/`canAccess`, then drops empty groups. Home and Help survive for signed-in `[]`; neither appears for `null`. `getMe` is an operation, not a literal permission string.
 - `Shell` partitions filtered groups by placement. `ShellFrame` renders main `SideNav` labelled `shell.navLabel` and a separate footer `SideNav` labelled `page.help.title`; Help is not duplicated in the main nav. Footer and collapse button stay together at the bottom.
 - Desktop (`md` and above): two-column grid, sidebar spans header/main rows; aside is `sticky top-0 h-dvh`, `w-64` expanded / `w-20` collapsed. A `min-h-0 flex-1 overflow-y-auto` navigation area scrolls independently; footer does not shrink. Main remains `min-w-0`; header occupies the content column. Use existing spacing utilities, border roles and responsive classes.
@@ -200,13 +201,15 @@ expect(contrastRatio(
 ## Red zones and instruction review
 
 - No red zone is expected: no dependency, schema/migration, API/config/event/feature-boundary change, token change, auth/permission change or destructive action. Sign-out presentation keeps the existing operation and leave confirmation. SideNav additions are internal under `docs/contracts/README.md`; existing defaults remain compatible.
-- **Budget decision (orchestrator-authorized):** after named exports and shared markup, initial JS is 451,609 raw / 135,019 gzip (baseline 441,990 / 131,834). Both exceeded caps move to measured size plus about 1 %: raw 445,000 → 456,200; gzip 135,000 → 136,400. No other cap changes.
+- **Budget decision (orchestrator-authorized, rebased):** initial JS is 456 996 raw / 136 998 gzip (baseline 447 298 / 133 774). Both exceeded caps move to measured size plus about 1 %: raw 450 000 → 461 600; gzip 135 000 → 138 400. No other cap changes.
+- **Review decision:** the account popup keeps Tailwind `z-10`, following the existing storefront popover approach (`z-30` in `apps/storefront/src/app/globals.css`). There is no z-index token; adding one changes the theme-token contract (AGENTS.md section 14), so PR 1 adds none.
 
 ## Results (PR 1)
 
+- Review fixes retain `nav.group.sales` and `nav.group.catalog` for fork overrides; a regression spec validates both keys in uk and en. Fix-round verification (Node 22.23.5): admin tests pass (175 files, 2 057 tests); lint, format check, typecheck and docs check each exit 0. The regression fails before restoring the key and passes afterwards. This round does not rerun builds, e2e or screenshots; bundle numbers below are the recorded rebased measurement.
 - PR 1 provides shared decorative icons, remembered desktop collapse, role-filtered daily-work navigation, pinned Help, a scrolling sidebar and compact account disclosure. Mobile keeps the expanded Menu panel. PRs 2 and 3 remain separate later sessions; no dependency, API, migration or theme-token change.
 - Orchestrator verification uses Node 22.23.5 and real Postgres 17, Redis 8 and Meilisearch v1.55.0 in Docker.
-- Final entry bundle (entry plus static imports, gzip level 9, 3 chunks): **451 685 raw / 135 038 gzip bytes**, before **441 990 raw / 131 834 gzip**; delta **+9 695 raw / +3 204 gzip**. Caps remain **456 200 raw / 136 400 gzip**.
+- Final entry bundle (entry plus static imports, gzip level 9, 3 chunks): **456 996 raw / 136 998 gzip bytes**, before **447 298 raw / 133 774 gzip** (main after blog PR 5, Node 22); delta **+9 698 raw / +3 224 gzip**. Caps are **461 600 raw / 138 400 gzip**.
 
 | Command | Result |
 |---|---|

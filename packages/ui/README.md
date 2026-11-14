@@ -19,7 +19,7 @@ File map: `docs/files/ui.md`.
 
 ## Navigation icons and collapsed SideNav
 
-`icons.tsx` exports 22 named decorative line icons and `IconProps` (`className` only). Replace that file to change the family in a fork. SVG geometry is 24×24; colour and size follow the existing tokens.
+`icons.tsx` exports 23 named decorative line icons and `IconProps` (`className` only). This includes `ExtensionIcon`, the generic admin feature-navigation icon; the feature manifest has no `icon` field (a possible later contract addition). Replace that file to change the family in a fork. SVG geometry is 24×24; colour and size follow the existing tokens.
 
 `SideNavItem.icon?: ReactNode`, `SideNav.collapsed?: boolean` (default `false`) and `currentTone?: "solid" | "muted"` (default `"solid"`) are additive. Existing no-icon callers keep their markup and appearance. Icon links retain their real label as visually hidden text when collapsed; items without icons keep visible text. Headings remain associated with lists through instance-specific ids, with separators in the collapsed view. `renderLink` still forwards all link props and children.
 
