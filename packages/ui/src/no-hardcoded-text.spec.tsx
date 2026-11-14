@@ -3,6 +3,11 @@ import { IconButton } from "./icon-button";
 import type { ReactElement } from "react";
 import { describe, expect, it } from "vitest";
 import { Alert } from "./alert";
+import { ActionButton } from "./action-button";
+import { Drawer } from "./drawer";
+import { Loader } from "./loader";
+import { NumberRoll } from "./number-roll";
+import { Toast, ToastStack } from "./toast";
 import { Badge } from "./badge";
 import { BannerCard } from "./banner-card";
 import { Breadcrumbs } from "./breadcrumbs";
@@ -43,11 +48,51 @@ const s = (name: string): string => `§${name}`;
 const cases: [string, ReactElement][] = [
   [
     "Button ghost",
-    <Button variant="ghost" icon={<HomeIcon className="size-5" />}>
+    <Button key="ghost" variant="ghost" icon={<HomeIcon className="size-5" />}>
       {s("cancel")}
     </Button>,
   ],
-  ["IconButton", <IconButton label={s("label")} icon={<HomeIcon className="size-5" />} />],
+  [
+    "IconButton",
+    <IconButton key="icon-button" label={s("label")} icon={<HomeIcon className="size-5" />} />,
+  ],
+  [
+    "Drawer",
+    <Drawer
+      key="motion-drawer"
+      open={false}
+      title={s("title")}
+      closeLabel={s("close")}
+      onClose={() => undefined}
+    >
+      {s("body")}
+    </Drawer>,
+  ],
+  ["Loader", <Loader key="motion-loader" label={s("loading")} />],
+  ["NumberRoll", <NumberRoll key="motion-number" value={3} accessibleLabel={s("value")} />],
+  [
+    "ActionButton",
+    <ActionButton
+      key="motion-action"
+      state="loading"
+      idleLabel={s("idle")}
+      loadingLabel={s("loading")}
+      doneLabel={s("done")}
+      accessibleSuffix={s("suffix")}
+    />,
+  ],
+  [
+    "Toast",
+    <ToastStack key="motion-toast">
+      <Toast
+        message={s("message")}
+        action={s("action")}
+        dismissLabel={s("dismiss")}
+        lifetime={5000}
+        onDismiss={() => undefined}
+      />
+    </ToastStack>,
+  ],
   [
     "Alert",
     <Alert key="a" title={s("title")}>

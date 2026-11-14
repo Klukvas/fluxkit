@@ -1,6 +1,6 @@
 # Playful default design (concept 03)
 
-Status: owner-approved decisions (2026-11-14). Workstream A merged (PR 285), B merged (PR 284); C in progress; D implemented, in review (PR).
+Status: owner-approved decisions (2026-11-14). Workstream A merged (PR 285), B merged (PR 284, test only), D merged (PR 291); C implemented, in review (PR 292).
 
 ## Goal
 
@@ -72,3 +72,21 @@ review by a different model than its author.
 
 `docs/contracts/theme-tokens.md` (motion tokens, new defaults), `docs/api/catalog.md` and `docs/api/search.md` (`defaultVariantId`),
 `docs/dependencies.md` and AGENTS.md section 16 (OFL fonts), `CHANGELOG.md`, `docs/HANDOFF.md`, `apps/storefront/README.md` (drawer).
+
+## Workstream C: as built (2026-11-14)
+
+- The card "Add" button of PR 272 was kept and wired to the drawer (not rebuilt); so were the product page's add and its phone buy bar.
+- Decisions taken in the session: the header's cart control stays a link to `/cart` (no-JS and canonical) and opens the drawer only on a
+  plain primary click outside `/cart` and `/checkout`; the drawer is mounted on the first open and kept (pending saves survive a reopen; never in the server HTML), with an entry slide
+  and no exit animation, so closing never waits; the drawer is the add confirmation, so the toast stack is used for failed card adds (the old product page toast is gone).
+- Motion CSS lives in `@fluxkit/ui/motion.css` (the theme package stays token-only), imported by the storefront before the fork's
+  overrides; `brand-overrides.spec.ts` gained that one import (orchestrator-approved scope extension). The admin does not import it yet.
+- The toast life bar runs on the Web Animations API with the timer's clock: the design guard refuses inline styles, and a reading time is
+  not a motion token.
+- The spring easing overshoots: the drawer panel carries a decorative `::after` buffer past its end edge (spacing token), so the
+  overshoot shows panel background, not the backdrop; layout and content width are unchanged.
+- "View cart" is a secondary (outlined) link, Checkout the primary one (`secondaryLinkButton` in `components/styles.ts`).
+- Visual parity with main (CI, Linux Chromium): an idle page runs no animation (hidden loader dots are still), the empty toast
+  stack has no box, and `ActionButton` clips its labels only with `truncateLabels` (cards): any clipping box inside the product
+  page's add button changed the anti-aliasing of the trust bar text after it (bisected with CSS overrides against main's screenshot).
+- Follow-ups: free-shipping progress (API red zone, see above); admin use of the motion kit.

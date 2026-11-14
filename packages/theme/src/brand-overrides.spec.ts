@@ -232,6 +232,7 @@ describe("the storefront's fork-owned token overrides (brand-overrides.css)", ()
       "tailwindcss",
       "@fluxkit/theme/tokens.css",
       "@fluxkit/theme/tailwind.css",
+      "@fluxkit/ui/motion.css",
       "@fluxkit/theme/brand-overrides.css",
     ]);
   });

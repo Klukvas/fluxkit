@@ -50,5 +50,8 @@
   "cart.checkout.stockBlocked": "Not enough stock for these items. Change them to continue:",
   "cart.checkout.stockBlockedShort.one": "Change {count} item to continue.",
   "cart.checkout.stockBlockedShort.other": "Change {count} items to continue.",
-  "cart.checkout.firstLine": "Go to the first"
+  "cart.checkout.firstLine": "Go to the first",
+  "cart.drawer.close": "Close the cart",
+  "cart.drawer.viewCart": "View cart",
+  "cart.toast.dismiss": "Dismiss the message"
 }
