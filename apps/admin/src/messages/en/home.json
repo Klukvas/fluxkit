@@ -1,0 +1,18 @@
+{
+  "home.counters.title": "Overview",
+  "home.counter.awaitingPayment": "Orders awaiting payment",
+  "home.counter.paid": "Paid orders awaiting fulfilment",
+  "home.counter.customers": "Customers",
+  "home.counter.draftProducts": "Draft products",
+  "home.counter.activeProducts": "Active products",
+  "home.actions.title": "Quick actions",
+  "home.action.newProduct": "New product",
+  "home.action.processOrders": "Orders to process",
+  "home.action.customers": "Customers",
+  "home.counter.loading": "Loading this counter…",
+  "home.counter.unavailable": "This count is unavailable",
+  "home.counter.forbidden": "Access to this count is denied",
+  "home.counter.retry": "Retry loading: {label}",
+  "home.noAccess": "Your permissions do not include workspace counters or actions. You can still open Help.",
+  "home.openHelp": "Open Help"
+}

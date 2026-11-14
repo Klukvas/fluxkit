@@ -1,0 +1,18 @@
+{
+  "home.counters.title": "Огляд",
+  "home.counter.awaitingPayment": "Замовлення в очікуванні оплати",
+  "home.counter.paid": "Оплачені замовлення в очікуванні виконання",
+  "home.counter.customers": "Покупці",
+  "home.counter.draftProducts": "Чернетки товарів",
+  "home.counter.activeProducts": "Активні товари",
+  "home.actions.title": "Швидкі дії",
+  "home.action.newProduct": "Новий товар",
+  "home.action.processOrders": "Замовлення до виконання",
+  "home.action.customers": "Покупці",
+  "home.counter.loading": "Завантаження показника…",
+  "home.counter.unavailable": "Показник зараз недоступний",
+  "home.counter.forbidden": "Немає доступу до показника",
+  "home.counter.retry": "Завантажити знову: {label}",
+  "home.noAccess": "Ваші дозволи не надають доступу до показників або дій робочого простору. Ви можете відкрити довідку.",
+  "home.openHelp": "Відкрити довідку"
+}
