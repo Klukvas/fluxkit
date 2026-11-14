@@ -51,7 +51,8 @@ describe("motion stylesheet", () => {
     expect(buffer).toContain("background: inherit");
     expect(panel).toContain("transform: translateX(100%)");
     expect(panel).toContain("var(--fk-motion-ease-spring)");
-    expect(css).toMatch(/\.fk-drawer\s*\{[^}]*overflow: hidden;/);
+    expect(css).toMatch(/\.fk-drawer\s*\{[^}]*overflow: clip;/);
+    expect(css).not.toMatch(/\.fk-drawer\s*\{[^}]*overflow: hidden;/);
     expect(css.slice(css.indexOf("@starting-style"))).toMatch(
       /\.fk-drawer\[open\] \.fk-drawer-panel\s*\{\s*transform: translateX\(100%\)/,
     );

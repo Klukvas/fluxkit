@@ -14,7 +14,8 @@
     max-width: none;
     max-height: none;
     background: none;
-    overflow: hidden;
+    /* The overshoot buffer must never become scrollable overflow. */
+    overflow: clip;
   }
   .fk-drawer::backdrop {
     background: none;
