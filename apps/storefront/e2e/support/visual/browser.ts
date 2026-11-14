@@ -1,5 +1,6 @@
 import { expect, type BrowserContext, type Locator, type Page } from "@playwright/test";
 import { E2E_ORIGIN } from "../env.ts";
+import { installVisualFonts } from "./fonts.ts";
 import {
   CART_VARIANT_SKU,
   FROZEN_TIME,
@@ -41,22 +42,24 @@ export async function addCartLine(page: Page): Promise<void> {
 }
 
 /**
- * Installs the frozen clock (scripts on only: without scripts there is no clock to fake) and, for a `cart-line` page, fills
- * the cart; call before `goto`.
+ * Installs settled typography for both script modes and the frozen clock (scripts on only: without scripts there is no
+ * clock to fake) and, for a `cart-line` page, fills the cart; call before `goto`.
  */
 export async function preparePage(
   page: Page,
   target: VisualPage,
   javaScript = true,
 ): Promise<void> {
+  await installVisualFonts(page, E2E_ORIGIN);
   if (javaScript) await page.clock.install({ time: FROZEN_TIME });
   if (target.setup === "cart-line") await addCartLine(page);
 }
 
 /**
- * Waits until the page is settled: loaded, fonts ready, hydrated (React has attached itself to the main landmark), no
- * pending streamed boundary, no `[aria-busy="true"]` region, and the network quiet. Then the focus is dropped, so an
- * auto-focused field does not paint a focus ring on one side only.
+ * Waits for load and, with scripts on, hydration (React attached to the main landmark), no pending streamed boundary,
+ * no `[aria-busy="true"]` region and a quiet network. Both script modes await and check fonts; with scripts on it then
+ * waits two paint frames. Focus is dropped only with scripts on, so an auto-focused field does not paint a focus ring on
+ * one side only.
  */
 export async function settle(page: Page, javaScript = true): Promise<void> {
   await page.waitForLoadState("load");
@@ -70,11 +73,22 @@ export async function settle(page: Page, javaScript = true): Promise<void> {
       const pending = document.body.innerHTML.includes("<!--$?-->");
       return hydrated && !pending && document.querySelector('[aria-busy="true"]') === null;
     });
-    await page.evaluate(async () => {
-      await document.fonts.ready;
+    await page.evaluate(() => {
       (document.activeElement as HTMLElement | null)?.blur();
     });
-    // Two frames: layout and paint after the last state change.
+  }
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    const unsettled = [...document.fonts]
+      .filter((face) => face.status === "error" || face.status === "loading")
+      .map((face) => `${face.family}: ${face.status}`);
+    if (unsettled.length > 0) {
+      throw new Error(`Visual frame has unsettled fonts: ${unsettled.join(", ")}`);
+    }
+  });
+  // Two frames: layout and paint after the last state change. Scripts on only: with JavaScript disabled Chromium never
+  // runs animation frame callbacks, so the wait would hang; the screenshot itself captures a fresh frame there.
+  if (javaScript) {
     await page.evaluate(
       () =>
         new Promise<void>((resolve) => {
