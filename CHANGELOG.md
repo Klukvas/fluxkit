@@ -3,6 +3,8 @@
 One line per user-visible or schema change.
 
 ## Unreleased
+
+- Storefront: optional playful home hero decoration and CSS section reveals; template defaults opt in, existing configs keep their markup (plan 2026-11-14 WS-D).
 - Theme defaults: warm cream/ink palette, tomato actions, generous role radii and offset sticker shadows in light and dark (plan `docs/plans/2026-11-14-playful-default-design.md`).
 - Storefront: self-hosted Rubik variable font as the template body and display face; fork-owned fonts and overrides keep precedence; no font preload.
 - Theme contract (additive, minor): six motion duration/easing tokens, Tailwind duration/ease utilities and transition defaults; reduced motion zeroes durations even after fork overrides.

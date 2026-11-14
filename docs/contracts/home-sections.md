@@ -50,3 +50,28 @@ section reads itself must be fast and cached: an `async` custom section delays t
 view stays meanwhile).
 
 Not contract: the markup and classes of the frames, the default home composition, the built-in sections' markup.
+
+## Hero decoration and section reveal (2026-11-14, WS-D)
+
+Additive/minor: every new field is optional. Omitting `decoration` and `reveal` preserves the previous markup byte for byte;
+only the template's default composition opts in. No API, DB, feature flag or client script is added.
+
+| Field | Shape | Behaviour |
+|---|---|---|
+| `HeroSection.decoration` | `HeroDecoration`, optional | Selects the storefront's decorated hero with the same section, grid, heading roles and picture priority as `Hero`. Omitted: unchanged `Hero` from `@fluxkit/ui`. |
+| `decoration.blob` | `boolean`, optional | Soft accent shape behind `image`; ignored without an image. Decorative, `aria-hidden`. |
+| `decoration.sticker` | `{ textKey: string }`, optional | Short translated circular SVG text, decorative (`aria-hidden`), unique textPath id derived from the section id. |
+| `decoration.highlightKey` | `string`, optional | Translated phrase found exactly in the translated headline; only the first occurrence is wrapped in a marker span. Missing or empty phrase: plain headline, warning outside production only. The span remains accessible heading text. |
+| `decoration.popIn` | `boolean`, optional | Stagger heading, subline, action and picture on first paint. Picture animates transform only, never opacity (LCP). |
+| `reveal` on every section kind, including `custom` | `"fade-up" \| "pop-in"`, optional | `HOME_SECTION_REVEALS` lists values; `checkHomeSections` rejects unknown values. A div with `data-home-reveal` surrounds the section, including its streamed skeleton; empty output leaves no gap. Omitted: no wrapper. |
+
+The default hero uses `popIn`, not `reveal`; sections after it use reveals (categories pop in, others fade up). Both shared-container
+and per-section-frame layouts support them. Scroll effects use CSS view timelines in the entry phase; unsupported browsers show
+all content without hiding it. All animations live inside `prefers-reduced-motion: no-preference`; reduced motion leaves the static
+shapes and full marker. Durations/easings use existing motion tokens, colours use existing colour tokens. No scroll listeners.
+While a section is entering (and below the viewport) its reveal animates `transform`, so it is the containing block of a
+`position: fixed` descendant; put overlays (drawers, toasts, popovers) in the top layer or outside the section. Once entered, no
+animation effect stays on it (fill mode `backwards`).
+
+Texts live under `home.hero.*` in both locale home message files. Default titles stay `Welcome` / `Ласкаво просимо`; highlight
+phrases are `Welcome` / `просимо`. Forks retune or remove the options in `config/home.ts`.
