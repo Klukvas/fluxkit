@@ -32,6 +32,7 @@ describe("Drawer", () => {
       tabindex: "-1",
       "aria-label": "Close cart",
     });
+    expect(String(buttons[0]?.attributes.class).split(" ")).toContain("bg-scrim");
     expect(buttons[1]?.attributes).toHaveProperty("data-autofocus");
   });
   it("cancels Escape's native mutation and requests the controlled close", () => {

@@ -11,7 +11,7 @@ import {
 import { parseTokenBlocks, themeSelectors, tokenBlock } from "./token-blocks.js";
 
 // WCAG 2.x contrast (https://www.w3.org/TR/WCAG21/#dfn-contrast-ratio), pure code, no dependency.
-// The theme files use 6-digit hex colors only; any other format fails loudly instead of being skipped.
+// Text/background pairs use 6-digit hex; the overlay scrim alone uses 8-digit hex with alpha. Unsupported formats fail loudly.
 // The pairs are checked on the EFFECTIVE values (`theme-run.testing.ts`): the storefront's `tokens.css` plus its fork-owned
 // overrides in every mode it renders, and the admin's `tokens.css`, the storefront overrides (light rule) and its own
 // fork-owned overrides (light only, ADR 0047),
@@ -38,6 +38,21 @@ function luminance(hex: string): number {
   const [r, g, b] = [match[1], match[2], match[3]].map((part) =>
     channel(Number.parseInt(part as string, 16)),
   ) as [number, number, number];
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+// Browser-style sRGB alpha blend BEFORE converting the resulting channels to linear luminance.
+function scrimmedLuminance(scrim: string, surface: string): number {
+  const match = /^#([0-9a-f]{6})([0-9a-f]{2})$/i.exec(scrim);
+  if (!match) throw new Error(`Unsupported scrim format "${scrim}": use #rrggbbaa`);
+  luminance(surface); // Validate the opaque surface with the same strict parser as the contrast pairs.
+  const alpha = Number.parseInt(match[2] as string, 16) / 255;
+  const blended = [0, 2, 4].map((offset) => {
+    const overlayChannel = Number.parseInt((match[1] as string).slice(offset, offset + 2), 16);
+    const surfaceChannel = Number.parseInt(surface.slice(offset + 1, offset + 3), 16);
+    return channel(overlayChannel * alpha + surfaceChannel * (1 - alpha));
+  });
+  const [r, g, b] = blended as [number, number, number];
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
@@ -130,6 +145,42 @@ describe("token contrast (WCAG 2.x) on the effective values", () => {
         expect(ratio, `${foregroundValue} on ${backgroundValue}`).toBeGreaterThanOrEqual(minimum);
       });
     }
+  }
+});
+
+describe("overlay scrim dimming on the effective values", () => {
+  it("blends in sRGB and refuses unsupported formats", () => {
+    expect(scrimmedLuminance("#00000080", "#ffffff")).toBeCloseTo(luminance("#7f7f7f"), 10);
+    for (const scrim of ["#000000", "#0008", "rgba(0, 0, 0, 0.5)"]) {
+      expect(() => scrimmedLuminance(scrim, "#ffffff")).toThrow(/Unsupported scrim format/);
+    }
+    expect(() => scrimmedLuminance("#00000080", "#fff")).toThrow(/Unsupported color format/);
+    // The former dark-mode foreground/50 backdrop washes out the dark page.
+    expect(scrimmedLuminance("#fff3e380", "#1f130d")).toBeGreaterThan(luminance("#1f130d"));
+  });
+
+  for (const [theme, tokens] of effectiveSets) {
+    it(`${theme}: dims both surfaces and retains 15–35% of the lighter surface luminance`, () => {
+      const required = (name: string): string => {
+        const value = tokens.get(`--fk-color-${name}`);
+        if (value === undefined) throw new Error(`${theme}: --fk-color-${name} is not defined`);
+        return value;
+      };
+      const scrim = required("scrim");
+      const surfaces = [required("background"), required("foreground")];
+      for (const surface of surfaces) {
+        expect(
+          scrimmedLuminance(scrim, surface),
+          `${theme}: scrim over ${surface}`,
+        ).toBeLessThanOrEqual(luminance(surface));
+      }
+      const lighter = surfaces.reduce((first, second) =>
+        luminance(first) >= luminance(second) ? first : second,
+      );
+      const retained = scrimmedLuminance(scrim, lighter) / luminance(lighter);
+      expect(retained).toBeGreaterThanOrEqual(0.15);
+      expect(retained).toBeLessThanOrEqual(0.35);
+    });
   }
 });
 
