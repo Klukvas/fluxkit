@@ -58,7 +58,7 @@ only the template's default composition opts in. No API, DB, feature flag or cli
 
 | Field | Shape | Behaviour |
 |---|---|---|
-| `HeroSection.decoration` | `HeroDecoration`, optional | Selects the storefront's decorated hero with the same section, grid, heading roles and picture priority as `Hero`. Omitted: unchanged `Hero` from `@fluxkit/ui`. |
+| `HeroSection.decoration` | `HeroDecoration`, optional | Renders `Hero` of `@fluxkit/ui` with the highlighted ReactNode title, section data attributes, `mediaClassName` and ornament slot; markup, grid, heading roles and picture priority stay unchanged. Omitted: unchanged `Hero`. |
 | `decoration.blob` | `boolean`, optional | Soft accent shape behind `image`; ignored without an image. Decorative, `aria-hidden`. |
 | `decoration.sticker` | `{ textKey: string }`, optional | Short translated circular SVG text, decorative (`aria-hidden`), unique textPath id derived from the section id. |
 | `decoration.highlightKey` | `string`, optional | Translated phrase found exactly in the translated headline; only the first occurrence is wrapped in a marker span. Missing or empty phrase: plain headline, warning outside production only. The span remains accessible heading text. |
@@ -75,3 +75,5 @@ animation effect stays on it (fill mode `backwards`).
 
 Texts live under `home.hero.*` in both locale home message files. Default titles stay `Welcome` / `Ласкаво просимо`; highlight
 phrases are `Welcome` / `просимо`. Forks retune or remove the options in `config/home.ts`.
+
+2026-11-14 additive/minor: UI `Hero` accepts a phrasing-only `ReactNode` title, section `data-*` attributes, `mediaClassName` and an `aria-hidden` ornament slot; the decorated home reuses it with unchanged markup.

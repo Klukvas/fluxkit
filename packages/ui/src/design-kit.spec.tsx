@@ -216,6 +216,77 @@ describe("textStyles", () => {
 });
 
 describe("Hero (design batch B)", () => {
+  it.each(["h1", "h2"] as const)("renders a ReactNode title inside its %s", (headingLevel) => {
+    const markup = render(
+      <Hero
+        headingId="h"
+        headingLevel={headingLevel}
+        title={
+          <>
+            A <em>highlighted</em> title
+          </>
+        }
+      />,
+    );
+    expect(markup).toContain(">A <em>highlighted</em> title</" + headingLevel + ">");
+    expect(text(markup)).toBe("A highlighted title");
+  });
+
+  it("places data attributes on the section after data-hero and omits undefined values", () => {
+    const markup = render(
+      <Hero
+        headingId="h"
+        headingLevel="h2"
+        title="T"
+        data-home-decorated=""
+        data-home-pop-in={undefined}
+        data-custom="value"
+      />,
+    );
+    const section = first(markup, "section");
+    expect(section.attributes["data-home-decorated"]).toBe("");
+    expect(section.attributes["data-custom"]).toBe("value");
+    expect(markup).not.toContain("data-home-pop-in");
+    expect(section.raw).toContain(
+      'aria-labelledby="h" data-hero="" data-home-decorated="" data-custom="value" class=',
+    );
+  });
+
+  it("classes the media wrapper only when mediaClassName is supplied", () => {
+    const media = <span>Picture</span>;
+    const bare = render(<Hero headingId="h" headingLevel="h2" title="T" media={media} />);
+    expect(bare).toContain("<div><span>Picture</span></div></section>");
+    const styled = render(
+      <Hero headingId="h" headingLevel="h2" title="T" media={media} mediaClassName="picture" />,
+    );
+    expect(styled).toContain('<div class="picture"><span>Picture</span></div></section>');
+  });
+
+  it.each([undefined, <span key="media">Picture</span>])(
+    "renders an ornament last, with or without media (%#)",
+    (media) => {
+      const markup = render(
+        <Hero
+          headingId="h"
+          headingLevel="h2"
+          title="T"
+          media={media}
+          ornament={<span aria-hidden="true">Ornament</span>}
+        />,
+      );
+      expect(markup).toMatch(/<\/div><span aria-hidden="true">Ornament<\/span><\/section>$/);
+      expect(String(first(markup, "section").attributes.class).includes("md:grid-cols-2")).toBe(
+        Boolean(media),
+      );
+    },
+  );
+
+  it("keeps string title markup unchanged", () => {
+    expect(render(<Hero headingId="h" headingLevel="h1" title="Welcome" />)).toBe(
+      '<section aria-labelledby="h" data-hero="" class="grid items-center gap-6 rounded-card bg-muted p-6 md:p-10"><div class="flex flex-col items-start gap-3"><h1 id="h" class="font-display text-3xl font-bold text-foreground md:text-4xl">Welcome</h1></div></section>',
+    );
+  });
+
   it("is a section labelled by its heading, at the level the page asks for", () => {
     const markup = render(<Hero headingId="hero-a" headingLevel="h1" title="Welcome" />);
     expect(first(markup, "section").attributes["aria-labelledby"]).toBe("hero-a");
