@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join, sep } from "node:path";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
@@ -85,12 +85,21 @@ function isUpstreamSpec(path: string): boolean {
   return /\.upstream\.spec\.[cm]?[jt]sx?$/.test(path);
 }
 
+const SKIPPED_DIRECTORIES = new Set(["node_modules", "dist", ".next", ".turbo"]);
+
 /** Every `*.upstream.spec.*` file under `apps/` and `packages/` (no dependencies or build output). */
 function upstreamSpecsOnDisk(): string[] {
-  return ["apps", "packages"].flatMap((top) =>
-    readdirSync(join(repoRoot, top), { recursive: true, encoding: "utf8" })
-      .map((path) => `${top}/${path.split(sep).join("/")}`)
-      .filter((path) => !/\/(node_modules|dist|\.next|\.turbo)\//.test(path))
-      .filter(isUpstreamSpec),
+  return ["apps", "packages"].flatMap((top) => filesUnder(top).filter(isUpstreamSpec));
+}
+
+// Dependencies and build output are pruned while walking, not filtered afterwards: a recursive listing of the whole tree went
+// through every node_modules folder and took over 5 s on a busy CI runner (the test timed out).
+function filesUnder(relativeDirectory: string): string[] {
+  return readdirSync(join(repoRoot, relativeDirectory), { withFileTypes: true }).flatMap(
+    (entry) => {
+      const path = `${relativeDirectory}/${entry.name}`;
+      if (entry.isDirectory()) return SKIPPED_DIRECTORIES.has(entry.name) ? [] : filesUnder(path);
+      return entry.isFile() ? [path] : [];
+    },
   );
 }
