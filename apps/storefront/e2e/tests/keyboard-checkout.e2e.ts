@@ -27,8 +27,12 @@ test("the whole purchase works with the keyboard alone (Tab, Enter, Space and ty
   await page.keyboard.press("Enter");
   await expect(page.getByRole("heading", { level: 1, name: "Checkout" })).toBeVisible();
 
-  // Checkout form: the focus order is the reading order, every field takes typed text, the select needs no action.
   const field = (label: string) => page.getByLabel(label, { exact: true });
+  // Address fields replace the loading placeholder once delivery options answer;
+  // tabbing earlier tests a form that is still being built.
+  await expect(field("Country")).toBeVisible();
+
+  // Checkout form: the focus order is the reading order, every field takes typed text, the select needs no action.
   await tabTo(page, field("Email"));
   const steps: [string, string | null][] = [
     ["Email", uniqueEmail(testInfo, "keyboard")],

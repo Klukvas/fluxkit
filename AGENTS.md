@@ -95,7 +95,7 @@ until both support it and `pnpm lint` and `pnpm check:boundaries` are verified; 
 - Do not bake client-specific branding, copy, or images into the template. Use placeholders and demo data.
 
 ### 2.3 Catalog data model (do not break this; details in `docs/adr/0004-core-data-model.md`)
-- **Product** = catalog entity (card, SEO, reviews, categories). **Variant/SKU** = purchasable unit (price, stock, SKU code).
+- **Product** = catalog entity (content, SEO, reviews, categories; one or more listing cards). **Variant/SKU** = purchasable unit (price, stock, SKU code).
 - Cart, order items, and stock reference `variant_id`, never `product_id`.
 - A simple product still has one default variant. No special-case branches for "no variants".
 - **Options** (color, size) generate variants. **Attributes** (material, length) describe the product. Never mix them.
@@ -104,7 +104,9 @@ until both support it and `pnpm lint` and `pnpm check:boundaries` are verified; 
 - Attribute behavior is controlled by flags (`is_filterable`, `is_searchable`, `is_visible_on_storefront`,
   `is_comparable`, `is_sortable`, `is_internal`). Categories can override filter lists and order.
 - `is_internal` data must never leave the public/storefront API. Enforce on the backend, not only in templates.
-- Catalog filters operate on variants and group results by product. Search runs through a search index, not ad-hoc SQL JOINs.
+- Catalog filters operate on variants. Storefront listings group by product plus the value of the product type's single option
+  marked `splits_listing`, or by product when none applies. Product-level API mode remains available for compatibility. Search runs
+  through a search index, not ad-hoc SQL JOINs; the plain SQL list and fallback use the same listing groups (ADR 0052).
 - Money is stored in minor units (integers) with a currency code. Never floats.
 - Order items store a **snapshot** (title, SKU, price, image) at purchase time.
 - Prices live in a `price` table (variant, currency, minor-unit amount, optional compare-at amount; one row per variant and currency); no customer group

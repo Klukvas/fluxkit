@@ -20,6 +20,7 @@ shimmer, button states) becomes generic, token-driven storefront behaviour that 
 | 6 | Font format (asked after the WS-A review) | **Lossless WOFF2 approved**: Rubik's official TTF converted to WOFF2 with every table unchanged (about 122 KB instead of 360 KB); font name Rubik kept (no Reserved Font Name), OFL text kept. Licence wording: unmodified or losslessly converted to WOFF2, font name unchanged. Owner, 2026-11-14: "Да, WOFF2". |
 | 7 | Free-shipping progress in the drawer (asked after C merged) | **Approved, additive**: a nullable store-API field with the cart's free-shipping threshold (lowest active `free_over` in the cart currency); the remainder is computed on the server. No migration. Owner, 2026-11-14: "Да, аддитивно". |
 | 8 | Subscription toggle of the concept | **Not now**: a feature package with pricing, recurring orders and payments; build it for a client who needs it, with its own plan. Owner, 2026-11-14: "Не сейчас". |
+| 9 | Overlay scrim token | **Approved, additive (minor)**: `--fk-color-scrim` for overlay backdrops, dark and translucent in both themes; 8-digit `#rrggbbaa` with alpha in the token. Light `#2b1a1280`; dark and system `#09050380`. Owner, 2026-11-14: "Да, токен scrim". |
 
 Not part of this plan: the concept's "one-off / subscription -15%" toggle. Subscriptions do not exist; they would be a feature package
 that touches pricing (red zone, own plan). The demo copy stays the coffee seed's.
@@ -33,7 +34,7 @@ that touches pricing (red zone, own plan). The demo copy stays the coffee seed's
 - Shapes: large radii (cards about 1.5rem, controls pill-shaped), thick ink borders and offset "sticker" shadows.
 - Motion: pop-in, spring drawer from the right, number roll on quantity, wobble sticker, marker underline, three-bean loader, shimmer
   skeletons, all off under `prefers-reduced-motion`.
-- Only existing colour roles are used (`accent` takes butter or mint). A new colour token needs the owner (red zone, not approved here).
+- Only existing colour roles are used (`accent` takes butter or mint). A new colour token needs the owner (red zone); decision 9 approves only the overlay scrim.
 
 ## Existing functionality found
 
