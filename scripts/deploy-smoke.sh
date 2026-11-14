@@ -116,6 +116,32 @@ for (const name of fs.readdirSync(root)) {
 [[ "$FEATURE_JOURNALS" == *"journal blog "* ]] || fail "the blog's migration journal is not in the API image"
 pass "feature migrations and their .down.sql files are in the API image ($(tr '\n' ' ' <<<"$FEATURE_JOURNALS"))"
 
+# The image installs with `pnpm install --prod`, which links no peer of a workspace package: every provider and feature
+# package must resolve @nestjs/common on its own, to the API's very copy (one Nest, one HttpException class), or the API
+# fails at start once that package is enabled. The guard in the repository is apps/api/src/common/workspace-runtime-dependencies.spec.ts.
+NEST_RESOLUTION=$(docker run --rm "${PREFIX}-api:${TAG}" node -e '
+const fs = require("node:fs");
+const path = require("node:path");
+const { createRequire } = require("node:module");
+const nestOf = (folder) => fs.realpathSync(createRequire(path.join(folder, "package.json")).resolve("@nestjs/common"));
+const apiNest = nestOf("/app/apps/api");
+for (const group of ["providers", "features"]) {
+  const root = path.join("/app/packages", group);
+  for (const name of fs.readdirSync(root)) {
+    const folder = path.join(root, name);
+    if (!fs.existsSync(path.join(folder, "package.json"))) continue;
+    let resolved;
+    try { resolved = nestOf(folder); } catch (error) { console.log(`unresolved ${group}/${name} ${error.code}`); continue; }
+    console.log(resolved === apiNest ? `nest ${group}/${name}` : `other-copy ${group}/${name} ${resolved}`);
+  }
+}
+') || fail "could not check @nestjs/common in the API image's packages"
+[[ "$NEST_RESOLUTION" != *unresolved* && "$NEST_RESOLUTION" != *other-copy* ]] ||
+  fail "a package in the API image does not resolve the API's @nestjs/common: $NEST_RESOLUTION"
+[[ "$NEST_RESOLUTION" == *"nest providers/nova-post"* && "$NEST_RESOLUTION" == *"nest features/blog"* ]] ||
+  fail "the Nest check found no provider or feature packages in the API image: $NEST_RESOLUTION"
+pass "every provider and feature package resolves the API's @nestjs/common ($(tr '\n' ' ' <<<"$NEST_RESOLUTION"))"
+
 compose config --quiet
 compose up -d --no-build --wait --wait-timeout 180
 pass "stack healthy (postgres, meilisearch, migrate, api, storefront, edge)"
