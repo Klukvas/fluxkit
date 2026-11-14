@@ -113,6 +113,7 @@ const cart: Shape<Cart> = {
     itemCount: "integer",
     purchasable: "boolean",
     requiresShipping: "boolean",
+    freeShipping: { nullable: { object: { threshold: money, remaining: money } } },
     notices: cartNotices,
   },
 };
@@ -1061,6 +1062,10 @@ describe("the comparison itself fails when the contract or the types drift", () 
 
 describe("types the storefront relies on", () => {
   it("are what the contract says", () => {
+    expectTypeOf<Cart["freeShipping"]>().toEqualTypeOf<{
+      threshold: Money;
+      remaining: Money;
+    } | null>();
     expectTypeOf<Cart["requiresShipping"]>().toEqualTypeOf<boolean>();
     expectTypeOf<Cart["purchasable"]>().toEqualTypeOf<boolean>();
     expectTypeOf<Money["amount"]>().toEqualTypeOf<number>();

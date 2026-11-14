@@ -8041,6 +8041,47 @@
                       "type": "boolean",
                       "description": "Whether the checkout will ask for a shipping address: at least one AVAILABLE line is a physical product (its product type ships goods). Unavailable lines are not counted, because the checkout refuses them before it asks for an address; an empty cart is `false`. Equal to what `POST /store/checkout` enforces (`400 shipping_address_required`) once the cart is purchasable."
                     },
+                    "freeShipping": {
+                      "nullable": true,
+                      "description": "Lowest offered valid free-over threshold and remaining amount, computed by the server from the cart subtotal (all available lines, including digital goods). Null for an empty cart, a cart that does not require shipping or no qualifying method. A free-over method with amount zero has effective threshold zero. Destination country is ignored; flat-zero methods do not count.",
+                      "type": "object",
+                      "properties": {
+                        "threshold": {
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 1000000000000,
+                              "description": "Minor units of the shop currency (for example kopiykas)."
+                            },
+                            "currency": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false
+                        },
+                        "remaining": {
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 1000000000000,
+                              "description": "Minor units of the shop currency (for example kopiykas)."
+                            },
+                            "currency": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": ["threshold", "remaining"],
+                      "additionalProperties": false
+                    },
                     "notices": {
                       "type": "array",
                       "items": {
@@ -8063,6 +8104,7 @@
                     "itemCount",
                     "purchasable",
                     "requiresShipping",
+                    "freeShipping",
                     "notices"
                   ],
                   "additionalProperties": false
@@ -8481,6 +8523,47 @@
                       "type": "boolean",
                       "description": "Whether the checkout will ask for a shipping address: at least one AVAILABLE line is a physical product (its product type ships goods). Unavailable lines are not counted, because the checkout refuses them before it asks for an address; an empty cart is `false`. Equal to what `POST /store/checkout` enforces (`400 shipping_address_required`) once the cart is purchasable."
                     },
+                    "freeShipping": {
+                      "nullable": true,
+                      "description": "Lowest offered valid free-over threshold and remaining amount, computed by the server from the cart subtotal (all available lines, including digital goods). Null for an empty cart, a cart that does not require shipping or no qualifying method. A free-over method with amount zero has effective threshold zero. Destination country is ignored; flat-zero methods do not count.",
+                      "type": "object",
+                      "properties": {
+                        "threshold": {
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 1000000000000,
+                              "description": "Minor units of the shop currency (for example kopiykas)."
+                            },
+                            "currency": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false
+                        },
+                        "remaining": {
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 1000000000000,
+                              "description": "Minor units of the shop currency (for example kopiykas)."
+                            },
+                            "currency": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": ["threshold", "remaining"],
+                      "additionalProperties": false
+                    },
                     "notices": {
                       "type": "array",
                       "items": {
@@ -8503,6 +8586,7 @@
                     "itemCount",
                     "purchasable",
                     "requiresShipping",
+                    "freeShipping",
                     "notices"
                   ],
                   "additionalProperties": false
@@ -8890,6 +8974,47 @@
                       "type": "boolean",
                       "description": "Whether the checkout will ask for a shipping address: at least one AVAILABLE line is a physical product (its product type ships goods). Unavailable lines are not counted, because the checkout refuses them before it asks for an address; an empty cart is `false`. Equal to what `POST /store/checkout` enforces (`400 shipping_address_required`) once the cart is purchasable."
                     },
+                    "freeShipping": {
+                      "nullable": true,
+                      "description": "Lowest offered valid free-over threshold and remaining amount, computed by the server from the cart subtotal (all available lines, including digital goods). Null for an empty cart, a cart that does not require shipping or no qualifying method. A free-over method with amount zero has effective threshold zero. Destination country is ignored; flat-zero methods do not count.",
+                      "type": "object",
+                      "properties": {
+                        "threshold": {
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 1000000000000,
+                              "description": "Minor units of the shop currency (for example kopiykas)."
+                            },
+                            "currency": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false
+                        },
+                        "remaining": {
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 1000000000000,
+                              "description": "Minor units of the shop currency (for example kopiykas)."
+                            },
+                            "currency": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": ["threshold", "remaining"],
+                      "additionalProperties": false
+                    },
                     "notices": {
                       "type": "array",
                       "items": {
@@ -8912,6 +9037,7 @@
                     "itemCount",
                     "purchasable",
                     "requiresShipping",
+                    "freeShipping",
                     "notices"
                   ],
                   "additionalProperties": false
@@ -9277,6 +9403,47 @@
                       "type": "boolean",
                       "description": "Whether the checkout will ask for a shipping address: at least one AVAILABLE line is a physical product (its product type ships goods). Unavailable lines are not counted, because the checkout refuses them before it asks for an address; an empty cart is `false`. Equal to what `POST /store/checkout` enforces (`400 shipping_address_required`) once the cart is purchasable."
                     },
+                    "freeShipping": {
+                      "nullable": true,
+                      "description": "Lowest offered valid free-over threshold and remaining amount, computed by the server from the cart subtotal (all available lines, including digital goods). Null for an empty cart, a cart that does not require shipping or no qualifying method. A free-over method with amount zero has effective threshold zero. Destination country is ignored; flat-zero methods do not count.",
+                      "type": "object",
+                      "properties": {
+                        "threshold": {
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 1000000000000,
+                              "description": "Minor units of the shop currency (for example kopiykas)."
+                            },
+                            "currency": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false
+                        },
+                        "remaining": {
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 1000000000000,
+                              "description": "Minor units of the shop currency (for example kopiykas)."
+                            },
+                            "currency": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": ["threshold", "remaining"],
+                      "additionalProperties": false
+                    },
                     "notices": {
                       "type": "array",
                       "items": {
@@ -9299,6 +9466,7 @@
                     "itemCount",
                     "purchasable",
                     "requiresShipping",
+                    "freeShipping",
                     "notices"
                   ],
                   "additionalProperties": false
@@ -9658,6 +9826,47 @@
                       "type": "boolean",
                       "description": "Whether the checkout will ask for a shipping address: at least one AVAILABLE line is a physical product (its product type ships goods). Unavailable lines are not counted, because the checkout refuses them before it asks for an address; an empty cart is `false`. Equal to what `POST /store/checkout` enforces (`400 shipping_address_required`) once the cart is purchasable."
                     },
+                    "freeShipping": {
+                      "nullable": true,
+                      "description": "Lowest offered valid free-over threshold and remaining amount, computed by the server from the cart subtotal (all available lines, including digital goods). Null for an empty cart, a cart that does not require shipping or no qualifying method. A free-over method with amount zero has effective threshold zero. Destination country is ignored; flat-zero methods do not count.",
+                      "type": "object",
+                      "properties": {
+                        "threshold": {
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 1000000000000,
+                              "description": "Minor units of the shop currency (for example kopiykas)."
+                            },
+                            "currency": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false
+                        },
+                        "remaining": {
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 1000000000000,
+                              "description": "Minor units of the shop currency (for example kopiykas)."
+                            },
+                            "currency": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": ["threshold", "remaining"],
+                      "additionalProperties": false
+                    },
                     "notices": {
                       "type": "array",
                       "items": {
@@ -9680,6 +9889,7 @@
                     "itemCount",
                     "purchasable",
                     "requiresShipping",
+                    "freeShipping",
                     "notices"
                   ],
                   "additionalProperties": false
@@ -45575,6 +45785,47 @@
                 "type": "boolean",
                 "description": "Whether the checkout will ask for a shipping address: at least one AVAILABLE line is a physical product (its product type ships goods). Unavailable lines are not counted, because the checkout refuses them before it asks for an address; an empty cart is `false`. Equal to what `POST /store/checkout` enforces (`400 shipping_address_required`) once the cart is purchasable."
               },
+              "freeShipping": {
+                "nullable": true,
+                "description": "Lowest offered valid free-over threshold and remaining amount, computed by the server from the cart subtotal (all available lines, including digital goods). Null for an empty cart, a cart that does not require shipping or no qualifying method. A free-over method with amount zero has effective threshold zero. Destination country is ignored; flat-zero methods do not count.",
+                "type": "object",
+                "properties": {
+                  "threshold": {
+                    "type": "object",
+                    "properties": {
+                      "amount": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 1000000000000,
+                        "description": "Minor units of the shop currency (for example kopiykas)."
+                      },
+                      "currency": {
+                        "type": "string"
+                      }
+                    },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false
+                  },
+                  "remaining": {
+                    "type": "object",
+                    "properties": {
+                      "amount": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 1000000000000,
+                        "description": "Minor units of the shop currency (for example kopiykas)."
+                      },
+                      "currency": {
+                        "type": "string"
+                      }
+                    },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false
+                  }
+                },
+                "required": ["threshold", "remaining"],
+                "additionalProperties": false
+              },
               "notices": {
                 "type": "array",
                 "items": {
@@ -45597,6 +45848,7 @@
               "itemCount",
               "purchasable",
               "requiresShipping",
+              "freeShipping",
               "notices"
             ],
             "additionalProperties": false,
