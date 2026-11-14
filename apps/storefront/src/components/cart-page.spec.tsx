@@ -110,6 +110,25 @@ const mixedCart = cartOf(
 );
 
 describe("CartPageView: states", () => {
+  it("shows free-shipping progress under the subtotal only for non-empty carts", () => {
+    const freeShipping = {
+      threshold: { amount: 5000, currency: "UAH" },
+      remaining: { amount: 1234, currency: "UAH" },
+    };
+    const translator = createTranslator(en, "en");
+    const html = view(ready(cartOf([cartLine("page")], { freeShipping })), {
+      t: translator,
+      locale: "en",
+    });
+    expect(html).toContain("12.34");
+    expect(html).toContain("more for free delivery");
+    expect(html.indexOf("<progress")).toBeGreaterThan(html.indexOf("Subtotal"));
+    for (const hidden of [cartOf([], { freeShipping }), cartOf([cartLine("page")])]) {
+      const hiddenHtml = view(ready(hidden), { t: translator, locale: "en" });
+      expect(hiddenHtml).not.toContain("<progress");
+      expect(hiddenHtml).not.toContain("more for free delivery");
+    }
+  });
   it("is a labelled loading state with a skeleton before the first answer", () => {
     const html = view(initialCartState);
     expect(html).toContain("<h1");

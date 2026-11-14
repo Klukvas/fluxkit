@@ -40,6 +40,8 @@
   "cart.stock.none": "Немає в наявності. Видаліть товар, щоб оформити замовлення.",
   "cart.notice.outOfRange": "Сума завелика",
   "cart.notice.outOfRange.hint": "Зменште кількість або видаліть товар.",
+  "cart.freeShipping.remaining": "Ще {amount} до безкоштовної доставки",
+  "cart.freeShipping.reached": "Доставка безкоштовна",
   "cart.summary.title": "Підсумок замовлення",
   "cart.summary.items": "Товарів",
   "cart.summary.subtotal": "Проміжна сума",

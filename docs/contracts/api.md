@@ -103,11 +103,12 @@ Plan step 4. The rules every cart route follows:
 | Creation | Lazy: a read never creates a cart or a cookie; the first successful `POST /store/cart/items` does. A cookie that matches no cart is no cart; a write replaces it with a new token |
 | Prices | Never client input. Every response shows the CURRENT catalog price, availability and notices; a cart holds no stock |
 | Money | `{amount, currency}` in minor units of the shop currency; overflow of a line total or subtotal is `409 rule_violation` (`line_total_out_of_range`, `subtotal_out_of_range`), never a clamp |
+| Free shipping hint | Required nullable `freeShipping: {threshold: Money, remaining: Money}`: lowest offered valid `free_over` threshold in the cart/shop currency; server remainder is at least zero, based on the subtotal of all available lines. Null with no candidate, empty cart or no shipping required. Country is ignored; `flat` 0 does not count. The browser never computes money. Present also in checkout's `cart_changed` cart |
 | Limits | 1 to 999 per line (never capped silently on a request), 100 lines per cart, one line per variant. The numbers are internal and may change in a minor release; the codes are contract |
 | Sign-in | `POST /store/account/register` and `login` merge the guest cart and answer `{customer, cartNotices}`; `cartNotices` is an array of `{code}` with `quantity_capped` or `lines_dropped`, `[]` when there is nothing to report (additive change of those two responses) |
 | Caching | Every `/store/cart` response, errors included, is `Cache-Control: no-store`; writes need the store CSRF header and are rate limited (`429`) |
 
-`requiresShipping`, `insufficientStock` and `maxQuantity` are additive fields of the cart shape (minor; clients must ignore unknown fields as with any additive field). The `cart` of a `409 cart_changed` is typed in `openapi.json` as the same cart schema as `GET /store/cart`. Not contract (internal): the cart-level `notices` array of the cart shape is always empty today (reserved), the order of lines within the cart is insertion order, the rate-limit numbers, the sliding expiry mechanism beyond `CART_TTL_DAYS`.
+`freeShipping`, `requiresShipping`, `insufficientStock` and `maxQuantity` are additive fields of the cart shape (minor; clients must ignore unknown fields as with any additive field). The `cart` of a `409 cart_changed` is typed in `openapi.json` as the same cart schema as `GET /store/cart`. Not contract (internal): the cart-level `notices` array of the cart shape is always empty today (reserved), the order of lines within the cart is insertion order, the rate-limit numbers, the sliding expiry mechanism beyond `CART_TTL_DAYS`.
 
 Known limits:
 

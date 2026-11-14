@@ -139,6 +139,8 @@ export interface Cart {
   purchasable: boolean;
   /** True when any line ships physical goods: the checkout then needs a shipping address. */
   requiresShipping: boolean;
+  /** Server-computed progress to the lowest offered free-over threshold, or null when not applicable. */
+  freeShipping: { threshold: Money; remaining: Money } | null;
   notices: CartNotice[];
 }
 

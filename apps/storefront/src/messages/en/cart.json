@@ -38,6 +38,8 @@
   "cart.stock.none": "Out of stock. Remove the item to place the order.",
   "cart.notice.outOfRange": "Amount too large",
   "cart.notice.outOfRange.hint": "Lower the quantity or remove the item.",
+  "cart.freeShipping.remaining": "{amount} more for free delivery",
+  "cart.freeShipping.reached": "Free delivery unlocked",
   "cart.summary.title": "Order summary",
   "cart.summary.items": "Items",
   "cart.summary.subtotal": "Subtotal",
