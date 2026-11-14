@@ -19,6 +19,7 @@ Source of truth: `packages/theme/src/tokens.css` (the template's values). A clie
 | `--fk-color-danger-foreground` | `text-danger-foreground` | text on a `danger` fill, such as the header's cart count badge (added 2026-11-02) |
 | `--fk-color-success` | `text-success`, `border-success` | success and availability (added in storefront plan step 4a) |
 | `--fk-color-warning` | `text-warning`, `border-warning` | notices such as changed prices (added in step 4a) |
+| `--fk-color-scrim` | `bg-scrim` (`backdrop:bg-scrim` on a native dialog) | overlay backdrops (drawer, dialog); dark and translucent in both themes, `#rrggbbaa`; added 2026-11-14, owner decision |
 | `--fk-color-ring` | `outline-ring`, `ring-ring` | visible keyboard focus (added in step 4a) |
 | `--fk-radius-sm` / `-md` / `-lg` | `rounded-sm` / `rounded-md` / `rounded-lg` | the radius size steps. Kept for forks' own components (additive); the template's code uses the role radii below and these steps only through the guard's exception list |
 | `--fk-radius-control` | `rounded-control` | buttons, fields, selects, chips, pagination, menu entries and header links, focus targets (a focused section's outline), and popups anchored to a field (menus, suggestion and combobox lists, the search hint). Default `1.5rem`. Added 2026-11-09 |
@@ -48,6 +49,7 @@ Source of truth: `packages/theme/src/tokens.css` (the template's values). A clie
 | danger / danger-foreground | `#b83224` / `#ffffff` | `#ff9380` / `#2b1a12` |
 | success / warning | `#326b44` / `#925d0d` | `#9be3c0` / `#ffd166` |
 | ring | `#db3b18` | `#ff7959` |
+| scrim | `#2b1a1280` | `#09050380` |
 
 - Radius roles: control/card/overlay `1.5rem`, panel/media `1rem`; scale sm/md/lg `0.375rem` / `0.75rem` / `1.5rem`. Small marks retain the sm step. Type scale and spacing unit stay unchanged.
 - Shadows: card `3px 3px 0 0`, raised `5px 5px 0 0`, overlay `6px 6px 0 0`, all in ink `#2b1a12` (light) or near-black brown `#090503` (dark); no blur.
@@ -185,7 +187,7 @@ a token in the light block of `tokens.css` (since 2026-11-08 non-colour tokens l
   `prefers-color-scheme` rule (a source check in any letter case and spacing, plus the built-CSS check; pattern checks, not a parser).
 - The file's location and its import order are part of this contract; its content is the fork's. Since PR-I2a (2026-11-10) `contrast.spec.ts`
   checks the pairs of "Contrast" below on the admin's EFFECTIVE values (the light block of `tokens.css`, the light rule of `brand-overrides.css`,
-  then this file; a `@font-face` rule is skipped), and `brand-overrides.spec.ts` checks its token values (6-digit hex colours, lengths,
+  then this file; a `@font-face` rule is skipped), and `brand-overrides.spec.ts` checks its token values (6-digit hex colours except scrim (`#rrggbbaa`), lengths,
   shadows, font lists, no `!important`), so a fork's admin colours are checked by CI (the ADR 0047 follow-up). Note for
   `apps/admin/README.md` (not edited in PR-I2a, a parallel change owns it): it says "a rebrand of `tokens.css` reaches the admin"; a rebrand
   in `brand-overrides.css` reaches it too.
@@ -217,7 +219,7 @@ a token in the light block of `tokens.css` (since 2026-11-08 non-colour tokens l
   So a colour or shadow set in the overrides' light rule ALSO wins on dark pages unless the overrides' dark and system rules set it too.
   The rules: a colour or shadow set for light is also set for dark; the system rule holds exactly the dark rule's tokens and values;
   fonts, radii, the type scale and the spacing unit only in the light rule (all modes inherit them); existing `--fk-*` tokens only, 6-digit
-  hex colours and valid values (lengths, shadows, font lists; an empty value fails), no `!important` (any spacing), no other selector (`html { ... }` would lose to `:root`, `html[data-theme="dark"]` would win by
+  hex colours except `--fk-color-scrim` (8-digit `#rrggbbaa`, alpha included), and valid values (lengths, shadows, font lists; an empty value fails), no `!important` (any spacing), no other selector (`html { ... }` would lose to `:root`, `html[data-theme="dark"]` would win by
   specificity; both are refused; a selector that differs only in spaces or quotes is told the exact spelling) and no other at-rule. Unlike
   `admin-overrides.css`, dark and system rules are allowed (the storefront renders all three modes). `brand-overrides.spec.ts` refuses
   everything else with a message naming the token or rule; a parse error names the overrides file.
@@ -284,7 +286,7 @@ dark, or sets `defaultMode: "light"`.
 
 ## Contrast (enforced by `packages/theme/src/contrast.spec.ts`)
 
-The test parses `tokens.css` and the overrides files into their blocks (`packages/theme/src/token-blocks.ts`; 6-digit hex values only; another color format fails the test) and computes the WCAG 2.x contrast ratio on the EFFECTIVE values (since 2026-11-10): the storefront's `tokens.css` plus `brand-overrides.css` in light, dark and the system mode on a light and on a dark device, and the admin's `tokens.css`, the light rule of `brand-overrides.css` and `admin-overrides.css` in light. A rebrand must keep these pairs passing:
+The test parses `tokens.css` and the overrides files into their blocks (`packages/theme/src/token-blocks.ts`; 6-digit hex for text/background pairs, 8-digit hex for scrim only; another color format fails the test) and computes the WCAG 2.x contrast ratio on the EFFECTIVE values (since 2026-11-10): the storefront's `tokens.css` plus `brand-overrides.css` in light, dark and the system mode on a light and on a dark device, and the admin's `tokens.css`, the light rule of `brand-overrides.css` and `admin-overrides.css` in light. A rebrand must keep these pairs passing:
 
 | Foreground on background | Minimum |
 |---|---|
@@ -308,6 +310,8 @@ The test parses `tokens.css` and the overrides files into their blocks (`package
 the colour TOKEN `--fk-color-accent` that tone uses (`bg-accent text-accent-foreground`; before 2026-11-08 the tone used the primary
 classes, with the same pixels), and Tailwind's own `accent-*` utilities, which set the CSS `accent-color` of checkboxes and radios
 (`accent-primary` in `Checkbox` stays as it is). A fork sets the accent pair in all three theme blocks; the pairs above must pass.
+
+The scrim is checked separately on the same EFFECTIVE values (including overrides) in light, dark, both system device states and the admin: composite `--fk-color-scrim` over `background` and `foreground` with browser-style sRGB alpha blending before computing luminance. Neither surface may become lighter, and the lighter surface must retain 15–35% of its original luminance. Scrim is an overlay, not a text/background contrast pair.
 
 The test also reads the class strings of `packages/ui` and `apps/storefront` and fails when a component uses a text, border, outline or ring token on a background that is neither in this table nor declared decorative in the test (`border` on `background` and on `muted`: outlines of cards, badges, buttons and dividers, whose content is identified by its text).
 
@@ -338,7 +342,7 @@ Mail clients do not support CSS variables, so mail templates (`EmailTemplate`, `
 | `lineHeight` | mail only | `1.5` |
 | `contentWidth` | mail only (pixels, the content table's `width`) | `600` |
 
-Not used in mail: `--fk-motion-*` (mail has no transitions or animations), `--fk-color-border-input` (no form controls), `--fk-color-danger-foreground` (no text on a danger fill), `--fk-color-accent` and `-accent-foreground` (no banner or other accent surface in mail; 2026-11-08), `--fk-font-display` (mail headings use `font.sans`; a fork's display face is a web font mail cannot load; 2026-11-08), `--fk-color-ring` (no keyboard focus), `--fk-shadow-card`, `--fk-shadow-raised`, `--fk-shadow-overlay` (box-shadow is poorly supported), `--fk-font-size-*`, `--fk-line-height-*` and `--fk-space-unit` (mail keeps its own px groups `fontSize`, `lineHeight`, `space`). Dark mode is not attempted in mail.
+Not used in mail: `--fk-color-scrim` (no overlay backdrops), `--fk-motion-*` (mail has no transitions or animations), `--fk-color-border-input` (no form controls), `--fk-color-danger-foreground` (no text on a danger fill), `--fk-color-accent` and `-accent-foreground` (no banner or other accent surface in mail; 2026-11-08), `--fk-font-display` (mail headings use `font.sans`; a fork's display face is a web font mail cannot load; 2026-11-08), `--fk-color-ring` (no keyboard focus), `--fk-shadow-card`, `--fk-shadow-raised`, `--fk-shadow-overlay` (box-shadow is poorly supported), `--fk-font-size-*`, `--fk-line-height-*` and `--fk-space-unit` (mail keeps its own px groups `fontSize`, `lineHeight`, `space`). Dark mode is not attempted in mail.
 `packages/theme/src/email-theme.spec.ts` fails when a color, font or radius differs from its light token (fonts retain internal `var()` fallbacks and drop bare `var(--font-*)` entries, since mail cannot load a web font) or when a light token is neither in `emailTheme` nor in that list. Rebranding mail = changing `tokens.css` and the matching `emailTheme` values (the guard names each one), never a template.
 
 ## Motion (2026-11-14)

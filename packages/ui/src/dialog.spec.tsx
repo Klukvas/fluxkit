@@ -47,7 +47,7 @@ describe("Dialog", () => {
 
   it("styles the backdrop with a token and keeps the dialog centered", () => {
     const markup = dialog(true);
-    expect(markup).toContain("backdrop:bg-foreground/50");
+    expect(markup).toContain("backdrop:bg-scrim");
     expect(markup).toContain("m-auto");
   });
 });
