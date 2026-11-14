@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { CatalogOutcome, StoreData } from "./store-data";
-import { SITEMAP_PRODUCT_PAGE_SIZE, buildSitemap, collectSitemapProducts } from "./sitemap";
+import { feature as fixtureFeature } from "../features/fixtures/app/[locale]/(feature-notebook)/_feature/feature";
+import type { FeatureData, RegisteredFeature, StorefrontFeature } from "../features/types";
+import {
+  SITEMAP_PRODUCT_PAGE_SIZE,
+  buildSitemap,
+  collectFeatureSitemapPages,
+  collectSitemapProducts,
+} from "./sitemap";
 import { category, summary } from "./test-fixtures";
 
 function ok<T>(data: T): CatalogOutcome<T> {
@@ -150,5 +157,203 @@ describe("buildSitemap", () => {
       publishedAt: "2026-03-01T10:00:00.000Z",
     }));
     expect(buildSitemap({ ...input, products }).length).toBeLessThan(50_000);
+  });
+});
+
+describe("feature pages in the sitemap (plan 2026-11-13-blog.md, section 9)", () => {
+  const atlas: StorefrontFeature = {
+    ...fixtureFeature,
+    name: "atlas",
+    sitemap: async ({ locale, data }) => {
+      const outcome = await data.read<string[]>("GET /store/atlas/maps", async () => ({
+        ok: true,
+        status: 200,
+        data: [`maps-${locale}`],
+      }));
+      if (!outcome.ok) throw new Error("refused");
+      return outcome.data.map((slug) => ({ path: `/atlas/${slug}`, lastModified: "2026-11-01" }));
+    },
+  };
+  /** A registry entry of a manifest whose pages live under `/<segment>`. */
+  const entry = (feature: StorefrontFeature, segment = feature.name): RegisteredFeature => ({
+    folder: feature.name,
+    segments: [segment],
+    feature,
+  });
+  /** Feature data that answers every read with what the call gives, recording the feature it was asked for. */
+  function dataOf(asked: string[]) {
+    return (feature: string): FeatureData => ({
+      read: async (_operation, call) => {
+        asked.push(feature);
+        const result = await call({
+          baseUrl: "http://api.internal:3000",
+          fetch: async () => new Response(null),
+          options: {},
+        });
+        return result.ok
+          ? { ok: true, data: result.data, stale: false }
+          : { ok: false, status: result.status, problem: result.problem };
+      },
+    });
+  }
+
+  it("asks only the enabled slices, in registry order, through their own reads", async () => {
+    const asked: string[] = [];
+    const pages = await collectFeatureSitemapPages(
+      [entry(atlas), entry(fixtureFeature)],
+      ["notebook", "atlas"],
+      {
+        locale: "uk",
+        data: dataOf(asked),
+      },
+    );
+    expect(pages).toEqual([
+      { path: "/atlas/maps-uk", lastModified: "2026-11-01" },
+      { path: "/notebook" },
+    ]);
+    expect(asked).toEqual(["atlas"]);
+    expect(
+      await collectFeatureSitemapPages([entry(atlas), entry(fixtureFeature)], [], {
+        locale: "uk",
+        data: dataOf([]),
+      }),
+    ).toEqual([]);
+  });
+
+  it("fails loudly on a refused read and on a path that is not under one of the slice's own pages", async () => {
+    const refusing: StorefrontFeature = {
+      ...fixtureFeature,
+      sitemap: async () => {
+        throw new Error("GET /store/notebook/pages answered 500");
+      },
+    };
+    await expect(
+      collectFeatureSitemapPages([entry(refusing)], ["notebook"], {
+        locale: "uk",
+        data: dataOf([]),
+      }),
+    ).rejects.toThrow(/answered 500/);
+    for (const path of [
+      "https://example.com/x",
+      "notebook",
+      "/",
+      "/notebook/../b",
+      "/notebook?page=2",
+      "/notebook/a b",
+      "/catalog",
+    ]) {
+      const odd: StorefrontFeature = { ...fixtureFeature, sitemap: async () => [{ path }] };
+      await expect(
+        collectFeatureSitemapPages([entry(odd)], ["notebook"], { locale: "uk", data: dataOf([]) }),
+        path,
+      ).rejects.toThrow(`The sitemap of feature "notebook" lists "${path}"`);
+    }
+  });
+
+  it("lists the feature pages after the shop pages, in every locale with alternates, and nothing without them", () => {
+    const input = {
+      origin: "https://shop.example",
+      locales: ["uk", "en"],
+      defaultLocale: "uk",
+      categories: [],
+      products: [],
+      shopPages: ["/about"],
+    };
+    const without = buildSitemap(input);
+    const urls = buildSitemap({
+      ...input,
+      featurePages: [{ path: "/notebook", lastModified: "2026-11-01" }],
+    });
+    expect(buildSitemap({ ...input, featurePages: [] })).toEqual(without);
+    expect(urls.map((entry) => entry.url)).toEqual([
+      "https://shop.example/uk",
+      "https://shop.example/en",
+      "https://shop.example/uk/catalog",
+      "https://shop.example/en/catalog",
+      "https://shop.example/uk/about",
+      "https://shop.example/en/about",
+      "https://shop.example/uk/notebook",
+      "https://shop.example/en/notebook",
+    ]);
+    expect(urls[6]).toEqual({
+      url: "https://shop.example/uk/notebook",
+      lastModified: "2026-11-01",
+      alternates: {
+        languages: {
+          uk: "https://shop.example/uk/notebook",
+          en: "https://shop.example/en/notebook",
+          "x-default": "https://shop.example/uk/notebook",
+        },
+      },
+    });
+  });
+  it("lists a feature page that names its locales in those alone, with alternates and x-default among them", () => {
+    const input = {
+      origin: "https://shop.example",
+      locales: ["uk", "en"],
+      defaultLocale: "uk",
+      categories: [],
+      products: [],
+    };
+    const urls = buildSitemap({
+      ...input,
+      featurePages: [
+        { path: "/notebook/both", locales: ["en", "uk"] },
+        { path: "/notebook/english", lastModified: "2026-11-02", locales: ["en"] },
+        { path: "/notebook/none", locales: [] },
+      ],
+    }).slice(4);
+    expect(urls).toEqual([
+      {
+        url: "https://shop.example/uk/notebook/both",
+        alternates: {
+          languages: {
+            uk: "https://shop.example/uk/notebook/both",
+            en: "https://shop.example/en/notebook/both",
+            "x-default": "https://shop.example/uk/notebook/both",
+          },
+        },
+      },
+      {
+        url: "https://shop.example/en/notebook/both",
+        alternates: {
+          languages: {
+            uk: "https://shop.example/uk/notebook/both",
+            en: "https://shop.example/en/notebook/both",
+            "x-default": "https://shop.example/uk/notebook/both",
+          },
+        },
+      },
+      {
+        url: "https://shop.example/en/notebook/english",
+        lastModified: "2026-11-02",
+        alternates: {
+          languages: {
+            en: "https://shop.example/en/notebook/english",
+            "x-default": "https://shop.example/en/notebook/english",
+          },
+        },
+      },
+    ]);
+  });
+
+  it("passes a feature page's locales on and refuses one that is not a storefront locale", async () => {
+    const withLocales: StorefrontFeature = {
+      ...fixtureFeature,
+      sitemap: async () => [{ path: "/notebook/a", locales: ["en"] }],
+    };
+    expect(
+      await collectFeatureSitemapPages([entry(withLocales)], ["notebook"], {
+        locale: "uk",
+        data: dataOf([]),
+      }),
+    ).toEqual([{ path: "/notebook/a", locales: ["en"] }]);
+    const odd = {
+      ...fixtureFeature,
+      sitemap: async () => [{ path: "/notebook/a", locales: ["de"] }],
+    } as unknown as StorefrontFeature;
+    await expect(
+      collectFeatureSitemapPages([entry(odd)], ["notebook"], { locale: "uk", data: dataOf([]) }),
+    ).rejects.toThrow(`lists "/notebook/a" in "de", which is not a storefront locale`);
   });
 });

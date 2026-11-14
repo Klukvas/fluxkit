@@ -4,10 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "node ../../scripts/generate-feature-registry.mjs",
     "dev": "NEXT_TELEMETRY_DISABLED=1 next dev",
+    "prebuild": "node ../../scripts/generate-feature-registry.mjs",
     "build": "NEXT_TELEMETRY_DISABLED=1 next build",
     "start": "NEXT_TELEMETRY_DISABLED=1 next start",
+    "pretypecheck": "node ../../scripts/generate-feature-registry.mjs",
     "typecheck": "tsc --noEmit",
+    "pretest": "node ../../scripts/generate-feature-registry.mjs",
     "test": "vitest run && vitest run -c vitest.brand-fork.config.ts && vitest run -c vitest.home-fork.config.ts",
     "test:e2e": "playwright test -c e2e/playwright.config.ts"
   },

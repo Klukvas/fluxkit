@@ -2,6 +2,8 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { locales, type Messages } from "@fluxkit/ui";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { feature as fixtureFeature } from "../features/fixtures/app/[locale]/(feature-notebook)/_feature/feature";
+import { storefrontFeatures } from "../features/registry";
 import { CLIENT_MESSAGE_PREFIXES, pickClientMessages } from "../lib/client-messages";
 import {
   CUSTOM_NAMESPACE,
@@ -13,6 +15,7 @@ import {
 import {
   MESSAGE_FILES,
   applyExtras,
+  applyFeatureMessages,
   applyOverrides,
   baseMessagesByLocale,
   buildLocaleMessages,
@@ -159,12 +162,13 @@ describe("message overrides (WP3 M2: fork-owned src/messages-overrides/{uk,en}.j
     }
   });
 
-  it("are merged last into what the app uses: messagesByLocale equals the base, then the extras, then the overrides", () => {
+  it("are merged last into what the app uses: messagesByLocale equals the base, then the feature slices' texts, then the extras, then the overrides", () => {
     for (const locale of locales) {
       const extras = readJson(join(extrasDir, `${locale}.json`));
       const overrides = readJson(join(overridesDir, `${locale}.json`));
       expect(messagesByLocale[locale]).toEqual({
         ...baseMessagesByLocale[locale],
+        ...Object.assign({}, ...storefrontFeatures.map((feature) => feature.messages[locale])),
         ...extras,
         ...overrides,
       });
@@ -350,5 +354,65 @@ describe("messagesByLocale wiring with non-empty fork files (review of PR 244: t
         { en: { "custom.deliveryKyiv": "Courier" } },
       ),
     ).resolves.toMatchObject({ en: { "custom.deliveryKyiv": "Courier" } });
+  });
+});
+
+describe("feature slice messages (plan 2026-11-13-blog.md, E6: features.<name>. in the slice's _feature/messages)", () => {
+  const base: Messages = { "site.name": "Shopname Fixture" };
+
+  it("are added after the area files, each under its own feature's namespace", () => {
+    expect(applyFeatureMessages(base, [fixtureFeature], "en")).toEqual({
+      ...base,
+      ...fixtureFeature.messages.en,
+    });
+  });
+
+  it("refuse a key outside the feature's own namespace (another feature's included), a key already present and an empty text", () => {
+    const of = (messages: Record<string, string>) => [
+      { name: "notebook", messages: { uk: messages, en: messages } },
+    ];
+    expect(() => applyFeatureMessages(base, of({ "site.title": "x" }), "uk")).toThrow(
+      'Feature message "site.title" in app/[locale]/(feature-notebook)/_feature/messages/uk.json is outside the feature\'s namespace "features.notebook."',
+    );
+    expect(() => applyFeatureMessages(base, of({ "features.blog.nav": "x" }), "uk")).toThrow(
+      /outside the feature's namespace/,
+    );
+    expect(() => applyFeatureMessages(base, of({ "features.notebook.": "x" }), "uk")).toThrow(
+      /outside the feature's namespace/,
+    );
+    expect(() =>
+      applyFeatureMessages(
+        { "features.notebook.nav": "x" },
+        of({ "features.notebook.nav": "y" }),
+        "uk",
+      ),
+    ).toThrow(/already has a message/);
+    expect(() => applyFeatureMessages(base, of({ "features.notebook.nav": " " }), "uk")).toThrow(
+      /must be a non-empty string/,
+    );
+  });
+
+  it("come before the fork's overrides, so a fork overrides a feature's text like any upstream one", () => {
+    const merged = buildLocaleMessages(
+      { shell: base },
+      {},
+      { "features.notebook.nav": "Own" },
+      "en",
+      [fixtureFeature],
+    );
+    expect(merged["features.notebook.nav"]).toBe("Own");
+    expect(merged["features.notebook.title"]).toBe(
+      fixtureFeature.messages.en["features.notebook.title"],
+    );
+  });
+
+  it("stay on the server: the features namespace has no area file and is not sent to the browser", () => {
+    expect(MESSAGE_NAMESPACES.features).toEqual({ area: null, client: false });
+    expect(areaOfKey("features.notebook.nav")).toBeNull();
+    expect(
+      Object.keys(
+        pickClientMessages({ ...base, ...fixtureFeature.messages.en, "nav.cart": "Cart" }),
+      ),
+    ).not.toContain("features.notebook.nav");
   });
 });

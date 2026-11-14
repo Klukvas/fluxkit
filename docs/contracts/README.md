@@ -7,7 +7,7 @@ Existing:
 - `branding.md` - the storefront brand config `apps/storefront/src/config/brand.ts` (fork-owned): logo, icons, theme colour, default social picture.
 - `card-registry.md` - storefront product card registry (fork-owned `cards/custom.ts`, `ProductCardModel`) and the `view` URL parameter (draft).
 - `config.md` - environment variables and the feature package contract.
-- "Feature extension points" below (ADR 0049) - the API kit, feature migrations, a feature's personal-data inventory, `features` on the config routes.
+- "Feature extension points" below (ADR 0049) - the API kit, feature migrations, a feature's personal-data inventory, `features` on the config routes, the storefront slice of a feature.
 - `header-footer.md` - storefront header and footer composition: the fork-owned `config/header.ts` and `config/footer.ts` (blocks, order, controls, category count, link groups with headings, text lines) (draft; the plan `docs/plans/2026-11-08-design-changeability.md` calls it `layout-config.md`).
 - `home-sections.md` - storefront home sections: the per-section `width` and the `custom` kind with the fork-owned `config/custom-sections.ts` (draft).
 - `events.md` - domain events (the outbox), the handler metadata key, the delivery rules and the order ports.
@@ -25,8 +25,8 @@ Entry format: name, since-version, description, shape, status (stable / deprecat
 
 ## Feature extension points (stable, ADR 0049)
 
-E1 to E4 of `docs/plans/2026-11-13-blog.md`; the storefront and admin slices (E5 to E8) and the safe Markdown (E9) are added when they
-exist. Kept in this file until the planned `features.md` exists (a documentation-file hook blocked creating it in PR 1). The package
+E1 to E4 of `docs/plans/2026-11-13-blog.md`, and the storefront slice (E5 to E7, below); the admin slice (E8) and the safe Markdown (E9)
+are added when they exist. Kept in this file until the planned `features.md` exists (a documentation-file hook blocked creating it in PR 1). The package
 contract itself (manifest, `featureModule`, `FEATURES_ENABLED`) is in `config.md`, "Feature package contract".
 
 **API kit (`@fluxkit/api-kit`).** A feature imports these from the package's public entry, never from `apps/api` (module boundary) and
@@ -76,6 +76,21 @@ fails when any column of `public` is not classified by the merged inventory. Tab
 **Enabled features on the config routes.** `features: string[]` on `GET /store/config` and `GET /admin/config`: the names in
 `FEATURES_ENABLED` that loaded, sorted. A client shows a feature's pages, links and screens only when its name is listed; otherwise the
 feature's routes answer `404`.
+
+**Storefront slice (E5 to E7, blog plan PR 4a; draft until the first real slice, the blog, ships in PR 4b).** A feature's storefront part is
+the route group `apps/storefront/src/app/[locale]/(feature-<name>)/`, deleted with the feature:
+
+| Part | Shape and rule |
+|---|---|
+| Folder | `(feature-<name>)`, `<name>` the `FEATURES_ENABLED` name. Holds exactly `layout.tsx` at its root (only `export { default } from "../(site)/layout";`), `page.tsx` files and private `_`-prefixed folders (`_feature/`). FORBIDDEN outside the private folders, because nothing would gate them: any other file, so route handlers (`route.ts`), metadata files (`opengraph-image`, `twitter-image`, `icon`, `sitemap`, `robots`, `manifest`), `loading`, `error`, `not-found` (the app's own `[locale]/not-found.tsx` renders), `template`, `default`, nested layouts, `page.ts`/`.js`; parallel (`@slot`) and intercepting (`(.)`) folders. No `loading.tsx` above it either: every page answers a real 404 (`route-structure.spec.ts`, which lists every slice page in `mustAnswerRealNotFound`). |
+| Pages | Exports only `export default async function` and, if needed, `export async function generateMetadata` / `generateViewport`, each with `await requireFeature("<name>");` (`src/features/runtime.server.ts`) as its FIRST statement: a 404 while `GET /store/config` `features` does not list the feature, before any read of the feature's API; route segment config (`dynamic`, `dynamicParams`, `revalidate`, `fetchCache`, `runtime`, `preferredRegion`, `maxDuration`) as plain literals; types. FORBIDDEN: `generateStaticParams` (it runs at build time, ungated), any other exported value, `export { ... }`, `export ... from`, `export * from`, `export default <expression>` (checked with the TypeScript compiler, `slice-rules.ts`). The first path segment is static, belongs to one slice only (the generator refuses two) and is not a shop page slug, a reserved slug (`lib/shop-pages.ts` `RESERVED_SLUGS`) or a segment of another route. |
+| Enabled state | `GET /store/config` `features`, through the data cache: a switch shows within 60 s (`CATALOG_REVALIDATE_SECONDS`). While the API cannot be read and only the in-memory copy of the config is left (stale), a page and the sitemap refuse to decide (the error view, a failed sitemap); the header and footer use the stale copy (a link's page decides again), and with no copy at all show no feature link. |
+| Manifest `_feature/feature.ts` | `export const feature: StorefrontFeature` (`src/features/types.ts`): `name` (equal to the folder's), `navigation: {placement: "header" \| "footer", labelKey, path}[]` (`/<segment>...` without the locale, query, fragment, whitespace, control characters or dot segments, whose first segment is one of the slice's own page segments; a label among its own messages), `sitemap(context) => Promise<{path, lastModified?, locales?}[]>` (`context`: `{locale, data}`; `locales`: the storefront locales the page exists in, absent for every locale), `messages: {uk, en}`. It imports only types, storefront constants and its message files (it is loaded on every page). |
+| Messages `_feature/messages/<locale>.json` | Flat keys under `features.<name>.` only, non-empty, the same keys in every locale, equal to the manifest's `messages`. Merged after the area files and before a fork's `messages-extra` and `messages-overrides` (a fork overrides them like any upstream text; a key outside the namespace or already present fails the build and every page). The release check of `next.config.ts` reads the same files. Server only (not sent to the browser). |
+| Registry | `scripts/generate-feature-registry.mjs` writes the git-ignored `src/features/registry.generated.ts` (each slice's folder name, its pages' first path segments and its manifest; written to a temporary file and renamed) from the slices on disk (empty without one) before `dev`, `build`, `typecheck` and `test` of the storefront (so also in the Docker build and after a slice is deleted). `src/features/registry.ts` checks it at load. No other module imports a slice; slices never import each other (dependency-cruiser). |
+| Data | `featureData(name).read(operation, call, read?)` (`runtime.server.ts`, `StoreData.featureRead`): the slice's own request (`call({baseUrl, fetch, options})` answers a `StoreResult`) with the catalog reads' timeout, data cache (tag `feature:<name>`, 60 s unless `read.revalidateSeconds`), logging and `StoreUnavailableError`, but never the in-memory last-good copy: an outage shows the error view instead of content the shop may have taken back. |
+| Header and footer | The enabled features' links are appended (`docs/contracts/header-footer.md`, "Feature links"); none, and the markup is unchanged. |
+| Sitemap | `/sitemap.xml` asks each enabled feature's `sitemap` and lists the pages after the shop pages, in every locale (a page with `locales`: in those, with alternates and `x-default` among them; `x-default` is the default locale when listed, else the first; a locale the storefront does not have fails the sitemap); every path follows the link rule above (its own pages only); a failed read fails the sitemap. Without any slice on disk the config is not read for it. |
 
 ## Admin text overrides (draft, PR-I2b)
 

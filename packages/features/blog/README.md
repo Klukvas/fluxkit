@@ -3,9 +3,9 @@
 Purpose: an optional blog. Admins with the catalog permissions write posts (title, excerpt, Markdown body, SEO title and description,
 cover picture and its alt text, per content locale), keep them as drafts, publish, schedule (a future `publishedAt`), unpublish and delete
 them; the store API serves the public posts with their body as a parsed Markdown AST, never HTML. Plan: `docs/plans/2026-11-13-blog.md`
-(this package is its PR 3: the API part). The storefront pages and the admin screens are separate slices (plan PRs 4b and 5).
+(this package is its PR 3: the API part). The storefront pages (plan PR 4b, below) and the admin screens (PR 5) are separate slices.
 
-Posts are public shop content: never put personal data in them (no author, no names of staff or customers).
+Posts are public shop content: never put personal data in them (no personal author, no names of staff or customers).
 
 - Flag: `blog` in `FEATURES_ENABLED` (off by default; owner's answer 9 (a)). Off: no route (every `/store/blog/*` and `/admin/blog/*`
   answers `404` like an unknown path), no migration, no database write; `features` of `GET /store/config` and `GET /admin/config` lacks
@@ -26,6 +26,32 @@ Posts are public shop content: never put personal data in them (no author, no na
 - Feature migrations: `drizzle.config.ts`, `src/schema.ts`, `drizzle/` with its own journal, applied by `pnpm db:migrate` when the flag is
   on and recorded in `drizzle.__drizzle_migrations_feature_blog`. The API refuses to start while the flag is on and the migration is
   missing: enable the feature with `FEATURES_ENABLED=blog`, `pnpm db:migrate`, then start the API.
+
+## Storefront slice (plan PR 4b)
+
+`apps/storefront/src/app/[locale]/(feature-blog)/` (slice rules and manifest: `docs/contracts/README.md`, "Feature extension points";
+files: `docs/files/storefront.md`). Shown only while `GET /store/config` `features` lists `blog`; otherwise every page below is a real
+`404` and no page links them.
+
+- `/{locale}/blog?page=N`: the public posts written in the locale, newest first, 12 a page (cover in a 16:9 frame, title link, date,
+  excerpt); an empty state linking the catalog; an inline error while the API cannot be read (the page is then `noindex`); a real
+  `404` when the list route answers `404` (the feature was just switched off and the storefront's config copy is not 60 s old yet). A bad `page` redirects to the repaired
+  address, one past the last page to the last page. Metadata: the list's canonical, hreflang for every locale, `noindex, follow` from
+  page 2; JSON-LD `BreadcrumbList`.
+- `/{locale}/blog/{slug}`: one post (title, date, cover through `StoreImage`, the body through `MarkdownView`, a link back); a real `404`
+  for anything the API does not serve in the locale. Metadata: `seoTitle ?? title`, `seoDescription ?? excerpt ??` the start of the
+  body, the canonical and hreflang of the locales the post is written in only (`x-default` the default locale when it has it, else its
+  first), Open Graph `article` with the publish and change times and the cover (else the brand's picture). JSON-LD `BlogPosting`
+  (headline at most 110 characters, `wordCount`, `inLanguage`, `image` the cover else the brand's social picture; the shop as
+  `Organization` author (name and address) and publisher (with its logo when the brand has a picture), no personal author) and
+  `BreadcrumbList`. A post whose answer names another slug is a 404 (logged).
+- Header and footer link "Блог" / "Blog" (`features.blog.nav`) to `/blog`; `/sitemap.xml` lists `/blog` and every public post in the
+  locales it is written in, with `updatedAt` (1 h cache; a truncated answer is logged). So the sitemap may list a post for up to an
+  hour after it was unpublished; its page answers a real `404` at once. Dates are shown as the UTC calendar day.
+- Caching: the list through the Next data cache for 60 s (tag `feature:blog`); a post is read on every view (the data cache keeps `200`
+  answers only, so a cached post would stay on the shop after it was unpublished). Never served from the in-memory last-good copy.
+- Texts: `_feature/messages/{uk,en}.json` (`features.blog.*`), overridable like any upstream text (`src/messages-overrides`).
+- E2E: `apps/storefront/e2e/tests/blog.e2e.ts` with `E2E_FEATURES=blog`, `blog-off.e2e.ts` in the default run.
 
 ## Database
 
@@ -69,5 +95,7 @@ guard, CSRF rule and real problem filter are proven by the core specs with the f
 2. If the database ever had the migration, roll it back BEFORE any core down migration (its foreign key references `media_upload`):
    `psql "$DATABASE_URL" -f packages/features/blog/drizzle/0000_blog_post.down.sql`. Every post is lost; cover uploads stay attached
    with their files.
-3. Delete this folder (and the blog slices of the storefront and the admin once they exist), then run `pnpm install` to update the
-   lockfile.
+3. Delete this folder, the storefront slice `apps/storefront/src/app/[locale]/(feature-blog)/` and the e2e files
+   `apps/storefront/e2e/tests/blog.e2e.ts` and `blog-off.e2e.ts` (the blog methods of `apps/storefront/e2e/support/api.ts` may go too), and the
+   admin slice once it exists, then run `pnpm install` to update the lockfile. The storefront's registry is generated again by its next
+   `dev`, `build`, `typecheck` or `test`.

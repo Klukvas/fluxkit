@@ -1,0 +1,15 @@
+{
+  "features.blog.nav": "Blog",
+  "features.blog.title": "Blog",
+  "features.blog.metaDescription": "News, tips and stories from the shop.",
+  "features.blog.list.label": "Posts",
+  "features.blog.empty.title": "No posts yet",
+  "features.blog.empty.description": "Check back later, and browse the catalog in the meantime.",
+  "features.blog.empty.action": "Browse the catalog",
+  "features.blog.error": "The posts could not be loaded right now. Reload the page in a moment.",
+  "features.blog.pagination.label": "Blog pages",
+  "features.blog.pagination.previous": "Previous",
+  "features.blog.pagination.next": "Next",
+  "features.blog.pagination.page": "Page {page}",
+  "features.blog.back": "All posts"
+}

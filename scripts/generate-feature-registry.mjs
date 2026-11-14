@@ -1,0 +1,166 @@
+// Writes the storefront's feature registry (plan docs/plans/2026-11-13-blog.md, E6; contract docs/contracts/README.md, "Feature
+// extension points"): `apps/storefront/src/features/registry.generated.ts`, git-ignored, from the feature slices present on disk,
+// `apps/storefront/src/app/[locale]/(feature-<name>)/_feature/feature.ts`. Next 16 with Turbopack has no glob import, so the one
+// module that imports the slices is generated. Without a slice the registry is empty. Run by the storefront's `predev`,
+// `prebuild`, `pretypecheck` and `pretest` scripts, so also inside the Docker build and after a feature's folders are deleted.
+//
+// Usage: node scripts/generate-feature-registry.mjs [--app <dir>] [--out <file>]
+// --app: the app router folder holding `[locale]` (default apps/storefront/src/app); --out: the file to write (default
+// apps/storefront/src/features/registry.generated.ts). The file is rewritten only when its content changes. No dependency;
+// plain Node 22.
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
+import { dirname, join, relative, sep } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const usage = "Usage: node scripts/generate-feature-registry.mjs [--app <dir>] [--out <file>]";
+const repositoryRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
+
+/** The route group of a slice; the name follows `FEATURES_ENABLED` (packages/config/src/features.ts), at most 32 characters. */
+const SLICE_GROUP = /^\(feature-([a-z][a-z0-9-]*)\)$/;
+const MAX_FEATURE_NAME_LENGTH = 32;
+/** Any route group that claims to be a slice: a malformed name must fail loudly, not be skipped. */
+const SLICE_LIKE = /^\(feature-/;
+
+/** The value after `name`; a missing value or another flag in its place is a usage error, never taken as a path. */
+function option(name) {
+  const index = process.argv.indexOf(name);
+  if (index < 0) return undefined;
+  const value = process.argv[index + 1];
+  if (value === undefined || value.startsWith("--")) {
+    console.error(`${name} needs a value.\n${usage}`);
+    process.exit(2);
+  }
+  return value;
+}
+
+/**
+ * The first URL segments of a slice's pages (`(feature-blog)/blog/[slug]/page.tsx` -> `blog`): every `page.tsx` outside the
+ * private `_` folders, route groups skipped. A page at the slice's root or with a dynamic first segment is left out here
+ * (`route-structure.spec.ts` refuses it).
+ */
+function pageSegments(sliceDir) {
+  const segments = new Set();
+  const walk = (directory, path) => {
+    for (const entry of readdirSync(directory)) {
+      const full = join(directory, entry);
+      if (statSync(full).isDirectory()) {
+        if (entry.startsWith("_")) continue;
+        walk(full, /^\(.*\)$/.test(entry) ? path : [...path, entry]);
+      } else if (entry === "page.tsx" && path[0] !== undefined && !path[0].startsWith("[")) {
+        segments.add(path[0]);
+      }
+    }
+  };
+  walk(sliceDir, []);
+  return [...segments].sort();
+}
+
+/**
+ * The slices under `<appDir>/[locale]`, sorted by name, each with its pages' first segments; throws on a malformed group, a
+ * slice without its manifest and two slices claiming the same first segment.
+ */
+function findSlices(appDir) {
+  const localeDir = join(appDir, "[locale]");
+  if (!existsSync(localeDir)) {
+    throw new Error(
+      `${localeDir} was not found: --app must be the app router folder holding [locale].`,
+    );
+  }
+  const slices = [];
+  for (const entry of readdirSync(localeDir).sort()) {
+    if (!SLICE_LIKE.test(entry) || !statSync(join(localeDir, entry)).isDirectory()) continue;
+    const name = SLICE_GROUP.exec(entry)?.[1];
+    if (name === undefined || name.length > MAX_FEATURE_NAME_LENGTH) {
+      throw new Error(
+        `${join(localeDir, entry)}: a feature slice is "(feature-<name>)" with <name> a feature name of FEATURES_ENABLED (a-z, 0-9 and "-", starting with a letter, at most ${MAX_FEATURE_NAME_LENGTH} characters).`,
+      );
+    }
+    const manifest = join(localeDir, entry, "_feature", "feature.ts");
+    if (!existsSync(manifest)) {
+      throw new Error(`${join(localeDir, entry)} has no manifest _feature/feature.ts.`);
+    }
+    slices.push({ name, manifest, segments: pageSegments(join(localeDir, entry)) });
+  }
+  const owners = new Map();
+  for (const slice of slices) {
+    for (const segment of slice.segments) {
+      const owner = owners.get(segment);
+      if (owner !== undefined) {
+        throw new Error(
+          `the slices "${owner}" and "${slice.name}" both have pages under /${segment}: a path segment belongs to one feature.`,
+        );
+      }
+      owners.set(segment, slice.name);
+    }
+  }
+  return slices;
+}
+
+/** The registry's source: one import per slice, in name order. Formatted as Prettier would (the file is lint-checked). */
+function registrySource(slices, outFile) {
+  const header = [
+    "// GENERATED by scripts/generate-feature-registry.mjs from the feature slices on disk",
+    "// (src/app/[locale]/(feature-<name>)/_feature/feature.ts). Do not edit; not committed (.gitignore).",
+    'import type { RegisteredFeature } from "./types";',
+  ];
+  const imports = slices.map((slice, index) => {
+    const path = relative(dirname(outFile), slice.manifest)
+      .split(sep)
+      .join("/")
+      .replace(/\.ts$/, "");
+    const specifier = path.startsWith(".") ? path : `./${path}`;
+    return `import { feature as feature${index} } from ${JSON.stringify(specifier)};`;
+  });
+  const list =
+    slices.length === 0
+      ? "export const generatedFeatures: readonly RegisteredFeature[] = [];"
+      : [
+          "export const generatedFeatures: readonly RegisteredFeature[] = [",
+          ...slices.map(
+            (slice, index) =>
+              `  { folder: ${JSON.stringify(slice.name)}, segments: ${JSON.stringify(slice.segments)}, feature: feature${index} },`,
+          ),
+          "];",
+        ].join("\n");
+  return `${[...header, ...imports].join("\n")}\n\n${list}\n`;
+}
+
+function main() {
+  const appDir = option("--app") ?? join(repositoryRoot, "apps", "storefront", "src", "app");
+  const outFile =
+    option("--out") ??
+    join(repositoryRoot, "apps", "storefront", "src", "features", "registry.generated.ts");
+  const slices = findSlices(appDir);
+  const source = registrySource(slices, outFile);
+  if (existsSync(outFile) && readFileSync(outFile, "utf8") === source) return;
+  mkdirSync(dirname(outFile), { recursive: true });
+  // Written next to the target and renamed over it: turbo may run two storefront tasks (build and typecheck) at once, and
+  // neither may read a half-written registry.
+  const temporary = `${outFile}.${process.pid}.tmp`;
+  try {
+    writeFileSync(temporary, source);
+    renameSync(temporary, outFile);
+  } finally {
+    rmSync(temporary, { force: true });
+  }
+  const names = slices.map((slice) => slice.name);
+  console.log(
+    `feature registry: ${names.length === 0 ? "no feature slices" : names.join(", ")} -> ${relative(process.cwd(), outFile)}`,
+  );
+}
+
+try {
+  main();
+} catch (error) {
+  console.error(`generate-feature-registry: ${error.message}`);
+  process.exit(1);
+}

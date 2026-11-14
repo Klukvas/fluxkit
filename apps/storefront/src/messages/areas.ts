@@ -2,7 +2,8 @@
  * The ONE map of message namespaces (plan docs/plans/2026-11-08-design-changeability.md, WP3 M1). A key's namespace is the
  * text before its first dot (`site.name` -> `site`). For every namespace it says:
  * - `area`: the file the key lives in, `src/messages/<locale>/<area>.json` (`message-files.spec.ts` checks every key), or
- *   `null` for the one namespace upstream ships no file for: `custom`, a fork's own keys in `src/messages-extra/<locale>.json`;
+ *   `null` for the two namespaces without an area file: `custom`, a fork's own keys in `src/messages-extra/<locale>.json`, and
+ *   `features`, the texts of the feature slices (`features/registry.ts`);
  * - `client`: whether client components use it, so its keys are serialized into the page for the browser
  *   (`CLIENT_MESSAGE_PREFIXES` in `lib/client-messages.ts` is derived from this flag; server-only namespaces such as home
  *   sections and the footer stay out of the client payload).
@@ -84,6 +85,9 @@ export const MESSAGE_NAMESPACES = {
   // A fork's own keys (`src/messages-extra`, no upstream area file). Client, so a fork's client component can use them; every
   // `custom.` key is then serialized into each page for the browser: that payload is the fork's to keep small.
   custom: { area: null, client: true },
+  // The texts of the optional features' storefront slices (`features.<name>.`, `app/[locale]/(feature-<name>)/_feature/messages`,
+  // no upstream area file; plan docs/plans/2026-11-13-blog.md, E6). Server only: a slice renders its texts on the server.
+  features: { area: null, client: false },
 } as const satisfies Record<string, MessageNamespace>;
 
 /** The namespace of a key: the text before its first dot. */
