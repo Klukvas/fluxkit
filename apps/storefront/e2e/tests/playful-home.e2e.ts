@@ -1,8 +1,33 @@
+import type { Page } from "@playwright/test";
 import { E2E_ORIGIN } from "../support/env.ts";
 import { expect, test } from "../support/fixtures.ts";
 import { readLayoutShifts, watchLayoutShifts } from "../support/layout-shift.ts";
 
 // Plan 2026-11-14-playful-default-design WS-D: optional ornaments, CSS motion and stable section geometry.
+
+/** Sideways scroll of the page, with the elements reaching past the viewport's end edge for the failure message. */
+async function horizontalOverflow(page: Page): Promise<{ overflow: number; offenders: string[] }> {
+  return page.evaluate(() => {
+    const root = document.documentElement;
+    const width = root.clientWidth;
+    const offenders = [...document.querySelectorAll("body *")]
+      .filter((element) => element.getBoundingClientRect().right > width + 0.5)
+      .slice(0, 6)
+      .map((element) => {
+        const box = element.getBoundingClientRect();
+        const style = getComputedStyle(element);
+        const name = element.getAttribute("class") ?? "";
+        return `${element.tagName.toLowerCase()}.${name.slice(0, 60)} right=${String(Math.round(box.right))} transform=${style.transform}`;
+      });
+    return {
+      overflow: root.scrollWidth - width,
+      offenders: [
+        `clientWidth=${String(width)} scrollWidth=${String(root.scrollWidth)}`,
+        ...offenders,
+      ],
+    };
+  });
+}
 for (const locale of ["en", "uk"] as const) {
   for (const width of [1280, 360]) {
     test(`playful home ${locale} at ${width}px: ornaments, opaque LCP, reveals and CLS`, async ({
@@ -46,11 +71,8 @@ for (const locale of ["en", "uk"] as const) {
       await expect(
         page.locator('[data-home-reveal="pop-in"] [data-home-section="categories"]'),
       ).toBeAttached();
-      expect(
-        await page.evaluate(
-          () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-        ),
-      ).toBeLessThanOrEqual(0);
+      const sideways = await horizontalOverflow(page);
+      expect(sideways.overflow, sideways.offenders.join(" | ")).toBeLessThanOrEqual(0);
       const stickerBox = await hero.locator("[data-home-sticker]").boundingBox();
       const heroBox = await hero.boundingBox();
       expect(stickerBox).not.toBeNull();
