@@ -58,6 +58,7 @@ const AREA_MODULES = [
   "src/areas/audit/index.tsx",
   "src/areas/search/index.tsx",
   "src/areas/help/index.tsx",
+  "src/areas/home/home-workspace.tsx",
 ];
 
 interface ManifestChunk {

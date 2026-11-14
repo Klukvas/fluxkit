@@ -51,7 +51,7 @@ R5. **The principal carries the token hash it was resolved with** (`sessionId` a
 | `apps/api/src/customers/account/account.service.ts`, `account.controller.ts` | change-password rotates and sets the cookie |
 | `apps/api/src/auth/current-admin.ts`, `customers/auth/current-customer.ts` (principal types) | add the token hash |
 | `docs/api/auth.md`, `docs/api/customers.md`, `docs/api/openapi.json` | `Set-Cookie` on change-password; admin login revokes the presented session |
-| `docs/adr/0052-session-token-rotation.md` | new ADR; supplements ADR 0009, 0010, 0016 (old ADRs are not edited); number checked again at implementation time |
+| `docs/adr/0054-session-token-rotation.md` | new ADR; supplements ADR 0009, 0010, 0016 (old ADRs are not edited); 0052 went to the split listing, 0053 to the catalog review drift |
 | `CHANGELOG.md`, `docs/HANDOFF.md` | one line each |
 
 - No migration, no new dependency, no new config variable.

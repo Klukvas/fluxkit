@@ -50,10 +50,12 @@ export function PrivacyRequestsPage() {
       description={t("personal.list.intro")}
     >
       <RequestFilter
-        key={writeRequestListQuery(query)}
         t={t}
         query={query}
-        onChange={(status) => setParams(writeRequestListQuery(withStatus(query, status)))}
+        onChange={(status) => {
+          // Update the controlled select synchronously while keeping its keyboard focus.
+          setParams(writeRequestListQuery(withStatus(query, status)), { flushSync: true });
+        }}
       />
       <RequestResults query={query} />
     </PrivacyFrame>

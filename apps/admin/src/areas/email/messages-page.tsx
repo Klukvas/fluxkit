@@ -61,7 +61,8 @@ export function EmailMessagesPage() {
     templates.status === "ready" ? templates.data.items.map((item) => item.key) : [];
 
   function apply(filters: MessageFilters) {
-    setParams(writeMessageListQuery(withFilters(query, filters)));
+    // Remount the keyed form synchronously so its replacement cannot discard newly typed text.
+    setParams(writeMessageListQuery(withFilters(query, filters)), { flushSync: true });
   }
 
   return (

@@ -31,7 +31,7 @@ api ──MEILI_URL=http://meilisearch:7700──▶ meilisearch (Community Edit
 volumes: postgres-data, meili-data, media (MEDIA_DIR), acme-webroot
 ```
 
-- Only the edge publishes ports. The API's `/docs`, `/docs-json` and `/health` are not routed (they answer the storefront's 404); the owner's decision on Swagger in production stays open, the default is "not public".
+- Only the edge publishes ports. The API's `/docs`, `/docs-json` and `/health` are not routed (they answer the storefront's 404); Swagger UI in production is not public (owner's decision 2026-11-14, `docs/plans/2026-11-14-swagger-in-production.md`): keep it unrouted.
 - **Meilisearch is part of the example** (catalog search, ADR 0034; image pinned to the version CI tests, `MEILI_ENV=production`). It is reachable only by the API on the Compose network; the browser never talks to it. `api` waits for it to be healthy even with search off, so a broken engine stops the boot instead of failing later. The index is rebuilt from Postgres, so `meili-data` is a cache, not a backup target.
 - **Redis is not part of the example on purpose**: `REDIS_URL` is parsed but no running code uses Redis or BullMQ (only the spike specs; `grep` for `redisUrl`, `ioredis`, `bullmq` outside specs, 2026-11-04). It comes with the queue or shared rate-limit plan, and runs then under the approved AGPLv3 exception (`docs/dependencies.md`).
 - **Run exactly one `api` container.** The rate limits, the login throttle, the shipping caches, the mail pacing and the local media disk are per process (ADR 0009, 0016, 0028; shipping step 6). Two instances double every limit and split the uploaded files. The scheduler (jobs 1 to 14, `docs/api/jobs.md`) runs inside that one API under a Postgres lock; there is no worker image. With `SCHEDULER_ENABLED=false` run `node dist/jobs/run-once.js` from a host cron (`docker compose ... run --rm api node dist/jobs/run-once.js`) instead.
@@ -66,9 +66,35 @@ Required in the env file: `FLUXKIT_DOMAIN`, `FLUXKIT_CERTS_DIR`, `POSTGRES_USER`
 
 - `TRUST_PROXY=1` matches the example (the edge is the only proxy and replaces `X-Forwarded-For`). With a CDN or load balancer in front of the edge it becomes 2, and the edge must then APPEND instead of replace (`proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;` in `infra/proxy/nginx/snippets/forwarded-headers.conf`, the ONE snippet that both the API locations and the storefront location include, so the change covers the search results page too; ADR 0038): too high lets a client choose its rate-limit key, too low puts every shopper into one window (ADR 0024, README "Deployment notes").
 - `STOREFRONT_FORWARD_CLIENT_ADDRESS=true` (the example's value; ADR 0038) makes the storefront pass the edge's `X-Forwarded-For` on to the API for the search results page, so its `search` window counts shoppers. **The storefront must be reachable only through the edge when this is on** (the Compose example publishes no storefront port): a client that reaches `next start` directly would choose its own rate-limit key, or use up another address's window. Unset or `false`: every results page counts as the Next server's one address (one shared window for page searches; the browser's own `/store/*` calls stay per shopper).
+- The hop count of each set-up, and the check from two networks: "Proxy hops" and "Checking per-address limits" below.
 - `STOREFRONT_IMAGE_HOSTS` is frozen into the storefront's CSP when the image is BUILT (Compose passes it as a build argument and again at run time) and becomes the admin's `img-src` at the edge: rebuild the storefront after a change. With uploads in use, the shop's own domain belongs in it.
 - `ADMIN_COOKIE_SECURE` and `STORE_COOKIE_SECURE` stay `true` (HTTPS).
 - With `EMAIL_PROVIDER=none` the API logs one warning at start; password reset and order mail are then off (`docs/api/customers.md`).
+
+### Proxy hops (`TRUST_PROXY`) per set-up
+
+Count the proxies between the internet and the API that set or append `X-Forwarded-For`. The Next server is not counted: the edge routes `/store/*` straight to the API, and with `STOREFRONT_FORWARD_CLIENT_ADDRESS=true` the Next server passes the edge's chain on unchanged (ADR 0038), so the API sees the same chain on both paths.
+
+| Set-up | Chain the API receives | `TRUST_PROXY` | `STOREFRONT_FORWARD_CLIENT_ADDRESS` |
+|---|---|---|---|
+| nginx edge of the Compose example (`infra/proxy/nginx`, replaces the header with `$remote_addr`) | `X-Forwarded-For: <client>`, socket = edge (or the Next server on the results page) | `1` | `true` (only the edge publishes ports) |
+| Caddy edge (`infra/proxy/caddy/Caddyfile`, no `trusted_proxies`: Caddy replaces the header of a client it does not trust) | the same | `1` | `true` when the storefront is reachable only through Caddy |
+| CDN or load balancer in front of nginx (the edge APPENDS: `$proxy_add_x_forwarded_for`) | `<client>, <cdn node>` | `2` | `true` |
+| CDN in front of Caddy (Caddy's `trusted_proxies` set to the CDN's ranges, so it appends) | `<client>, <cdn node>` | `2` | `true` |
+| Development: `next dev` rewrite, no edge (the rewrite passes a browser-sent header through, ADR 0026) | whatever the browser sent | `0` | `false` (unset) |
+
+### Checking per-address limits
+
+After a deployment, from two different networks (for example a computer on the home network as A, a phone on mobile data with Wi-Fi off as B), within one minute. These routes cost nothing and their windows reset after a minute; do not use the admin login for this (a used-up login window locks your own address out of the admin for 10 minutes).
+
+1. On the host, the values: `grep -E '^(TRUST_PROXY|STOREFRONT_FORWARD_CLIENT_ADDRESS)=' <env file>` shows the row of the table above.
+2. The `/store/*` path (edge to API), window `searchSuggest`, 120 a minute. From A:
+   `for i in $(seq 1 125); do curl -s -o /dev/null -w '%{http_code}\n' 'https://<domain>/store/search/suggest?q=ab'; done | sort | uniq -c`
+   prints about `120 200` and `5 429`. At once, B opens `https://<domain>/store/search/suggest?q=ab`: JSON, not `too_many_requests`. A again, with an invented address: `curl -s -o /dev/null -w '%{http_code}\n' -H 'X-Forwarded-For: 198.51.100.7' 'https://<domain>/store/search/suggest?q=ab'` prints `429` (a `200` here means a client can choose its key: `TRUST_PROXY` too high for an edge that appends, or the edge does not replace the header). B refused too means every client shares one window (`TRUST_PROXY` too low, or IPv6 clients behind `docker-proxy`, above).
+3. The results page path (`STOREFRONT_FORWARD_CLIENT_ADDRESS`), window `search`, 60 a minute. After a minute, from A:
+   `for i in $(seq 1 65); do curl -s -o /dev/null "https://<domain>/uk/search?q=test$i"; done; curl -s -o /dev/null -w '%{http_code}\n' 'https://<domain>/store/search?q=x'`
+   prints `429`: the pages used up A's own window. B searches on the site at once and gets results. If A prints `200` and B sees the search error instead, the pages counted the Next server's one address: the setting is off or the edge does not set the header on page requests (every shopper then sees that error for up to a minute, so run this step on a quiet shop).
+4. The catalog reads (`catalogRead`, 300 a minute, `docs/api/catalog.md`): the same as step 2 with `/store/config` and 305 requests.
 
 ## Build and first start
 
@@ -271,7 +297,7 @@ The test server's scripts and timers for these points are described in `docs/pla
 - [ ] Images built from a tagged commit; `pnpm lint`, `typecheck`, `test`, `check:licenses`, `audit:prod` green on that commit.
 - [ ] `infra/production.env` filled, `chmod 600`, secrets generated as above, `NODE_ENV` not overridden.
 - [ ] TLS certificate valid for the domain; renewal and the `nginx -s reload` hook in place.
-- [ ] `TRUST_PROXY` equals the number of proxies in front of the API; from two different networks a limited route (for example the admin login) is counted separately.
+- [ ] `TRUST_PROXY` equals the number of proxies in front of the API ("Proxy hops"); from two different networks a limited route is counted separately ("Checking per-address limits").
 - [ ] Exactly one `api` container; `SCHEDULER_ENABLED=true` there (or a cron running `run-once`).
 - [ ] First owner created; `pnpm seed` NOT run; demo methods or products not present.
 - [ ] The API runs as a database role that owns no table and has no `TRUNCATE` (Database roles); the owner role's password is not in the API's environment.
@@ -280,8 +306,8 @@ The test server's scripts and timers for these points are described in `docs/pla
 - [ ] Backups of Postgres and the media volume scheduled and a restore tested.
 - [ ] Search: `infra/meilisearch.env` written (master key generated), the scoped key made, `SEARCH_ENABLED=true`, `GET /store/config` says `search: true`, a product found after the index is built; the engine's port is not published.
 - [ ] `FEATURES_ENABLED` decided; for each enabled feature the `migrate` log shows its migrations, `GET /store/config` lists it in `features` and its pages answer (section "Optional features").
-- [ ] Swagger UI decision (not routed by the example).
-- [ ] Launch blockers in `docs/HANDOFF.md` reviewed (catalog read rate limits, privacy plan before the EU launch).
+- [ ] Swagger UI stays unrouted: `/docs` and `/docs-json` answer 404 through the edge (owner's decision 2026-11-14).
+- [ ] Launch blockers in `docs/HANDOFF.md` reviewed (privacy plan before the EU launch). The catalog reads of `/store/*` are limited per address (`catalogRead`) only when `TRUST_PROXY` is right (above), the API is reachable only through the edge, and the storefront's `API_INTERNAL_URL` points at the API itself (the Compose value), not at the public edge.
 - [ ] The Docker images' own licences reviewed before images are handed to a client (below).
 
 ## Smoke test
