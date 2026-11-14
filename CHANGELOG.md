@@ -5,6 +5,7 @@
 One line per user-visible or schema change.
 
 ## Unreleased
+- `@fluxkit/ui` `Hero` gains a phrasing-only `ReactNode` title, section `data-*` attributes, `mediaClassName` and an ornament slot (additive); the decorated home reuses it with unchanged markup.
 - Admin: one page header on every screen (title, description, actions; at most one primary action), `ghost` Cancel buttons; `@fluxkit/ui` `Button` gains `variant="ghost"` and a leading `icon`, new `IconButton` (plan `docs/plans/2026-11-13-admin-shell-redesign.md`, PR 2; existing variants render unchanged).
 - Storefront cart drawer and motion kit (plan `docs/plans/2026-11-14-playful-default-design.md`, workstream C; storefront and UI library only: no API, schema, token, configuration or dependency change): a successful add from a product card or the product page, and a plain click on the header's cart control, open a cart drawer (lines, quantity, server subtotal, View cart and Checkout; focus trapped, Escape and the backdrop close it, focus returns to the opener); the product page's "Added" toast is replaced by the drawer, and a failed card add shows a toast. New `@fluxkit/ui` components `Drawer`, `ToastStack`/`Toast`, `NumberRoll`, `ActionButton`, `Loader`, `Skeleton variant="shimmer"` and the stylesheet `@fluxkit/ui/motion.css`; every animation uses the motion tokens and is off under reduced motion.
 - Storefront: a product card's prefixed price ("from UAH 1,299.00") wraps after its prefix instead of overflowing a two-column card at 360 px (`PriceText`, found by the playful home e2e).
