@@ -54,5 +54,8 @@
   "cart.checkout.stockBlockedShort.few": "Змініть {count} товари, щоб продовжити.",
   "cart.checkout.stockBlockedShort.many": "Змініть {count} товарів, щоб продовжити.",
   "cart.checkout.stockBlockedShort.other": "Змініть {count} товару, щоб продовжити.",
-  "cart.checkout.firstLine": "Перейти до першого"
+  "cart.checkout.firstLine": "Перейти до першого",
+  "cart.drawer.close": "Закрити кошик",
+  "cart.drawer.viewCart": "Переглянути кошик",
+  "cart.toast.dismiss": "Закрити повідомлення"
 }

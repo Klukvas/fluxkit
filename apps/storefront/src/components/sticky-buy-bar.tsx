@@ -1,5 +1,6 @@
 "use client";
 
+import { ActionButton } from "@fluxkit/ui";
 import { useEffect, useState, type RefObject } from "react";
 
 /**
@@ -58,7 +59,10 @@ export interface StickyBuyBarProps {
   decreaseLabel: string;
   increaseLabel: string;
   onQuantity: (quantity: number) => void;
-  onAdd: () => void;
+  state?: "idle" | "loading" | "done";
+  loadingLabel?: string;
+  doneLabel?: string;
+  onAdd: (opener: HTMLButtonElement) => void;
 }
 
 const stepButton =
@@ -113,15 +117,23 @@ export function StickyBuyBar(props: StickyBuyBarProps) {
           </button>
         </div>
       </div>
-      <button
+      <ActionButton
         type="button"
         tabIndex={-1}
-        disabled={!props.canAdd}
-        onClick={props.onAdd}
-        className="mt-2 inline-flex min-h-12 w-full items-center justify-center rounded-control bg-primary px-4 font-medium text-primary-foreground disabled:opacity-50"
-      >
-        {props.addLabel}
-      </button>
+        state={props.state ?? "idle"}
+        idleLabel={props.addLabel}
+        loadingLabel={props.loadingLabel ?? props.addLabel}
+        doneLabel={props.doneLabel ?? props.addLabel}
+        aria-disabled={!props.canAdd}
+        onClick={(event) => {
+          if (!props.canAdd) {
+            event.preventDefault();
+            return;
+          }
+          props.onAdd(event.currentTarget);
+        }}
+        className="mt-2 inline-flex min-h-12 w-full items-center justify-center rounded-control bg-primary px-4 font-medium text-primary-foreground disabled:opacity-50 aria-disabled:opacity-50 aria-disabled:hover:bg-primary"
+      />
     </div>
   );
 }

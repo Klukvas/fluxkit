@@ -89,7 +89,10 @@ test("the guest order token never appears in a URL, a header, the page source, t
   await page.goto("/en/p/demo-e-book");
   await waitForHydration(page);
   await page.getByRole("button", { name: "Add to cart" }).click();
-  await page.getByRole("link", { name: "Go to the cart" }).click();
+  await page
+    .getByRole("dialog", { name: /^Cart/ })
+    .getByRole("link", { name: "View cart", exact: true })
+    .click();
   await page.getByRole("link", { name: "Checkout" }).click();
   await fillCheckoutForm(page, { email: uniqueEmail(testInfo, "hygiene") });
   await page.getByRole("button", { name: "Place the order" }).click();

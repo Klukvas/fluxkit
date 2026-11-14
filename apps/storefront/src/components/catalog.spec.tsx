@@ -385,7 +385,7 @@ describe("ProductPurchaseView", () => {
   it("names the cart's quantity and disables the button when the line is already at the limit", () => {
     const html = view({ cartLines: inCart(999) });
     expect(html).toContain("§product.quantity.atLimit");
-    expect(html).toMatch(/<button[^>]*type="submit"[^>]*disabled=""/);
+    expect(html).toMatch(/<button[^>]*type="submit"[^>]*aria-disabled="true"/);
   });
 
   // Plan 2026-11-03: the cart's line says the checkout would refuse it for stock; adding more cannot help.
@@ -414,11 +414,11 @@ describe("ProductPurchaseView", () => {
     expect(real(en, "en", 3)).toContain("only 3 are available");
     expect(real(uk, "uk", 1)).toContain("доступно лише 1 шт.");
     expect(counted).not.toContain("§product.quantity.atLimit");
-    expect(counted).toMatch(/<button[^>]*type="submit"[^>]*disabled=""/);
+    expect(counted).toMatch(/<button[^>]*type="submit"[^>]*aria-disabled="true"/);
     expect(counted).toContain('href="/uk/cart"');
     const uncounted = view({ cartLines: inCart(999, true, null) });
     expect(uncounted).toContain("§product.quantity.stockShort");
-    expect(uncounted).toMatch(/<button[^>]*type="submit"[^>]*disabled=""/);
+    expect(uncounted).toMatch(/<button[^>]*type="submit"[^>]*aria-disabled="true"/);
     expect(view({ cartLines: inCart(2) })).not.toContain("§product.quantity.stock");
   });
 
@@ -518,19 +518,21 @@ describe("ProductPurchaseView", () => {
         variants: [variant("only", {}, { availability: "out_of_stock" })],
       }),
     });
-    expect(sold).toMatch(/<button[^>]*type="submit"[^>]*disabled=""/);
+    expect(sold).toMatch(/<button[^>]*type="submit"[^>]*aria-disabled="true"/);
     expect(sold).toContain("§availability.out_of_stock");
     expect(sold).toContain('aria-describedby="product-availability"');
     // The server HTML disables every buy button until the island hydrated (below); a sellable variant is named "add to cart".
-    expect(view()).toMatch(/<button[^>]*type="submit"[^>]*>§product\.addToCart<\/button>/);
-    expect(view()).not.toContain("§availability.out_of_stock</button>");
+    expect(view()).toMatch(
+      /<button[^>]*type="submit"[^>]*>[\s\S]*?<span aria-hidden="false" data-visible="true"[^>]*>§product\.addToCart<\/span>[\s\S]*?<\/button>/,
+    );
+    expect(view()).not.toContain("§availability.out_of_stock");
   });
 
   // UX round 2, batch 3A item 6: a tap before hydration posted the form natively and reloaded the page with nothing added.
   it("renders the buy button disabled and marked not ready in the server HTML, with a no-script line that says why", () => {
     const html = view();
     expect(html).toMatch(
-      /<button[^>]*type="submit"[^>]*disabled=""[^>]*data-ready="false"[^>]*>§product\.addToCart<\/button>/,
+      /<button[^>]*type="submit"[^>]*disabled=""[^>]*data-ready="false"[^>]*>[\s\S]*?<span aria-hidden="false" data-visible="true"[^>]*>§product\.addToCart<\/span>[\s\S]*?<\/button>/,
     );
     expect(html).toContain(
       '<noscript><p class="text-sm text-muted-foreground">§productReady.noScript</p></noscript>',
@@ -623,7 +625,7 @@ describe("ProductPurchaseView", () => {
     expect(fine).not.toContain("§product.soldOut.hint");
     const out = view({ product: stocked, preferredSelection: { flavor: "mint", pack: "twelve" } });
     expect(out).toMatch(
-      /<button[^>]*type="submit"[^>]*disabled=""[^>]*>§availability\.out_of_stock<\/button>/,
+      /<button[^>]*type="submit"[^>]*aria-disabled="true"[^>]*>[\s\S]*?<span aria-hidden="false" data-visible="true"[^>]*>§availability\.out_of_stock<\/span>[\s\S]*?<\/button>/,
     );
     expect(out).toContain("§product.soldOut.hint");
   });

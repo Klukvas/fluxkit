@@ -172,9 +172,7 @@ test.describe("the product page's buy button before hydration", () => {
       await expect(button).not.toHaveAttribute("data-ready");
       await button.click();
       await expect(
-        page
-          .getByRole("status")
-          .getByText(locale === "en" ? "Added to the cart." : "Додано до кошика."),
+        page.getByRole("dialog", { name: locale === "en" ? /^Cart/ : /^Кошик/ }),
       ).toBeVisible();
     });
 

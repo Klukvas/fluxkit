@@ -10,12 +10,12 @@ test("the whole purchase works with the keyboard alone (Tab, Enter, Space and ty
   // Product page: reach "Add to cart" with Tab and press Enter.
   await tabTo(page, page.getByRole("button", { name: "Add to cart" }));
   await page.keyboard.press("Enter");
-  await expect(page.getByText("Added to the cart.")).toBeVisible();
+  const drawer = page.getByRole("dialog", { name: /^Cart/ });
+  await expect(drawer).toBeVisible();
 
-  // The next control is the link to the cart.
-  const toCart = page.getByRole("link", { name: "Go to the cart" });
-  await page.keyboard.press("Tab");
-  await expect(toCart).toBeFocused();
+  // Native dialog traps focus; reach its cart link by keyboard alone.
+  const toCart = drawer.getByRole("link", { name: "View cart", exact: true });
+  await tabTo(page, toCart);
   await page.keyboard.press("Enter");
   await expect(page.getByRole("heading", { level: 1, name: "Cart" })).toBeVisible();
 

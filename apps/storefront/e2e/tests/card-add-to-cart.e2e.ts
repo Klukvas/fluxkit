@@ -25,7 +25,12 @@ test("adds a one-variant product from its catalog card and the cart badge counts
   expect((await add.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
   await add.click();
 
-  // The button confirms in its own words for a moment and the status region announces it.
+  // The successful add opens the cart; close it to inspect the card's own confirmation and the shared badge.
+  const drawer = page.getByRole("dialog", { name: /^Cart/ });
+  await expect(drawer).toBeVisible();
+  await expect(drawer).toContainText("Demo Screwdriver");
+  await page.keyboard.press("Escape");
+  await expect(drawer).toBeHidden();
   await expect(card.getByRole("button", { name: "Added Demo Screwdriver" })).toBeVisible();
   await expect(card.getByRole("status")).toHaveText("Added to the cart.");
   await expect(page).toHaveURL(/\/en\/c\/demo-tools$/);

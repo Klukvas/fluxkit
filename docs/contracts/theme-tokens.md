@@ -197,8 +197,8 @@ a token in the light block of `tokens.css` (since 2026-11-08 non-colour tokens l
 ## Storefront overrides (PR-I2a, 2026-11-10, plan `docs/plans/2026-11-08-design-changeability.md` WP2)
 
 - `packages/theme/src/brand-overrides.css` (exported as `@fluxkit/theme/brand-overrides.css`) is **fork-owned**: empty upstream (a comment
-  with an example), never edited upstream after its creation. `apps/storefront/src/app/globals.css` imports it LAST, after `tokens.css` and
-  `tailwind.css`; `apps/admin/src/styles.css` imports it too, after `tailwind.css` and before `admin-overrides.css` (see "Admin"). No other
+  with an example), never edited upstream after its creation. `apps/storefront/src/app/globals.css` imports it LAST, after `tokens.css`,
+  `tailwind.css` and `@fluxkit/ui/motion.css` (the UI library's motion classes, 2026-11-14, so a fork's token overrides still win); `apps/admin/src/styles.css` imports it too, after `tailwind.css` and before `admin-overrides.css` (see "Admin"). No other
   shipped source of the admin, `packages/ui` or the other theme files names it (tests may read it). `packages/theme/src/brand-overrides.spec.ts`
   checks the import order of both apps, the export and that scan.
 - The file's location, its import order and the rules below are part of this contract (additive: no token renamed or removed); its content
@@ -358,4 +358,4 @@ Additive contract (minor); no existing token is renamed or removed.
 - Plain `transition*` utilities use the fast duration and standard easing through `--default-transition-duration` and `--default-transition-timing-function`. Duration utilities set both `--tw-duration` and `transition-duration`, like Tailwind's own duration utility.
 - `@media (prefers-reduced-motion: reduce) { html:root { ... } }` zeroes exactly the three durations (`0ms`), leaves easings intact, and beats fork override selectors by specificity (0,1,1 over 0,1,0), whatever their import order.
 - Code waiting for `transitionend` / `animationend` must not rely on the event under reduced motion: a 0ms transition fires no event. Motion must not block input.
-- Guards refuse numeric `duration-<n>`, arbitrary duration/ease/delay classes and built-in ease-in/out/in-out/linear classes. Raw milliseconds in storefront `globals.css` belong to the separate motion workstream.
+- Guards refuse numeric `duration-<n>`, arbitrary duration/ease/delay classes and built-in ease-in/out/in-out/linear classes. Raw time values, `cubic-bezier()` and raw colours in the storefront's `globals.css` and in `@fluxkit/ui/motion.css` fail `apps/storefront/src/components/motion-guard.spec.ts` (2026-11-14); keyframe animations there also switch off under reduced motion.
