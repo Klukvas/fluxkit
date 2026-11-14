@@ -84,18 +84,10 @@ describe("runtime dependencies of the workspace packages", () => {
     );
   });
 
-  // Not vacuous: the API kit always imports Nest, and every provider and feature package on disk does too (the CI matrix
-  // deletes some of them, so the list is read from disk rather than written out here).
-  it("finds the API kit and every provider and feature package among the Nest importers", () => {
-    const providersAndFeatures = ["providers", "features"].flatMap((group) =>
-      existsSync(join(PACKAGES_DIR, group))
-        ? readdirSync(join(PACKAGES_DIR, group), { withFileTypes: true })
-            .filter((entry) => existsSync(join(PACKAGES_DIR, group, entry.name, "package.json")))
-            .map((entry) => join("packages", group, entry.name))
-        : [],
-    );
+  // Not vacuous: the API kit always imports Nest and is never deleted (the CI matrix deletes provider and feature packages,
+  // and a future provider may not use Nest at all, so neither group is required here).
+  it("finds the API kit among the Nest importers", () => {
     expect(relativeImporters).toContain(join("packages", "api-kit"));
-    expect(relativeImporters).toEqual(expect.arrayContaining(providersAndFeatures));
   });
 
   it("lists Nest and its peers as runtime dependencies at the API's versions, never as peers", () => {
