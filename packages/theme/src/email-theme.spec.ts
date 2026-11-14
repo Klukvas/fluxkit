@@ -39,6 +39,7 @@ const notInMail: Record<string, string> = {
     ].map((name) => [name, "mail has no transitions or animations"]),
   ),
   "--fk-color-border-input": "mail has no form controls",
+  "--fk-color-scrim": "mail has no overlay backdrops",
   "--fk-color-ring": "mail has no keyboard focus to show",
   "--fk-color-danger-foreground": "mail has no count badge or other text on a danger fill",
   "--fk-color-accent":

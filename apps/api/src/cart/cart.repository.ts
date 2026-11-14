@@ -3,7 +3,8 @@ import { and, asc, eq, sql } from "drizzle-orm";
 import { createMoney, type CartLine, type Money } from "@fluxkit/core";
 import type { DbExecutor, Transaction } from "../common/transaction.js";
 import { DRIZZLE, type Database } from "../database/database.module.js";
-import { cart, cartItem, customer } from "../database/schema/index.js";
+import { cart, cartItem, customer, shippingMethod } from "../database/schema/index.js";
+import { SHIPPING_STORE_LIMITS } from "../shipping/store/shipping-store-limits.js";
 
 export type CartRow = typeof cart.$inferSelect;
 
@@ -39,6 +40,22 @@ function toStoredLine(row: typeof cartItem.$inferSelect): CartLine {
 @Injectable()
 export class CartRepository {
   constructor(@Inject(DRIZZLE) private readonly db: Database) {}
+
+  /** Same bounded active-method window as shipping options; one statement, no locks or per-line reads. */
+  async listActiveShippingMethods(executor: DbExecutor) {
+    return executor
+      .select({
+        kind: shippingMethod.kind,
+        isActive: shippingMethod.isActive,
+        currency: shippingMethod.currency,
+        pricing: shippingMethod.pricing,
+        providerCode: shippingMethod.providerCode,
+      })
+      .from(shippingMethod)
+      .where(eq(shippingMethod.isActive, true))
+      .orderBy(asc(shippingMethod.position), asc(shippingMethod.code), asc(shippingMethod.id))
+      .limit(SHIPPING_STORE_LIMITS.maxMethods);
+  }
 
   async findByTokenHash(
     tokenHash: string,

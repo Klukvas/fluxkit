@@ -115,6 +115,10 @@ export const cartSchema = z.object({
     description:
       "Whether the checkout will ask for a shipping address: at least one AVAILABLE line is a physical product (its product type ships goods). Unavailable lines are not counted, because the checkout refuses them before it asks for an address; an empty cart is `false`. Equal to what `POST /store/checkout` enforces (`400 shipping_address_required`) once the cart is purchasable.",
   }),
+  freeShipping: z.object({ threshold: moneySchema, remaining: moneySchema }).nullable().meta({
+    description:
+      "Lowest offered valid free-over threshold and remaining amount, computed by the server from the cart subtotal (all available lines, including digital goods). Null for an empty cart, a cart that does not require shipping or no qualifying method. A free-over method with amount zero has effective threshold zero. Destination country is ignored; flat-zero methods do not count.",
+  }),
   notices: z.array(cartNoticeSchema),
 });
 

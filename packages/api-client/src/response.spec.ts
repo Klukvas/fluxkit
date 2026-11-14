@@ -121,6 +121,7 @@ describe("parseResponse problems", () => {
       itemCount: 0,
       purchasable: true,
       requiresShipping: false,
+      freeShipping: null,
       notices: [],
     };
     const result = await parseResponse(

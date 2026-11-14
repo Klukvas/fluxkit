@@ -533,6 +533,7 @@ describe("cart API: repricing, notices and amounts", () => {
         "itemCount",
         "purchasable",
         "requiresShipping",
+        "freeShipping",
         "notices",
         "variantId",
         "productSlug",
