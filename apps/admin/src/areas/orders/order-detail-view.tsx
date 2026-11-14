@@ -13,7 +13,7 @@ import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { formatDateTime } from "../../lib/format";
 import { PATHS } from "../../router/paths";
-import { PageHeading } from "../../views/status-views";
+import { PageHeader } from "../../views/status-views";
 import type { OrderAction } from "./order-actions";
 import {
   ORDER_STATUS_TONES,
@@ -405,33 +405,41 @@ export function OrderDetailView({
             {t("order.detail.backToList")}
           </Link>
         </p>
-        <div className="flex flex-wrap items-center gap-3">
-          <PageHeading>{t("order.detail.title", { number: order.number })}</PageHeading>
-          <StatusBadge
-            tone={ORDER_STATUS_TONES[order.status]}
-            label={t(orderStatusLabelKey(order.status))}
-          />
-        </div>
+        <PageHeader
+          title={t("order.detail.title", { number: order.number })}
+          description={
+            <StatusBadge
+              tone={ORDER_STATUS_TONES[order.status]}
+              label={t(orderStatusLabelKey(order.status))}
+            />
+          }
+          actions={
+            actions.length === 0 ? null : (
+              <Section id="order-actions" title={t("order.detail.actions")}>
+                <p className="text-muted-foreground">{t("order.detail.actionsHint")}</p>
+                <div className="flex flex-wrap gap-3">
+                  {actions.map((action) => (
+                    <Button
+                      key={action}
+                      variant={
+                        action === "markFulfilled" && actions.includes("markPaid")
+                          ? "secondary"
+                          : ACTION_BUTTON[action].variant
+                      }
+                      disabled={busy}
+                      aria-busy={busy || undefined}
+                      onClick={() => onAction(action)}
+                    >
+                      {t(ACTION_BUTTON[action].key)}
+                    </Button>
+                  ))}
+                </div>
+              </Section>
+            )
+          }
+        />
       </div>
       {statusLine}
-      {actions.length === 0 ? null : (
-        <Section id="order-actions" title={t("order.detail.actions")}>
-          <p className="text-muted-foreground">{t("order.detail.actionsHint")}</p>
-          <div className="flex flex-wrap gap-3">
-            {actions.map((action) => (
-              <Button
-                key={action}
-                variant={ACTION_BUTTON[action].variant}
-                disabled={busy}
-                aria-busy={busy || undefined}
-                onClick={() => onAction(action)}
-              >
-                {t(ACTION_BUTTON[action].key)}
-              </Button>
-            ))}
-          </div>
-        </Section>
-      )}
       <Section id="order-summary" title={t("order.detail.summary")}>
         <DescriptionList items={summary} />
       </Section>

@@ -1,6 +1,7 @@
+import { PlusIcon } from "@fluxkit/ui";
 import type { AdminHomeBanner, AdminHomeBannerList } from "@fluxkit/api-client";
 import { LiveRegion, type Translator } from "@fluxkit/ui";
-import { useRef, useState, type Ref } from "react";
+import { useRef, useState, type Ref, type ReactNode } from "react";
 import { Link } from "react-router";
 import { useI18n } from "../../i18n/i18n-context";
 import { adminClient } from "../../lib/api";
@@ -59,6 +60,34 @@ export function ListStatusView({
         )}
       </LiveRegion>
     </div>
+  );
+}
+
+export function BannersListFrame({
+  t,
+  canWrite,
+  count,
+  children,
+}: {
+  t: Translator;
+  canWrite: boolean;
+  count: number | null;
+  children: ReactNode;
+}) {
+  return (
+    <BannersFrame
+      title={t("page.banners.title")}
+      actions={
+        canWrite && count !== null && count > 0 && count < BANNER_LIMITS.maxStored ? (
+          <Link to={PATHS.bannerNew} className={`${primaryLinkClass} gap-2`}>
+            <PlusIcon className="size-5" />
+            {t("banners.new")}
+          </Link>
+        ) : null
+      }
+    >
+      {children}
+    </BannersFrame>
   );
 }
 
@@ -121,18 +150,8 @@ function BannersList() {
     }
   }
 
-  const atCap = banners !== null && banners.length >= BANNER_LIMITS.maxStored;
   return (
-    <BannersFrame
-      title={t("page.banners.title")}
-      actions={
-        canWrite && banners !== null && banners.length > 0 && !atCap ? (
-          <Link to={PATHS.bannerNew} className={primaryLinkClass}>
-            {t("banners.new")}
-          </Link>
-        ) : null
-      }
-    >
+    <BannersListFrame t={t} canWrite={canWrite} count={banners?.length ?? null}>
       <ListStatusView t={t} status={status} innerRef={statusRef} />
       <FormErrorSummary t={t} summary={reorder.state.summary} summaryRef={reorder.summaryRef} />
       {resource.fallback !== null ? (
@@ -185,7 +204,7 @@ function BannersList() {
           confirmLabel={t("banners.delete.confirm")}
         />
       )}
-    </BannersFrame>
+    </BannersListFrame>
   );
 }
 

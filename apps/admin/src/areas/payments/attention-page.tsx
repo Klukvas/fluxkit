@@ -7,7 +7,7 @@ import { failureFromError } from "../../lib/failure";
 import { describeFailure, type MessageDescriptor } from "../../lib/problem-messages";
 import { useCrash } from "../../lib/use-crash";
 import { useResource } from "../../lib/use-resource";
-import { PageHeading, ResourceFallback } from "../../views/status-views";
+import { PageHeader, ResourceFallback } from "../../views/status-views";
 import { useOrderConfig } from "../orders/order-parts";
 import { AttentionMore, AttentionTable } from "./attention-view";
 import {
@@ -108,8 +108,7 @@ export function PaymentAttentionPage() {
   const [generation, setGeneration] = useState(0);
   return (
     <div className="flex flex-col gap-4">
-      <PageHeading>{t("page.payments.title")}</PageHeading>
-      <p className="max-w-prose text-muted-foreground">{t("payment.list.intro")}</p>
+      <PageHeader title={t("page.payments.title")} description={t("payment.list.intro")} />
       {config.status === "ready" ? (
         <AttentionResults
           key={generation}

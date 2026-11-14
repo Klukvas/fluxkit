@@ -2,7 +2,7 @@ import { Button, LiveRegion, type Translator } from "@fluxkit/ui";
 import { useEffect, useRef, type ReactNode, type Ref } from "react";
 import { Link } from "react-router";
 import { PATHS, type RouteId } from "../../router/paths";
-import { PageHeading } from "../../views/status-views";
+import { PageHeader } from "../../views/status-views";
 import { subNavLinkClass } from "../../views/sub-nav";
 import { UnknownResultNotice } from "./form-parts";
 import { standaloneLinkClass } from "../../views/links";
@@ -44,22 +44,21 @@ export function DictionaryPage({
   t,
   current,
   title,
+  description,
   actions,
   children,
 }: {
   t: Translator;
   current: DictionaryId;
   title: string;
+  description?: ReactNode;
   actions?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <div className="flex flex-col gap-6">
       <DictionaryNav t={t} current={current} />
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <PageHeading>{title}</PageHeading>
-        {actions}
-      </div>
+      <PageHeader title={title} description={description} actions={actions} />
       {children}
     </div>
   );
@@ -91,11 +90,7 @@ export type NoticeKind = (typeof NOTICE_KINDS)[number];
 const focusClass =
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 
-/**
- * A link that looks like the primary button (the create actions). The focus outline is its own string, as in the UI library:
- * it sits two pixels outside the box, on the page background, so the contrast scan must not pair it with the button fill.
- */
-export const primaryLinkClass = `inline-flex items-center justify-center rounded-control bg-primary px-4 py-2 font-medium text-primary-foreground ${focusClass}`;
+export { primaryLinkClass } from "../../views/links";
 
 /**
  * The status line of a screen: always in the page (a live region announces changes of a region that was already there), and

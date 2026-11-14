@@ -15,11 +15,7 @@ import { Link } from "react-router";
 import { formatDate, formatDateTime } from "../../lib/format";
 import type { MessageDescriptor } from "../../lib/problem-messages";
 import { PATHS } from "../../router/paths";
-import {
-  PageHeading,
-  ResourceFallback,
-  type ResourceFallbackState,
-} from "../../views/status-views";
+import { PageHeader, ResourceFallback, type ResourceFallbackState } from "../../views/status-views";
 import { CUSTOMER_SEARCH_MAX_LENGTH, type CustomerListQuery } from "./customer-list-query";
 import { CustomerPager, DescriptorText } from "./customer-parts";
 import { customerHref, fullName, statusLabelKey, statusTone } from "./customer-view";
@@ -62,7 +58,7 @@ export function CustomerListView({
   }
   return (
     <div className="flex flex-col gap-6">
-      <PageHeading>{t("page.customers.title")}</PageHeading>
+      <PageHeader title={t("page.customers.title")} />
       <FilterBar label={t("customer.list.filtersLabel")} onSubmit={submit}>
         <div className="min-w-64">
           <Field

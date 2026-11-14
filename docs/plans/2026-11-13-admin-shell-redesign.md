@@ -1,6 +1,6 @@
 # Admin shell redesign
 
-- Status: PR 1 is merged (PR 290); PR 2 plan exists below, implementation is pending; PR 3 remains a separate session.
+- Status: PR 1 is merged (PR 290); PR 2 implemented on feature/admin-buttons, in review; PR 3 remains a separate session.
 - Owner request: 2026-11-13, make `apps/admin` easier to navigate through three separate PRs.
 - Scope: admin core presentation; permission filtering, routes, session operations and domain behaviour stay intact.
 
@@ -9,7 +9,7 @@
 | PR | Scope | Completion boundary |
 |---|---|---|
 | 1 | Icons, collapsible desktop sidebar, reordered navigation, pinned Help, compact header and account disclosure | Design below; existing Button API; no page action redesign or dashboard counters |
-| 2 | Plan exists below; implementation pending | Button and page-header consistency |
+| 2 | implemented on feature/admin-buttons, in review | Button and page-header consistency |
 | 3 | Later, own session | Start page as a workspace |
 
 - **PR 2 — later, own session:** adds Button `ghost`, leading `icon`, `IconButton` and shared `PageHeader`; page headers contain at most one primary action. It reuses PR 1 icons, preserves translated names and permission checks, and owns its separate plan, compatibility review and verification.

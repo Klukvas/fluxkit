@@ -65,8 +65,12 @@ export function EmailMessagesPage() {
   }
 
   return (
-    <EmailFrame t={t} current="emailMessages" title={t("page.emailMessages.title")}>
-      <p className="max-w-prose text-muted-foreground">{t("mail.list.intro")}</p>
+    <EmailFrame
+      t={t}
+      current="emailMessages"
+      title={t("page.emailMessages.title")}
+      description={t("mail.list.intro")}
+    >
       <MessagesScreen
         t={t}
         uiLocale={locale}

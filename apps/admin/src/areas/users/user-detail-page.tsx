@@ -12,7 +12,7 @@ import { useRefreshingResource } from "../../lib/use-refreshing-resource";
 import { UnsavedChangesDialog } from "../../router/unsaved-changes-dialog";
 import { useUnsavedChangesGuard } from "../../router/unsaved-changes";
 import { useSession } from "../../session/session-context";
-import { PageHeading, ResourceFallback } from "../../views/status-views";
+import { PageHeader, ResourceFallback } from "../../views/status-views";
 import {
   activityPatch,
   confirmationOf,
@@ -156,7 +156,7 @@ function UserDetail({ userId }: { userId: string }) {
     // The status line stays: after a reset of the own password the next read is a 401 (the shell asks to sign in again).
     return (
       <div className="flex flex-col gap-4">
-        <PageHeading>{t("user.detail.title")}</PageHeading>
+        <PageHeader title={t("user.detail.title")} />
         {statusLine}
         {resource.fallback === null ? null : (
           <ResourceFallback t={t} state={resource.fallback} onRetry={resource.reload} />

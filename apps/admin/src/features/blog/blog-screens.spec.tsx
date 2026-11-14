@@ -1,3 +1,6 @@
+import { BlogCreateLink } from "./blog-list-page";
+import { BlogFrame } from "./blog-list-view";
+import { pageHeaderMarkup, primaryHeaderControls } from "../../test-helpers";
 import { createTranslator, type Translator } from "@fluxkit/ui";
 import { describe, expect, it } from "vitest";
 import {
@@ -256,4 +259,30 @@ describe("the publish panel", () => {
     expect(html).not.toContain("<button");
     expect(html).not.toContain('type="datetime-local"');
   });
+});
+
+describe("blog create header", () => {
+  for (const t of [en, uk]) {
+    for (const canWrite of [true, false]) {
+      it(`has one primary creation link or none, permission=${canWrite}, ${t("features.blog.new")}`, () => {
+        const header = pageHeaderMarkup(
+          renderInRouter(
+            <BlogFrame
+              title={t("features.blog.page.list.title")}
+              actions={canWrite ? <BlogCreateLink t={t} /> : null}
+            >
+              {null}
+            </BlogFrame>,
+          ),
+        );
+        const primary = primaryHeaderControls(header);
+        expect(primary).toHaveLength(canWrite ? 1 : 0);
+        if (canWrite) {
+          expect(primary[0]).toMatch(/^<a\b/);
+          expect(primary[0]).toContain(t("features.blog.new"));
+          expect(primary[0]).toContain('aria-hidden="true"');
+        }
+      });
+    }
+  }
 });

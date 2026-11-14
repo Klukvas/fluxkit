@@ -1,5 +1,7 @@
+import { PlusIcon } from "@fluxkit/ui";
 import type { AdminCategory } from "@fluxkit/api-client";
-import { Button, ConfirmDialog } from "@fluxkit/ui";
+import type { ReactNode } from "react";
+import { Button, ConfirmDialog, type Translator } from "@fluxkit/ui";
 import { useId, useState, type FormEvent } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { useI18n } from "../../i18n/i18n-context";
@@ -60,15 +62,18 @@ export function categoryFieldNames(locales: readonly string[]): string[] {
 
 // ------------------------------------------------------------------------- tree
 
-function CategoryTree() {
-  const { t, locale } = useI18n();
-  const content = useContentLocales();
-  const canWrite = useCanWrite();
-  const { tree, scanned, rootsFailure, retryRoots, toggle, retryChildren, loadMore } =
-    useCategoryTree();
-
+export function CategoryListFrame({
+  t,
+  canWrite,
+  children,
+}: {
+  t: Translator;
+  canWrite: boolean;
+  children: ReactNode;
+}) {
   const createLink = canWrite ? (
-    <Link to={pathTo("categoryNew")} className={primaryLinkClass}>
+    <Link to={pathTo("categoryNew")} className={`${primaryLinkClass} gap-2`}>
+      <PlusIcon className="size-5" />
       {t("dict.category.new")}
     </Link>
   ) : null;
@@ -80,6 +85,20 @@ function CategoryTree() {
       title={t("page.categories.title")}
       actions={createLink}
     >
+      {children}
+    </DictionaryPage>
+  );
+}
+
+function CategoryTree() {
+  const { t, locale } = useI18n();
+  const content = useContentLocales();
+  const canWrite = useCanWrite();
+  const { tree, scanned, rootsFailure, retryRoots, toggle, retryChildren, loadMore } =
+    useCategoryTree();
+
+  return (
+    <CategoryListFrame t={t} canWrite={canWrite}>
       {tree.roots.status === "loading" ? (
         <LoadingView t={t} />
       ) : tree.roots.status === "error" ? (
@@ -107,7 +126,7 @@ function CategoryTree() {
           )}
         </>
       )}
-    </DictionaryPage>
+    </CategoryListFrame>
   );
 }
 

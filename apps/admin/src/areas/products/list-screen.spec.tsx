@@ -2,6 +2,8 @@ import type { AdminProductSummary, Paginated } from "@fluxkit/api-client";
 import { createTranslator, type Translator } from "@fluxkit/ui";
 import { describe, expect, it } from "vitest";
 import {
+  pageHeaderMarkup,
+  primaryHeaderControls,
   leftoverText,
   messagesForArea,
   renderInRouter,
@@ -174,4 +176,22 @@ describe("product list screen", () => {
       }
     }
   });
+});
+
+describe("product create header", () => {
+  for (const locale of ["uk", "en"] as const) {
+    for (const canCreate of [true, false]) {
+      it(`has one named primary link or none in ${locale}, permission=${canCreate}`, async () => {
+        const t = createTranslator(await messagesForArea(locale, MESSAGE_FILES), locale);
+        const header = pageHeaderMarkup(render({ status: "loading" }, { canCreate, t }));
+        const primary = primaryHeaderControls(header);
+        expect(primary).toHaveLength(canCreate ? 1 : 0);
+        if (canCreate) {
+          expect(primary[0]).toMatch(/^<a\b/);
+          expect(primary[0]).toContain(t("products.list.create"));
+          expect(primary[0]).toContain('aria-hidden="true"');
+        }
+      });
+    }
+  }
 });

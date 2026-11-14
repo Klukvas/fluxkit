@@ -1,7 +1,7 @@
 import { Button, Field, Input, LiveRegion, type Locale, type Translator } from "@fluxkit/ui";
 import { useRef, type ReactNode } from "react";
 import { Link } from "react-router";
-import { PageHeading } from "../../views/status-views";
+import { PageHeader } from "../../views/status-views";
 import { articlesByTopic, helpArticlePath, type HelpArticle, type HelpLibrary } from "./help-model";
 import { standaloneLinkClass } from "../../views/links";
 
@@ -46,10 +46,7 @@ export function HelpIndexView({
   const count = searching ? t.plural("help.search.results", results.length) : null;
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-2">
-        <PageHeading>{t("page.help.title")}</PageHeading>
-        <p className="max-w-prose text-muted-foreground">{t("help.index.intro")}</p>
-      </div>
+      <PageHeader title={t("page.help.title")} description={t("help.index.intro")} />
       <form
         method="post"
         role="search"

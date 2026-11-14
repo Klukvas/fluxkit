@@ -8,7 +8,7 @@ import { jsonEqual } from "../../lib/diff-for-patch";
 import { PATHS, buildPath } from "../../router/paths";
 import { useUnsavedChangesGuard } from "../../router/unsaved-changes";
 import { UnsavedChangesDialog } from "../../router/unsaved-changes-dialog";
-import { PageHeading } from "../../views/status-views";
+import { PageHeader } from "../../views/status-views";
 import { ConfigGate, useContentLocales } from "../catalog-dictionaries/config-gate";
 import { BackLink, CreateUnknown, FocusedPanel } from "../catalog-dictionaries/dictionary-frame";
 import { hasIssues } from "../catalog-dictionaries/form-rules";
@@ -71,7 +71,7 @@ function ProductCreate() {
   return (
     <div className="flex flex-col gap-6">
       <BackLink to={PATHS.products} label={t("products.backToList")} />
-      <PageHeading>{t("page.productNew.title")}</PageHeading>
+      <PageHeader title={t("page.productNew.title")} />
       {created !== null ? (
         <FocusedPanel
           title={t("products.create.created", {

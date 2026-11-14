@@ -2,7 +2,7 @@ import type { AdminProduct, AdminProductTypeDetail } from "@fluxkit/api-client";
 import { Button, DescriptionList, StatusBadge, type Translator } from "@fluxkit/ui";
 import type { ReactNode, Ref } from "react";
 import { formatDateTime } from "../../lib/format";
-import { PageHeading } from "../../views/status-views";
+import { PageHeader } from "../../views/status-views";
 import { describe, type ContentLocales } from "../catalog-dictionaries/form-parts";
 import { resolveLocalized } from "../catalog-dictionaries/locale-text";
 import type { LifecycleAction } from "./lifecycle";
@@ -97,13 +97,16 @@ export function ProductSummaryView({
 }) {
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <PageHeading>{productTitle(product, uiLocale, content.defaultLocale)}</PageHeading>
-        <StatusBadge
-          tone={STATUS_TONES[product.status]}
-          label={t(statusLabelKey(product.status))}
-        />
-      </div>
+      <PageHeader
+        title={productTitle(product, uiLocale, content.defaultLocale)}
+        description={
+          <StatusBadge
+            tone={STATUS_TONES[product.status]}
+            label={t(statusLabelKey(product.status))}
+          />
+        }
+        actions={actions}
+      />
       <DescriptionList
         items={[
           {
@@ -132,7 +135,6 @@ export function ProductSummaryView({
           },
         ]}
       />
-      {actions}
     </div>
   );
 }

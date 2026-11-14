@@ -4,13 +4,15 @@ import { createTranslator, type Translator } from "@fluxkit/ui";
 import { describe, expect, it } from "vitest";
 import { formatDateTime } from "../../lib/format";
 import {
+  pageHeaderMarkup,
+  primaryHeaderControls,
   leftoverText,
   messagesForArea,
   renderInRouter,
   sentinelTranslator,
 } from "../../test-helpers";
 import { MESSAGE_FILES } from "./index";
-import { offeredActions } from "./order-actions";
+import { ORDER_ACTIONS, type OrderAction, offeredActions } from "./order-actions";
 import { OrderDetailView, type HistoryRow } from "./order-detail-view";
 import { OrderNoticeView } from "./order-detail-page";
 import { CancelDialog, FulfilDialog, MarkPaidDialog } from "./order-dialogs";
@@ -567,4 +569,62 @@ describe("with the real messages", () => {
       }
     }
   });
+});
+
+describe("order header action hierarchy", () => {
+  // Include every opaque slot subset, even both mark actions (currently mutually exclusive in offeredActions).
+  for (let mask = 0; mask < 8; mask += 1) {
+    const actions: OrderAction[] = ORDER_ACTIONS.filter((_, index) => (mask & (1 << index)) !== 0);
+    for (const busy of [false, true]) {
+      it(`keeps one promotion for ${actions.join(",") || "none"}, busy=${busy}`, () => {
+        const header = pageHeaderMarkup(
+          renderInRouter(
+            <OrderDetailView
+              t={sentinel}
+              uiLocale="en"
+              order={order()}
+              money={{ locale: "en", config }}
+              history={[]}
+              actions={actions}
+              onAction={noop}
+              busy={busy}
+              statusLine={null}
+            />,
+          ),
+        );
+        const primary = primaryHeaderControls(header);
+        expect(primary).toHaveLength(actions.some((action) => action !== "cancel") ? 1 : 0);
+        if (actions.includes("markPaid")) expect(primary[0]).toContain("§order.action.markPaid");
+        else if (actions.includes("markFulfilled"))
+          expect(primary[0]).toContain("§order.action.markFulfilled");
+        if (actions.includes("cancel"))
+          expect(header).toMatch(/<button[^>]*text-danger[^>]*>§order.action.cancel<\/button>/);
+        if (actions.length > 0) {
+          expect(header).toContain('id="order-actions"');
+          expect(header).toContain("§order.detail.actionsHint");
+        }
+        expect((header.match(/disabled=""/g) ?? []).length).toBe(busy ? actions.length : 0);
+        expect(header.match(/<h1\b/g)).toHaveLength(1);
+      });
+    }
+  }
+  for (const status of ["awaiting_payment", "paid", "fulfilled", "cancelled", "expired"] as const) {
+    for (const permissions of [
+      null,
+      [],
+      ROLE_PERMISSIONS.owner,
+      ROLE_PERMISSIONS.manager,
+      ROLE_PERMISSIONS.viewer,
+    ]) {
+      it(`respects permission-filtered ${status} actions: ${permissions?.join(",") ?? "loading"}`, () => {
+        const header = pageHeaderMarkup(detail(sentinel, order({ status }), permissions));
+        const actions = offeredActions(status, permissions);
+        expect(primaryHeaderControls(header)).toHaveLength(
+          actions.some((action) => action !== "cancel") ? 1 : 0,
+        );
+        for (const action of ORDER_ACTIONS)
+          expect(header.includes(`§order.action.${action}`)).toBe(actions.includes(action));
+      });
+    }
+  }
 });

@@ -13,7 +13,7 @@ import { focusWhenPresent, useFocusAfterCommit } from "../../lib/use-focus-after
 import { useRefreshingResource } from "../../lib/use-refreshing-resource";
 import { PATHS } from "../../router/paths";
 import { useSession } from "../../session/session-context";
-import { FailureMessage, PageHeading, ResourceFallback } from "../../views/status-views";
+import { FailureMessage, PageHeader, ResourceFallback } from "../../views/status-views";
 import { ConfigGate, useAdminConfig, useContentLocales } from "../catalog-dictionaries/config-gate";
 import { BackLink, DeletedPanel } from "../catalog-dictionaries/dictionary-frame";
 import { ConfirmDelete } from "../catalog-dictionaries/form-dialog";
@@ -152,7 +152,7 @@ function ProductEditor({ id }: { id: string }) {
   if (deleted) {
     return (
       <div className="flex flex-col gap-6">
-        <PageHeading>{t("page.productDetail.title")}</PageHeading>
+        <PageHeader title={t("page.productDetail.title")} />
         <DeletedPanel t={t} title={t("products.lifecycle.deleted")} listTo={PATHS.products} />
       </div>
     );
@@ -260,7 +260,7 @@ function ProductEditor({ id }: { id: string }) {
       <EditorNoticeBar t={t} notice={notice} innerRef={noticeRef} />
       {resource.fallback !== null || data === null || product === null ? (
         <>
-          <PageHeading>{t("page.productDetail.title")}</PageHeading>
+          <PageHeader title={t("page.productDetail.title")} />
           {resource.fallback === null ? null : (
             <ResourceFallback t={t} state={resource.fallback} onRetry={reload} />
           )}

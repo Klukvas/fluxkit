@@ -2,7 +2,7 @@ import { cn, type Locale, type Translator } from "@fluxkit/ui";
 import { Link } from "react-router";
 import { PATHS } from "../../router/paths";
 import type { ScreenAccess } from "../../router/screen-access";
-import { PageHeading } from "../../views/status-views";
+import { PageHeader } from "../../views/status-views";
 import {
   helpArticlePath,
   sectionElementId,
@@ -134,8 +134,7 @@ export function ArticleView({
             <span>{t("help.article.topic", { topic: topic.title[locale] })}</span>
           )}
         </p>
-        <PageHeading>{article.title[locale]}</PageHeading>
-        <p className="max-w-prose text-muted-foreground">{article.summary[locale]}</p>
+        <PageHeader title={article.title[locale]} description={article.summary[locale]} />
       </div>
       {sections.length < 2 ? null : (
         <nav aria-labelledby="help-contents-title" className="flex flex-col gap-2">

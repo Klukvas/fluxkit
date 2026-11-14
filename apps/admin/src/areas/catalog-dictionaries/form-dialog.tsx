@@ -49,7 +49,7 @@ export function FormDialog({
       description={description}
       footer={
         <>
-          <Button variant="secondary" disabled={busy} onClick={onClose}>
+          <Button variant="ghost" disabled={busy} onClick={onClose}>
             {t("dict.form.cancel")}
           </Button>
           <Button type="submit" form={formId} disabled={busy} aria-busy={busy || undefined}>

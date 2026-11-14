@@ -1,3 +1,4 @@
+import { type Translator, PlusIcon } from "@fluxkit/ui";
 import type { ReactNode } from "react";
 import { Link, useSearchParams } from "react-router";
 import { useI18n } from "../../i18n/i18n-context";
@@ -44,20 +45,28 @@ function BlogResults({ query, createLink }: { query: BlogListQuery; createLink: 
   );
 }
 
+export function BlogCreateLink({ t }: { t: Translator }) {
+  return (
+    <Link to={BLOG_PATHS.create} className={`${primaryLinkClass} gap-2`}>
+      <PlusIcon className="size-5" />
+      {t("features.blog.new")}
+    </Link>
+  );
+}
+
 /** `/features/blog`: every post, the most recently updated first; the state filter and the page are in the URL. */
 export function BlogListPage() {
   const { t } = useI18n();
   const { canWrite } = useBlogPermissions();
   const [params, setParams] = useSearchParams();
   const query = readBlogListQuery(params);
-  const createLink = canWrite ? (
-    <Link to={BLOG_PATHS.create} className={primaryLinkClass}>
-      {t("features.blog.new")}
-    </Link>
-  ) : null;
+  const createLink = canWrite ? <BlogCreateLink t={t} /> : null;
   return (
-    <BlogFrame title={t("features.blog.page.list.title")} actions={createLink}>
-      <p className="max-w-prose text-muted-foreground">{t("features.blog.list.intro")}</p>
+    <BlogFrame
+      title={t("features.blog.page.list.title")}
+      description={t("features.blog.list.intro")}
+      actions={createLink}
+    >
       <BlogStateFilter
         t={t}
         query={query}

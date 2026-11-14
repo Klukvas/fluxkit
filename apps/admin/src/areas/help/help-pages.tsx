@@ -10,7 +10,7 @@ import { canRun } from "../../permissions";
 import { PATHS } from "../../router/paths";
 import { useScreenAccess } from "../../router/screen-access";
 import { useSession } from "../../session/session-context";
-import { PageHeading } from "../../views/status-views";
+import { PageHeader } from "../../views/status-views";
 import { ArticleView } from "./article-view";
 import { loadChecklistFacts, withManual } from "./checklist-model";
 import { useChecklistPreferences } from "./checklist-storage";
@@ -177,7 +177,7 @@ export function HelpArticlePage() {
   if (article === null) {
     return (
       <div className="flex flex-col gap-4">
-        <PageHeading>{t("help.article.notFoundTitle")}</PageHeading>
+        <PageHeader title={t("help.article.notFoundTitle")} />
         <p className="text-muted-foreground">{t("help.article.notFoundBody")}</p>
         <p>
           <Link to={PATHS.help} className={standaloneLinkClass}>

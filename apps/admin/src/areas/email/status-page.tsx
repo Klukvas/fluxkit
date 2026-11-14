@@ -75,8 +75,12 @@ export function EmailStatusPage() {
         ? { status: "ready", data: resource.data }
         : { status: "loading" };
   return (
-    <EmailFrame t={t} current="email" title={t("page.email.title")}>
-      <p className="max-w-prose text-muted-foreground">{t("mail.status.intro")}</p>
+    <EmailFrame
+      t={t}
+      current="email"
+      title={t("page.email.title")}
+      description={t("mail.status.intro")}
+    >
       <StatusView
         t={t}
         uiLocale={locale}

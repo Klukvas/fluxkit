@@ -1,18 +1,21 @@
 import type { AdminUser, Paginated } from "@fluxkit/api-client";
-import { Badge, DataTable, EmptyState, type DataTableColumn, type Translator } from "@fluxkit/ui";
+import {
+  PlusIcon,
+  Badge,
+  DataTable,
+  EmptyState,
+  type DataTableColumn,
+  type Translator,
+} from "@fluxkit/ui";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { formatDate, formatDateTime } from "../../lib/format";
 import type { Paging } from "../../router/query";
 import { PATHS } from "../../router/paths";
-import {
-  PageHeading,
-  ResourceFallback,
-  type ResourceFallbackState,
-} from "../../views/status-views";
+import { PageHeader, ResourceFallback, type ResourceFallbackState } from "../../views/status-views";
 import { ActivityBadge, RoleBadge, UserPager } from "./user-parts";
 import { isSelf, userHref } from "./user-view";
-import { standaloneLinkClass } from "../../views/links";
+import { primaryLinkClass, standaloneLinkClass } from "../../views/links";
 
 export type UserListState =
   | { status: "loading" }
@@ -31,15 +34,18 @@ export function UserListView({
 }) {
   return (
     <div className="flex flex-col gap-6">
-      <PageHeading>{t("page.users.title")}</PageHeading>
-      <p className="max-w-prose text-muted-foreground">{t("user.list.intro")}</p>
-      {canCreate ? (
-        <p>
-          <Link to={PATHS.userNew} className={standaloneLinkClass}>
-            {t("user.list.create")}
-          </Link>
-        </p>
-      ) : null}
+      <PageHeader
+        title={t("page.users.title")}
+        description={t("user.list.intro")}
+        actions={
+          canCreate ? (
+            <Link to={PATHS.userNew} className={`${primaryLinkClass} gap-2`}>
+              <PlusIcon className="size-5" />
+              {t("user.list.create")}
+            </Link>
+          ) : null
+        }
+      />
       {results}
     </div>
   );

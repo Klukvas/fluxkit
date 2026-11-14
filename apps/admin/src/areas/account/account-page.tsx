@@ -22,7 +22,7 @@ import { describeFailure, type MessageDescriptor } from "../../lib/problem-messa
 import { UnsavedChangesDialog } from "../../router/unsaved-changes-dialog";
 import { useUnsavedChangesGuard } from "../../router/unsaved-changes";
 import { useSession } from "../../session/session-context";
-import { PageHeading } from "../../views/status-views";
+import { PageHeader } from "../../views/status-views";
 import {
   PASSWORD_LIMITS,
   isPasswordFormDirty,
@@ -251,7 +251,7 @@ export function AccountPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <PageHeading>{t("page.account.title")}</PageHeading>
+      <PageHeader title={t("page.account.title")} />
       {user === undefined ? null : <AccountDetailsView t={t} locale={locale} user={user} />}
       <PasswordFormView
         t={t}

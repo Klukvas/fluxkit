@@ -3,7 +3,7 @@ import type { ReactNode, Ref } from "react";
 import { Link } from "react-router";
 import type { MessageDescriptor } from "../../lib/problem-messages";
 import { PATHS, type RouteId } from "../../router/paths";
-import { PageHeading } from "../../views/status-views";
+import { PageHeader } from "../../views/status-views";
 import { subNavLinkClass } from "../../views/sub-nav";
 
 export const focusClass =
@@ -44,17 +44,21 @@ export function PrivacyFrame({
   t,
   current,
   title,
+  description,
+  actions,
   children,
 }: {
   t: Translator;
   current: PrivacyScreenId;
   title: string;
+  description?: ReactNode;
+  actions?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <div className="flex flex-col gap-6">
       <PrivacyNav t={t} current={current} />
-      <PageHeading>{title}</PageHeading>
+      <PageHeader title={title} description={description} actions={actions} />
       {children}
     </div>
   );

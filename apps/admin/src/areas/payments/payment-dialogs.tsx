@@ -155,7 +155,7 @@ export function RefundDialog({
           </>
         ) : (
           <>
-            <Button variant="secondary" disabled={busy} onClick={onClose}>
+            <Button variant="ghost" disabled={busy} onClick={onClose}>
               {t("order.dialog.cancel")}
             </Button>
             <Button type="submit" form="payment-refund" disabled={busy}>

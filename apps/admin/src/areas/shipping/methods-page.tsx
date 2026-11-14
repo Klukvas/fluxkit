@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+import { PlusIcon } from "@fluxkit/ui";
 import type { AdminConfig, AdminShippingMethod } from "@fluxkit/api-client";
 import {
   DataTable,
@@ -141,7 +143,8 @@ export function MethodsView({
         description={t("ship.list.emptyBody")}
         action={
           canManage ? (
-            <Link to={PATHS.shippingMethodNew} className={primaryLinkClass}>
+            <Link to={PATHS.shippingMethodNew} className={`${primaryLinkClass} gap-2`}>
+              <PlusIcon className="size-5" />
               {t("ship.list.create")}
             </Link>
           ) : undefined
@@ -171,6 +174,35 @@ export function MethodsView({
   );
 }
 
+export function MethodsListFrame({
+  t,
+  canManage,
+  children,
+}: {
+  t: Translator;
+  canManage: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <ShippingFrame
+      t={t}
+      current="shipping"
+      title={t("page.shipping.title")}
+      description={t("ship.list.intro")}
+      actions={
+        canManage ? (
+          <Link to={PATHS.shippingMethodNew} className={`${primaryLinkClass} gap-2`}>
+            <PlusIcon className="size-5" />
+            {t("ship.list.create")}
+          </Link>
+        ) : null
+      }
+    >
+      {children}
+    </ShippingFrame>
+  );
+}
+
 function MethodsList() {
   const { t, locale } = useI18n();
   const config = useAdminConfig();
@@ -182,19 +214,7 @@ function MethodsList() {
     [limit, offset],
   );
   return (
-    <ShippingFrame
-      t={t}
-      current="shipping"
-      title={t("page.shipping.title")}
-      actions={
-        canManage ? (
-          <Link to={PATHS.shippingMethodNew} className={primaryLinkClass}>
-            {t("ship.list.create")}
-          </Link>
-        ) : null
-      }
-    >
-      <p className="max-w-prose text-muted-foreground">{t("ship.list.intro")}</p>
+    <MethodsListFrame t={t} canManage={canManage}>
       <MethodsView
         t={t}
         uiLocale={locale}
@@ -209,7 +229,7 @@ function MethodsList() {
           `${PATHS.shipping}${writeQuery({ limit, offset: next }, { limit: METHODS_PAGE_SIZE, offset: 0 })}`
         }
       />
-    </ShippingFrame>
+    </MethodsListFrame>
   );
 }
 

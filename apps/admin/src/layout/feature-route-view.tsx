@@ -1,6 +1,6 @@
 import type { Translator } from "@fluxkit/ui";
 import { describeFailure } from "../lib/problem-messages";
-import { FailureMessage, LoadingView, NotFoundView, PageHeading } from "../views/status-views";
+import { FailureMessage, LoadingView, NotFoundView, PageHeader } from "../views/status-views";
 import type { EnabledFeatures, FeatureRouteGate } from "./enabled-features";
 
 /**
@@ -27,7 +27,7 @@ export function FeatureRouteFallback({
     case "failed":
       return (
         <div className="flex flex-col gap-4">
-          <PageHeading>{t("error.title")}</PageHeading>
+          <PageHeader title={t("error.title")} />
           <FailureMessage
             t={t}
             descriptor={

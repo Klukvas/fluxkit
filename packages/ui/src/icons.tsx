@@ -5,9 +5,11 @@ import { cn } from "./cn";
 export type IconProps = Pick<SVGProps<SVGSVGElement>, "className">;
 
 function Icon({ className, children }: IconProps & { children: ReactNode }): ReactElement {
+  // Do not compete with an explicit size: Tailwind's stylesheet order decides between two size utilities.
+  const hasSize = className?.split(/\s+/).some((name) => name.startsWith("size-"));
   return (
     <svg
-      className={cn("size-6 shrink-0", className)}
+      className={cn(!hasSize && "size-6", "shrink-0", className)}
       viewBox="0 0 24 24"
       stroke="currentColor"
       fill="none"

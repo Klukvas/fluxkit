@@ -2,7 +2,7 @@ import type { Translator } from "@fluxkit/ui";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { PATHS, type RouteId } from "../../router/paths";
-import { PageHeading } from "../../views/status-views";
+import { PageHeader } from "../../views/status-views";
 import { subNavLinkClass } from "../../views/sub-nav";
 
 /** The two lists of the Shipping area, in the order of the sub-navigation (both need shipping.manage). */
@@ -39,22 +39,21 @@ export function ShippingFrame({
   t,
   current,
   title,
+  description,
   actions,
   children,
 }: {
   t: Translator;
   current: ShippingScreenId;
   title: string;
+  description?: ReactNode;
   actions?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <div className="flex flex-col gap-6">
       <ShippingNav t={t} current={current} />
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <PageHeading>{title}</PageHeading>
-        {actions}
-      </div>
+      <PageHeader title={title} description={description} actions={actions} />
       {children}
     </div>
   );

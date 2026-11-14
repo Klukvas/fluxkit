@@ -16,8 +16,12 @@ export function EmailTemplatesPage() {
   const { t } = useI18n();
   const resource = useResource((signal) => adminClient.listEmailTemplates({ signal }), []);
   return (
-    <EmailFrame t={t} current="emailTemplates" title={t("page.emailTemplates.title")}>
-      <p className="max-w-prose text-muted-foreground">{t("mail.templates.intro")}</p>
+    <EmailFrame
+      t={t}
+      current="emailTemplates"
+      title={t("page.emailTemplates.title")}
+      description={t("mail.templates.intro")}
+    >
       <TemplatesView t={t} state={resource} onRetry={resource.reload} />
     </EmailFrame>
   );
