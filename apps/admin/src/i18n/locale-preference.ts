@@ -2,10 +2,15 @@ import { defaultLocale, isLocale, type Locale } from "@fluxkit/ui";
 
 /**
  * The UI language (owner answer 10): the browser language by default, a uk/en switch in the header remembered per
- * browser. The ONLY thing the SPA keeps in `localStorage` is this language code (no credential, nothing personal). Storage
+ * browser. The shared `localStorage` accessor also serves the sidebar preference and Help checklist; credentials are never stored. Storage
  * can be missing or throw (private mode, blocked site data); the UI then works without remembering.
  */
-export const LOCALE_STORAGE_KEY = "fluxkit.admin.uiLocale";
+/** Non-personal browser preferences share one key catalogue and the lazy accessor. */
+export const BROWSER_PREFERENCE_KEYS = {
+  locale: "fluxkit.admin.uiLocale",
+  sidebar: "fluxkit.admin.sidebarCollapsed",
+} as const;
+export const LOCALE_STORAGE_KEY = BROWSER_PREFERENCE_KEYS.locale;
 
 export interface StorageLike {
   getItem(key: string): string | null;

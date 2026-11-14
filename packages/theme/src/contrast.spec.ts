@@ -226,3 +226,12 @@ describe("pairs the components use", () => {
     ).toEqual([]);
   });
 });
+
+it("admin current navigation item: foreground on muted is at least 4.5:1", () => {
+  expect(
+    contrastRatio(
+      adminTokens.get("--fk-color-foreground") as string,
+      adminTokens.get("--fk-color-muted") as string,
+    ),
+  ).toBeGreaterThanOrEqual(4.5);
+});

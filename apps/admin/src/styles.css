@@ -13,3 +13,17 @@ body {
   color: var(--color-foreground);
   font-family: var(--font-sans);
 }
+
+/* Structural tracks leave the content column shrinkable when the sidebar changes width. */
+@utility admin-shell-grid {
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+}
+
+@utility account-popup-width {
+  max-width: calc(100vw - var(--fk-space-unit) * 8);
+}
+
+@utility sidebar-safe-bottom {
+  padding-bottom: max(calc(var(--fk-space-unit) * 4), env(safe-area-inset-bottom));
+}
