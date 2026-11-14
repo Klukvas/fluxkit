@@ -199,9 +199,9 @@ Approved by the owner on 2026-11-02 (plan `docs/plans/2026-11-02-storefront-ui-p
 ## Added in the playful default (Rubik font, SIL OFL 1.1)
 
 - Source: Google Fonts `ofl/rubik/Rubik[wght].ttf`, commit `8b0a1d0f5983c89bc2b93f1b5fb55f9e252744b5` ([source](https://github.com/google/fonts/tree/8b0a1d0f5983c89bc2b93f1b5fb55f9e252744b5/ofl/rubik)).
-- Files: `apps/storefront/src/lib/fonts/rubik-wght.ttf` (the official TTF byte for byte, sha256 `1b3a7437ba2af80e465e773ed60c5036d1ba6ace492d89046dbcf18fb31e4e88`), `OFL.txt` and provenance `README.md`; loaded by `lib/template-fonts.ts`.
-- Licence: SIL OFL 1.1, no Reserved Font Name. Owner approval 2026-11-14 covers unmodified font files shipped with the template, not code packages.
-- Format: the official TTF unchanged (about 360 KB). The OFL counts a format change as a Modified Version, so a WOFF2 conversion (about 122 KB, lossless) is outside the 2026-11-14 approval of unmodified font files and waits for the owner.
+- Files: `apps/storefront/src/lib/fonts/rubik-wght.woff2` (sha256 `bdb2228f9f30a2c5c455b40e88be9e00755a3f81e9e0235df2411663b0d971e1`, from the TTF with sha256 `1b3a7437ba2af80e465e773ed60c5036d1ba6ace492d89046dbcf18fb31e4e88`), `OFL.txt` and provenance `README.md`; loaded by `lib/template-fonts.ts`.
+- Licence: SIL OFL 1.1, no Reserved Font Name. Owner approval 2026-11-14 covers font files shipped with the template, unmodified or losslessly converted to WOFF2, font name unchanged; not code packages.
+- Format: lossless WOFF2 conversion of the official TTF (about 122 KB instead of 360 KB): every decoded table equals the TTF's; no subsetting or instancing; font name Rubik unchanged (owner decision 6 of the plan, 2026-11-14).
 - Notice handling: OFL text stays next to the font; `scripts/third-party-notices.mjs` embeds the full text in `pnpm notices` output for client delivery.
 - Alternatives considered: system stack (kept as fallback); Fontsource npm package (a new dependency); Google Fonts CDN (blocked by CSP and introduces a third-party request).
 - No npm dependency added. `scripts/check-licenses.mjs` scans npm packages through `pnpm licenses list`, so `scripts/license-policy.json` does not need a font exception.

@@ -16,6 +16,8 @@ shimmer, button states) becomes generic, token-driven storefront behaviour that 
 | 2 | Motion tokens | **Approved, additive**: `--fk-motion-*` (durations and easings) join the theme-token contract (minor version). |
 | 3 | Add-to-cart on the product card | **Approved, additive**: `defaultVariantId` (nullable) in the store `ProductSummary` (council item 9 of `2026-11-13-storefront-ui-round-4.md`). |
 | 4 | Font licence | **SIL OFL 1.1 approved for unmodified font files** (woff2) shipped with the template, OFL text kept in the third-party notices. Not for code packages. |
+| 5 | Light accent (asked after the WS-A review) | **Keep ochre** `#b17b15` with ink text as the light `accent`; the accent contrast rule stays. Butter `#ffd166` (1.32:1 on cream) may come back later only as decoration in WS-D. Owner, 2026-11-14: "Оставить охру". |
+| 6 | Font format (asked after the WS-A review) | **Lossless WOFF2 approved**: Rubik's official TTF converted to WOFF2 with every table unchanged (about 122 KB instead of 360 KB); font name Rubik kept (no Reserved Font Name), OFL text kept. Licence wording: unmodified or losslessly converted to WOFF2, font name unchanged. Owner, 2026-11-14: "Да, WOFF2". |
 
 Not part of this plan: the concept's "one-off / subscription -15%" toggle. Subscriptions do not exist; they would be a feature package
 that touches pricing (red zone, own plan). The demo copy stays the coffee seed's.

@@ -97,5 +97,5 @@ Narrative, rendering findings and how-tos: `apps/storefront/README.md`. Rules: `
 
 Run: `pnpm --filter @fluxkit/storefront dev -p 3001` (needs `pnpm build` once so workspace packages are built, and `API_INTERNAL_URL` in the root `.env` or the shell; the API on port 3000 with `STORE_COOKIE_SECURE=false`). Next telemetry is disabled in the scripts.
 
-- `apps/storefront/src/lib/template-fonts.ts` — template-owned Rubik `next/font/local` setup; exposes variable classes without preloading, never imported by unit tests.
-- `apps/storefront/src/lib/fonts/` — the Rubik variable TTF (Google Fonts, unmodified), its SIL OFL 1.1 text and the provenance README; no client font files.
+- `apps/storefront/src/lib/template-fonts.ts` — template-owned Rubik `next/font/local` setup; exposes variable classes without preloading, `display: "optional"`, never imported by unit tests.
+- `apps/storefront/src/lib/fonts/` — the Rubik variable font (Google Fonts, converted losslessly to WOFF2), its SIL OFL 1.1 text and the provenance README; no client font files.

@@ -146,11 +146,13 @@ a token in the light block of `tokens.css` (since 2026-11-08 non-colour tokens l
   `@font-face` (the admin has no `next/font`), declared in the fork-owned `packages/theme/src/admin-overrides.css` (see "Admin" below).
   Same rules as below.
 
-- **Self-hosted font files only** (woff2 for a fork's faces; the template's Rubik is Google's TTF unchanged, because a WOFF2 conversion is a Modified Version under the OFL and the owner approved unmodified files only, see `lib/fonts/README.md`). The CSP has no `font-src`, so `default-src 'self'` applies: same origin only (`next.config.ts`,
+- **Self-hosted woff2 only.** The CSP has no `font-src`, so `default-src 'self'` applies: same origin only (`next.config.ts`,
   `buildContentSecurityPolicy`). Google Fonts and other font CDNs are blocked on purpose (no third-party request, AGENTS.md 3); `next/font/google`
   is refused by `config/fonts.spec.ts`. Check the font's licence allows self-hosting on the web.
-- `display: "swap"` with fallback metrics (`adjustFontFallback`, which writes a `size-adjust` fallback face), so text shows at once and
-  barely moves when the face arrives.
+- Fallback metrics (`adjustFontFallback`, which writes a `size-adjust` fallback face), so text shows at once. Without a preload use
+  `display: "optional"` (the template's Rubik does, 2026-11-14): with `swap` the face arrived after the first paint on a cold visit and
+  re-wrapped text (layout shift 0.178 on the register page at 390 px; e2e `first-html` requires under 0.05). `optional` keeps the fallback
+  for that view and uses the cached face on the next page.
 - Coverage: Cyrillic including Ґ Є І Ї (and ґ є і ї), the apostrophe U+2019, ₴ and the Latin set; test with the shop's real copy in `uk`
   and `en`.
 - Weights: load the ones `textStyles` uses (600 and 700 for headings, plus 500 for `cardTitle` if the body face is replaced) or one

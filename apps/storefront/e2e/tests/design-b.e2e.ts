@@ -15,8 +15,9 @@ import { SHOP_NAME } from "../support/shop-name.ts";
 const DESKTOP = { width: 1280, height: 800 };
 test.use({ viewport: DESKTOP });
 
-const LIGHT_BACKGROUND = "rgb(255, 255, 255)";
-const DARK_BACKGROUND = "rgb(11, 16, 32)";
+// `--fk-color-background` of tokens.css (playful default, plan 2026-11-14): cream `#fff3e3` and dark brown `#1f130d`.
+const LIGHT_BACKGROUND = "rgb(255, 243, 227)";
+const DARK_BACKGROUND = "rgb(31, 19, 13)";
 
 async function setThemeCookie(context: BrowserContext, value: string): Promise<void> {
   await context.addCookies([{ name: "fluxkit_theme", value, url: E2E_ORIGIN }]);
@@ -355,7 +356,8 @@ test("in dark, the text of the home, product, cart, checkout and shop pages keep
   const link = page.getByRole("link", { name: SHOP_NAME.en });
   await link.focus();
   const ring = await link.evaluate((element) => getComputedStyle(element).outlineColor);
-  expect(ring).toBe("rgb(129, 140, 248)");
+  // `--fk-color-ring` of the dark theme, `#ff7959`.
+  expect(ring).toBe("rgb(255, 121, 89)");
 });
 
 test("in light, the same pages keep their contrast too (the check itself finds a real failure)", async ({
