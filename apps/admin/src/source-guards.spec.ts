@@ -187,7 +187,7 @@ describe("source guards (AGENTS.md sections 2.2, 2.3 and 11; plan, Security (adm
     }
   });
 
-  it("keeps browser storage behind one accessor, used for the UI language and the help checklist only; no cookie, sessionStorage or IndexedDB", () => {
+  it("keeps browser storage behind one accessor, used for the UI language, sidebar and help checklist only; no cookie, sessionStorage or IndexedDB", () => {
     const storage = sources.filter((file) => /\blocalStorage\b/.test(code(file.text)));
     expect(storage.map((file) => file.path)).toEqual([join("i18n", "i18n-context.tsx")]);
     expect(code(storage[0]?.text ?? "")).toMatch(
@@ -200,6 +200,7 @@ describe("source guards (AGENTS.md sections 2.2, 2.3 and 11; plan, Security (adm
       [
         join("areas", "help", "checklist-storage.ts"),
         join("i18n", "i18n-context.tsx"),
+        join("layout", "sidebar-preference.ts"),
         "main.tsx",
       ].sort(),
     );
