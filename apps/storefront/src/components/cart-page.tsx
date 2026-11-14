@@ -520,13 +520,16 @@ export function CartPageView({
                 <dd>{formatMoney(cart.subtotal, exponent, locale)}</dd>
               </div>
             </dl>
-            <FreeShippingProgress
-              freeShipping={cart.freeShipping}
-              subtotal={cart.subtotal}
-              t={t}
-              locale={locale}
-              exponent={exponent}
-            />
+            {/* As wide as the summary list above, not the page. */}
+            <div className="max-w-sm">
+              <FreeShippingProgress
+                freeShipping={cart.freeShipping}
+                subtotal={cart.subtotal}
+                t={t}
+                locale={locale}
+                exponent={exponent}
+              />
+            </div>
             {/* The full list of the lines that block the checkout stays in the page; the sticky bar below only counts them
                 and links to the first, so it stays short on a phone (review M1 of PR 216). */}
             {block === "stock" ? (
