@@ -28,12 +28,13 @@ internet ──80/443──▶ edge (nginx, uid 101; TLS, routing, admin SPA fil
 storefront ──API_INTERNAL_URL=http://api:3000──▶ api   (catalog reads of the Next server, no cookies)
 migrate (api image, runs once per `up`) ──▶ postgres:5432 ◀── api
 api ──MEILI_URL=http://meilisearch:7700──▶ meilisearch (Community Edition; no published port, not routed by the edge)
+redis (password, no persistence, no published port; not read by the API yet, multi-instance plan)
 volumes: postgres-data, meili-data, media (MEDIA_DIR), acme-webroot
 ```
 
 - Only the edge publishes ports. The API's `/docs`, `/docs-json` and `/health` are not routed (they answer the storefront's 404); the owner's decision on Swagger in production stays open, the default is "not public".
 - **Meilisearch is part of the example** (catalog search, ADR 0034; image pinned to the version CI tests, `MEILI_ENV=production`). It is reachable only by the API on the Compose network; the browser never talks to it. `api` waits for it to be healthy even with search off, so a broken engine stops the boot instead of failing later. The index is rebuilt from Postgres, so `meili-data` is a cache, not a backup target.
-- **Redis is not part of the example on purpose**: `REDIS_URL` is parsed but no running code uses Redis or BullMQ (only the spike specs; `grep` for `redisUrl`, `ioredis`, `bullmq` outside specs, 2026-11-04). It comes with the queue or shared rate-limit plan, and runs then under the approved AGPLv3 exception (`docs/dependencies.md`).
+- **Redis is part of the example** (2026-11-14, `docs/plans/2026-11-14-multi-instance.md`, PR 1 of 4): unmodified `redis:8-alpine` under the approved AGPLv3 exception (`docs/dependencies.md`), password `REDIS_PASSWORD`, reachable only on the Compose network, run as the image's `redis` user with the same hardening as the other services. It holds counters only: no RDB snapshots, no append-only file, `maxmemory 128mb` with `volatile-ttl`, nothing to back up. The API does not read it yet (`REDIS_URL` is not set in the example); the shared rate limits come with PR 2 of the plan. `deploy-smoke` checks it is healthy, publishes no port, refuses a client without the password and persists nothing.
 - **Run exactly one `api` container.** The rate limits, the login throttle, the shipping caches, the mail pacing and the local media disk are per process (ADR 0009, 0016, 0028; shipping step 6). Two instances double every limit and split the uploaded files. The scheduler (jobs 1 to 14, `docs/api/jobs.md`) runs inside that one API under a Postgres lock; there is no worker image. With `SCHEDULER_ENABLED=false` run `node dist/jobs/run-once.js` from a host cron (`docker compose ... run --rm api node dist/jobs/run-once.js`) instead.
 
 ## Prerequisites
@@ -52,6 +53,7 @@ Secrets (generate, store in a password manager, back up with the database where 
 | Variable | Generate | Note |
 |---|---|---|
 | `POSTGRES_PASSWORD` | `openssl rand -hex 32` | Hex only: it is placed unescaped into `DATABASE_URL` by the Compose file |
+| `REDIS_PASSWORD` | `openssl rand -hex 32` | Hex only (it will stand unescaped in `REDIS_URL`). Required by the Compose file since 2026-11-14: an existing host must add it to `production.env` BEFORE it deploys a release with Redis, or `compose pull` stops the deployment (the running release is untouched). Nothing to back up |
 | `MEILI_MASTER_KEY` | `openssl rand -hex 32` | At least 16 bytes. Not in `production.env`: it is in `infra/meilisearch.env` (template `infra/meilisearch.env.example`, `chmod 600`, git-ignored), read only by the engine container, so the API process never holds a key that can mint other keys. Used once to create the scoped key |
 | `MEILI_API_KEY` | created once, see "Catalog search" | The scoped key the API uses; never the master key. Needed only with `SEARCH_ENABLED=true` |
 | `ORDER_TOKEN_SECRET` | `openssl rand -base64 48` | At least 32 characters. Changing it breaks the links of unpaid guest orders and every emailed reset or verification link (ADR 0023, 0031): keep it with the database backup |

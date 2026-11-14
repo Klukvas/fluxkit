@@ -5,6 +5,7 @@
 One line per user-visible or schema change.
 
 ## Unreleased
+- Production example: a `redis` service (password `REDIS_PASSWORD`, required; no persistence, internal only), PR 1 of the multi-instance plan; the API does not use it yet. Existing hosts add `REDIS_PASSWORD` to `production.env` before deploying (`docs/deployment.md`).
 - Store cart API (additive, minor): required nullable `freeShipping` carries the lowest offered valid `free_over` threshold and server-computed remaining amount from the cart subtotal, including in checkout's `cart_changed` cart; the drawer and cart-page summary show the server remainder with accessible, token-styled native progress and a reached state (including zero-cost `free_over` methods); no migration.
 - `@fluxkit/ui` `Hero` gains a phrasing-only `ReactNode` title, section `data-*` attributes, `mediaClassName` and an ornament slot (additive); the decorated home reuses it with unchanged markup.
 - Admin: one page header on every screen (title, description, actions; at most one primary action), `ghost` Cancel buttons; `@fluxkit/ui` `Button` gains `variant="ghost"` and a leading `icon`, new `IconButton` (plan `docs/plans/2026-11-13-admin-shell-redesign.md`, PR 2; existing variants render unchanged).
