@@ -1,9 +1,14 @@
+import { createTranslator } from "@fluxkit/ui";
+import { messagesByLocale } from "../messages";
 import type { EffectCallback, ReactNode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cartLine, cartOf } from "../lib/test-fixtures";
 import { createQuantityAutosave } from "../lib/quantity-autosave";
 import { CartDrawerProvider } from "./cart-drawer-provider";
 import { CartDrawer } from "./cart-drawer";
+import { CartDrawerView } from "./cart-drawer-view";
+import { findElements } from "./test-helpers";
+import { initialCartState } from "../lib/cart-store";
 
 // Hook slots persist across render calls, effects run after each dependency change.
 // No DOM is needed: these controllers return view elements whose callbacks we exercise directly.
@@ -56,7 +61,9 @@ const context = vi.hoisted(() => ({
   push: vi.fn(),
 }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: context.push }) }));
-vi.mock("./i18n-provider", () => ({ useI18n: () => ({ locale: "en", t: vi.fn() }) }));
+vi.mock("./i18n-provider", () => ({
+  useI18n: () => ({ locale: "en", t: createTranslator(messagesByLocale.en, "en") }),
+}));
 vi.mock("./session-provider", () => ({
   useCart: () => ({
     state: {},
@@ -77,7 +84,92 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
+afterEach(() => vi.useRealTimers());
+
 describe("drawer lifecycle", () => {
+  it.each(["onClose", "provider"])(
+    "flushes every waiting change immediately on %s close",
+    (source) => {
+      vi.useFakeTimers();
+      const save = vi.fn(() => new Promise<{ status: "ok" }>(() => {}));
+      const draw = () => render(() => CartDrawer({ exponent: 2, imageHosts: [] }));
+      const tree = draw();
+      for (const id of ["one", "two"]) {
+        const autosave = createQuantityAutosave({ serverQuantity: () => 1, save });
+        tree.props.registerLine(id, autosave);
+        autosave.change(2);
+      }
+      expect(save).not.toHaveBeenCalled();
+      if (source === "onClose") tree.props.onClose();
+      else {
+        context.drawer.isOpen = false;
+        draw();
+      }
+      expect(save).toHaveBeenCalledTimes(2);
+      expect(save).toHaveBeenNthCalledWith(1, 2, false);
+      expect(save).toHaveBeenNthCalledWith(2, 2, false);
+      if (source === "onClose") expect(context.drawer.close).toHaveBeenCalledOnce();
+    },
+  );
+
+  it.each(["saved", "closed", "provider-closed", "refused"])(
+    "View cart waits for a pending save: %s",
+    async (outcome) => {
+      vi.useFakeTimers();
+      let answer: (value: import("../lib/quantity-autosave").SaveOutcome) => void = () => undefined;
+      const autosave = createQuantityAutosave({
+        serverQuantity: () => 1,
+        save: () =>
+          new Promise((resolve) => {
+            answer = resolve;
+          }),
+      });
+      const draw = () => render(() => CartDrawer({ exponent: 2, imageHosts: [] }));
+      let tree = draw();
+      tree.props.registerLine("one", autosave);
+      autosave.change(2);
+      const preventDefault = vi.fn();
+      const view = CartDrawerView({
+        ...tree.props,
+        state: { ...initialCartState, status: "ready", cart: cartOf([cartLine("one")]) },
+      });
+      const link = findElements(view, (element) => element.props.href === "/en/cart")[0];
+      (link?.props.onClick as (event: { preventDefault(): void }) => void)({ preventDefault });
+      expect(preventDefault).toHaveBeenCalledOnce();
+      expect(context.push).not.toHaveBeenCalled();
+      expect(context.drawer.close).not.toHaveBeenCalled();
+      tree = draw();
+      expect(tree.props.leaving).toBe(true);
+      if (outcome === "closed") tree.props.onClose();
+      if (outcome === "closed" || outcome === "provider-closed") {
+        context.drawer.isOpen = false;
+        draw();
+      }
+      const failure = {
+        messageKey: "errors.network",
+        status: null,
+        code: null,
+        retryAfterSeconds: null,
+        fieldErrors: [],
+      };
+      answer(outcome === "refused" ? { status: "failed", failure } : { status: "ok" });
+      await vi.advanceTimersByTimeAsync(0);
+      tree = draw();
+      expect(tree.props.leaving).toBe(false);
+      if (outcome === "saved") {
+        expect(context.push).toHaveBeenCalledExactlyOnceWith("/en/cart");
+        expect(context.drawer.close).toHaveBeenCalledOnce();
+      } else {
+        expect(context.push).not.toHaveBeenCalled();
+        if (outcome === "refused") {
+          expect(context.drawer.close).not.toHaveBeenCalled();
+          expect(autosave.getState().failure).toEqual(failure);
+        }
+      }
+      autosave.dispose();
+    },
+  );
+
   it("omits the drawer initially, mounts on first open, and retains it through close/reopen", () => {
     const drawer = <span>drawer instance</span>;
     const draw = () => render(() => CartDrawerProvider({ children: null, drawer }));

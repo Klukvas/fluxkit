@@ -22,6 +22,7 @@ function props(state: CartState): CartDrawerViewProps {
     onAcknowledge: vi.fn(),
     onSetQuantity: vi.fn(),
     registerLine: vi.fn(),
+    onViewCart: vi.fn(),
     onCheckout: vi.fn(),
   };
 }
@@ -111,6 +112,20 @@ describe("CartDrawerView", () => {
     expect(String(checkout[0]?.props.className).split(" ")).toEqual(
       expect.arrayContaining(["bg-primary", "text-primary-foreground"]),
     );
+  });
+  it("marks both navigation links busy with saving wording", () => {
+    const input = { ...props(ready(cartOf([cartLine("drawer")]))), leaving: true };
+    const tree = CartDrawerView(input);
+    for (const [path, handler] of [
+      ["/en/cart", input.onViewCart],
+      ["/en/checkout", input.onCheckout],
+    ] as const) {
+      const link = findElements(tree, (element) => element.props.href === path)[0];
+      expect(link?.props["aria-busy"]).toBe(true);
+      expect(link?.props["aria-disabled"]).toBe(true);
+      expect(link?.props.children).toBe(t("cart.checkout.saving"));
+      expect(link?.props.onClick).toBe(handler);
+    }
   });
   it("uses a standalone plural stock message for only the blocked lines", () => {
     const cart = cartOf([

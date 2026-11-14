@@ -22,6 +22,7 @@ export function ToastStack({ children }: { children?: ReactNode }) {
     <div
       role="status"
       aria-live="polite"
+      aria-atomic="false"
       aria-relevant="additions text"
       className="fk-toast-stack pointer-events-none fixed inset-x-0 bottom-0 z-50 p-4 sm:start-auto sm:w-full sm:max-w-md"
     >
@@ -132,7 +133,7 @@ export function Toast({
     >
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
-          <p>{message}</p>
+          <p aria-atomic="true">{message}</p>
           {action}
         </div>
         <Button

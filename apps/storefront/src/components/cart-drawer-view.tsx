@@ -43,6 +43,7 @@ export interface CartDrawerViewProps {
   onAcknowledge(): void;
   onSetQuantity: DrawerQuantityProps["onSetQuantity"];
   registerLine: DrawerQuantityProps["registerLine"];
+  onViewCart(event: MouseEvent<HTMLAnchorElement>): void;
   onCheckout(event: MouseEvent<HTMLAnchorElement>): void;
   leaving?: boolean;
 }
@@ -68,6 +69,7 @@ export function CartDrawerView({
   onAcknowledge,
   onSetQuantity,
   registerLine,
+  onViewCart,
   onCheckout,
   leaving = false,
 }: CartDrawerViewProps) {
@@ -100,9 +102,11 @@ export function CartDrawerView({
             <Link
               href={localizedHref(locale, "/cart")}
               className={`${secondaryLinkButton} w-full`}
-              onClick={onClose}
+              aria-busy={leaving}
+              aria-disabled={leaving || undefined}
+              onClick={onViewCart}
             >
-              {t("cart.drawer.viewCart")}
+              {leaving ? t("cart.checkout.saving") : t("cart.drawer.viewCart")}
             </Link>
             {block === null ? (
               <Link

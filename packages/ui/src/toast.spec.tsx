@@ -117,6 +117,7 @@ describe("Toast views", () => {
     const markup = render(<ToastStack />);
     expect(first(markup, "div").attributes.role).toBe("status");
     expect(first(markup, "div").attributes["aria-live"]).toBe("polite");
+    expect(first(markup, "div").attributes["aria-atomic"]).toBe("false");
     expect(tags(markup, "ul")).toHaveLength(1);
     expect(markup).toContain("pointer-events-none");
   });
@@ -131,6 +132,7 @@ describe("Toast views", () => {
         action={<a href="/cart">View cart</a>}
       />,
     );
+    expect(first(markup, "p").attributes["aria-atomic"]).toBe("true");
     expect(first(markup, "li").attributes.class).toContain("pointer-events-auto");
     expect(markup).toContain("border-danger");
     expect(first(markup, "button").attributes["aria-label"]).toBe("Dismiss");

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { useRouter } from "next/navigation";
 import { cartPageHandlers } from "../lib/cart-handlers";
 import { checkoutBlock } from "../lib/cart-model";
@@ -26,33 +26,40 @@ export function CartDrawer({
   const handlers = useMemo(() => cartPageHandlers(store), [store]);
   const registry = useMemo(() => createAutosaveRegistry(), []);
   const [leaving, setLeaving] = useState(false);
-  const checkoutAttempt = useRef(0);
-  const cancelCheckout = useCallback(() => {
-    checkoutAttempt.current += 1;
+  const navigationAttempt = useRef(0);
+  const cancelNavigation = useCallback(() => {
+    navigationAttempt.current += 1;
     setLeaving(false);
-  }, []);
+    void registry.settled();
+  }, [registry]);
   useEffect(() => {
-    if (!drawer.isOpen) cancelCheckout();
-    return cancelCheckout;
-  }, [drawer.isOpen, cancelCheckout]);
+    if (!drawer.isOpen) cancelNavigation();
+    return cancelNavigation;
+  }, [drawer.isOpen, cancelNavigation]);
   function close() {
-    cancelCheckout();
+    cancelNavigation();
     drawer.close();
   }
-  async function checkoutWhenSaved() {
-    const attempt = ++checkoutAttempt.current;
+  async function navigateWhenSaved(target: "/cart" | "/checkout") {
+    const attempt = ++navigationAttempt.current;
     setLeaving(true);
     try {
       const saved = await registry.settled();
-      if (attempt !== checkoutAttempt.current) return;
+      if (attempt !== navigationAttempt.current) return;
       const cart = store.getState().cart;
-      if (saved && cart !== null && checkoutBlock(cart) === null) {
+      if (saved && (target === "/cart" || (cart !== null && checkoutBlock(cart) === null))) {
         drawer.close();
-        router.push(localizedHref(locale, "/checkout"));
+        router.push(localizedHref(locale, target));
       }
     } finally {
-      if (attempt === checkoutAttempt.current) setLeaving(false);
+      if (attempt === navigationAttempt.current) setLeaving(false);
     }
+  }
+  function navigate(event: MouseEvent<HTMLAnchorElement>, target: "/cart" | "/checkout") {
+    if (registry.pending() || leaving) {
+      event.preventDefault();
+      if (!leaving) void navigateWhenSaved(target);
+    } else close();
   }
   return (
     <CartDrawerView
@@ -67,12 +74,8 @@ export function CartDrawer({
       {...handlers}
       registerLine={registry.register}
       leaving={leaving}
-      onCheckout={(event) => {
-        if (registry.pending() || leaving) {
-          event.preventDefault();
-          if (!leaving) void checkoutWhenSaved();
-        } else drawer.close();
-      }}
+      onViewCart={(event) => navigate(event, "/cart")}
+      onCheckout={(event) => navigate(event, "/checkout")}
     />
   );
 }
