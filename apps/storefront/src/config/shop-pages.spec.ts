@@ -70,10 +70,12 @@ describe("shop pages config (config/shop-pages.ts)", () => {
   });
 
   it("uses no slug another route owns: every first segment under [locale] is reserved", () => {
-    // A route group (`(site)`, and `(site)/(home)` since ADR 0048) adds no URL segment: look through it, at any depth.
+    // A route group (`(site)`, and `(site)/(home)` since ADR 0048) adds no URL segment: look through it, at any depth. A
+    // feature slice's own segments (`(feature-<name>)/`) are checked the other way round in `route-structure.spec.ts`: none of
+    // them may be a shop page slug.
     const firstSegments = (directory: string): string[] =>
       readdirSync(directory, { withFileTypes: true })
-        .filter((entry) => entry.isDirectory())
+        .filter((entry) => entry.isDirectory() && !entry.name.startsWith("(feature-"))
         .flatMap((entry) =>
           entry.name.startsWith("(")
             ? firstSegments(join(directory, entry.name))

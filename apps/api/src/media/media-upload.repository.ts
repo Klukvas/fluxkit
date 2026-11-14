@@ -38,6 +38,24 @@ export class MediaUploadRepository {
     return new Set(rows.map((row) => row.storageKey));
   }
 
+  /** The id, key and pixel size of the uploads named by `ids` (lower-case UUIDs); unknown ids are simply absent. */
+  async describeByIds(
+    ids: readonly string[],
+  ): Promise<{ id: string; storageKey: string; width: number; height: number }[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+    return this.db
+      .select({
+        id: mediaUpload.id,
+        storageKey: mediaUpload.storageKey,
+        width: mediaUpload.width,
+        height: mediaUpload.height,
+      })
+      .from(mediaUpload)
+      .where(inArray(mediaUpload.id, [...ids]));
+  }
+
   /**
    * `markAttached` for uploads named by id (banner pictures, ADR 0046): the same ONE `UPDATE ... RETURNING` in the caller's
    * transaction, with the same row locks against the cleanup job's delete. Returns the ids that exist.

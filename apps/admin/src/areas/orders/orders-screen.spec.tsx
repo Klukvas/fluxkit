@@ -52,6 +52,7 @@ const config: AdminConfig = {
   emailDelivery: false,
   onlinePayment: false,
   search: false,
+  features: [],
   media: {
     uploadsEnabled: true,
     maxBytes: 10485760,

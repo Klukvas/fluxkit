@@ -425,6 +425,7 @@ const storeConfig: Shape<StoreConfig> = {
     emailDelivery: "boolean",
     onlinePayment: "boolean",
     search: "boolean",
+    features: { array: "string" },
   },
 };
 

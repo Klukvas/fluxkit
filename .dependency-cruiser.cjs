@@ -59,6 +59,57 @@ module.exports = {
       to: { path: "^packages/features/", pathNot: "^packages/features/$1/" },
     },
     {
+      name: "storefront-reaches-slices-only-through-the-registry",
+      comment:
+        "A storefront feature slice (app/[locale]/(feature-<name>)/, plan 2026-11-13-blog.md E5 and E6) is deleted with its " +
+        "feature, so no app code imports it except the one generated registry module (features/registry.generated.ts); " +
+        "Next routes its pages itself. A slice may import the app (feature -> core direction).",
+      severity: "error",
+      from: {
+        path: "^apps/storefront/src/",
+        pathNot:
+          "^apps/storefront/src/(app/\\[locale\\]/\\(feature-[^/]+\\)/|features/registry\\.generated\\.ts$)",
+      },
+      to: { path: "^apps/storefront/src/app/\\[locale\\]/\\(feature-[^/]+\\)/" },
+    },
+    {
+      name: "storefront-slices-must-not-import-each-other",
+      comment:
+        "Feature slices are independent so that any one can be removed (as features-must-not-import-each-other).",
+      severity: "error",
+      from: { path: "^apps/storefront/src/app/\\[locale\\]/\\(feature-([^/]+)\\)/" },
+      to: {
+        path: "^apps/storefront/src/app/\\[locale\\]/\\(feature-[^/]+\\)/",
+        pathNot: "^apps/storefront/src/app/\\[locale\\]/\\(feature-$1\\)/",
+      },
+    },
+    {
+      name: "api-kit-depends-only-on-nest-common-and-core",
+      comment:
+        "The API kit (ADR 0049) is what a feature package may use from the API: problems, permission decorators and DI " +
+        "tokens. It depends on @nestjs/common and @fluxkit/core only (core resolves into packages/core, outside node_modules), " +
+        "so a feature never pulls the API's ORM, Swagger or Express through it. Its specs may use their test tools. " +
+        "packages-must-not-import-apps keeps it away from apps/api. Features must not import its ./internal entry " +
+        "(apps/api/src/features/feature-boundaries.spec.ts: the entry resolves into dist/, which this tool does not cruise).",
+      severity: "error",
+      from: { path: "^packages/api-kit/src/", pathNot: "\\.spec\\.ts$" },
+      to: { path: "(^|/)node_modules/", pathNot: "(^|/)node_modules/@nestjs/common/" },
+    },
+    {
+      name: "api-kit-must-not-import-node-builtins",
+      severity: "error",
+      from: { path: "^packages/api-kit/src/", pathNot: "\\.spec\\.ts$" },
+      to: { dependencyTypes: ["core"] },
+    },
+    {
+      name: "api-kit-must-not-import-unresolvable",
+      comment:
+        "A package the kit does not install (for example drizzle-orm) is reported unresolved: refused too.",
+      severity: "error",
+      from: { path: "^packages/api-kit/src/", pathNot: "\\.spec\\.ts$" },
+      to: { couldNotResolve: true },
+    },
+    {
       name: "packages-must-not-import-apps",
       comment: "Shared packages must not depend on applications.",
       severity: "error",

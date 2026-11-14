@@ -126,6 +126,8 @@ export interface AdminConfig {
   onlinePayment: boolean;
   /** False with `SEARCH_ENABLED=false`: the admin search routes answer 404, the Search area shows setup steps. */
   search: boolean;
+  /** The optional features enabled on the API (`FEATURES_ENABLED`), sorted; show a feature's screens only when listed (ADR 0049). */
+  features: string[];
   media: AdminMediaConfig;
 }
 

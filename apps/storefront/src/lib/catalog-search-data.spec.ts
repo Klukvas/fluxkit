@@ -15,6 +15,7 @@ const config = {
   emailDelivery: false,
   onlinePayment: false,
   search: true,
+  features: [],
 };
 
 function ok<T>(data: T): CatalogOutcome<T> {
@@ -51,6 +52,9 @@ function fakes(answer: SearchOutcome | (() => Promise<SearchOutcome>)) {
       throw new Error("not used");
     },
     listBanners: async () => {
+      throw new Error("not used");
+    },
+    featureRead: async () => {
       throw new Error("not used");
     },
   };

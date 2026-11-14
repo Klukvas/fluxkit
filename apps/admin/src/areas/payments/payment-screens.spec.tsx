@@ -38,6 +38,7 @@ const config: AdminConfig = {
   emailDelivery: false,
   onlinePayment: true,
   search: false,
+  features: [],
   media: { uploadsEnabled: true, maxBytes: 1, contentTypes: [] },
 };
 const money = { locale: "en", config };

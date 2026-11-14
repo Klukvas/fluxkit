@@ -1,0 +1,43 @@
+{
+  "name": "@fluxkit/feature-blog",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Optional blog feature: posts with a safe Markdown body, store and admin routes (plan docs/plans/2026-11-13-blog.md).",
+  "fluxkit": {
+    "feature": "blog"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate"
+  },
+  "dependencies": {
+    "@fluxkit/api-kit": "workspace:*",
+    "@fluxkit/core": "workspace:*",
+    "drizzle-orm": "0.45.4",
+    "zod": "4.6.7"
+  },
+  "peerDependencies": {
+    "@nestjs/common": "12.2.0"
+  },
+  "devDependencies": {
+    "@nestjs/common": "12.2.0",
+    "@nestjs/core": "12.2.0",
+    "@nestjs/platform-express": "12.2.0",
+    "@nestjs/testing": "12.2.0",
+    "@swc/core": "1.16.20",
+    "@types/node": "26.6.5",
+    "@types/pg": "8.23.1",
+    "drizzle-kit": "0.31.11",
+    "pg": "8.23.1",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2",
+    "typescript": "6.0.3",
+    "unplugin-swc": "2.0.0",
+    "vitest": "5.0.5"
+  }
+}

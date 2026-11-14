@@ -30,6 +30,7 @@
   "footer.group.shop": "Customer service",
   "footer.group.legal": "Legal",
   "footer.group.contacts": "Contacts",
+  "footer.group.more": "More",
   "locale.switcher.label": "Site language",
   "locale.switcher.current": "Site language: {name}",
   "locale.short.uk": "УКР",

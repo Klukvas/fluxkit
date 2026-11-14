@@ -3,6 +3,7 @@ import { exponentOf, type StoreLocale } from "@fluxkit/core";
 import { LOCALE_CONFIG, type LocaleConfig } from "../../common/locale.js";
 import { PRICING_CONFIG, type PricingConfig } from "../../common/pricing-config.js";
 import { SEARCH_PORT, type SearchPort } from "../../common/search-port.js";
+import { ENABLED_FEATURES, type EnabledFeatures } from "../../features/enabled-features.js";
 import { EmailProviderRegistry, type EmailProviderSource } from "../../email/registry/index.js";
 import {
   PaymentProviderRegistry,
@@ -106,6 +107,7 @@ export class StoreService {
     @Inject(EmailProviderRegistry) private readonly email: EmailProviderSource,
     @Inject(PaymentProviderRegistry) private readonly payments: PaymentProviderSource,
     @Inject(SEARCH_PORT) private readonly search: SearchPort,
+    @Inject(ENABLED_FEATURES) private readonly features: EnabledFeatures,
   ) {}
 
   /** What the storefront needs to format money and pick a language; nothing else (no thresholds, no internals). */
@@ -119,6 +121,7 @@ export class StoreService {
       emailDelivery: this.email.deliveryEnabled(),
       onlinePayment: this.payments.onlineEnabled(),
       search: this.search.enabled,
+      features: [...this.features],
     };
   }
 

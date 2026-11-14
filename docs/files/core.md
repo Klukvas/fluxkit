@@ -52,6 +52,20 @@ The API (`apps/api`) reads facts from the database, calls these functions inside
 - `src/content/banner-content.ts` - `checkBannerContent` (layout rules with `validateI18nText`), `checkBannerImageLocales`, `resolveBannerPicture`, `checkBannerOrder`, `checkBannerCount`.
 - `src/content/*.spec.ts` - the case tables (link, window boundaries, layouts); the link table is the one the storefront parity spec copies.
 
+## Safe Markdown (ADR 0050, blog plan E9, `src/content/markdown/`)
+
+- `src/content/markdown/index.ts` - barrel: exports `parseMarkdown`, `checkMarkdownLink`, `markdownPlainText`, `MARKDOWN_LIMITS` and the AST and error types only; the modules below without an export there are internal.
+- `src/content/markdown/types.ts` - the AST (`MarkdownDocument`, `MarkdownBlock`, `MarkdownInline`, ...), `MarkdownErrorCode`, `MarkdownError`, `MarkdownParseResult`, `MarkdownLinkRefusal`. Public contract (`docs/contracts/markdown.md`).
+- `src/content/markdown/limits.ts` - `MARKDOWN_LIMITS` (40 000 characters, 2 000 blocks, nesting 4, lists 2, inline nesting 4, 300 links, 20 000 nodes, 256 KB serialized, link target scan 2 048).
+- `src/content/markdown/parse.ts` - `parseMarkdown(source, {locales})`, the public entry; `run-parse.ts` (internal, not exported) - `runMarkdownParse`: length and NUL checks, the block parse, the serialized size cap, the first refusal with its line, and the work in steps (the adversarial spec's linearity check). Must never produce HTML.
+- `src/content/markdown/link.ts` - `checkMarkdownLink(href, locales)`: `checkBannerLink` plus an exact `https://` scheme and no control, bidi control or invisible format character, raw or percent-encoded.
+- `src/content/markdown/plain-text.ts` - `markdownPlainText(document)` (blocks separated by a blank line); `inline-text.ts` - the inline part (also the empty link text check).
+- `src/content/markdown/source.ts` - line splitting (`\r\n`, `\r`, `\n`), prefix tab expansion, the line of an offset, blank and indent helpers.
+- `src/content/markdown/block-syntax.ts` - recognizers of one line's block start (fence, ATX heading, thematic break, quote, list marker) and the paragraph interruption rule; hand-written scans, no backtracking expression.
+- `src/content/markdown/blocks.ts` - the block parser (containers with lazy continuation lines, depth and list depth checks).
+- `src/content/markdown/inline.ts` - the inline parser of one paragraph or heading (escapes, code spans, delimiter runs, brackets and link targets, hard breaks); `emphasis.ts` - CommonMark's process emphasis with `openers_bottom`; `backtick-runs.ts` - the code span closer index; `inline-list.ts` - the linked list of pieces; `budget.ts` - block, node, link and work counters and `MarkdownFailure`.
+- `src/content/markdown/*.spec.ts` - `parse.spec.ts` (case table per node and refusals with lines), `link.spec.ts` (link targets, raw and encoded controls, bidi controls and format characters), `plain-text.spec.ts`, `adversarial.spec.ts` (linear work by the step counter, a one-second backstop and output caps at the length limit, every limit, a seeded fuzz run).
+
 ## Admin authentication rules (ADR 0009)
 
 Pure decisions only: no hashing, no cookies, no random numbers, no clock (`now` is a parameter). The API does the I/O (scrypt, sessions, database) and calls these.
@@ -141,6 +155,7 @@ Pure rules of the image-upload gate. No I/O and no `node:` import: the API suppl
 - `src/media/key.ts` - `MediaKey` (branded), `isMediaKey(value)` (`^[0-9a-f]{32}\.(jpg|png|webp)$`, nothing else), `keyToRelativePath(key)` (`ab/cd/<key>`, throws for a non-key), `typeOfKey(key)`, `generateMediaKey(randomBytes, type)` (the source is injected and must return exactly 16 bytes) and re-exports of `extensionOf` and `contentTypeOf`. Must not import `node:crypto` and must not turn client input into a path without `isMediaKey`.
 - `src/media/reasons.ts` - `MEDIA_VALIDATION_REASONS` and `MEDIA_PROBLEM_CODES`, exactly the codes of ADR 0028; add one only together with the ADR.
 - `src/media/storage-port.ts` - types and constants only (ADR 0018 pattern): `MEDIA_STORAGE_PORT` (token), `MediaStoragePort` (`put`, `open`, `delete`) and `MediaReadable`. Implemented by `apps/api`; must not hold I/O.
+- `src/media/media-port.ts` - types only (ADR 0049): `MediaPort` (`markAttachedByIds(tx, refs)`, `describeUploads(ids)`), `MediaUploadReference`, `MediaUploadDescription`. Implemented by `apps/api` (`MEDIA_PORT` of `@fluxkit/api-kit`) for feature packages; must not hold I/O.
 - `src/media/test-support.ts` - byte fixtures and a seeded generator for the media specs; excluded from the build. Must not be imported by the API.
 - `src/media/*.spec.ts` - Vitest specs; `sniff.spec.ts` and `key.spec.ts` include seeded property tests.
 
@@ -228,3 +243,4 @@ Pure rules for personal data (privacy plan step 3): no I/O; the clock and the ra
 
 - `src/catalog/test-support.ts` - `deepFreeze` for tests; excluded from the build (`tsconfig.build.json`). Must not be imported by the API.
 - `src/auth/*.spec.ts`, `src/cart/*.spec.ts`, `src/catalog/*.spec.ts`, `src/email/*.spec.ts`, `src/media/*.spec.ts`, `src/orders/*.spec.ts`, `src/pricing/*.spec.ts`, `src/inventory/*.spec.ts`, `src/search/*.spec.ts`, `src/shipping/*.spec.ts` - Vitest unit tests next to each module (rules and edge cases); `src/pricing/money.property.spec.ts` compares rounding, arithmetic and decimal strings with independent BigInt references on tens of thousands of cases from a seeded generator (no `Math.random`); `src/inventory/decisions.property.spec.ts` runs seeded random sequences of reserve, release, expire, commit and adjustment and checks that on hand and reserved never go negative, reserved stays within on hand without backorder, on hand equals the sum of journal deltas and availability matches an independent reference; `src/orders/totals.property.spec.ts` compares the order totals and every refusal with an independent BigInt reference on 30 000 seeded random orders; `src/orders/status.spec.ts` checks the whole start state x target x actor matrix against a literal copy of the plan table; `src/orders/number.spec.ts` round-trips 20 000 seeded order numbers against a bit-reading reference; `src/index.spec.ts` checks the public entry point.
+- `src/privacy/data-inventory.ts` - the personal-data inventory vocabulary and rules (ADR 0033, moved from `apps/api` by ADR 0049 so feature packages classify their tables): `PersonalDataClass`, `PersonalDataExportAction`, `PersonalDataErasureAction`, `PersonalDataColumnEntry`, `PersonalDataInventory`, `PersonalDataSchemaTable`, `checkPersonalDataInventory(inventory, schema)`. Pure; must not read a schema itself.

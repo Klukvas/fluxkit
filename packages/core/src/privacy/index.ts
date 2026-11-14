@@ -5,3 +5,4 @@ export * from "./export.js";
 export * from "./request.js";
 export * from "./retention.js";
 export * from "./subject-scope.js";
+export * from "./data-inventory.js";

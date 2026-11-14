@@ -33,6 +33,10 @@ export const adminConfigResponseSchema = z.object({
     description:
       "False when `SEARCH_ENABLED=false`: the admin search routes answer 404, so the admin Search area shows the setup steps.",
   }),
+  features: z.array(z.string()).meta({
+    description:
+      "The optional features enabled on this API (`FEATURES_ENABLED`, the ones that loaded), sorted by name. The admin shows a feature's screens only when its name is here (ADR 0049).",
+  }),
   media: z
     .object({
       uploadsEnabled: z.boolean().meta({

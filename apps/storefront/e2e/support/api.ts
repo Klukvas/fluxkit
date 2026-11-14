@@ -256,6 +256,28 @@ export class AdminApi {
     );
   }
 
+  /** `POST /admin/blog/posts` (docs/api/features-blog.md; only with the `blog` feature on): a draft. */
+  async createBlogPost(body: Record<string, unknown>): Promise<{ id: string; slug: string }> {
+    return json(await this.context.post("/admin/blog/posts", { headers: CSRF, data: body }), 201);
+  }
+
+  /** `POST /admin/blog/posts/{id}/publish`: public now. */
+  async publishBlogPost(id: string): Promise<void> {
+    await json(await this.context.post(`/admin/blog/posts/${id}/publish`, { headers: CSRF }), 200);
+  }
+
+  /** `POST /admin/blog/posts/{id}/unpublish`: back to draft. */
+  async unpublishBlogPost(id: string): Promise<void> {
+    await json(
+      await this.context.post(`/admin/blog/posts/${id}/unpublish`, { headers: CSRF }),
+      200,
+    );
+  }
+
+  async deleteBlogPost(id: string): Promise<void> {
+    await json(await this.context.delete(`/admin/blog/posts/${id}`, { headers: CSRF }), 204);
+  }
+
   /** `POST /admin/banners` (docs/api/banners.md): appended at the end of the list. */
   async createBanner(body: Record<string, unknown>): Promise<{ id: string }> {
     return json(await this.context.post("/admin/banners", { headers: CSRF, data: body }), 201);

@@ -29,6 +29,7 @@ import { Tabs } from "./tabs";
 import { TrustBar } from "./trust-bar";
 import { Disclosure } from "./disclosure";
 import { Hero } from "./hero";
+import { MarkdownView } from "./markdown-view";
 import { render, text } from "./test-helpers";
 
 // Every user-facing string must come from props (AGENTS.md section 2.2). Each component is rendered with sentinel
@@ -338,6 +339,54 @@ const cases: [string, ReactElement][] = [
     <Disclosure key="y5" title={s("title")} headingId="d">
       {s("body")}
     </Disclosure>,
+  ],
+  [
+    "MarkdownView",
+    <MarkdownView
+      key="y8"
+      localePrefix="/uk"
+      document={{
+        type: "document",
+        children: [
+          { type: "heading", level: 2, children: [{ type: "text", value: s("h") }] },
+          {
+            type: "paragraph",
+            children: [
+              { type: "text", value: s("p") },
+              {
+                type: "link",
+                kind: "path",
+                href: "/a",
+                children: [{ type: "text", value: s("l") }],
+              },
+              {
+                type: "link",
+                kind: "https",
+                href: "https://example.com",
+                children: [{ type: "text", value: s("x") }],
+              },
+            ],
+          },
+          { type: "codeBlock", value: s("c") },
+          {
+            type: "blockquote",
+            children: [{ type: "paragraph", children: [{ type: "text", value: s("q") }] }],
+          },
+          {
+            type: "list",
+            ordered: true,
+            start: 2,
+            items: [
+              {
+                type: "listItem",
+                children: [{ type: "paragraph", children: [{ type: "text", value: s("i") }] }],
+              },
+            ],
+          },
+          { type: "thematicBreak" },
+        ],
+      }}
+    />,
   ],
 ];
 

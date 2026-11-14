@@ -1,4 +1,6 @@
 import type { Locale, Messages } from "@fluxkit/ui";
+import { featureMessagePrefix, storefrontFeatures } from "../features/registry";
+import type { StorefrontFeature } from "../features/types";
 import enExtras from "../messages-extra/en.json";
 import ukExtras from "../messages-extra/uk.json";
 import enOverrides from "../messages-overrides/en.json";
@@ -35,7 +37,8 @@ import ukShell from "./uk/shell.json";
  * UI strings (plan docs/plans/2026-11-08-design-changeability.md, WP3): one file per area and locale,
  * `messages/<locale>/<area>.json`, with FLAT keys (`"site.name"`); which namespace goes in which area is the one map in
  * `areas.ts`. Every file is imported statically, so a page needs no file system and the bundler sees every text. A client
- * fork ADDS its own keys (`custom.<name>` only) in `src/messages-extra/<locale>.json`, merged after the area files, and
+ * feature slice brings its own texts (`features.<name>.` only, `features/registry.ts`), merged after the area files; a client
+ * fork ADDS its own keys (`custom.<name>` only) in `src/messages-extra/<locale>.json`, merged after those, and
  * changes upstream texts (and its own extras) in `src/messages-overrides/<locale>.json`, merged LAST; upstream ships both as
  * `{}` and never edits them. Both apply before `pickClientMessages` picks the browser's subset (`components/site-shell.tsx`),
  * so the server and the browser render the same text. `next.config.ts` repeats this merge in plain Node for the legal release check (it cannot
@@ -95,6 +98,39 @@ export function mergeAreas(areas: Readonly<Record<string, Messages>>): Messages 
       }
       merged[key] = message;
       origin[key] = area;
+    }
+  }
+  return merged;
+}
+
+/**
+ * Adds the texts of the feature slices (plan docs/plans/2026-11-13-blog.md, E6) to the merged area files, before a fork's extras
+ * and overrides (so a fork overrides a feature's text like any upstream one). Throws, naming the key and the slice's file, on a
+ * key outside `features.<name>.` of its own feature, a key the base already has and a value that is not a non-empty string,
+ * like `applyExtras`.
+ */
+export function applyFeatureMessages(
+  base: Readonly<Messages>,
+  features: readonly Pick<StorefrontFeature, "name" | "messages">[],
+  locale: Locale,
+): Messages {
+  const merged: Messages = { ...base };
+  for (const feature of features) {
+    const file = `app/[locale]/(feature-${feature.name})/_feature/messages/${locale}.json`;
+    const prefix = featureMessagePrefix(feature.name);
+    for (const [key, value] of Object.entries(feature.messages[locale] ?? {})) {
+      if (!key.startsWith(prefix) || key.length === prefix.length) {
+        throw new Error(
+          `Feature message "${key}" in ${file} is outside the feature's namespace "${prefix}".`,
+        );
+      }
+      if (Object.hasOwn(merged, key)) {
+        throw new Error(`Feature message "${key}" in ${file} already has a message.`);
+      }
+      if (typeof value !== "string" || value.trim() === "") {
+        throw new Error(`Feature message "${key}" in ${file} must be a non-empty string.`);
+      }
+      merged[key] = value;
     }
   }
   return merged;
@@ -160,23 +196,34 @@ export function applyOverrides(
   return merged;
 }
 
-/** The messages of one locale: its area files merged, then its extras added, then its overrides applied. */
+/**
+ * The messages of one locale: its area files merged, then the feature slices' texts (`features`, none by default), then its
+ * extras added, then its overrides applied.
+ */
 export function buildLocaleMessages(
   areas: Readonly<Record<string, Messages>>,
   extras: Readonly<Record<string, unknown>>,
   overrides: Readonly<Record<string, unknown>>,
-  locale: string,
+  locale: Locale,
+  features: readonly Pick<StorefrontFeature, "name" | "messages">[] = [],
 ): Messages {
-  return applyOverrides(applyExtras(mergeAreas(areas), extras, locale), overrides, locale);
+  return applyOverrides(
+    applyExtras(applyFeatureMessages(mergeAreas(areas), features, locale), extras, locale),
+    overrides,
+    locale,
+  );
 }
 
-/** The upstream texts without the fork's extras and overrides (for the specs and the overrides check). */
+/**
+ * The upstream area files without the feature slices' texts and the fork's extras and overrides (for the specs and the
+ * overrides check).
+ */
 export const baseMessagesByLocale: Record<Locale, Messages> = {
   uk: mergeAreas(MESSAGE_FILES.uk),
   en: mergeAreas(MESSAGE_FILES.en),
 };
 
-/** What the app renders: the upstream texts, plus the fork's extras, with the fork's overrides applied. */
+/** What the app renders: the upstream texts, plus the slices' and the fork's extras, with the fork's overrides applied. */
 export const messagesByLocale: Record<Locale, Messages> = {
   uk: buildFromBase(baseMessagesByLocale.uk, "uk"),
   en: buildFromBase(baseMessagesByLocale.en, "en"),
@@ -184,7 +231,11 @@ export const messagesByLocale: Record<Locale, Messages> = {
 
 function buildFromBase(base: Messages, locale: Locale): Messages {
   return applyOverrides(
-    applyExtras(base, EXTRA_FILES[locale], locale),
+    applyExtras(
+      applyFeatureMessages(base, storefrontFeatures, locale),
+      EXTRA_FILES[locale],
+      locale,
+    ),
     OVERRIDE_FILES[locale],
     locale,
   );

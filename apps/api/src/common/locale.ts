@@ -1,7 +1,5 @@
-export const LOCALE_CONFIG = Symbol("LOCALE_CONFIG");
-
-/** Locales of translated texts (`DEFAULT_LOCALE`, `LOCALES`); services pass it to the core i18n functions. */
-export interface LocaleConfig {
-  readonly defaultLocale: string;
-  readonly locales: readonly string[];
-}
+/*
+ * `LOCALE_CONFIG` and `LocaleConfig` live in `@fluxkit/api-kit` (ADR 0049), so a feature package injects the same token;
+ * re-exported here unchanged.
+ */
+export { LOCALE_CONFIG, type LocaleConfig } from "@fluxkit/api-kit";

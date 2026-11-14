@@ -7,6 +7,7 @@ import { staffTables } from "./tables-staff.js";
 import type { Inventory } from "./types.js";
 
 export { checkInventory } from "./rules.js";
+export { mergeFeatureInventories, type FeatureInventorySource } from "./feature-inventories.js";
 export { listSchemaTables } from "./schema-tables.js";
 export type {
   ColumnEntry,

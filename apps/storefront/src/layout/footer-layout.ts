@@ -8,7 +8,7 @@
  */
 import type { ContactsView } from "../lib/contacts";
 import { isPlainStorefrontPath } from "../lib/locale-path";
-import { repeatedValues } from "./header-layout";
+import { appendFeatureLinks, repeatedValues } from "./header-layout";
 import type { NavigationLink } from "./navigation";
 
 /**
@@ -56,6 +56,12 @@ export const FOOTER_GROUP_HEADINGS = {
   legal: "footer.group.legal",
 } as const;
 
+/**
+ * The heading of the feature links' own group in the `columns` layout, used only when the config has no `shopPages` group to
+ * append them to.
+ */
+export const FOOTER_FEATURES_HEADING = "footer.group.more";
+
 /** The heading of the contacts column in the `columns` layout. */
 export const FOOTER_CONTACTS_HEADING = "footer.group.contacts";
 
@@ -97,6 +103,9 @@ export type FooterBlockView =
  * `FooterContacts` renders nothing without a phone or an email. In the `columns` layout every group has a heading (the
  * built-in groups' default when the config sets none). A config with a structural problem throws here
  * (`assertFooterConfig`, with `showThemeSwitch` as `showToggle`), so a fork that skipped the tests still fails loudly.
+ * `featureLinks` are the footer links of the enabled feature slices (`docs/contracts/header-footer.md`): appended to the
+ * `shopPages` group (a path already there left out), or, when the config lists no such group, a group of their own after the
+ * configured ones (headed `footer.group.more` in the `columns` layout). None, and the view is exactly the config's.
  */
 export function footerView(
   config: FooterConfig,
@@ -107,33 +116,40 @@ export function footerView(
     showThemeSwitch: boolean;
     /** The header lists the `theme` control (`headerHasThemeControl`). */
     themeInHeader: boolean;
+    /** The footer links of the enabled feature slices; none when left out. */
+    featureLinks?: readonly NavigationLink[];
   },
 ): FooterBlockView[] {
   assertFooterConfig(config, { showToggle: input.showThemeSwitch, inHeader: input.themeInHeader });
   const isColumns = config.layout === "columns";
-  const groups = config.navigation.groups
-    .map((group): FooterLinkGroupView => {
-      const own = group.headingKey ?? null;
-      switch (group.kind) {
-        case "shopPages":
-          return {
-            headingKey: own ?? (isColumns ? FOOTER_GROUP_HEADINGS.shopPages : null),
-            links: input.shopLinks,
-          };
-        case "legal":
-          return {
-            headingKey: own ?? (isColumns ? FOOTER_GROUP_HEADINGS.legal : null),
-            links: input.legalLinks,
-          };
-        case "links":
-          return { headingKey: own, links: group.links };
-        default: {
-          const unknown: never = group;
-          throw new RangeError(`Unknown footer link group ${JSON.stringify(unknown)}`);
-        }
+  const featureLinks = input.featureLinks ?? [];
+  const hasShopGroup = config.navigation.groups.some((group) => group.kind === "shopPages");
+  const featureGroup: FooterLinkGroupView[] =
+    hasShopGroup || featureLinks.length === 0
+      ? []
+      : [{ headingKey: isColumns ? FOOTER_FEATURES_HEADING : null, links: featureLinks }];
+  const configuredGroups = config.navigation.groups.map((group): FooterLinkGroupView => {
+    const own = group.headingKey ?? null;
+    switch (group.kind) {
+      case "shopPages":
+        return {
+          headingKey: own ?? (isColumns ? FOOTER_GROUP_HEADINGS.shopPages : null),
+          links: appendFeatureLinks(input.shopLinks, featureLinks),
+        };
+      case "legal":
+        return {
+          headingKey: own ?? (isColumns ? FOOTER_GROUP_HEADINGS.legal : null),
+          links: input.legalLinks,
+        };
+      case "links":
+        return { headingKey: own, links: group.links };
+      default: {
+        const unknown: never = group;
+        throw new RangeError(`Unknown footer link group ${JSON.stringify(unknown)}`);
       }
-    })
-    .filter((group) => group.links.length > 0);
+    }
+  });
+  const groups = [...configuredGroups, ...featureGroup].filter((group) => group.links.length > 0);
   const blocks: FooterBlockView[] = [];
   for (const block of config.blocks) {
     if (typeof block !== "string") {

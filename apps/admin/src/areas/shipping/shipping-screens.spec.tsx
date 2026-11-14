@@ -28,6 +28,7 @@ const config: AdminConfig = {
   emailDelivery: false,
   onlinePayment: false,
   search: false,
+  features: [],
   media: { uploadsEnabled: true, maxBytes: 10485760, contentTypes: ["image/jpeg"] },
 };
 const content = { defaultLocale: "uk", locales: ["uk", "en"] } as const;

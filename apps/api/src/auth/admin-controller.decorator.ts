@@ -1,12 +1,9 @@
-import { applyDecorators, Controller, UseGuards } from "@nestjs/common";
+import { applyDecorators, UseGuards } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
+import { AdminController as KitAdminController } from "@fluxkit/api-kit";
 import { ApiProblemResponses } from "../common/openapi.js";
 import { AdminGuard } from "./admin.guard.js";
-import {
-  CATALOG_DEFAULT_PERMISSIONS,
-  UseDefaultPermissionByMethod,
-  type DefaultPermissions,
-} from "./route-access.js";
+import { CATALOG_DEFAULT_PERMISSIONS, type DefaultPermissions } from "./route-access.js";
 
 /**
  * Use instead of `@Controller` for every admin resource: `@AdminController("brands")` serves `/admin/brands`.
@@ -18,15 +15,17 @@ import {
  * of another area names its own pair, for example
  * `@AdminController("customers", { read: "customers.read", write: "customers.write" })`. Routes that need more
  * (publishing) or something else declare it explicitly.
+ *
+ * The prefix and the default-permission metadata come from the API kit's `AdminController` (ADR 0049), the one feature
+ * packages use; this one adds what needs the API itself (the guard class and the OpenAPI decorators).
  */
 export function AdminController(
   resource: string,
   defaults: DefaultPermissions = CATALOG_DEFAULT_PERMISSIONS,
 ): ClassDecorator {
   return applyDecorators(
-    Controller(`admin/${resource}`),
+    KitAdminController(resource, defaults),
     UseGuards(AdminGuard),
-    UseDefaultPermissionByMethod(defaults),
     ApiTags(`admin-${resource}`),
     ApiProblemResponses(401, 403, 500),
   );

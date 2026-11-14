@@ -1,4 +1,5 @@
 import { Global, Module, type DynamicModule } from "@nestjs/common";
+import { MEDIA_PORT } from "@fluxkit/api-kit";
 import { MEDIA_STORAGE_PORT } from "@fluxkit/core";
 import {
   DisabledMediaStorage,
@@ -8,6 +9,7 @@ import {
 import { MediaAttachService } from "./media-attach.service.js";
 import { MEDIA_CONFIG, type MediaConfig } from "./media-config.js";
 import { MediaFilesController } from "./media-files.controller.js";
+import { MediaPortService } from "./media-port.service.js";
 import { MediaUploadRepository } from "./media-upload.repository.js";
 import { MediaUploadService } from "./media-upload.service.js";
 import { MediaUploadsController } from "./media-uploads.controller.js";
@@ -15,8 +17,8 @@ import { ProcessingSlots } from "./processing-slots.js";
 
 /**
  * Media upload and serving (ADR 0028; core, not a feature: switched by `MEDIA_STORAGE_DRIVER`). Global so the catalog
- * saves can mark uploads attached (`MediaAttachService`) and the admin config can read `MEDIA_CONFIG` without importing
- * this module. With the local driver the storage is checked at start (`LocalMediaStorage.open`), so a missing or
+ * saves can mark uploads attached (`MediaAttachService`), feature packages reach uploads through `MEDIA_PORT` (ADR 0049) and
+ * the admin config can read `MEDIA_CONFIG` without importing this module. With the local driver the storage is checked at start (`LocalMediaStorage.open`), so a missing or
  * unwritable `MEDIA_DIR` stops the API instead of failing the first upload.
  */
 @Global()
@@ -48,8 +50,9 @@ export class MediaModule {
         MediaUploadRepository,
         MediaUploadService,
         MediaAttachService,
+        { provide: MEDIA_PORT, useClass: MediaPortService },
       ],
-      exports: [MEDIA_CONFIG, MEDIA_STORAGE_PORT, MediaAttachService],
+      exports: [MEDIA_CONFIG, MEDIA_STORAGE_PORT, MediaAttachService, MEDIA_PORT],
     };
   }
 }

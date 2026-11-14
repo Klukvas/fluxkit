@@ -33,6 +33,10 @@ infra/meilisearch.env
 infra/certs/
 infra/.smoke/
 
+# The storefront's feature registry, generated from the slices on disk before dev, build, typecheck and test
+# (scripts/generate-feature-registry.mjs)
+apps/storefront/src/features/registry.generated.ts
+
 # Visual comparison (scripts/visual-compare.sh): baselines, the base tree and reports are never committed; a PR's declared
 # exceptions file is (apps/storefront/e2e/README.md, "Visual comparison")
 /.visual/*

@@ -103,8 +103,12 @@ function sourceFiles(directory: string): string[] {
     const path = join(directory, name);
     if (statSync(path).isDirectory()) return sourceFiles(path);
     // Fork fixtures (`lib/*-fork-fixture.*`) are test data of the fork runs: their `custom.` keys belong to those runs' extras,
-    // and a fork's own extras must not make them look like missing keys.
-    return /\.(ts|tsx)$/.test(name) && !/\.spec\.tsx?$/.test(name) && !/-fork-fixture\./.test(name)
+    // and a fork's own extras must not make them look like missing keys. The fixture feature slice (`features/fixtures/`) is
+    // not registered, so its `features.notebook.` keys are not in the app's messages (its spec checks them against its own).
+    return /\.(ts|tsx)$/.test(name) &&
+      !/\.spec\.tsx?$/.test(name) &&
+      !/-fork-fixture\./.test(name) &&
+      !/[\\/]features[\\/]fixtures[\\/]/.test(path)
       ? [path]
       : [];
   });

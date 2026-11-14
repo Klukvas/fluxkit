@@ -3094,6 +3094,13 @@
                       "type": "boolean",
                       "description": "False when `SEARCH_ENABLED=false`: the admin search routes answer 404, so the admin Search area shows the setup steps."
                     },
+                    "features": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The optional features enabled on this API (`FEATURES_ENABLED`, the ones that loaded), sorted by name. The admin shows a feature's screens only when its name is here (ADR 0049)."
+                    },
                     "media": {
                       "type": "object",
                       "properties": {
@@ -3131,6 +3138,7 @@
                     "emailDelivery",
                     "onlinePayment",
                     "search",
+                    "features",
                     "media"
                   ],
                   "additionalProperties": false
@@ -3169,7 +3177,7 @@
             }
           }
         },
-        "summary": "Locales, shop currency, supported currencies, stock threshold, upload limits and whether mail, online payment and catalog search are configured, for the admin UI",
+        "summary": "Locales, shop currency, supported currencies, stock threshold, upload limits, enabled features and whether mail, online payment and catalog search are configured, for the admin UI",
         "tags": ["admin-config"],
         "x-fluxkit-permission": "authenticated"
       }
@@ -31070,6 +31078,13 @@
                     "search": {
                       "type": "boolean",
                       "description": "False when `SEARCH_ENABLED=false`: the search routes answer 404, so show no search box and no facets and use `GET /store/products`. True when catalog search is configured (it may still answer `503 search_unavailable` while the engine is down or the first index is built)."
+                    },
+                    "features": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The optional features enabled on this API (`FEATURES_ENABLED`, the ones that loaded), sorted by name. A storefront shows a feature's pages and links only when its name is here; a missing name means its routes answer 404 (ADR 0049)."
                     }
                   },
                   "required": [
@@ -31080,7 +31095,8 @@
                     "locales",
                     "emailDelivery",
                     "onlinePayment",
-                    "search"
+                    "search",
+                    "features"
                   ],
                   "additionalProperties": false
                 }

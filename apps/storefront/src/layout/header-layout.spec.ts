@@ -367,3 +367,66 @@ describe("headerView: the theme control (round 4)", () => {
     ).toEqual(['header control "theme" is listed more than once']);
   });
 });
+
+describe("headerView: links of the enabled feature slices (plan 2026-11-13-blog.md, E7)", () => {
+  const featureLinks = [
+    { labelKey: "features.notebook.nav", href: "/notebook" },
+    // A path the config already links: left out, the config's entry keeps its place.
+    { labelKey: "features.notebook.nav", href: "/catalog" },
+  ];
+  const view = (config: HeaderConfig, links = featureLinks) =>
+    headerView(config, {
+      locale: "uk",
+      t,
+      categories,
+      searchEnabled: true,
+      showThemeSwitch: true,
+      featureLinks: links,
+    });
+
+  it("appends them after the configured links, in the menu and the inline list, without a repeated path", () => {
+    const blocks = view(base);
+    const expected = [
+      { key: "c:shoes", href: "/uk/c/shoes", label: "Shoes" },
+      { key: "c:a b/c", href: "/uk/c/a%20b%2Fc", label: "Odd" },
+      { key: "/catalog", href: "/uk/catalog", label: "§nav.catalog" },
+      { key: "/notebook", href: "/uk/notebook", label: "§features.notebook.nav" },
+    ];
+    expect(blocks[0]).toMatchObject({ kind: "menu", links: expected });
+    expect(blocks[2]).toEqual({ kind: "navigation", links: expected });
+  });
+
+  it("appends them after the configured links in the picker's panel", () => {
+    const blocks = view({ ...base, navigation: { ...base.navigation, display: "picker" } });
+    expect(blocks[0]).toMatchObject({
+      kind: "picker",
+      links: [
+        { key: "/catalog", href: "/uk/catalog", label: "§nav.catalog" },
+        { key: "/notebook", href: "/uk/notebook", label: "§features.notebook.nav" },
+      ],
+    });
+  });
+
+  it("is exactly the config's view without feature links", () => {
+    const without = headerView(base, {
+      locale: "uk",
+      t,
+      categories,
+      searchEnabled: true,
+      showThemeSwitch: true,
+    });
+    expect(view(base, [])).toEqual(without);
+  });
+
+  it("gives a header without configured links a navigation when a feature brings one", () => {
+    const empty: HeaderConfig = { ...base, navigation: { categoryLimit: 0, links: [] } };
+    expect(view(empty, []).map((block) => block.kind)).toEqual(["logo", "search", "controls"]);
+    expect(view(empty).map((block) => block.kind)).toEqual([
+      "menu",
+      "logo",
+      "navigation",
+      "search",
+      "controls",
+    ]);
+  });
+});
