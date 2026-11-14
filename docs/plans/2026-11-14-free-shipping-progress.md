@@ -2,7 +2,7 @@
 
 Status: owner-approved shape (decision 7 of `2026-11-14-playful-default-design.md`, recorded by PR 295): "Approved, additive: a nullable
 store-API field with the cart's free-shipping threshold (lowest active `free_over` in the cart currency); the remainder is computed on the
-server. No migration." Implementation in progress.
+server. No migration." Implemented, in review.
 
 ## Goal
 

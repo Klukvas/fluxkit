@@ -3,11 +3,11 @@
 Read this first (Claude Code, Codex or a human). Rules live in `AGENTS.md`; decisions in `docs/adr/` (0001 to 0047, index in `docs/adr/README.md`); plans in `docs/plans/`.
 The long per-step history that used to live here is archived verbatim in `docs/HISTORY.md` (not current). Update this file in every PR that changes project state; keep it short and keep "Last updated" to one line.
 
-Last updated: 2026-11-14, free-shipping progress API/core/client and storefront implemented (verification below); admin shell redesign PR 2 (buttons and page headers) in review (PR 294); playful default design workstream C (cart drawer and motion kit) merged (PR 292); playful home WS-D (PR 291: hero decoration, section reveals; card prices wrap after "from" at 360 px) merged; admin shell redesign PR 1 (sidebar with icons, PR 290) merged; the visual comparison is deterministic again (PR 293).
+Last updated: 2026-11-14, free-shipping progress in the cart drawer and cart page in review (decision 7 of the playful design plan); admin shell redesign PR 2 (buttons and page headers) in review (PR 294); playful default design workstream C (cart drawer and motion kit) merged (PR 292); playful home WS-D (PR 291: hero decoration, section reveals; card prices wrap after "from" at 360 px) merged; admin shell redesign PR 1 (sidebar with icons, PR 290) merged; the visual comparison is deterministic again (PR 293).
 
 ## 1. Current state
 
-- **Free-shipping progress:** required nullable cart `freeShipping` (threshold and server remainder), core rule and client contract; plan `docs/plans/2026-11-14-free-shipping-progress.md`. No migration. Drawer and cart-page summary display a shared native progress bar and translated server remainder/reached text; zero-cost `free_over` uses threshold zero. E2E scenario written but not run; API cart/orders integration checks need `DATABASE_URL`.
+- **Free-shipping progress in review:** required nullable cart `freeShipping` (threshold and server remainder), core rule and client contract; plan `docs/plans/2026-11-14-free-shipping-progress.md`. No migration. Drawer and cart-page summary display a shared native progress bar and translated server remainder/reached text; zero-cost `free_over` uses threshold zero. Covered by core, API integration, storefront unit and one drawer e2e test.
 
 - **Admin shell redesign PR 2 (buttons and page headers) in review:** additive Button ghost/icon and IconButton; shared PageHeader with one primary action at most, translated creation links and preserved destructive confirmations. PR 3 remains separate.
 
