@@ -20,6 +20,7 @@ import type { LocaleConfig } from "./common/locale.js";
 import { DEFAULT_PRICING_CONFIG, type PricingConfig } from "./common/pricing-config.js";
 import { DatabaseModule } from "./database/database.module.js";
 import type { LoadedFeature } from "./features/feature-loader.js";
+import { FeaturesModule } from "./features/features.module.js";
 import { EmailAdminModule } from "./email/admin/index.js";
 import { EmailHandlersModule } from "./email/handlers/index.js";
 import {
@@ -58,7 +59,10 @@ import { SearchModule } from "./search/search.module.js";
 
 export interface AppModuleOptions {
   databaseUrl: string;
+  /** The features loaded from `FEATURES_ENABLED` (their names are `features` of the config routes). */
   features: LoadedFeature[];
+  /** Tests only: extra modules mounted like features (probe controllers); not named in `features`, never migration-checked. */
+  extraFeatures?: LoadedFeature[];
   /** The enabled shipping provider packages (`SHIPPING_PROVIDERS_ENABLED`); defaults to none. */
   shippingProviders?: LoadedShippingProvider[];
   /** The enabled payment provider packages (`PAYMENT_PROVIDERS_ENABLED`); defaults to none (no online payment). */
@@ -121,6 +125,7 @@ export class AppModule {
       imports: [
         CommonModule.register(options.locale, options.pricing ?? DEFAULT_PRICING_CONFIG),
         DatabaseModule.forRoot(options.databaseUrl),
+        FeaturesModule.register(options.features),
         AuthModule.register({
           config: options.adminAuth ?? DEFAULT_ADMIN_AUTH_CONFIG,
           authenticator: options.adminAuthenticator,
@@ -165,7 +170,7 @@ export class AppModule {
         PrivacyModule.register(
           options.privacy ?? { tokenSecret: null, orderContactRetentionDays: null },
         ),
-        ...options.features.map((feature) => feature.module),
+        ...[...options.features, ...(options.extraFeatures ?? [])].map((feature) => feature.module),
       ],
     };
   }

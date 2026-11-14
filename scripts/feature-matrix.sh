@@ -4,6 +4,8 @@
 #   on      build, start the API with FEATURES_ENABLED=example, expect /health and /example/ping
 #   off     build, start the API with no features, expect /health and 404 on /example/ping
 #   deleted remove packages/features/_example, reinstall, then lint, typecheck, boundaries and tests must pass (destructive: CI only)
+# No mode deletes the features AND the providers: the table guard of apps/api/src/privacy/inventory/source-guards.spec.ts
+# needs files in at least one of the two roots to be a real scan.
 # The provider modes do the same for the test-only shipping provider packages/providers/_fake (ADR 0029 decision 8). Their
 # observable is the line the provider registry logs at startup, "Shipping providers loaded: <codes|none>": it needs no route
 # and so no new public contract.

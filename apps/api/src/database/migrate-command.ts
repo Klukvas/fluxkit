@@ -1,9 +1,23 @@
-import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { loadEnv } from "@fluxkit/config";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import pg from "pg";
+import {
+  DEFAULT_FEATURES_DIR,
+  featureMigrationsFolder,
+  findEnabledFeatures,
+} from "../features/feature-loader.js";
+import {
+  aheadOfJournal,
+  appliedTimestamps,
+  CORE_MIGRATIONS_TABLE,
+  featureMigrationsTable,
+  MIGRATIONS_SCHEMA,
+  pendingEntries,
+  readJournal,
+  type JournalEntry,
+} from "./migration-journal.js";
 
 /**
  * Folder with the generated migrations, resolved from this file (`src/database` and `dist/database` are both two
@@ -20,7 +34,7 @@ export const migrationsFolder = fileURLToPath(new URL("../../drizzle", import.me
 export const MIGRATION_LOCK_KEY = 7_426_002;
 
 const USAGE =
-  "Usage: pnpm db:migrate (takes no arguments; DATABASE_URL comes from the environment or .env)";
+  "Usage: pnpm db:migrate (takes no arguments; DATABASE_URL and FEATURES_ENABLED come from the environment or .env)";
 
 /** The person running the command can fix this (bad input, missing variable): the message is the whole output. */
 export class MigrateUsageError extends Error {
@@ -53,6 +67,17 @@ export interface MigrateIo {
 export interface MigrateOptions {
   /** Tests only: another folder with the same layout (`meta/_journal.json` plus `<tag>.sql`). */
   migrationsFolder?: string;
+  /** Tests only: where feature packages are looked up (default `FEATURES_DIR`, else `<repo>/packages/features`). */
+  featuresDir?: string;
+}
+
+/** What one run did to the journal of one enabled feature (ADR 0049). */
+export interface FeatureMigrateResult {
+  name: string;
+  /** Journal tags applied by this run, in order; empty when the feature was up to date. */
+  applied: string[];
+  /** Number of migrations in the feature's journal. */
+  total: number;
 }
 
 export interface MigrateResult {
@@ -62,22 +87,35 @@ export interface MigrateResult {
   applied: string[];
   /** Number of migrations in the journal. */
   total: number;
+  /** The enabled features that ship migrations, in `FEATURES_ENABLED` order; empty without such features. */
+  features: FeatureMigrateResult[];
 }
 
-interface JournalEntry {
-  tag: string;
-  when: number;
+function plural(count: number): string {
+  return count === 1 ? "migration" : "migrations";
 }
 
 export function formatMigrateResult(result: MigrateResult): string {
-  if (result.applied.length === 0) {
-    return `Database is up to date (${result.total} migrations)`;
+  const lines =
+    result.applied.length === 0
+      ? [`Database is up to date (${result.total} migrations)`]
+      : [
+          `Applied ${result.applied.length} ${plural(result.applied.length)}:`,
+          ...result.applied.map((tag) => `  ${tag}`),
+        ];
+  for (const feature of result.features) {
+    if (feature.applied.length === 0) {
+      lines.push(
+        `Feature "${feature.name}" is up to date (${feature.total} ${plural(feature.total)})`,
+      );
+    } else {
+      lines.push(
+        `Feature "${feature.name}": applied ${feature.applied.length} ${plural(feature.applied.length)}:`,
+        ...feature.applied.map((tag) => `  ${tag}`),
+      );
+    }
   }
-  const noun = result.applied.length === 1 ? "migration" : "migrations";
-  return [
-    `Applied ${result.applied.length} ${noun}:`,
-    ...result.applied.map((tag) => `  ${tag}`),
-  ].join("\n");
+  return lines.join("\n");
 }
 
 function databaseNameOf(databaseUrl: string): string {
@@ -150,78 +188,111 @@ export function describeMigrateError(error: unknown, secrets: readonly string[])
   return redact(describeOne(error, 0), secrets);
 }
 
-async function readJournal(folder: string): Promise<JournalEntry[]> {
-  const journal = JSON.parse(await readFile(`${folder}/meta/_journal.json`, "utf8")) as {
-    entries: JournalEntry[];
-  };
-  return journal.entries;
+/** One journal and the table that records it: the core one, or the one of an enabled feature. */
+interface JournalTarget {
+  /** Absent for the core journal. */
+  feature?: string;
+  folder: string;
+  table: string;
 }
 
-/** `created_at` of every row the migrator recorded; empty before the first run. */
-async function appliedTimestamps(pool: pg.Pool): Promise<number[]> {
-  const exists = await pool.query<{ name: string | null }>(
-    "select to_regclass('drizzle.__drizzle_migrations') as name",
-  );
-  if (exists.rows[0]?.name === null) {
+interface FeatureTarget extends JournalTarget {
+  feature: string;
+}
+
+interface Planned {
+  journal: JournalEntry[];
+  pending: JournalEntry[];
+}
+
+/** The enabled features that ship migrations, resolved BEFORE anything connects, so a missing feature changes nothing. */
+async function featureTargets(
+  enabled: readonly string[],
+  featuresDir: string,
+): Promise<FeatureTarget[]> {
+  let manifests;
+  try {
+    manifests = await findEnabledFeatures({ enabled, featuresDir });
+  } catch (error) {
+    throw new MigrateUsageError(`${(error as Error).message} Nothing was changed. ${USAGE}`);
+  }
+  const targets: FeatureTarget[] = [];
+  for (const manifest of manifests) {
+    const folder = await featureMigrationsFolder(manifest.dir);
+    if (folder !== undefined) {
+      targets.push({
+        feature: manifest.name,
+        folder,
+        table: featureMigrationsTable(manifest.name),
+      });
+    }
+  }
+  return targets;
+}
+
+/**
+ * Reads every journal and its table, and refuses before applying anything when one table is ahead of its journal (the
+ * code is older than the database): the Drizzle migrator would call it "up to date" and the run would be half done.
+ */
+async function plan<Target extends JournalTarget>(
+  pool: pg.Pool,
+  targets: readonly Target[],
+  database: string,
+): Promise<(Target & Planned)[]> {
+  const planned: (Target & Planned)[] = [];
+  for (const target of targets) {
+    const journal = await readJournal(target.folder);
+    const applied = await appliedTimestamps(pool, target.table);
+    const ahead = aheadOfJournal(journal, applied);
+    if (ahead !== undefined) {
+      const newestInJournal =
+        journal.length === 0 ? "none" : String(Math.max(...journal.map((e) => e.when)));
+      const subject =
+        target.feature === undefined
+          ? `database "${database}"`
+          : `feature "${target.feature}" of database "${database}"`;
+      throw new MigrateRefusal(
+        `Refusing to migrate ${subject}: it has migrations that are newer than this code ` +
+          `(newest recorded created_at ${ahead}, newest in the journal ${newestInJournal}). ` +
+          "The code is older than the database. Deploy the matching or newer release, or point DATABASE_URL at the right database. " +
+          "Nothing was changed.",
+      );
+    }
+    planned.push({ ...target, journal, pending: pendingEntries(journal, applied) });
+  }
+  return planned;
+}
+
+/** Forward only. Drizzle runs all pending migrations of one journal in one transaction; its errors propagate unchanged. */
+async function apply(pool: pg.Pool, target: JournalTarget & Planned): Promise<string[]> {
+  if (target.pending.length === 0) {
     return [];
   }
-  const result = await pool.query<{ created_at: string }>(
-    'select created_at from "drizzle"."__drizzle_migrations"',
-  );
-  return result.rows.map((row) => Number(row.created_at));
-}
-
-async function applyPending(
-  pool: pg.Pool,
-  folder: string,
-  database: string,
-): Promise<MigrateResult> {
-  const journal = await readJournal(folder);
-  const applied = await appliedTimestamps(pool);
-  const newestApplied = applied.length === 0 ? undefined : Math.max(...applied);
-  const newestInJournal =
-    journal.length === 0 ? undefined : Math.max(...journal.map((e) => e.when));
-
-  // The Drizzle migrator runs every journal entry newer than the newest recorded one and nothing else. A database
-  // whose newest record is newer than the whole journal would therefore look "up to date" to a plain migrate call.
-  if (
-    newestApplied !== undefined &&
-    (newestInJournal === undefined || newestApplied > newestInJournal)
-  ) {
-    throw new MigrateRefusal(
-      `Refusing to migrate database "${database}": it has migrations that are newer than this code ` +
-        `(newest recorded created_at ${newestApplied}, newest in the journal ${newestInJournal ?? "none"}). ` +
-        "The code is older than the database. Deploy the matching or newer release, or point DATABASE_URL at the right database. " +
-        "Nothing was changed.",
-    );
-  }
-
-  const pending = journal.filter(
-    (entry) => newestApplied === undefined || entry.when > newestApplied,
-  );
-  if (pending.length === 0) {
-    return { database, applied: [], total: journal.length };
-  }
-
-  // Forward only. Drizzle runs all pending migrations in one transaction; its errors propagate unchanged.
-  await migrate(drizzle(pool), { migrationsFolder: folder });
-
-  const recorded = new Set(await appliedTimestamps(pool));
-  const missing = pending.filter((entry) => !recorded.has(entry.when));
+  await migrate(drizzle(pool), {
+    migrationsFolder: target.folder,
+    migrationsTable: target.table,
+    migrationsSchema: MIGRATIONS_SCHEMA,
+  });
+  const recorded = new Set(await appliedTimestamps(pool, target.table));
+  const missing = target.pending.filter((entry) => !recorded.has(entry.when));
   if (missing.length > 0) {
     throw new Error(
       `The migrator finished but did not record: ${missing.map((entry) => entry.tag).join(", ")}.`,
     );
   }
-  return { database, applied: pending.map((entry) => entry.tag), total: journal.length };
+  return target.pending.map((entry) => entry.tag);
 }
 
 /**
  * Applies every pending migration of `apps/api/drizzle` to `DATABASE_URL`, in journal order, using the Drizzle
- * migrator. Forward only: it never rolls back, drops or deletes (rollbacks are the hand-written
- * `drizzle/NNNN_name.down.sql` scripts). Runs under a session-level advisory lock, so two instances starting
- * together cannot both apply. Throws `MigrateUsageError`, `MigrateRefusal` or `MigrateFailure`; the caller decides
- * the exit code.
+ * migrator; then, for each feature in `FEATURES_ENABLED` that ships a `drizzle/` journal, its pending migrations, each
+ * recorded in its own table `drizzle.__drizzle_migrations_feature_<name>` (ADR 0049). A disabled feature is never
+ * migrated. Forward only: it never rolls back, drops or deletes (rollbacks are the hand-written `NNNN_name.down.sql`
+ * scripts; a feature's go before any core one). Runs under a session-level advisory lock, so two instances starting
+ * together cannot both apply. Each journal runs in its own transaction, core first: a failing feature migration leaves
+ * the core (and the features before it) migrated and its own changes rolled back; after the fix, a re-run applies only
+ * what is pending. Throws `MigrateUsageError`, `MigrateRefusal` or `MigrateFailure`; the caller decides the
+ * exit code.
  */
 export async function runMigrateCommand(
   argv: readonly string[],
@@ -240,9 +311,17 @@ export async function runMigrateCommand(
       `DATABASE_URL is not set. Put it in the root .env (see .env.example) or export it. ${USAGE}`,
     );
   }
-  const { databaseUrl } = loadEnv({ ...env });
+  const { databaseUrl, enabledFeatures, featuresDir } = loadEnv({ ...env });
   const database = databaseNameOf(databaseUrl);
   const secrets = secretsOf(databaseUrl);
+  const coreTarget: JournalTarget = {
+    folder: options.migrationsFolder ?? migrationsFolder,
+    table: CORE_MIGRATIONS_TABLE,
+  };
+  const features = await featureTargets(
+    enabledFeatures,
+    options.featuresDir ?? featuresDir ?? DEFAULT_FEATURES_DIR,
+  );
 
   io.log(`Migrating database "${database}"`);
   // A dedicated connection holds the lock for the whole run; the pool (one connection) runs the migrator.
@@ -257,11 +336,25 @@ export async function runMigrateCommand(
   try {
     await lock.connect();
     await lock.query("select pg_advisory_lock($1)", [MIGRATION_LOCK_KEY]);
-    const result = await applyPending(pool, options.migrationsFolder ?? migrationsFolder, database);
+    const [core] = await plan(pool, [coreTarget], database);
+    const plannedFeatures = await plan(pool, features, database);
+    if (core === undefined) {
+      throw new Error("The core journal is missing from the migration plan.");
+    }
+    // Core first, then the features in FEATURES_ENABLED order: a feature table may reference a core table, never the reverse.
+    const coreApplied = await apply(pool, core);
+    const featureResults: FeatureMigrateResult[] = [];
+    for (const feature of plannedFeatures) {
+      featureResults.push({
+        name: feature.feature,
+        applied: await apply(pool, feature),
+        total: feature.journal.length,
+      });
+    }
     if (connectionError !== undefined) {
       throw connectionError;
     }
-    return result;
+    return { database, applied: coreApplied, total: core.journal.length, features: featureResults };
   } catch (error) {
     if (error instanceof MigrateRefusal) {
       throw error;

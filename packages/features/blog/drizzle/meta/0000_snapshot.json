@@ -1,0 +1,198 @@
+{
+  "id": "712867d4-5514-4c1f-84e0-465092c0ce65",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.blog_post": {
+      "name": "blog_post",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'draft'"
+        },
+        "published_at": {
+          "name": "published_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "title": {
+          "name": "title",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "excerpt": {
+          "name": "excerpt",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "body": {
+          "name": "body",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "seo_title": {
+          "name": "seo_title",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "seo_description": {
+          "name": "seo_description",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cover_upload_id": {
+          "name": "cover_upload_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cover_alt": {
+          "name": "cover_alt",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "blog_post_public_idx": {
+          "name": "blog_post_public_idx",
+          "columns": [
+            {
+              "expression": "published_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"blog_post\".\"status\" = 'published'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "blog_post_updated_idx": {
+          "name": "blog_post_updated_idx",
+          "columns": [
+            {
+              "expression": "updated_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "blog_post_slug_key": {
+          "name": "blog_post_slug_key",
+          "nullsNotDistinct": false,
+          "columns": ["slug"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "blog_post_status_check": {
+          "name": "blog_post_status_check",
+          "value": "\"blog_post\".\"status\" in ('draft', 'published')"
+        },
+        "blog_post_published_at_check": {
+          "name": "blog_post_published_at_check",
+          "value": "\"blog_post\".\"status\" = 'draft' or \"blog_post\".\"published_at\" is not null"
+        },
+        "blog_post_title_check": {
+          "name": "blog_post_title_check",
+          "value": "jsonb_typeof(\"blog_post\".\"title\") = 'object'"
+        },
+        "blog_post_excerpt_check": {
+          "name": "blog_post_excerpt_check",
+          "value": "\"blog_post\".\"excerpt\" is null or jsonb_typeof(\"blog_post\".\"excerpt\") = 'object'"
+        },
+        "blog_post_body_check": {
+          "name": "blog_post_body_check",
+          "value": "jsonb_typeof(\"blog_post\".\"body\") = 'object'"
+        },
+        "blog_post_seo_title_check": {
+          "name": "blog_post_seo_title_check",
+          "value": "\"blog_post\".\"seo_title\" is null or jsonb_typeof(\"blog_post\".\"seo_title\") = 'object'"
+        },
+        "blog_post_seo_description_check": {
+          "name": "blog_post_seo_description_check",
+          "value": "\"blog_post\".\"seo_description\" is null or jsonb_typeof(\"blog_post\".\"seo_description\") = 'object'"
+        },
+        "blog_post_cover_alt_check": {
+          "name": "blog_post_cover_alt_check",
+          "value": "\"blog_post\".\"cover_alt\" is null or jsonb_typeof(\"blog_post\".\"cover_alt\") = 'object'"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

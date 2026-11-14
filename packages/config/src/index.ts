@@ -32,7 +32,7 @@ export {
   type EmailMailbox,
   type EmailProviderChoice,
 } from "./email.js";
-export { parseEnabledFeatures } from "./features.js";
+export { MAX_FEATURE_NAME_LENGTH, parseEnabledFeatures } from "./features.js";
 export {
   DEFAULT_MEILI_INDEX_PREFIX,
   DEFAULT_SEARCH_ENGINE_MAX_CONCURRENCY,

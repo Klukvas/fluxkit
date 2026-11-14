@@ -194,6 +194,7 @@ const config: Shape<AdminConfig> = {
     emailDelivery: "boolean",
     onlinePayment: "boolean",
     search: "boolean",
+    features: { array: "string" },
     media: {
       object: {
         uploadsEnabled: "boolean",

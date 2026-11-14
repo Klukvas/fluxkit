@@ -1743,6 +1743,7 @@ describe("store API (public, real app, real Postgres)", () => {
           emailDelivery: false,
           onlinePayment: false,
           search: false,
+          features: [],
         });
       });
 
@@ -1760,6 +1761,7 @@ describe("store API (public, real app, real Postgres)", () => {
             emailDelivery: false,
             onlinePayment: false,
             search: false,
+            features: [],
           });
         } finally {
           await jpy.app.close();

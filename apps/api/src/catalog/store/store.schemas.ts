@@ -137,6 +137,10 @@ export const storeConfigSchema = z.object({
     description:
       "False when `SEARCH_ENABLED=false`: the search routes answer 404, so show no search box and no facets and use `GET /store/products`. True when catalog search is configured (it may still answer `503 search_unavailable` while the engine is down or the first index is built).",
   }),
+  features: z.array(z.string()).meta({
+    description:
+      "The optional features enabled on this API (`FEATURES_ENABLED`, the ones that loaded), sorted by name. A storefront shows a feature's pages and links only when its name is here; a missing name means its routes answer 404 (ADR 0049).",
+  }),
 });
 
 export type StoreConfig = z.output<typeof storeConfigSchema>;

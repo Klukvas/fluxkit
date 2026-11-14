@@ -10,6 +10,7 @@ import { EmailProviderRegistry } from "../email/registry/index.js";
 import { PaymentProviderRegistry } from "../payments/registry/index.js";
 import { MEDIA_CONFIG, type MediaConfig } from "../media/media-config.js";
 import { SEARCH_PORT, type SearchPort } from "../common/search-port.js";
+import { ENABLED_FEATURES, type EnabledFeatures } from "../features/enabled-features.js";
 import { adminConfigResponseSchema, type AdminConfigResponse } from "./admin-config.schemas.js";
 
 /**
@@ -25,13 +26,14 @@ export class AdminConfigController {
     @Inject(EmailProviderRegistry) private readonly email: EmailProviderRegistry,
     @Inject(PaymentProviderRegistry) private readonly payments: PaymentProviderRegistry,
     @Inject(SEARCH_PORT) private readonly search: SearchPort,
+    @Inject(ENABLED_FEATURES) private readonly features: EnabledFeatures,
   ) {}
 
   @Get()
   @AuthenticatedAdminRoute()
   @ApiOperation({
     summary:
-      "Locales, shop currency, supported currencies, stock threshold, upload limits and whether mail, online payment and catalog search are configured, for the admin UI",
+      "Locales, shop currency, supported currencies, stock threshold, upload limits, enabled features and whether mail, online payment and catalog search are configured, for the admin UI",
   })
   @ApiZodResponse(200, adminConfigResponseSchema, "The shop settings.")
   get(): AdminConfigResponse {
@@ -46,6 +48,7 @@ export class AdminConfigController {
       emailDelivery: this.email.deliveryEnabled(),
       onlinePayment: this.payments.onlineEnabled(),
       search: this.search.enabled,
+      features: [...this.features],
       media: {
         uploadsEnabled: this.media.driver !== "none",
         maxBytes: this.media.maxBytes,

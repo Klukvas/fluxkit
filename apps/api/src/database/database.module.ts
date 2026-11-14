@@ -7,6 +7,7 @@ import {
   type DynamicModule,
   type OnApplicationShutdown,
 } from "@nestjs/common";
+import { FEATURE_DATABASE } from "@fluxkit/api-kit";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import pg from "pg";
 import * as schema from "./schema/index.js";
@@ -65,9 +66,11 @@ export class DatabaseModule {
           inject: [PG_POOL],
           useFactory: (pool: pg.Pool): Database => drizzle(pool, { schema }),
         },
+        // Feature packages get the same instance (one pool) under the API kit token (ADR 0049).
+        { provide: FEATURE_DATABASE, useExisting: DRIZZLE },
         PoolLifecycle,
       ],
-      exports: [PG_POOL, DRIZZLE],
+      exports: [PG_POOL, DRIZZLE, FEATURE_DATABASE],
     };
   }
 }

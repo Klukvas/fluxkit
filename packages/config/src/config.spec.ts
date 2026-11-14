@@ -14,6 +14,11 @@ describe("parseEnabledFeatures", () => {
   it("rejects invalid feature names loudly", () => {
     expect(() => parseEnabledFeatures("ok,Bad Name!")).toThrow(/Invalid feature name/);
   });
+
+  it("caps a name at 32 characters, so its migrations table fits Postgres's 63-byte identifiers", () => {
+    expect(parseEnabledFeatures("a".repeat(32))).toEqual(["a".repeat(32)]);
+    expect(() => parseEnabledFeatures(`ok,${"a".repeat(33)}`)).toThrow(/longer than 32 characters/);
+  });
 });
 
 describe("loadEnv", () => {
