@@ -37,7 +37,7 @@ function problem(status: number, code: string): Response {
 
 function setup(
   handler: (call: Call, index: number) => Response | Promise<Response>,
-  extra: { readTimeoutMs?: number } = {},
+  extra: { readTimeoutMs?: number; now?: () => number } = {},
 ) {
   const calls: Call[] = [];
   const events: string[] = [];
@@ -356,12 +356,18 @@ describe("createStoreData answers", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     vi.spyOn(console, "warn").mockImplementation(() => {});
     let mode: "notfound" | "down" = "notfound";
-    const { data } = setup(() => {
-      if (mode === "down") throw new TypeError("fetch failed");
-      return problem(404, "not_found");
-    });
+    let clock = 0;
+    const { data } = setup(
+      () => {
+        if (mode === "down") throw new TypeError("fetch failed");
+        return problem(404, "not_found");
+      },
+      { now: () => clock },
+    );
     await data.getProduct("uk", "x");
     mode = "down";
+    // Past the product answer cache's minute, so the read reaches the (failing) API.
+    clock += CATALOG_REVALIDATE_SECONDS * 1000;
     await expect(data.getProduct("uk", "x")).rejects.toBeInstanceOf(StoreUnavailableError);
   });
 
@@ -487,5 +493,97 @@ describe("createStoreData feature reads (plan 2026-11-13-blog.md, section 9 and 
       data: { items: [{ id: "1" }] },
       stale: true,
     });
+  });
+});
+
+describe("createStoreData product answers (a product taken back leaves its page)", () => {
+  const product = { id: "p1", slug: "x", title: "Product" };
+  const minute = CATALOG_REVALIDATE_SECONDS * 1000;
+
+  function productSetup() {
+    let clock = 0;
+    let mode: "found" | "notfound" | "down" = "found";
+    const harness = setup(
+      () => {
+        if (mode === "down") throw new TypeError("fetch failed");
+        if (mode === "notfound") return problem(404, "not_found");
+        return json(product);
+      },
+      { now: () => clock },
+    );
+    return {
+      ...harness,
+      setMode: (next: typeof mode) => {
+        mode = next;
+      },
+      advance: (ms: number) => {
+        clock += ms;
+      },
+    };
+  }
+
+  it("reads the product outside the Next data cache (it keeps 200 answers only, so a 404 would never replace one)", async () => {
+    const { data, calls } = productSetup();
+    await data.getProduct("uk", "x");
+    expect(calls[0]?.init).toMatchObject({ cache: "no-store" });
+    expect((calls[0]?.init as { next?: unknown }).next).toBeUndefined();
+  });
+
+  it("keeps the answer for the catalog minute, then a 404 replaces the product and is kept in turn", async () => {
+    const { data, calls, setMode, advance } = productSetup();
+    expect(await data.getProduct("uk", "x")).toEqual({ ok: true, data: product, stale: false });
+    setMode("notfound");
+    advance(minute - 1);
+    expect(await data.getProduct("uk", "x")).toMatchObject({ ok: true });
+    expect(calls).toHaveLength(1);
+    advance(1);
+    expect(await data.getProduct("uk", "x")).toMatchObject({ ok: false, status: 404 });
+    setMode("found");
+    advance(minute - 1);
+    expect(await data.getProduct("uk", "x")).toMatchObject({ ok: false, status: 404 });
+    expect(calls).toHaveLength(2);
+    advance(1);
+    expect(await data.getProduct("uk", "x")).toMatchObject({ ok: true });
+  });
+
+  it("keeps products apart per locale and slug", async () => {
+    const { data, calls } = productSetup();
+    await data.getProduct("uk", "x");
+    await data.getProduct("en", "x");
+    await data.getProduct("uk", "y");
+    await data.getProduct("uk", "x");
+    expect(calls.map((call) => call.url)).toHaveLength(3);
+  });
+
+  it("never brings an unpublished product back from the last good copy during an outage", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const { data, setMode, advance } = productSetup();
+    await data.getProduct("uk", "x");
+    setMode("notfound");
+    advance(minute);
+    await data.getProduct("uk", "x");
+    setMode("down");
+    advance(minute);
+    await expect(data.getProduct("uk", "x")).rejects.toBeInstanceOf(StoreUnavailableError);
+  });
+
+  it("serves the last good copy in an outage without keeping it, so the next view asks the API again", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { data, calls, setMode, advance } = productSetup();
+    await data.getProduct("uk", "x");
+    setMode("down");
+    advance(minute);
+    expect(await data.getProduct("uk", "x")).toMatchObject({ ok: true, stale: true });
+    setMode("notfound");
+    expect(await data.getProduct("uk", "x")).toMatchObject({ ok: false, status: 404 });
+    expect(calls).toHaveLength(3);
+  });
+
+  it("waits for a request (beforeRequest) also when the answer comes from its cache", async () => {
+    const { data, events } = productSetup();
+    await data.getProduct("uk", "x");
+    events.length = 0;
+    await data.getProduct("uk", "x");
+    expect(events).toEqual(["beforeRequest"]);
   });
 });
