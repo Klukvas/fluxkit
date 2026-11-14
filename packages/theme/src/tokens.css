@@ -4,7 +4,7 @@
  * (AGENTS.md section 2.2); they use the semantic names mapped in tailwind.css.
  * Replace the values below (or add a theme preset selector) when delivering a client design; a rebrand sets BOTH themes (and
  * copies the changed dark colours and shadows into the system block at the end; a test keeps it equal to the dark block).
- * Fonts, radii, the type scale and the spacing unit are defined ONCE, in the light block: the dark and system blocks hold only
+ * Fonts, radii, motion, the type scale and the spacing unit are defined ONCE, in the light block: the dark and system blocks hold only
  * colours and shadows and inherit everything else from `:root` (theme.spec.ts refuses a repeat).
  *
  * Themes (`data-theme` on <html>): `light` (also the default without the attribute), `dark`, and `system`, which is light
@@ -14,42 +14,49 @@
 :root,
 [data-theme="light"] {
   color-scheme: light;
-  --fk-color-background: #ffffff;
-  --fk-color-foreground: #0f172a;
-  --fk-color-muted: #f1f5f9;
-  --fk-color-muted-foreground: #475569;
-  --fk-color-border: #e2e8f0;
-  --fk-color-border-input: #64748b;
-  --fk-color-primary: #4f46e5;
+  --fk-color-background: #fff3e3;
+  --fk-color-foreground: #2b1a12;
+  --fk-color-muted: #fae9d3;
+  --fk-color-muted-foreground: #75543e;
+  --fk-color-border: #d9b997;
+  --fk-color-border-input: #957052;
+  --fk-color-primary: #db3b18;
   --fk-color-primary-foreground: #ffffff;
-  /* Accent: the banner `accent` tone, otherwise reserved for client code. Defaults equal the primary pair (no visual change). */
-  --fk-color-accent: #4f46e5;
-  --fk-color-accent-foreground: #ffffff;
-  --fk-color-danger: #b91c1c;
+  /*
+   * Accent: the banner `accent` tone, otherwise reserved for client code. Ochre, the concept's butter (#ffd166) darkened until
+   * the accent pairs of contrast.spec.ts pass on cream (butter itself is 1.3:1 there); the dark theme uses butter as is.
+   */
+  --fk-color-accent: #b17b15;
+  --fk-color-accent-foreground: #2b1a12;
+  --fk-color-danger: #b83224;
   --fk-color-danger-foreground: #ffffff;
-  --fk-color-success: #15803d;
-  --fk-color-warning: #b45309;
-  --fk-color-ring: #4f46e5;
-  --fk-radius-sm: 0.25rem;
-  --fk-radius-md: 0.5rem;
-  --fk-radius-lg: 1rem;
+  --fk-color-success: #326b44;
+  --fk-color-warning: #925d0d;
+  --fk-color-ring: #db3b18;
+  --fk-radius-sm: 0.375rem;
+  --fk-radius-md: 0.75rem;
+  --fk-radius-lg: 1.5rem;
   /*
    * Radius ROLES (rounded-control, rounded-card, rounded-panel, rounded-overlay, rounded-media): what components use. Literal
-   * values, not var(--fk-radius-md): changing one role restyles only that role. Defaults equal the scale values these parts had.
+   * values, not var(--fk-radius-md): changing one role restyles only that role. The playful defaults use generous, rounded shapes.
    * control: buttons, fields, chips, menu entries, focus targets and popups anchored to a field (menus, suggestion lists);
    * card: product, banner and order cards, the hero; panel: inline notices, empty-result boxes, alerts, sections and fieldsets
    * inside a page; overlay: dialogs and toasts; media: images, thumbnails, skeletons.
-   * 0.25rem marks (checkbox, badges, flags) still use --fk-radius-sm: the guard's `radiusExceptions` lists them.
+   * Small marks (checkbox, badges, flags) still use --fk-radius-sm (the guard lists them).
    */
-  --fk-radius-control: 0.5rem;
-  --fk-radius-card: 1rem;
-  --fk-radius-panel: 0.5rem;
-  --fk-radius-overlay: 1rem;
-  --fk-radius-media: 0.5rem;
-  --fk-font-sans: ui-sans-serif, system-ui, sans-serif;
+  --fk-radius-control: 1.5rem;
+  --fk-radius-card: 1.5rem;
+  --fk-radius-panel: 1rem;
+  --fk-radius-overlay: 1.5rem;
+  --fk-radius-media: 1rem;
+  --fk-font-sans: var(--font-template-sans, ui-sans-serif), system-ui, sans-serif;
   --fk-font-mono: ui-monospace, monospace;
-  /* Headings (`pageTitle`, `sectionTitle`). Defaults to the body stack; a fork's own face comes from `config/fonts.ts`: `var(--font-...)`. */
-  --fk-font-display: ui-sans-serif, system-ui, sans-serif;
+  /*
+   * Body and headings (`pageTitle`, `sectionTitle`) default to the template's Rubik (`lib/template-fonts.ts` in the storefront). The
+   * fallback inside var() keeps the declaration valid where that variable does not exist (the admin, mail). A fork's own face comes
+   * from `config/fonts.ts`, named in its overrides file: `var(--font-...)`.
+   */
+  --fk-font-display: var(--font-template-sans, ui-sans-serif), system-ui, sans-serif;
   /* Type scale (font size and line height per step). Values equal Tailwind's defaults, so the mapping moved nothing. */
   --fk-font-size-xs: 0.75rem;
   --fk-line-height-xs: 1rem;
@@ -67,34 +74,42 @@
   --fk-line-height-3xl: 2.25rem;
   --fk-font-size-4xl: 2.25rem;
   --fk-line-height-4xl: 2.5rem;
+  /* Fast: hover/press feedback; base: toasts, popovers and number roll; slow: drawers and page reveals. */
+  --fk-motion-duration-fast: 150ms;
+  --fk-motion-duration-base: 250ms;
+  --fk-motion-duration-slow: 400ms;
+  /* Standard preserves Tailwind timing; emphasized settles reveals; spring overshoots pop-ins and the drawer. */
+  --fk-motion-ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --fk-motion-ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
+  --fk-motion-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   /* Spacing: the unit every padding, margin, gap and size utility multiplies (p-4 = 4 units). */
   --fk-space-unit: 0.25rem;
   /* Elevation: resting card, raised (a hovered card), overlay (menus, toasts, bars over the page). */
-  --fk-shadow-card: 0 1px 3px 0 rgb(15 23 42 / 0.1);
-  --fk-shadow-raised: 0 4px 12px -2px rgb(15 23 42 / 0.12), 0 2px 4px -2px rgb(15 23 42 / 0.08);
-  --fk-shadow-overlay: 0 12px 32px -8px rgb(15 23 42 / 0.2), 0 4px 8px -4px rgb(15 23 42 / 0.1);
+  --fk-shadow-card: 3px 3px 0 0 #2b1a12;
+  --fk-shadow-raised: 5px 5px 0 0 #2b1a12;
+  --fk-shadow-overlay: 6px 6px 0 0 #2b1a12;
 }
 
 [data-theme="dark"] {
   color-scheme: dark;
-  --fk-color-background: #0b1020;
-  --fk-color-foreground: #e2e8f0;
-  --fk-color-muted: #172036;
-  --fk-color-muted-foreground: #94a3b8;
-  --fk-color-border: #26314d;
-  --fk-color-border-input: #6b7a99;
-  --fk-color-primary: #818cf8;
-  --fk-color-primary-foreground: #0b1020;
-  --fk-color-accent: #818cf8;
-  --fk-color-accent-foreground: #0b1020;
-  --fk-color-danger: #f87171;
-  --fk-color-danger-foreground: #0b1020;
-  --fk-color-success: #4ade80;
-  --fk-color-warning: #fbbf24;
-  --fk-color-ring: #818cf8;
-  --fk-shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.5);
-  --fk-shadow-raised: 0 4px 12px -2px rgb(0 0 0 / 0.6), 0 2px 4px -2px rgb(0 0 0 / 0.5);
-  --fk-shadow-overlay: 0 12px 32px -8px rgb(0 0 0 / 0.7), 0 4px 8px -4px rgb(0 0 0 / 0.5);
+  --fk-color-background: #1f130d;
+  --fk-color-foreground: #fff3e3;
+  --fk-color-muted: #352217;
+  --fk-color-muted-foreground: #d2b397;
+  --fk-color-border: #65432e;
+  --fk-color-border-input: #b58b68;
+  --fk-color-primary: #ff7959;
+  --fk-color-primary-foreground: #2b1a12;
+  --fk-color-accent: #ffd166;
+  --fk-color-accent-foreground: #2b1a12;
+  --fk-color-danger: #ff9380;
+  --fk-color-danger-foreground: #2b1a12;
+  --fk-color-success: #9be3c0;
+  --fk-color-warning: #ffd166;
+  --fk-color-ring: #ff7959;
+  --fk-shadow-card: 3px 3px 0 0 #090503;
+  --fk-shadow-raised: 5px 5px 0 0 #090503;
+  --fk-shadow-overlay: 6px 6px 0 0 #090503;
 }
 
 /*
@@ -104,23 +119,35 @@
 @media (prefers-color-scheme: dark) {
   [data-theme="system"] {
     color-scheme: dark;
-    --fk-color-background: #0b1020;
-    --fk-color-foreground: #e2e8f0;
-    --fk-color-muted: #172036;
-    --fk-color-muted-foreground: #94a3b8;
-    --fk-color-border: #26314d;
-    --fk-color-border-input: #6b7a99;
-    --fk-color-primary: #818cf8;
-    --fk-color-primary-foreground: #0b1020;
-    --fk-color-accent: #818cf8;
-    --fk-color-accent-foreground: #0b1020;
-    --fk-color-danger: #f87171;
-    --fk-color-danger-foreground: #0b1020;
-    --fk-color-success: #4ade80;
-    --fk-color-warning: #fbbf24;
-    --fk-color-ring: #818cf8;
-    --fk-shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.5);
-    --fk-shadow-raised: 0 4px 12px -2px rgb(0 0 0 / 0.6), 0 2px 4px -2px rgb(0 0 0 / 0.5);
-    --fk-shadow-overlay: 0 12px 32px -8px rgb(0 0 0 / 0.7), 0 4px 8px -4px rgb(0 0 0 / 0.5);
+    --fk-color-background: #1f130d;
+    --fk-color-foreground: #fff3e3;
+    --fk-color-muted: #352217;
+    --fk-color-muted-foreground: #d2b397;
+    --fk-color-border: #65432e;
+    --fk-color-border-input: #b58b68;
+    --fk-color-primary: #ff7959;
+    --fk-color-primary-foreground: #2b1a12;
+    --fk-color-accent: #ffd166;
+    --fk-color-accent-foreground: #2b1a12;
+    --fk-color-danger: #ff9380;
+    --fk-color-danger-foreground: #2b1a12;
+    --fk-color-success: #9be3c0;
+    --fk-color-warning: #ffd166;
+    --fk-color-ring: #ff7959;
+    --fk-shadow-card: 3px 3px 0 0 #090503;
+    --fk-shadow-raised: 5px 5px 0 0 #090503;
+    --fk-shadow-overlay: 6px 6px 0 0 #090503;
+  }
+}
+
+/*
+ * Reduced motion: every duration is 0. `html:root` (specificity 0,1,1) beats the override rules (0,1,0) of the fork-owned
+ * overrides files whatever their order, so a fork's retuned durations are zeroed too. Easings are left alone.
+ */
+@media (prefers-reduced-motion: reduce) {
+  html:root {
+    --fk-motion-duration-fast: 0ms;
+    --fk-motion-duration-base: 0ms;
+    --fk-motion-duration-slow: 0ms;
   }
 }

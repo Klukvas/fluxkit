@@ -150,16 +150,17 @@ interface RadiusException {
 }
 
 /**
- * Raw scale radii the template still uses on purpose, each with its count and reason (plan 2026-11-08 T3). Only the 0.25rem
- * parts are left (owner decision 2026-11-09: inline panels got the `panel` role, these stay): moving one to a role would change
+ * Raw scale radii the template still uses on purpose, each with its count and reason (plan 2026-11-08 T3). Only small marks
+ * are left (owner decision 2026-11-09: inline panels got the `panel` role, these stay): moving one to a role would change
  * pixels at the default tokens. Keep the list short; a new entry needs a reason a reviewer can check.
  */
-// The 0.25rem step has no role: a native checkbox and the focus ring of a text link are smaller than a control, a count or
+// The small mark step (now 0.375rem) has no role: a native checkbox and the focus ring of a text link are smaller than a control, a count or
 // discount badge is a mark inside text, a flag or a 48px thumbnail is smaller than media.
 const SMALL_CONTROL =
-  "0.25rem: smaller than the control role (0.5rem); no role for this step (owner, 2026-11-09)";
-const SMALL_MARK = "0.25rem badge inside text: no role covers marks (owner decision 2026-11-09)";
-const SMALL_MEDIA = "0.25rem small picture (flag, 48px thumbnail): the media role is 0.5rem";
+  "Small radius: smaller than the control role (1.5rem); no role for this step (owner, 2026-11-09)";
+const SMALL_MARK =
+  "Small radius badge inside text: no role covers marks (owner decision 2026-11-09)";
+const SMALL_MEDIA = "Small radius picture (flag, 48px thumbnail): the media role is 1rem";
 
 const radiusExceptions: RadiusException[] = [
   { file: "packages/ui/src/badge.tsx", className: "rounded-sm", count: 1, reason: SMALL_MARK },
@@ -529,5 +530,49 @@ describe("design guard, heading roles", () => {
 
   it("builds every dynamic <Heading> and every <legend> of ui and the storefront from a textStyles role", () => {
     expect(roleOffenders(/Heading|legend/)).toEqual([]);
+  });
+});
+
+// Scan class lists and @apply like the scale guards. Raw ms in globals.css belong to the motion workstream, not this PR.
+function offTokenMotionClasses(source: string): string[] {
+  return [...quotedClasses(source), ...appliedClasses(source)].filter((name) =>
+    /^!?(?:(?:duration|delay)-(?:[0-9]+|\[[^\]]*\]|\([^)]*\))|ease-(?:\[[^\]]*\]|\([^)]*\))|ease-(?:in|out|in-out|linear))!?$/.test(
+      name,
+    ),
+  );
+}
+
+describe("design guard, token motion classes", () => {
+  it("rejects numeric and arbitrary timings and built-in easings, including variants", () => {
+    expect(
+      offTokenMotionClasses(
+        '"duration-150 hover:duration-300 duration-[250ms] ease-[linear] delay-[1s] ease-in ease-out ease-in-out ease-linear"',
+      ),
+    ).toHaveLength(9);
+    // Tailwind v4 custom-property values, numeric delays and important markers are timings outside the tokens too.
+    expect(
+      offTokenMotionClasses(
+        '"duration-(--custom-time) ease-(--custom-ease) delay-(--custom-delay) delay-150 md:hover:!duration-200 ease-out!"',
+      ),
+    ).toHaveLength(6);
+    expect(
+      offTokenMotionClasses(
+        '"transition duration-fast duration-base duration-slow ease-standard ease-emphasized ease-spring"',
+      ),
+    ).toEqual([]);
+    expect(offTokenMotionClasses(".x { @apply duration-200 ease-out; }")).toEqual([
+      "duration-200",
+      "ease-out",
+    ]);
+  });
+  it("finds no timings outside tokens in components and apps", () => {
+    const offenders = sources
+      .filter((file) => !/\.spec\.tsx?$/.test(file))
+      .flatMap((file) =>
+        offTokenMotionClasses(readFileSync(file, "utf8")).map(
+          (name) => `${file.replace(repoRoot, "")}: ${name}`,
+        ),
+      );
+    expect(offenders).toEqual([]);
   });
 });

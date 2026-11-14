@@ -48,6 +48,17 @@ const lines = [
     .split("\n")
     .map((line) => (line === "" ? "" : `    ${line}`)),
   "",
+  "## Vendored fonts",
+  "",
+  "### Rubik (SIL OFL 1.1)",
+  "",
+  "`apps/storefront/src/lib/fonts/rubik-wght.woff2`: Google Fonts Rubik (`ofl/rubik/Rubik[wght].ttf`, commit 8b0a1d0f5983c89bc2b93f1b5fb55f9e252744b5), converted losslessly to WOFF2 (font tables unchanged). Font name unchanged; no Reserved Font Name.",
+  "",
+  ...readFileSync("apps/storefront/src/lib/fonts/OFL.txt", "utf8")
+    .trimEnd()
+    .split("\n")
+    .map((line) => (line === "" ? "" : `    ${line}`)),
+  "",
 ];
 mkdirSync("third-party", { recursive: true });
 writeFileSync("third-party/THIRD_PARTY_NOTICES.md", lines.join("\n"));
