@@ -3,7 +3,7 @@
 Read this first (Claude Code, Codex or a human). Rules live in `AGENTS.md`; decisions in `docs/adr/` (0001 to 0047, index in `docs/adr/README.md`); plans in `docs/plans/`.
 The long per-step history that used to live here is archived verbatim in `docs/HISTORY.md` (not current). Update this file in every PR that changes project state; keep it short and keep "Last updated" to one line.
 
-Last updated: 2026-11-13, the test server moved to the own domain `fluxkitcore.com`.
+Last updated: 2026-11-13, the owner approved the blog plan.
 
 ## 1. Current state
 
@@ -69,7 +69,7 @@ Fluxkit is a white-label e-commerce template: TypeScript monorepo, NestJS + Driz
 
 ## 2. Next steps (in order)
 
-0. Blog (owner request 2026-11-13): plan `docs/plans/2026-11-13-blog.md`, revised after an independent review; waits for the owner's approval of its red zones (feature flag, feature contracts and migrations, `@fluxkit/api-kit`, the AGENTS.md 2.1 wording) and its ten questions.
+0. Blog (owner request 2026-11-13): plan `docs/plans/2026-11-13-blog.md`, revised after an independent review; approved by the owner on 2026-11-13 (every red zone, the recommended option of all ten questions; AGENTS.md 2.1, 5 and 18 now say "one package plus one slice per app"). Next: PR 1 (API extension points) and PR 2 (safe Markdown) in parallel, then PRs 3 to 6 (plan section 14).
 1. Owner-only items of section 3 (the AGENTS.md sync was merged in #196 and the owner decisions of 2026-10-30 are recorded): live provider checks; legal review. Migrations `0009_privacy` and `0010_search` and the vendored Snowball code were confirmed by the owner on 2026-10-31 (first approved by the orchestrator on 2026-10-29 under the standing autonomy grant); migration `0011` was approved by the owner personally on 2026-10-30. Nothing below replaces these.
 2. Storefront: owner confirmation of ADR 0045 (with the lawyer) and of the defaults (plan "Results", owner decisions). Mobile layout (PR 216, merged): iOS Safari still unverified. Admin knowledge base (merged, PR 212): independent review of the code and of the article texts against the real behaviour (owner reads the uk texts). Storefront UI polish: independent UX/a11y review (planned as a second round); then a plan for the payment method choice at checkout (owner decision 3 of 2026-11-02). Local demo: a run of `pnpm demo:up` on a machine with Docker (never verified), and on Windows (unverified; WSL2 documented). Search: PR 208 (ADR 0044) is merged. Re-measured at 20 000 products (plan `docs/plans/2026-10-29-search.md`, "Re-measurement at 20 000 products (2026-11-01)"): targets missed at concurrency 32 and for deep pages; F3 to F5 open. Still to do: test the engine-down fallback in a real browser (unit level only).
 2a. Design changeability: the A1 re-run is done (section 6 of the acceptance file); the guide fixes of its section 6.3 are done except the items that need a contract decision (fork stylesheet, `home.ts` ownership) and two code items (`slots.fork.spec.tsx` reads the real `config/header.ts`; the `check:docs` message still names the missing `catalog`; the header comment of `config/brand.ts` still names `tokens.css`, left because a comment-only edit of a contract file needs a change under `docs/contracts/`); next: a browser and e2e look at the four experiment branches, owner decisions on `EmailTheme` display font and accent, `home.ts` ownership and the `.fluxkit-fork` mention in `AGENTS.md` (`docs/plans/2026-11-08-design-experiments-after.md`).
