@@ -94,7 +94,7 @@ test.describe("free-shipping progress", () => {
     const variant = product.variants[0];
     if (variant === undefined) throw new Error("Seed screwdriver has no variant");
     await admin.createShippingMethod({
-      code: `drawer_free_${String(testInfo.retry)}`,
+      code: `drawer_free_${String(testInfo.retry)}_${String(testInfo.repeatEachIndex)}`,
       title: "Free-over courier",
       kind: "address",
       pricing: { type: "free_over", amount: 9000, freeFrom: variant.price.amount * 2 },
@@ -103,7 +103,8 @@ test.describe("free-shipping progress", () => {
     await waitForHydration(page);
     const added = page.waitForResponse(
       (response) =>
-        response.url().endsWith("/store/cart/items") && response.request().method() === "POST",
+        new URL(response.url()).pathname.endsWith("/store/cart/items") &&
+        response.request().method() === "POST",
     );
     await page.getByRole("button", { name: "Add to cart Demo Screwdriver" }).click();
     const response = await added;
