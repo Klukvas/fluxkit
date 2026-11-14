@@ -20,7 +20,7 @@ describe("PageHeader", () => {
       expect(html).toContain(t("action.reload"));
       expect(html.indexOf("</h1>")).toBeLessThan(html.indexOf("<button"));
       expect(html).toContain('class="flex flex-wrap items-start justify-between gap-3"');
-      expect(html).toContain('class="min-w-0 flex-1 space-y-2"');
+      expect(html).toContain('class="min-w-0 grow basis-64 space-y-2 wrap-break-word"');
       expect(html).toContain('class="flex flex-wrap items-center gap-2"');
     });
   }

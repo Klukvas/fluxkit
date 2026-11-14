@@ -577,21 +577,20 @@ describe("order header action hierarchy", () => {
     const actions: OrderAction[] = ORDER_ACTIONS.filter((_, index) => (mask & (1 << index)) !== 0);
     for (const busy of [false, true]) {
       it(`keeps one promotion for ${actions.join(",") || "none"}, busy=${busy}`, () => {
-        const header = pageHeaderMarkup(
-          renderInRouter(
-            <OrderDetailView
-              t={sentinel}
-              uiLocale="en"
-              order={order()}
-              money={{ locale: "en", config }}
-              history={[]}
-              actions={actions}
-              onAction={noop}
-              busy={busy}
-              statusLine={null}
-            />,
-          ),
+        const html = renderInRouter(
+          <OrderDetailView
+            t={sentinel}
+            uiLocale="en"
+            order={order()}
+            money={{ locale: "en", config }}
+            history={[]}
+            actions={actions}
+            onAction={noop}
+            busy={busy}
+            statusLine={<div id="order-status-line" />}
+          />,
         );
+        const header = pageHeaderMarkup(html);
         const primary = primaryHeaderControls(header);
         expect(primary).toHaveLength(actions.some((action) => action !== "cancel") ? 1 : 0);
         if (actions.includes("markPaid")) expect(primary[0]).toContain("§order.action.markPaid");
@@ -600,8 +599,18 @@ describe("order header action hierarchy", () => {
         if (actions.includes("cancel"))
           expect(header).toMatch(/<button[^>]*text-danger[^>]*>§order.action.cancel<\/button>/);
         if (actions.length > 0) {
-          expect(header).toContain('id="order-actions"');
-          expect(header).toContain("§order.detail.actionsHint");
+          expect(header).toContain(
+            '<div role="group" id="order-actions" aria-label="§order.detail.actions" aria-describedby="order-actions-hint" class="flex flex-wrap gap-3">',
+          );
+          expect(header).not.toContain("§order.detail.actionsHint");
+          expect(header).not.toMatch(/<h2\b/);
+          expect(html).toContain(
+            `${header}<p id="order-actions-hint" class="text-sm text-muted-foreground">§order.detail.actionsHint</p></div><div id="order-status-line">`,
+          );
+        } else {
+          expect(html).not.toContain('id="order-actions"');
+          expect(html).not.toContain('id="order-actions-hint"');
+          expect(html).not.toContain("§order.detail.actionsHint");
         }
         expect((header.match(/disabled=""/g) ?? []).length).toBe(busy ? actions.length : 0);
         expect(header.match(/<h1\b/g)).toHaveLength(1);

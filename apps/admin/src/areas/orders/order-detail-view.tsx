@@ -415,29 +415,37 @@ export function OrderDetailView({
           }
           actions={
             actions.length === 0 ? null : (
-              <Section id="order-actions" title={t("order.detail.actions")}>
-                <p className="text-muted-foreground">{t("order.detail.actionsHint")}</p>
-                <div className="flex flex-wrap gap-3">
-                  {actions.map((action) => (
-                    <Button
-                      key={action}
-                      variant={
-                        action === "markFulfilled" && actions.includes("markPaid")
-                          ? "secondary"
-                          : ACTION_BUTTON[action].variant
-                      }
-                      disabled={busy}
-                      aria-busy={busy || undefined}
-                      onClick={() => onAction(action)}
-                    >
-                      {t(ACTION_BUTTON[action].key)}
-                    </Button>
-                  ))}
-                </div>
-              </Section>
+              <div
+                role="group"
+                id="order-actions"
+                aria-label={t("order.detail.actions")}
+                aria-describedby="order-actions-hint"
+                className="flex flex-wrap gap-3"
+              >
+                {actions.map((action) => (
+                  <Button
+                    key={action}
+                    variant={
+                      action === "markFulfilled" && actions.includes("markPaid")
+                        ? "secondary"
+                        : ACTION_BUTTON[action].variant
+                    }
+                    disabled={busy}
+                    aria-busy={busy || undefined}
+                    onClick={() => onAction(action)}
+                  >
+                    {t(ACTION_BUTTON[action].key)}
+                  </Button>
+                ))}
+              </div>
             )
           }
         />
+        {actions.length === 0 ? null : (
+          <p id="order-actions-hint" className="text-sm text-muted-foreground">
+            {t("order.detail.actionsHint")}
+          </p>
+        )}
       </div>
       {statusLine}
       <Section id="order-summary" title={t("order.detail.summary")}>

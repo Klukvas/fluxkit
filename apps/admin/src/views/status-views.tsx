@@ -38,7 +38,7 @@ export function PageHeader({
 }) {
   return (
     <div className="flex flex-wrap items-start justify-between gap-3">
-      <div className="min-w-0 flex-1 space-y-2">
+      <div className="min-w-0 grow basis-64 space-y-2 wrap-break-word">
         <PageHeading>{title}</PageHeading>
         {description == null ? null : (
           <div className="max-w-prose text-muted-foreground">{description}</div>
