@@ -1,0 +1,183 @@
+/* Component CSS uses tokens directly: no @apply context or second Tailwind import is needed. */
+.fk-home-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: clip;
+}
+
+/* A hero without a picture still reserves a corner for an optional sticker before first paint. */
+.fk-home-hero:has(> .fk-home-sticker) > div:first-child {
+  min-block-size: calc(var(--fk-space-unit) * 28);
+  padding-inline-end: min(32%, calc(var(--fk-space-unit) * 28));
+}
+
+.fk-home-hero > .fk-home-sticker {
+  inset-block-start: calc(var(--fk-space-unit) * 4);
+  inset-inline-end: calc(var(--fk-space-unit) * 4);
+}
+
+.fk-home-hero-media {
+  position: relative;
+  isolation: isolate;
+  min-width: 0;
+}
+
+.fk-home-hero-picture {
+  position: relative;
+}
+
+.fk-home-blob {
+  position: absolute;
+  inset: -8% -8%;
+  clip-path: ellipse(48% 46% at 48% 52%);
+  background: color-mix(in oklab, var(--fk-color-accent) 45%, var(--fk-color-background));
+  transform: rotate(-6deg);
+}
+
+.fk-home-sticker {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-end: 0;
+  width: min(32%, calc(var(--fk-space-unit) * 28));
+  aspect-ratio: 1;
+  overflow: visible;
+  pointer-events: none;
+  box-shadow: var(--fk-shadow-card);
+}
+
+.fk-home-sticker-surface {
+  fill: var(--fk-color-primary);
+  stroke: var(--fk-color-border);
+}
+
+.fk-home-sticker text {
+  fill: var(--fk-color-primary-foreground);
+  font-family: var(--fk-font-sans);
+  font-size: var(--fk-font-size-sm);
+  font-weight: 600;
+}
+
+.fk-home-marker {
+  background-image: linear-gradient(
+    color-mix(in oklab, var(--fk-color-accent) 55%, transparent),
+    color-mix(in oklab, var(--fk-color-accent) 55%, transparent)
+  );
+  background-repeat: no-repeat;
+  background-position: left bottom;
+  background-size: 100% 24%;
+  box-decoration-break: clone;
+}
+
+/* An empty reveal must hide its own frame too, otherwise the frame still participates in the stack's gap. */
+[data-home-width]:has(> .fk-home-reveal:empty) {
+  display: none;
+}
+
+/* Match the legacy frame rule after a section whose opted-in content turned out empty. */
+[data-home-width="full"]:has(> .fk-home-reveal:empty) + [data-home-width="full"] {
+  margin-top: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .fk-home-blob {
+    animation: fk-home-morph calc(var(--fk-motion-duration-slow) * 20)
+      var(--fk-motion-ease-standard) infinite alternate;
+  }
+
+  .fk-home-sticker {
+    /* A continuous rotation has no start/stop to ease; constant angular speed avoids a hitch each lap. */
+    animation: fk-home-spin calc(var(--fk-motion-duration-slow) * 80) linear infinite;
+  }
+
+  [data-home-pop-in] > div:first-child > :is(h1, h2, p, div) {
+    animation: fk-home-pop var(--fk-motion-duration-slow) var(--fk-motion-ease-spring) backwards;
+  }
+
+  [data-home-pop-in] > div:first-child > p {
+    animation-delay: var(--fk-motion-duration-fast);
+  }
+
+  [data-home-pop-in] > div:first-child > div {
+    animation-delay: calc(var(--fk-motion-duration-fast) * 2);
+  }
+
+  /* Only transform the LCP picture: it is always opaque, including during its stagger delay. */
+  [data-home-pop-in] .fk-home-hero-picture {
+    animation: fk-home-picture var(--fk-motion-duration-slow) var(--fk-motion-ease-spring)
+      calc(var(--fk-motion-duration-fast) * 3) backwards;
+  }
+
+  .fk-home-marker {
+    animation: fk-home-marker var(--fk-motion-duration-slow) var(--fk-motion-ease-emphasized)
+      calc(var(--fk-motion-duration-fast) * 3) backwards;
+  }
+
+  @supports (animation-timeline: view()) {
+    /* `backwards`, not `both`: once a section has entered, no animation effect stays on it, so its transform cannot become
+       the containing block of a fixed-position descendant (a toast or popover inside a card). */
+    .fk-home-reveal {
+      animation: fk-home-fade var(--fk-motion-duration-slow) var(--fk-motion-ease-emphasized)
+        backwards;
+      animation-timeline: view();
+      animation-range: entry 0% entry 100%;
+    }
+
+    .fk-home-reveal[data-home-reveal="pop-in"] {
+      animation-name: fk-home-pop;
+      animation-timing-function: var(--fk-motion-ease-spring);
+    }
+  }
+
+  @keyframes fk-home-morph {
+    to {
+      clip-path: ellipse(44% 50% at 52% 48%);
+      transform: rotate(5deg) scale(1.04, 0.96);
+    }
+  }
+
+  @keyframes fk-home-spin {
+    to {
+      transform: rotate(1turn);
+    }
+  }
+
+  @keyframes fk-home-pop {
+    from {
+      opacity: 0;
+      transform: translateY(calc(var(--fk-space-unit) * 3)) scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes fk-home-picture {
+    from {
+      transform: scale(0.94) rotate(-2deg);
+    }
+    to {
+      transform: none;
+    }
+  }
+
+  @keyframes fk-home-fade {
+    from {
+      opacity: 0;
+      transform: translateY(calc(var(--fk-space-unit) * 4));
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes fk-home-marker {
+    from {
+      background-size: 0% 24%;
+    }
+    to {
+      background-size: 100% 24%;
+    }
+  }
+}

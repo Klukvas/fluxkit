@@ -3,7 +3,6 @@ import {
   BannerCard,
   type BannerCardLinkProps,
   Container,
-  Hero,
   Skeleton,
   textStyles,
   VisuallyHidden,
@@ -22,7 +21,6 @@ import {
   type CategoriesSection,
   type ConfigBannersSection,
   type CustomSection,
-  type HeroSection,
   type HomeDataSection,
   type HomeSection,
   type LocalImage,
@@ -45,8 +43,10 @@ import { CategoryIcon } from "./icons";
 import { LocalPicture } from "./local-picture";
 import { ProductGrid } from "./product-grid";
 import { StoreImage } from "./store-image";
-import { focusRing, linkButton } from "./styles";
+import { focusRing } from "./styles";
 import { StoreTrustBar } from "./trust-bar";
+import { HeroView } from "./home-sections-hero";
+import { homeSectionReveal } from "./home-sections-reveal";
 
 /**
  * The home page from `config/home.ts` (review D-18, plan 2026-11-03-storefront-design-b.md). Every section is presentational:
@@ -108,45 +108,6 @@ function SectionShell({
       </div>
       {children}
     </section>
-  );
-}
-
-function HeroView({
-  section,
-  context,
-  isPageHeading,
-}: {
-  section: HeroSection;
-  context: HomeContext;
-  isPageHeading: boolean;
-}) {
-  const { t, locale } = context;
-  return (
-    <Hero
-      headingId={headingId(section)}
-      headingLevel={isPageHeading ? "h1" : "h2"}
-      title={t(section.headlineKey)}
-      subline={section.sublineKey === undefined ? null : t(section.sublineKey)}
-      action={
-        section.cta === undefined ? undefined : (
-          <Link href={localizedHref(locale, section.cta.href)} className={`${linkButton} px-6`}>
-            {t(section.cta.labelKey)}
-          </Link>
-        )
-      }
-      media={
-        section.image === undefined ? undefined : (
-          <LocalPicture
-            image={section.image}
-            t={t}
-            // The first hero is the largest paint above the fold: load it at once.
-            eager={isPageHeading}
-            sizes="(min-width: 768px) 50vw, 100vw"
-            className="h-auto w-full rounded-media"
-          />
-        )
-      }
-    />
   );
 }
 
@@ -710,10 +671,10 @@ function SectionsLayout({
             first={index === 0}
             last={index === sections.length - 1}
           >
-            {renderSection(section, index)}
+            {homeSectionReveal(section, renderSection(section, index))}
           </SectionFrame>
         ) : (
-          renderSection(section, index)
+          homeSectionReveal(section, renderSection(section, index))
         ),
       )}
     </div>
