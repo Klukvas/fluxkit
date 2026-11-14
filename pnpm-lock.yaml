@@ -298,10 +298,17 @@ importers:
         version: 5.0.5(@types/node@26.6.5)(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
 
   packages/features/_example:
-    devDependencies:
+    dependencies:
       '@nestjs/common':
         specifier: 12.2.0
         version: 12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      reflect-metadata:
+        specifier: 0.2.2
+        version: 0.2.2
+      rxjs:
+        specifier: 7.8.2
+        version: 7.8.2
+    devDependencies:
       '@nestjs/platform-express':
         specifier: 12.2.0
         version: 12.2.0(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.2.0)
@@ -314,12 +321,6 @@ importers:
       '@types/node':
         specifier: 26.6.5
         version: 26.6.5
-      reflect-metadata:
-        specifier: 0.2.2
-        version: 0.2.2
-      rxjs:
-        specifier: 7.8.2
-        version: 7.8.2
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -393,10 +394,16 @@ importers:
       '@fluxkit/core':
         specifier: workspace:*
         version: link:../../core
-    devDependencies:
       '@nestjs/common':
         specifier: 12.2.0
         version: 12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      reflect-metadata:
+        specifier: 0.2.2
+        version: 0.2.2
+      rxjs:
+        specifier: 7.8.2
+        version: 7.8.2
+    devDependencies:
       '@nestjs/platform-express':
         specifier: 12.2.0
         version: 12.2.0(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.2.0)
@@ -409,12 +416,6 @@ importers:
       '@types/node':
         specifier: 26.6.5
         version: 26.6.5
-      reflect-metadata:
-        specifier: 0.2.2
-        version: 0.2.2
-      rxjs:
-        specifier: 7.8.2
-        version: 7.8.2
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -430,10 +431,16 @@ importers:
       '@fluxkit/core':
         specifier: workspace:*
         version: link:../../core
-    devDependencies:
       '@nestjs/common':
         specifier: 12.2.0
         version: 12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      reflect-metadata:
+        specifier: 0.2.2
+        version: 0.2.2
+      rxjs:
+        specifier: 7.8.2
+        version: 7.8.2
+    devDependencies:
       '@nestjs/platform-express':
         specifier: 12.2.0
         version: 12.2.0(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.2.0)
@@ -446,12 +453,6 @@ importers:
       '@types/node':
         specifier: 26.6.5
         version: 26.6.5
-      reflect-metadata:
-        specifier: 0.2.2
-        version: 0.2.2
-      rxjs:
-        specifier: 7.8.2
-        version: 7.8.2
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -467,10 +468,16 @@ importers:
       '@fluxkit/core':
         specifier: workspace:*
         version: link:../../core
-    devDependencies:
       '@nestjs/common':
         specifier: 12.2.0
         version: 12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      reflect-metadata:
+        specifier: 0.2.2
+        version: 0.2.2
+      rxjs:
+        specifier: 7.8.2
+        version: 7.8.2
+    devDependencies:
       '@nestjs/platform-express':
         specifier: 12.2.0
         version: 12.2.0(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.2.0)
@@ -483,12 +490,6 @@ importers:
       '@types/node':
         specifier: 26.6.5
         version: 26.6.5
-      reflect-metadata:
-        specifier: 0.2.2
-        version: 0.2.2
-      rxjs:
-        specifier: 7.8.2
-        version: 7.8.2
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -504,13 +505,19 @@ importers:
       '@fluxkit/core':
         specifier: workspace:*
         version: link:../../core
+      '@nestjs/common':
+        specifier: 12.2.0
+        version: 12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      reflect-metadata:
+        specifier: 0.2.2
+        version: 0.2.2
+      rxjs:
+        specifier: 7.8.2
+        version: 7.8.2
       zod:
         specifier: 4.6.7
         version: 4.6.7
     devDependencies:
-      '@nestjs/common':
-        specifier: 12.2.0
-        version: 12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/platform-express':
         specifier: 12.2.0
         version: 12.2.0(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.2.0)
@@ -523,12 +530,6 @@ importers:
       '@types/node':
         specifier: 26.6.5
         version: 26.6.5
-      reflect-metadata:
-        specifier: 0.2.2
-        version: 0.2.2
-      rxjs:
-        specifier: 7.8.2
-        version: 7.8.2
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -544,13 +545,19 @@ importers:
       '@fluxkit/core':
         specifier: workspace:*
         version: link:../../core
+      '@nestjs/common':
+        specifier: 12.2.0
+        version: 12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      reflect-metadata:
+        specifier: 0.2.2
+        version: 0.2.2
+      rxjs:
+        specifier: 7.8.2
+        version: 7.8.2
       zod:
         specifier: 4.6.7
         version: 4.6.7
     devDependencies:
-      '@nestjs/common':
-        specifier: 12.2.0
-        version: 12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/platform-express':
         specifier: 12.2.0
         version: 12.2.0(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.2.0)
@@ -563,12 +570,6 @@ importers:
       '@types/node':
         specifier: 26.6.5
         version: 26.6.5
-      reflect-metadata:
-        specifier: 0.2.2
-        version: 0.2.2
-      rxjs:
-        specifier: 7.8.2
-        version: 7.8.2
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -584,13 +585,19 @@ importers:
       '@fluxkit/core':
         specifier: workspace:*
         version: link:../../core
+      '@nestjs/common':
+        specifier: 12.2.0
+        version: 12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      reflect-metadata:
+        specifier: 0.2.2
+        version: 0.2.2
+      rxjs:
+        specifier: 7.8.2
+        version: 7.8.2
       zod:
         specifier: 4.6.7
         version: 4.6.7
     devDependencies:
-      '@nestjs/common':
-        specifier: 12.2.0
-        version: 12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/platform-express':
         specifier: 12.2.0
         version: 12.2.0(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.2.0)
@@ -603,12 +610,6 @@ importers:
       '@types/node':
         specifier: 26.6.5
         version: 26.6.5
-      reflect-metadata:
-        specifier: 0.2.2
-        version: 0.2.2
-      rxjs:
-        specifier: 7.8.2
-        version: 7.8.2
       typescript:
         specifier: 6.0.3
         version: 6.0.3

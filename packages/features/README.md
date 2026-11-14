@@ -10,4 +10,5 @@ A feature reaches the API only through `@fluxkit/api-kit` (problems, admin permi
 A package the feature imports at run time (`@nestjs/common` with its peers `reflect-metadata` and `rxjs`, at the API's versions, like
 `@fluxkit/api-kit`) is a `dependency`, never only a peer or dev dependency: the production API image installs with `--prod`, which links
 no peer of a workspace package, so the API would fail to load the enabled feature (`scripts/deploy-smoke.sh` switches the blog on in
-that image). `_example` still declares it as a peer only; it is never enabled in an image.
+that image). The same holds for `_example` and every provider package; the guard is
+`apps/api/src/common/workspace-runtime-dependencies.spec.ts`.
