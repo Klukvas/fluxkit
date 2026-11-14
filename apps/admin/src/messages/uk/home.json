@@ -12,7 +12,7 @@
   "home.counter.loading": "Завантаження показника…",
   "home.counter.unavailable": "Показник зараз недоступний",
   "home.counter.forbidden": "Немає доступу до показника",
-  "home.counter.retry": "Завантажити знову: {label}",
+  "home.counter.retry": "Спробувати ще раз: {label}",
   "home.noAccess": "Ваші дозволи не надають доступу до показників або дій робочого простору. Ви можете відкрити довідку.",
   "home.openHelp": "Відкрити довідку"
 }

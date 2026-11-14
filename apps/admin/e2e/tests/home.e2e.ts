@@ -97,7 +97,7 @@ test("one unavailable counter retries independently and recovers the real total"
   await expect(
     workspace.getByRole("link", { name: "This count is unavailable Customers", exact: true }),
   ).toBeVisible();
-  const retry = workspace.getByRole("button", { name: "Retry loading: Customers", exact: true });
+  const retry = workspace.getByRole("button", { name: "Try again: Customers", exact: true });
   await expect(retry).toBeVisible();
   await expect(
     workspace.getByText("The service is temporarily unavailable. Try again later.", {

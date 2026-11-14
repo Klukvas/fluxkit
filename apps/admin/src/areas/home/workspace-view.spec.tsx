@@ -49,7 +49,7 @@ describe("workspace view", () => {
     expect(html).toContain(t("home.counter.forbidden"));
     expect(html).toContain(t("home.counter.unavailable"));
     expect(html).toContain(t("errors.network"));
-    expect(html).toContain('aria-label="Retry loading: Customers"');
+    expect(html).toContain('aria-label="Try again: Customers"');
     expect(html.match(/<button /g)).toHaveLength(1);
     for (const link of html.matchAll(/<a\b[^>]*>(.*?)<\/a>/g))
       expect(link[1]).not.toContain("<button");

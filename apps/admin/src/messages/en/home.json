@@ -12,7 +12,7 @@
   "home.counter.loading": "Loading this counter…",
   "home.counter.unavailable": "This count is unavailable",
   "home.counter.forbidden": "Access to this count is denied",
-  "home.counter.retry": "Retry loading: {label}",
+  "home.counter.retry": "Try again: {label}",
   "home.noAccess": "Your permissions do not include workspace counters or actions. You can still open Help.",
   "home.openHelp": "Open Help"
 }
