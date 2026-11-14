@@ -78,7 +78,7 @@ export function MarkPaidDialog({
       description={t("order.markPaid.description")}
       footer={
         <>
-          <Button variant="secondary" disabled={busy} onClick={onClose}>
+          <Button variant="ghost" disabled={busy} onClick={onClose}>
             {t("order.dialog.cancel")}
           </Button>
           <Button

@@ -4,7 +4,7 @@ import type { FormEvent, ReactNode, Ref } from "react";
 import { Link } from "react-router";
 import type { MessageDescriptor } from "../../lib/problem-messages";
 import { PATHS } from "../../router/paths";
-import { PageHeading } from "../../views/status-views";
+import { PageHeader } from "../../views/status-views";
 import { EMAIL_MAX_LENGTH, type CreateField, type CreateUserValues } from "./user-form";
 import type { LookupResult } from "./user-lookup";
 import { DescriptorText, NewPasswordField, RoleBadge, RoleChoices, focusClass } from "./user-parts";
@@ -215,7 +215,7 @@ export function CreateUserScreen({ t, children }: { t: Translator; children: Rea
           {t("user.back")}
         </Link>
       </p>
-      <PageHeading>{t("page.userNew.title")}</PageHeading>
+      <PageHeader title={t("page.userNew.title")} />
       {children}
     </div>
   );

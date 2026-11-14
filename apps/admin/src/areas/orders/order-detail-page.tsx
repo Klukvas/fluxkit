@@ -19,7 +19,7 @@ import { useRefreshingResource } from "../../lib/use-refreshing-resource";
 import { useUnsavedChangesGuard } from "../../router/unsaved-changes";
 import { UnsavedChangesDialog } from "../../router/unsaved-changes-dialog";
 import { useSession } from "../../session/session-context";
-import { PageHeading, ResourceFallback } from "../../views/status-views";
+import { PageHeader, ResourceFallback } from "../../views/status-views";
 import { PaymentSection } from "../payments/payment-section";
 import {
   EMPTY_CANCEL,
@@ -125,7 +125,7 @@ function OrderDetail({ orderId, config }: { orderId: string; config: AdminConfig
   if (resource.fallback !== null || resource.data === null) {
     return (
       <div className="flex flex-col gap-4">
-        <PageHeading>{t("page.orderDetail.title")}</PageHeading>
+        <PageHeader title={t("page.orderDetail.title")} />
         {resource.fallback === null ? null : (
           <ResourceFallback t={t} state={resource.fallback} onRetry={resource.reload} />
         )}
@@ -412,7 +412,7 @@ export function OrderDetailPage() {
   if (config.status !== "ready") {
     return (
       <div className="flex flex-col gap-4">
-        <PageHeading>{t("page.orderDetail.title")}</PageHeading>
+        <PageHeader title={t("page.orderDetail.title")} />
         <ResourceFallback t={t} state={config} onRetry={config.reload} />
       </div>
     );

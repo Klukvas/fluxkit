@@ -126,3 +126,24 @@ export function refundFixture(overrides: Partial<AdminPaymentRefund> = {}): Admi
     ...overrides,
   };
 }
+
+/** The complete rendered PageHeader subtree, including nested action groups (never the body's controls). */
+export function pageHeaderMarkup(html: string): string {
+  const start = html.indexOf('<div class="flex flex-wrap items-start justify-between gap-3">');
+  if (start === -1) throw new Error("No rendered PageHeader");
+  let depth = 0;
+  for (const match of html.slice(start).matchAll(/<div\b[^>]*>|<\/div>/g)) {
+    depth += match[0] === "</div>" ? -1 : 1;
+    if (depth === 0) return html.slice(start, start + match.index + match[0].length);
+  }
+  throw new Error("Unclosed PageHeader");
+}
+
+/** Primary controls inside an already isolated header, including button-shaped navigation links. */
+export function primaryHeaderControls(header: string): string[] {
+  return [
+    ...header.matchAll(
+      /<(?:button|a)\b[^>]*class="[^"]*\bbg-primary(?:\s|")[^>]*>[\s\S]*?<\/(?:button|a)>/g,
+    ),
+  ].map((match) => match[0]);
+}

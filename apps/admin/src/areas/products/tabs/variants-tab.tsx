@@ -504,7 +504,7 @@ export function VariantEditorView({
             submitLabel={t("products.variants.save")}
             busyLabel={t("products.form.saving")}
           />
-          <Button variant="secondary" disabled={busy} onClick={onCancel}>
+          <Button variant="ghost" disabled={busy} onClick={onCancel}>
             {t("dict.form.cancel")}
           </Button>
         </div>
@@ -651,7 +651,7 @@ export function VariantCreateView({
             submitLabel={t("products.variants.create")}
             busyLabel={t("products.form.saving")}
           />
-          <Button variant="secondary" disabled={busy} onClick={onCancel}>
+          <Button variant="ghost" disabled={busy} onClick={onCancel}>
             {t("dict.form.cancel")}
           </Button>
         </div>

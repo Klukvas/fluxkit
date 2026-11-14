@@ -3,7 +3,7 @@ import type { ReactNode, Ref } from "react";
 import { Link } from "react-router";
 import type { MessageDescriptor } from "../../lib/problem-messages";
 import { PATHS, type RouteId } from "../../router/paths";
-import { PageHeading } from "../../views/status-views";
+import { PageHeader } from "../../views/status-views";
 import { subNavLinkClass } from "../../views/sub-nav";
 
 export const focusClass =
@@ -43,22 +43,21 @@ export function SearchFrame({
   t,
   current,
   title,
+  description,
   actions,
   children,
 }: {
   t: Translator;
   current: SearchScreenId;
   title: string;
+  description?: ReactNode;
   actions?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <div className="flex flex-col gap-6">
       <SearchNav t={t} current={current} />
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <PageHeading>{title}</PageHeading>
-        {actions}
-      </div>
+      <PageHeader title={title} description={description} actions={actions} />
       {children}
     </div>
   );

@@ -26,10 +26,33 @@ export function PageHeading({ children }: { children: ReactNode }) {
   );
 }
 
+/** A page's heading and optional context/actions; PageHeading owns route-focus registration. */
+export function PageHeader({
+  title,
+  description,
+  actions,
+}: {
+  title: string;
+  description?: ReactNode;
+  actions?: ReactNode;
+}) {
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="min-w-0 grow basis-64 space-y-2 wrap-break-word">
+        <PageHeading>{title}</PageHeading>
+        {description == null ? null : (
+          <div className="max-w-prose text-muted-foreground">{description}</div>
+        )}
+      </div>
+      {actions == null ? null : <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+    </div>
+  );
+}
+
 function PageView({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div className="flex flex-col gap-4">
-      <PageHeading>{title}</PageHeading>
+      <PageHeader title={title} />
       {children}
     </div>
   );

@@ -11,7 +11,7 @@ import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { formatDateTime } from "../../lib/format";
 import { PATHS } from "../../router/paths";
-import { PageHeading } from "../../views/status-views";
+import { PageHeader } from "../../views/status-views";
 import type { UserAction } from "./user-actions";
 import { ActivityBadge, RoleBadge, RoleChoices } from "./user-parts";
 import { standaloneLinkClass } from "../../views/links";
@@ -111,7 +111,7 @@ export function UserDetailView({
           {t("user.back")}
         </Link>
       </p>
-      <PageHeading>{t("user.detail.title")}</PageHeading>
+      <PageHeader title={t("user.detail.title")} />
       {statusLine}
       {self ? (
         <Alert variant="warning" title={t("user.detail.selfTitle")}>

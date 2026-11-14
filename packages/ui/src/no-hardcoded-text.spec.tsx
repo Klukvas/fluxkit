@@ -1,3 +1,5 @@
+import { Button } from "./button";
+import { IconButton } from "./icon-button";
 import type { ReactElement } from "react";
 import { describe, expect, it } from "vitest";
 import { Alert } from "./alert";
@@ -44,6 +46,16 @@ import { render, text } from "./test-helpers";
 const s = (name: string): string => `§${name}`;
 
 const cases: [string, ReactElement][] = [
+  [
+    "Button ghost",
+    <Button key="ghost" variant="ghost" icon={<HomeIcon className="size-5" />}>
+      {s("cancel")}
+    </Button>,
+  ],
+  [
+    "IconButton",
+    <IconButton key="icon-button" label={s("label")} icon={<HomeIcon className="size-5" />} />,
+  ],
   [
     "Drawer",
     <Drawer

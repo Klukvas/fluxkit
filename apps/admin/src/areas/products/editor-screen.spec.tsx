@@ -8,6 +8,8 @@ import type {
 import { createTranslator, type Translator } from "@fluxkit/ui";
 import { describe, expect, it } from "vitest";
 import {
+  pageHeaderMarkup,
+  primaryHeaderControls,
   leftoverText,
   messagesForArea,
   renderInRouter,
@@ -23,7 +25,8 @@ import {
   TabProblemsView,
 } from "./editor-views";
 import { MESSAGE_FILES } from "./index";
-import { LIFECYCLE_ACTIONS } from "./lifecycle";
+import { ROLE_PERMISSIONS } from "@fluxkit/core";
+import { permittedActions, LIFECYCLE_ACTIONS } from "./lifecycle";
 import { mapPublishProblems } from "./publish-problems";
 import { CategoryAssignmentsView } from "./tabs/categories-tab";
 
@@ -419,4 +422,53 @@ describe("the editor with the real uk and en messages", () => {
     }
     expect(leftoverText(text)).toBe("");
   });
+});
+
+describe("product header action hierarchy", () => {
+  for (const status of ["draft", "active", "archived"] as const) {
+    for (const publishedAt of [null, "2026-10-19T10:00:00.000Z"]) {
+      for (const permissions of [
+        null,
+        [],
+        ROLE_PERMISSIONS.owner,
+        ROLE_PERMISSIONS.manager,
+        ROLE_PERMISSIONS.viewer,
+      ]) {
+        it(`keeps at most one primary for ${status}/${publishedAt}/${permissions?.join(",") ?? "loading"}`, () => {
+          const value = product({ status, publishedAt });
+          const actions = permittedActions(value, permissions);
+          const header = pageHeaderMarkup(
+            renderInRouter(
+              <ProductSummaryView
+                t={sentinelTranslator()}
+                uiLocale="en"
+                content={content}
+                product={value}
+                productType={productType}
+                actions={
+                  <LifecycleActionsView
+                    t={sentinelTranslator()}
+                    actions={actions}
+                    busy={null}
+                    locked={false}
+                    onAction={noop}
+                  />
+                }
+              />,
+            ),
+          );
+          const primary = primaryHeaderControls(header);
+          expect(primary).toHaveLength(actions.includes("publish") ? 1 : 0);
+          if (actions.includes("publish"))
+            expect(primary[0]).toContain("§products.lifecycle.publish");
+          for (const action of actions) expect(header).toContain(`§products.lifecycle.${action}`);
+          if (actions.includes("delete"))
+            expect(header).toMatch(
+              /<button[^>]*text-danger[^>]*>§products.lifecycle.delete<\/button>/,
+            );
+          expect(header.match(/<h1\b/g)).toHaveLength(1);
+        });
+      }
+    }
+  }
 });

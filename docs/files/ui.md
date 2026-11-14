@@ -2,7 +2,7 @@
 
 Dumb, token-styled components: props in, markup out. No fetching, no API types, no hardcoded user-facing strings (labels and aria texts come from props), semantic Tailwind utilities only (guarded by `packages/theme/src/design-guard.spec.ts`). Radii are roles since 2026-11-09: `rounded-control` (`button.tsx`, `controlBase` in `styles.ts`, fields, chips), `rounded-card`, `rounded-panel` (`alert.tsx`, the `trust-bar.tsx` list container, the `data-table.tsx` scroll hint), `rounded-overlay` (`dialog.tsx`), `rounded-media` (`product-image.tsx`, `skeleton.tsx`); `checkbox.tsx`, `badge.tsx` and `price-text.tsx` keep `rounded-sm` (0.25rem) as listed guard exceptions (`docs/contracts/theme-tokens.md`, "Radius roles").
 
-- `src/index.ts` - public entry point; other packages import only from here.
+- `src/index.ts` - public entry point, including additive `IconButton`/`IconButtonProps` exports; other packages import only from here.
 - `src/cn.ts`, `src/styles.ts` - class joiner; shared focus ring (`outline-ring`) and form-control classes.
 - `src/i18n.ts` - `locales`, `defaultLocale`, `isLocale`, `createTranslator(messages, locale?)` (`t(key, values)` with `{name}` interpolation, `t.plural(key, count, values)` with `<key>.<one|few|many|other>` forms from `Intl.PluralRules`; a missing key, form or placeholder value throws), `messagePlaceholders`.
 - `src/button.tsx`, `src/card.tsx`, `src/container.tsx` - primitives.
@@ -55,3 +55,6 @@ Dumb, token-styled components: props in, markup out. No fetching, no API types, 
 - `src/icons.tsx`, `src/icons.spec.tsx` - 23 replaceable named decorative 24×24 line icons; fixed colour/accessibility invariants and token sizing, no copy or dependencies. `ExtensionIcon` is the generic admin feature-navigation icon; a manifest `icon` field is a possible later contract addition, not implemented.
 - `src/side-nav.tsx`, `src/admin-nav.spec.tsx` - optional icons, `collapsed` and `currentTone` with compatible defaults; hidden names, uniquely labelled groups and collapsed separators; router props stay intact.
 - `src/side-nav-tooltip.tsx` - client-only native top-layer popover for collapsed icon labels; hover/focus, Escape, inline-end placement and scroll/resize cleanup, no portal.
+
+- Admin shell PR 2: `src/button.tsx` adds `ghost` and a decorative leading `icon`; without an icon, existing variant/size classes and children remain identical. `src/icon-button.tsx` uses the shared internal variants, a required translated label and square md/lg targets; no children or competing ARIA naming props.
+- `src/button.spec.tsx`, `src/icon-button.spec.tsx` - literal pre-change Button baselines, icon order/hidden wrapper, explicit SVG sizing without a competing default (`icons.spec.tsx`), native props/ref, square sizes and type-level naming restrictions; `no-hardcoded-text.spec.tsx` includes both additive APIs.

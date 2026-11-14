@@ -24,3 +24,6 @@ File map: `docs/files/ui.md`.
 `SideNavItem.icon?: ReactNode`, `SideNav.collapsed?: boolean` (default `false`) and `currentTone?: "solid" | "muted"` (default `"solid"`) are additive. Existing no-icon callers keep their markup and appearance. Icon links retain their real label as visually hidden text when collapsed; items without icons keep visible text. Headings remain associated with lists through instance-specific ids, with separators in the collapsed view. `renderLink` still forwards all link props and children.
 
 Collapsed icon links alone use the small client tooltip: a native manual popover in the top layer, opened on hover/focus, dismissed with Escape, positioned at the logical inline end and clamped to the viewport. No portal or additional dependency. Browser interactions are specified by the admin `shell.e2e.ts`; browser execution is pending orchestrator verification.
+
+- `Button`: `variant="ghost"` is a quiet background button; optional `icon` is a decorative leading node (supply SVGs at `size-5`). Existing buttons without an icon retain their exact classes and children.
+- `IconButton`: required translated `label` and decorative `icon`, native button props/ref; defaults `variant="ghost"`, `size="md"` (44 px square), with `lg` (48 px square). No children, `aria-label` or `aria-labelledby` override; the label supplies its accessible name.

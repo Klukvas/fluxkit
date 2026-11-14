@@ -18,11 +18,7 @@ import { dateHint } from "../../lib/date-input-echo";
 import { formatDateTime } from "../../lib/format";
 import type { MessageDescriptor } from "../../lib/problem-messages";
 import { PATHS, buildPath } from "../../router/paths";
-import {
-  PageHeading,
-  ResourceFallback,
-  type ResourceFallbackState,
-} from "../../views/status-views";
+import { PageHeader, ResourceFallback, type ResourceFallbackState } from "../../views/status-views";
 import type { DayRangeFailure } from "../../lib/date-range";
 import {
   ORDER_SEARCH_MAX_LENGTH,
@@ -99,7 +95,7 @@ export function OrderListView({
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeading>{t("page.orders.title")}</PageHeading>
+      <PageHeader title={t("page.orders.title")} />
       <FilterBar label={t("order.list.filtersLabel")} onSubmit={submit}>
         <div className="min-w-64">
           <Field

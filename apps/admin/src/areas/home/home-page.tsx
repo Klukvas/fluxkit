@@ -1,7 +1,7 @@
 import type { Translator } from "@fluxkit/ui";
 import { lazy, Suspense, type ReactNode } from "react";
 import { useI18n } from "../../i18n/i18n-context";
-import { LoadingView, PageHeading } from "../../views/status-views";
+import { LoadingView, PageHeader } from "../../views/status-views";
 
 /**
  * The getting-started checklist lives in the help area's lazy chunk (with its messages), so the start page, which is in
@@ -14,10 +14,7 @@ const HomeChecklist = lazy(() =>
 export function HomeView({ t, checklist }: { t: Translator; checklist?: ReactNode }) {
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-4">
-        <PageHeading>{t("page.home.title")}</PageHeading>
-        <p className="text-muted-foreground">{t("page.home.welcome")}</p>
-      </div>
+      <PageHeader title={t("page.home.title")} description={t("page.home.welcome")} />
       {checklist}
     </div>
   );

@@ -10,7 +10,7 @@ import { createSingleFlight } from "../../lib/single-flight";
 import { useAdminEmails } from "../../lib/use-admin-emails";
 import { useResource } from "../../lib/use-resource";
 import { useSession } from "../../session/session-context";
-import { PageHeading, ResourceFallback } from "../../views/status-views";
+import { PageHeader, ResourceFallback } from "../../views/status-views";
 import {
   appendPage,
   auditRequest,
@@ -109,8 +109,7 @@ export function AuditLogPage() {
   // when the filters changed and left the old form in the page (two forms, the stale one focused).
   return (
     <div className="flex flex-col gap-6">
-      <PageHeading>{t("page.auditLog.title")}</PageHeading>
-      <p className="max-w-prose text-muted-foreground">{t("audit.list.intro")}</p>
+      <PageHeader title={t("page.auditLog.title")} description={t("audit.list.intro")} />
       <AuditFilterForm
         key={`filters${queryKey}`}
         t={t}

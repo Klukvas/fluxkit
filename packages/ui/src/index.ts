@@ -15,6 +15,7 @@ export {
 } from "./banner-card";
 export { Breadcrumbs, type BreadcrumbItem, type BreadcrumbsProps } from "./breadcrumbs";
 export { Button, type ButtonProps, type ButtonSize, type ButtonVariant } from "./button";
+export { IconButton, type IconButtonProps } from "./icon-button";
 export { Card } from "./card";
 export { Checkbox, type CheckboxProps } from "./checkbox";
 export { cn } from "./cn";

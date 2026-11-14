@@ -92,6 +92,7 @@ export function SearchStatusPage() {
       t={t}
       current="search"
       title={t("page.search.title")}
+      description={t("search.status.intro")}
       actions={
         screen.kind === "data" ? (
           <Button
@@ -105,7 +106,6 @@ export function SearchStatusPage() {
         ) : undefined
       }
     >
-      <p className="max-w-prose text-muted-foreground">{t("search.status.intro")}</p>
       {screen.kind === "data" ? (
         <p className="text-muted-foreground">
           {t("search.status.updated", { time: formatDateTime(now, locale) })}

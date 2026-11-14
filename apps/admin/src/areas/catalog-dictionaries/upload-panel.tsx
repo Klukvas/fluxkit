@@ -110,7 +110,7 @@ export function UploadPanel({
           />
         </label>
         {running && waiting ? (
-          <Button variant="secondary" onClick={controls.cancelQueued}>
+          <Button variant="ghost" onClick={controls.cancelQueued}>
             {t("dict.upload.cancel")}
           </Button>
         ) : null}

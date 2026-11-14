@@ -11,7 +11,7 @@ import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { formatDateTime } from "../../lib/format";
 import { PATHS } from "../../router/paths";
-import { PageHeading } from "../../views/status-views";
+import { PageHeader } from "../../views/status-views";
 import type { CustomerAction } from "./customer-actions";
 import {
   customerOrdersHref,
@@ -180,7 +180,7 @@ export function CustomerDetailView({
           {t("customer.detail.back")}
         </Link>
       </p>
-      <PageHeading>{t("customer.detail.title")}</PageHeading>
+      <PageHeader title={t("customer.detail.title")} />
       {statusLine}
       {customer.isLocked ? (
         <Alert variant="warning" title={t("customer.detail.lockedTitle")}>

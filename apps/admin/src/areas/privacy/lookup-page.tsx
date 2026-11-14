@@ -134,8 +134,12 @@ export function PrivacyLookupPage() {
   }
 
   return (
-    <PrivacyFrame t={t} current="privacyLookup" title={t("page.privacyLookup.title")}>
-      <p className="max-w-prose text-muted-foreground">{t("personal.lookup.intro")}</p>
+    <PrivacyFrame
+      t={t}
+      current="privacyLookup"
+      title={t("page.privacyLookup.title")}
+      description={t("personal.lookup.intro")}
+    >
       <LookupForm
         t={t}
         email={email}

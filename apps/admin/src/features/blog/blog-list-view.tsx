@@ -18,7 +18,7 @@ import { standaloneLinkClass } from "../../views/links";
 import type { ContentLocales } from "../../areas/catalog-dictionaries/form-parts";
 import { resolveLocalized } from "../../areas/catalog-dictionaries/locale-text";
 import { ListPager } from "../../areas/catalog-dictionaries/list-screen";
-import { PageHeading } from "../../views/status-views";
+import { PageHeader } from "../../views/status-views";
 import {
   BLOG_POST_STATES,
   type BlogPostPage,
@@ -56,19 +56,18 @@ export function StateBadge({ t, state }: { t: Translator; state: BlogPostState }
 /** Every blog screen: the one `h1`, an optional action beside it, then the content. */
 export function BlogFrame({
   title,
+  description,
   actions,
   children,
 }: {
   title: string;
+  description?: ReactNode;
   actions?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <PageHeading>{title}</PageHeading>
-        {actions}
-      </div>
+      <PageHeader title={title} description={description} actions={actions} />
       {children}
     </div>
   );

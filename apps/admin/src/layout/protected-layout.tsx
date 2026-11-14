@@ -4,7 +4,7 @@ import { useI18n } from "../i18n/i18n-context";
 import { describeFailure } from "../lib/problem-messages";
 import { currentRelativePath, loginPath } from "../router/safe-next";
 import { useSession } from "../session/session-context";
-import { FailureMessage, LoadingView, PageHeading } from "../views/status-views";
+import { FailureMessage, LoadingView, PageHeader } from "../views/status-views";
 import { Shell } from "./shell";
 
 /**
@@ -35,7 +35,7 @@ export function ProtectedLayout() {
     return (
       <Container className="flex flex-col gap-4 py-10">
         <main id="main" className="flex flex-col gap-4">
-          <PageHeading>{t("shell.sessionFailed")}</PageHeading>
+          <PageHeader title={t("shell.sessionFailed")} />
           {failure === null ? null : (
             <FailureMessage t={t} descriptor={describeFailure(failure)} onRetry={session.retry} />
           )}

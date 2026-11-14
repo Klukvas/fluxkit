@@ -1,6 +1,6 @@
 # Admin shell redesign
 
-- Status: PR 1 implemented and verified on branch claude/admin-sidebar-icons-95ad74; PR not opened yet.
+- Status: PR 1 is merged (PR 290); PR 2 implemented on feature/admin-buttons, in review; PR 3 remains a separate session.
 - Owner request: 2026-11-13, make `apps/admin` easier to navigate through three separate PRs.
 - Scope: admin core presentation; permission filtering, routes, session operations and domain behaviour stay intact.
 
@@ -9,7 +9,7 @@
 | PR | Scope | Completion boundary |
 |---|---|---|
 | 1 | Icons, collapsible desktop sidebar, reordered navigation, pinned Help, compact header and account disclosure | Design below; existing Button API; no page action redesign or dashboard counters |
-| 2 | Later, own session | Button and page-header consistency |
+| 2 | implemented on feature/admin-buttons, in review | Button and page-header consistency |
 | 3 | Later, own session | Start page as a workspace |
 
 - **PR 2 — later, own session:** adds Button `ghost`, leading `icon`, `IconButton` and shared `PageHeader`; page headers contain at most one primary action. It reuses PR 1 icons, preserves translated names and permission checks, and owns its separate plan, compatibility review and verification.
@@ -221,3 +221,94 @@ expect(contrastRatio(
 - Separate Codex QA: one major (focus after My account → Stay with unsaved input) and three minors are fixed: clipped navigation focus outlines, an e2e request-count race and a tooltip surface without a visible edge (now `border border-border`). Tooltip lazy-loading (~0.3 KB gzip) is declined: the saving does not justify a lazy boundary in the shared UI library.
 - Screenshots cover uk UI at 1440, 1024, 768 and 390 px, expanded/collapsed (390 px: Menu open/closed), in light and forced `data-theme="dark"`, plus the collapsed tooltip and open account menu. Forced dark is a palette probe; the admin has no dark mode of its own. At a 900 px tall window the expanded sidebar scrolls, with Settings items below the fold; the collapsed form fits.
 - **Not verified:** screen readers, Safari, Firefox, a real client fork and CI.
+
+## PR 2 plan: buttons and page headers
+
+### Scope and component APIs
+
+- Presentation only in `packages/ui` and `apps/admin`; reuse existing buttons, link styles, line icons and `PageHeading`. No API/data, permission, session, pricing or provider logic changes; no new dependency, token or feature flag. PR 3 and dashboard counters stay out of scope.
+- `docs/contracts/README.md` and the contract files do not list Button, IconButton or PageHeading as public contracts; these additive internal APIs require no change under `docs/contracts/`.
+
+| File | API and rendering decision |
+|---|---|
+| `packages/ui/src/button.tsx` | Add `ghost` to `ButtonVariant` and optional `icon: ReactNode` to `ButtonProps`; retain native props/ref, default primary, md and type=button. Ghost variant string is exactly `bg-background text-foreground enabled:hover:bg-muted` (no border). |
+| Same Button | Preserve the existing base, size, focus-ring, variant and caller-class order. Only a supplied, non-null icon adds `gap-2` after the variant string, before caller classes; wrap it in `span` with `aria-hidden="true"` and `className="inline-flex size-5 shrink-0 items-center justify-center"`; icon SVG uses `size-5`. Render label children after it. No icon means identical children and BYTE-IDENTICAL class strings, including whitespace, for all six existing variant/size combinations and defaults. |
+| `packages/ui/src/icon-button.tsx`, `index.ts` | Export IconButton and props: required `label: string`, required `icon: ReactNode`; optional existing ButtonVariant and ButtonSize; native button props/ref except children, aria-label and aria-labelledby. No children or alternate naming override; label supplies aria-label. Default ghost/md; render a native button with the existing Button base/focus classes and shared internal variant lookup; square size classes `size-11` (md) / `size-12` (lg), no padding classes or label gap (avoid conflicting px/py overrides). Callers supply non-empty translated labels. |
+| `apps/admin/src/views/status-views.tsx`, beside PageHeading | Export PageHeader here (PageView also uses it, avoiding a circular import). PageHeader props: `title: string`, optional `description: ReactNode`, optional `actions: ReactNode`. Wrapper `flex flex-wrap items-start justify-between gap-3`; title/description column `min-w-0 grow basis-64 space-y-2 wrap-break-word`; description `max-w-prose text-muted-foreground`; actions `flex flex-wrap items-center gap-2`. Render exactly one existing PageHeading; no duplicate h1, new heading effect or router hook. |
+| `packages/ui/src/icons.tsx` | Reuse PlusIcon for create links; header actions retain visible labels. No header needs a new icon or an icon-only replacement; IconButton is available for future consumers and unit-tested here. |
+
+- Ghost's explicit background avoids an untested transparent inherited surface. `foreground/background` and `foreground/muted` are existing 4.5:1 pairs; inherited focusRing uses `ring/background` and `ring/muted` at 3:1. `packages/theme/src/contrast.spec.ts` scans literal classes (including enabled:hover), checks effective admin light and storefront modes, and runs again with fork overrides. No new pair or guard exemption is needed.
+- Keep button-shaped navigation as Link, with its current router props and name; reuse `primaryLinkClass` and add the same conditional decorative PlusIcon/gap only to admin create links. Do not wrap Link in Button. Back links retain standaloneLinkClass and link semantics; ghost applies to quiet button actions, not navigation rewrites.
+
+### Complete header inventory and action hierarchy
+
+Paths below are relative to `apps/admin/src`; titles name existing message keys (translated at the caller), or existing localized data. P/S/G/D mean primary/secondary/ghost/danger; L means an underlined standalone link. `none` means no header action and zero primary; body filters, forms, dialogs and per-row actions stay in their own sections unless explicitly listed.
+
+| File / screen | Current title | Current actions → planned actions; primary rationale |
+|---|---|---|
+| `areas/banners/banners-frame.tsx`, `banners-page.tsx` | `page.banners.title` | New banner P link → P link + Plus; creation is the list's main action; retain cap/empty/permission conditions. |
+| `areas/banners/banner-editor-pages.tsx` (new/detail/deleted/fallback) | `page.bannerNew.title`; localized banner name, fallback `page.bannerDetail.title` | none; Back to the banners L stays L; zero primary, save/delete remain in form/body. |
+| `areas/catalog-dictionaries/dictionary-frame.tsx`, `categories-page.tsx` (tree) | `page.categories.title` | New category P link → P link + Plus; creation is main. Subcategory links stay in tree. |
+| `areas/catalog-dictionaries/list-screen.tsx`, `{brands,product-types,attributes,options}-page.tsx` (lists) | `page.brands.title`, `page.productTypes.title`, `page.attributes.title`, `page.options.title` | Respective New brand/product type/attribute/option P link → P link + Plus; one creation action per list. |
+| `areas/catalog-dictionaries/{categories,brands,product-types,attributes,options}-page.tsx` (new/detail/deleted/fallback) | `page.{category,brand,productType,attribute,option}New.title`; localized name/code/slug with corresponding `Detail.title` fallback | none; existing BackLink L stays L; zero primary, section saves/move/delete/assignment actions stay outside header. |
+| `areas/privacy/privacy-frame.tsx`, `requests-page.tsx` | `page.privacy.title` | none → none; filters are body actions. |
+| `areas/privacy/lookup-page.tsx` | `page.privacyLookup.title` | none → none; lookup/record controls belong to their form. |
+| `areas/privacy/request-detail-page.tsx` (including invalid id) | `page.privacyRequestDetail.title` | none; Back L stays L; export/preview/erase/reject remain in the guarded request-actions section. |
+| `areas/shipping/shipping-frame.tsx`, `methods-page.tsx` | `page.shipping.title` | New delivery method P link → P link + Plus; creation is main. |
+| `areas/shipping/method-pages.tsx` (new/detail/deleted/fallback) | `page.shippingMethodNew.title`; method localized title, fallback `page.shippingMethodDetail.title` | No action, detail has active/inactive StatusBadge in actions slot → retain badge (not a primary); Back L stays L; form/rates stay separate. |
+| `areas/shipping/provider-pages.tsx` (list/detail/invalid id) | `page.shippingProviders.title`; `ship.provider.title` with code, fallback `page.shippingProviderDetail.title` | none; provider Back L stays L; zero primary, no provider-operation changes. |
+| `areas/search/search-frame.tsx`, `status-page.tsx` | `page.search.title` | Refresh S → S; rebuild stays in body; no promoted primary for a read. |
+| `areas/search/synonyms-page.tsx` | `page.searchSynonyms.title` | none → none; Add group/editor remain in content. |
+| `areas/email/email-frame.tsx`, `status-page.tsx` | `page.email.title` | none → none; refresh/test send stay in content. |
+| `areas/email/messages-page.tsx`, `message-detail-page.tsx` | `page.emailMessages.title`; `page.emailMessageDetail.title` | none; detail Back L stays L; resend/cancel sending stay in content. |
+| `areas/email/templates-page.tsx` (list/preview/invalid key) | `page.emailTemplates.title`; `mail.preview.title` with key, fallback `page.emailTemplatePreview.title` | none; preview Back L stays L; locale controls stay outside header. |
+| `features/blog/blog-list-view.tsx` BlogFrame, `blog-list-page.tsx` | `features.blog.page.list.title` | New post P link → P link + Plus; creation is main. |
+| `features/blog/blog-editor-pages.tsx` (new/detail/deleted/fallback) | `features.blog.page.new.title`; localized post title/slug, fallback `features.blog.page.detail.title` | none; Back to the posts L stays L; save/publish/delete remain form/body actions. |
+| `areas/products/product-list-view.tsx`, `product-list-page.tsx` | `page.products.title` | New product P link → P link + Plus; creation is main. |
+| `areas/products/product-create-page.tsx` | `page.productNew.title` | none → none; creation submit remains in form. |
+| `areas/products/editor-views.tsx` ProductSummaryView/LifecycleActionsView | localized product title/slug | Publish P → P (only primary); unpublish/archive/restore S → S; delete D → S in header (label and destructive confirmation remain). Publish is the only promotion; other states may have zero primary. Move lifecycle group to PageHeader actions, preserve group label, pending/locked state and hint. |
+| `areas/products/product-editor-page.tsx` (fallback/deleted) | `page.productDetail.title` | none → none; body recovery links stay; exactly one heading per branch. |
+| `areas/orders/order-list-view.tsx` | `page.orders.title` | none → none; filters stay outside header. |
+| `areas/orders/order-detail-view.tsx` | `order.detail.title` with number | Back L stays above header; adjacent action section currently Mark paid P, Mark fulfilled P, Cancel D → header Mark paid P when offered, Mark fulfilled S while Mark paid is offered, otherwise P; Cancel S. Payment precedes fulfilment; one or zero primary after permission filtering. Preserve confirmations, busy state and existing action-group id/label in the actions slot; associate the hint with `aria-describedby="order-actions-hint"` and render it directly after PageHeader, above the status line. |
+| `areas/orders/order-detail-page.tsx` (fallback/invalid id) | `page.orderDetail.title` | none → none; recovery actions stay in body. |
+| `areas/customers/customer-list-view.tsx` | `page.customers.title` | none → none; filters stay in body. |
+| `areas/customers/customer-detail-view.tsx`, `customer-detail-page.tsx` fallback | `customer.detail.title` | Back L stays L; no header buttons; lock/unlock/reset actions stay in their explanatory section, zero header primary. |
+| `areas/users/user-list-view.tsx` | `page.users.title` | Create an admin user L → P link + Plus (same name/role/permission); creation becomes the main header action. |
+| `areas/users/user-create-view.tsx` | `page.userNew.title` | Back L stays L; no header buttons; form submit remains separate. |
+| `areas/users/user-detail-view.tsx`, `user-detail-page.tsx` fallback | `user.detail.title` | Back L stays L; no header buttons; role/activation/session operations stay in their explanatory sections. |
+| `areas/home/home-page.tsx` | `page.home.title` | none → none; welcome becomes description, checklist stays, PR 3 adds nothing here. |
+| `areas/account/account-page.tsx` | `page.account.title` | none → none; password form stays separate. |
+| `areas/audit/audit-page.tsx` | `page.auditLog.title` | none → none; filters/paging stay in body. |
+| `areas/payments/attention-page.tsx` | `page.payments.title` | none → none; intro becomes description; results refresh is a body control. |
+| `areas/help/help-index-view.tsx` | `page.help.title` | none → none; intro becomes description; search stays in body. |
+| `areas/help/article-view.tsx`, `help-pages.tsx` missing article | localized article title; `help.article.notFoundTitle` | All articles L stays L with topic metadata above title; summary/body becomes description; no primary. |
+| `areas/auth/login-page.tsx` | `auth.login.heading` | none → none; keep custom centred login layout and PageHeading; sign-in submit remains in Card. |
+| `views/status-views.tsx` PageView (NotFound/NotAllowed/NotBuilt/Error) | `notFound.title`, `notAllowed.title`, supplied titleKey, `error.title` | Go home L stays body L; Reload the page P stays body P; no header actions. Replace PageView's heading with PageHeader only. LoadingView/FailureMessage/ResourceFallback have no page header; unchanged. |
+| `layout/feature-route-view.tsx` failed gate | `error.title` | none → none; Retry S remains in FailureMessage; loading/not-found keep existing delegated views. |
+| `layout/protected-layout.tsx` failed session | `shell.sessionFailed` | none → none; Retry S remains in FailureMessage; loading/redirect/shell branches introduce no heading. |
+
+### Composition, accessibility and tests
+
+- All inventory headers migrate to PageHeader except the custom login composition; outer article, editor-summary, status and protected-session layouts remain custom but delegate their heading to PageHeader. Frames BannersFrame, DictionaryPage, PrivacyFrame, ShippingFrame, SearchFrame, EmailFrame and BlogFrame retain nav/content wrappers and forward title/description/actions, never add a second heading. Move existing intros where suitable, never duplicate them.
+- StatusBadge remains outside h1 (product/order header description or adjacent summary content); title remains a string so badges do not change heading accessible names. Existing Back links stay outside actions when already separate. Preserve status/error regions and their focus refs; do not move pending/locked hints out of association with actions.
+- `.dependency-cruiser.cjs`: `admin-must-not-import-feature-slices` forbids core → slice; `admin-feature-slices-must-not-import-each-other` explicitly allows slice → app. BlogFrame imports PageHeader from `../../views/status-views`; shared code imports no slice. Registry/manifest/contracts stay unchanged.
+- Keep every uk/en message key, interpolation, role permission condition, disabled/aria-busy state and confirmation handler. No new copy is necessary; decorative icons never contribute to names. Ghost Cancel buttons retain their existing translated label; no global replacement of danger or section buttons.
+- UI tests in `button.spec.tsx` (add if absent): exact ghost string; icon before label with hidden wrapper/SVG; conditional gap; six variant/size literal baseline class strings plus defaults/custom class/ref/native props without icon. Baselines come from pre-change output, not the implementation's maps. Include ghost and icons in `no-hardcoded-text.spec.tsx`.
+- Add `icon-button.spec.tsx`: accessible name from label, hidden SVG, default/size/variant, disabled/type/ref forwarding; typecheck fixtures reject missing label, children and competing aria naming props.
+- Add `views/page-header.spec.tsx`: one h1, optional description/actions, empty slot, translated names; existing navigation-focus/focus-guards specs and `keyboard.e2e.ts` verify lazy heading registration and language changes without stealing focus. PageHeading's ref/effect and `router/route-focus.tsx` stay unchanged.
+- Use rendered header scenario tests rather than a regex source guard: actions are opaque ReactNode slots and maps/links defeat source counting. Test all product statuses and order action subsets/permissions, including both mark actions, plus each create header; assert at most one primary-styled control within the header. No source-guards allowlist change is necessary.
+
+### Orchestrator amendments (2026-11-14)
+
+- Destructive header actions keep `danger` (product Delete, order Cancel the order): the rule limits `primary` to one per header, and `danger` is outlined, not an accent. The inventory rows that say D → S read D → D.
+- `ghost` is used where the owner described it: a plain Cancel that closes a form or dialog without choosing anything (`payments/payment-dialogs.tsx`, `products/tabs/variants-tab.tsx` both forms, `catalog-dictionaries/form-dialog.tsx`, `catalog-dictionaries/upload-panel.tsx`, `search/synonym-dialogs.tsx`, `orders/order-dialogs.tsx` refund-style Cancel). The safe choice of a destructive confirmation (`Keep ...`, `data-autofocus`) and Discard stay `secondary`: they are real answers, not tertiary actions. `packages/ui` `ConfirmDialog` is unchanged (out of scope for this PR).
+
+### Locator risks, docs and verification
+
+- Preserve role/name locators: links New product, New category/brand/product type/attribute/option, New banner, New delivery method, New post, Create an admin user; Back to the banners/posts/messages and user/order/customer back links; buttons Publish/Unpublish/Archive/Restore as draft/Delete, Mark paid, Mark fulfilled, Cancel the order, Refresh, Retry, Reload the page. Do not replace them with icon-only controls or change link roles. Preserve the product lifecycle group name and keyboard.e2e.ts ordered Back → Publish → Delete → General traversal; preserve the order-actions id on the labelled button group if moved; form/dialog Cancel and confirmation names stay unchanged.
+- Preserve all heading locators: Products, Customers/Покупці, Orders/Order {number}, dynamic product/dictionary names, Admin users/detail/new, banner/blog titles, Shipping/provider/method titles, Email/Message/Templates/preview, Search/Synonyms, Personal data/Privacy request/Look up by email, Audit log, Start, Help/articles, account, Sign in to the admin/Вхід до адмінки, Not allowed/Page not found/Something went wrong. `keyboard.e2e.ts` also checks focused h1 and tabindex; a visually identical replacement without registration is a regression.
+- Implementation docs: `docs/files/ui.md` (Button, IconButton, tests/exports), `docs/files/admin.md` (PageHeader, migrated frames/tests), `packages/ui/README.md` (additive APIs), `CHANGELOG.md` line “Add consistent admin page headers, quiet buttons and accessible icon buttons.”; `docs/HANDOFF.md` current state/next step and Last updated. This planning task changes only this plan.
+- Verification during implementation (Node 22 / pnpm 10.28): `pnpm lint`, `pnpm typecheck`, `pnpm format:check`, `pnpm check:boundaries`, `pnpm check:env`, `pnpm check:docs`, `pnpm build`, `pnpm --filter @fluxkit/ui test`, `pnpm --filter @fluxkit/admin test`, `pnpm --filter @fluxkit/theme test` (includes fork run), then `pnpm test` with real test services. Preserve bundle caps; measure build-output spec, no cap increase in this plan.
+- Run `pnpm test:e2e` with disposable real services and the documented test database; rerun admin blog scenarios with `ADMIN_E2E_FEATURES=blog`, check feature-off behaviour. Run `bash scripts/visual-compare.sh origin/main`: zero-tolerance storefront output stays unchanged because existing Button classes/markup stay identical without icon; do not update snapshots or relax comparisons.
+- Browser QA: uk/en, 390/768/1440 px, long titles/actions, keyboard Tab/Enter/Escape, route/lazy/error heading focus, permission-limited users, no overflow, unchanged confirmation focus. Record commands/results and distinguish pre-existing Email e2e/macOS API failures from new failures. Screen-reader and non-Chromium checks remain explicit limits if unrun.
+- Instruction review: canonical Projects AGENTS.md, project AGENTS.md/CLAUDE.md and applicable `~/.claude/rules/common/**` are checked; direct documentation path applies. The owner's one-file scope excludes HANDOFF and other implementation-doc updates now; no code, next task, commit, push or external write occurs.

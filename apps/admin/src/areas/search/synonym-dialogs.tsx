@@ -102,7 +102,7 @@ export function SynonymFormDialog({
       description={t("search.synonyms.formDescription")}
       footer={
         <>
-          <Button variant="secondary" disabled={busy} onClick={onClose}>
+          <Button variant="ghost" disabled={busy} onClick={onClose}>
             {t("search.synonyms.cancel")}
           </Button>
           <Button type="submit" form={formId} disabled={busy} aria-busy={busy || undefined}>

@@ -1,3 +1,4 @@
+import { PlusIcon } from "@fluxkit/ui";
 import type { AdminProductSummary } from "@fluxkit/api-client";
 import {
   Button,
@@ -15,7 +16,7 @@ import { Link } from "react-router";
 import { formatDateTime } from "../../lib/format";
 import type { MessageDescriptor } from "../../lib/problem-messages";
 import { PATHS, buildPath } from "../../router/paths";
-import { PageHeading, ResourceFallback } from "../../views/status-views";
+import { PageHeader, ResourceFallback } from "../../views/status-views";
 import { primaryLinkClass } from "../catalog-dictionaries/dictionary-frame";
 import { TextField } from "../catalog-dictionaries/form-parts";
 import { ListPager, type ListState } from "../catalog-dictionaries/list-screen";
@@ -83,7 +84,8 @@ export function ProductListView({
   hrefForOffset,
 }: ProductListViewProps) {
   const createLink = canCreate ? (
-    <Link to={PATHS.productNew} className={primaryLinkClass}>
+    <Link to={PATHS.productNew} className={`${primaryLinkClass} gap-2`}>
+      <PlusIcon className="size-5" />
       {t("products.list.create")}
     </Link>
   ) : null;
@@ -130,10 +132,7 @@ export function ProductListView({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <PageHeading>{t("page.products.title")}</PageHeading>
-        {createLink}
-      </div>
+      <PageHeader title={t("page.products.title")} actions={createLink} />
       <FilterBar label={t("products.list.filtersLabel")} onSubmit={submit}>
         <div className="min-w-64">
           <TextField

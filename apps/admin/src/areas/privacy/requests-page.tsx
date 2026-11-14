@@ -43,8 +43,12 @@ export function PrivacyRequestsPage() {
   const [params, setParams] = useSearchParams();
   const query = readRequestListQuery(params);
   return (
-    <PrivacyFrame t={t} current="privacy" title={t("page.privacy.title")}>
-      <p className="max-w-prose text-muted-foreground">{t("personal.list.intro")}</p>
+    <PrivacyFrame
+      t={t}
+      current="privacy"
+      title={t("page.privacy.title")}
+      description={t("personal.list.intro")}
+    >
       <RequestFilter
         key={writeRequestListQuery(query)}
         t={t}

@@ -1,3 +1,4 @@
+import { PlusIcon } from "@fluxkit/ui";
 import { DataTable, EmptyState, type DataTableColumn, type Translator } from "@fluxkit/ui";
 import { Link } from "react-router";
 import type { Paginated } from "@fluxkit/api-client";
@@ -93,7 +94,8 @@ export function ListScreen<Row>({
   hrefForOffset,
 }: ListScreenProps<Row>) {
   const createLink = canWrite ? (
-    <Link to={createTo} className={primaryLinkClass}>
+    <Link to={createTo} className={`${primaryLinkClass} gap-2`}>
+      <PlusIcon className="size-5" />
       {createLabel}
     </Link>
   ) : null;
@@ -126,7 +128,8 @@ export function ListScreen<Row>({
             description={emptyBody}
             action={
               canWrite ? (
-                <Link to={createTo} className={primaryLinkClass}>
+                <Link to={createTo} className={`${primaryLinkClass} gap-2`}>
+                  <PlusIcon className="size-5" />
                   {createLabel}
                 </Link>
               ) : undefined

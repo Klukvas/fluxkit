@@ -10,7 +10,7 @@ import { createSingleFlight } from "../../lib/single-flight";
 import { useRefreshingResource } from "../../lib/use-refreshing-resource";
 import { canRun } from "../../permissions";
 import { useSession } from "../../session/session-context";
-import { PageHeading, ResourceFallback } from "../../views/status-views";
+import { PageHeader, ResourceFallback } from "../../views/status-views";
 import {
   offeredCustomerActions,
   stateAfterUnknown,
@@ -87,7 +87,7 @@ function CustomerDetail({ customerId }: { customerId: string }) {
   if (resource.fallback !== null || resource.data === null) {
     return (
       <div className="flex flex-col gap-4">
-        <PageHeading>{t("customer.detail.title")}</PageHeading>
+        <PageHeader title={t("customer.detail.title")} />
         {resource.fallback === null ? null : (
           <ResourceFallback t={t} state={resource.fallback} onRetry={resource.reload} />
         )}
