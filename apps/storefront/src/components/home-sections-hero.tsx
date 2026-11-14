@@ -1,4 +1,4 @@
-import { cn, Hero, textStyles, type HeroProps, type Translator, type Locale } from "@fluxkit/ui";
+import { cn, Hero, type HeroProps, type Translator, type Locale } from "@fluxkit/ui";
 import type { HeroDecoration, HeroSection } from "../config/home";
 import Link from "next/link";
 import { localizedHref } from "../lib/locale-path";
@@ -48,7 +48,7 @@ function Sticker({ sectionId, text }: { sectionId: string; text: string }) {
   );
 }
 
-/** Mirrors @fluxkit/ui Hero's structure and typography; selected only when the config opts into decoration. */
+/** Composes UI Hero slots only when the config opts into decoration. */
 function DecoratedHomeHero({
   headingId,
   headingLevel,
@@ -60,51 +60,39 @@ function DecoratedHomeHero({
   decoration,
   sectionId,
   t,
-}: HeroProps & { decoration: HeroDecoration; sectionId: string; t: Translator }) {
-  const Heading = headingLevel;
+}: HeroProps & { title: string; decoration: HeroDecoration; sectionId: string; t: Translator }) {
   const sticker = decoration.sticker ? (
     <Sticker sectionId={sectionId} text={t(decoration.sticker.textKey)} />
   ) : null;
   return (
-    <section
-      aria-labelledby={headingId}
-      data-hero=""
+    <Hero
+      headingId={headingId}
+      headingLevel={headingLevel}
+      title={
+        <Highlight
+          title={title}
+          phrase={decoration.highlightKey === undefined ? undefined : t(decoration.highlightKey)}
+        />
+      }
+      subline={subline}
+      action={action}
+      className={cn("fk-home-hero", className)}
       data-home-decorated=""
       data-home-pop-in={decoration.popIn ? "" : undefined}
-      className={cn(
-        "grid items-center gap-6 rounded-card bg-muted p-6 md:p-10",
-        media ? "md:grid-cols-2" : null,
-        "fk-home-hero",
-        className,
-      )}
-    >
-      <div className="flex flex-col items-start gap-3">
-        <Heading
-          id={headingId}
-          className={cn(textStyles.pageTitle, headingLevel === "h1" ? "md:text-4xl" : null)}
-        >
-          <Highlight
-            title={title}
-            phrase={decoration.highlightKey === undefined ? undefined : t(decoration.highlightKey)}
-          />
-        </Heading>
-        {subline ? (
-          <p className="max-w-prose text-lg whitespace-pre-line text-muted-foreground">{subline}</p>
-        ) : null}
-        {action ? <div className="mt-3">{action}</div> : null}
-      </div>
-      {media ? (
-        <div className="fk-home-hero-media">
-          {decoration.blob ? (
-            <div aria-hidden="true" className="fk-home-blob" data-home-blob="" />
-          ) : null}
-          <div className="fk-home-hero-picture">{media}</div>
-          {sticker}
-        </div>
-      ) : (
-        sticker
-      )}
-    </section>
+      mediaClassName={media ? "fk-home-hero-media" : undefined}
+      media={
+        media ? (
+          <>
+            {decoration.blob ? (
+              <div aria-hidden="true" className="fk-home-blob" data-home-blob="" />
+            ) : null}
+            <div className="fk-home-hero-picture">{media}</div>
+            {sticker}
+          </>
+        ) : undefined
+      }
+      ornament={media ? undefined : sticker}
+    />
   );
 }
 
@@ -119,7 +107,7 @@ export function HeroView({
   isPageHeading: boolean;
 }) {
   const { t, locale } = context;
-  const props: HeroProps = {
+  const props = {
     headingId: `${section.id}-title`,
     headingLevel: isPageHeading ? "h1" : "h2",
     title: t(section.headlineKey),
@@ -141,7 +129,7 @@ export function HeroView({
           className="h-auto w-full rounded-media"
         />
       ),
-  };
+  } satisfies HeroProps;
   return section.decoration === undefined ? (
     <Hero {...props} />
   ) : (
