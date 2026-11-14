@@ -3,7 +3,7 @@
 Read this first (Claude Code, Codex or a human). Rules live in `AGENTS.md`; decisions in `docs/adr/` (0001 to 0047, index in `docs/adr/README.md`); plans in `docs/plans/`.
 The long per-step history that used to live here is archived verbatim in `docs/HISTORY.md` (not current). Update this file in every PR that changes project state; keep it short and keep "Last updated" to one line.
 
-Last updated: 2026-11-14, free-shipping progress in the cart drawer and cart page in review (PR 298, decision 7 of the playful design plan); home hero markup copy removed (PR 297, merged); the documented local checks pass on macOS (PR 296, merged); admin shell redesign PR 2 (buttons and page headers) in review (PR 294); playful default design workstream C (cart drawer and motion kit) merged (PR 292); playful home WS-D (PR 291: hero decoration, section reveals; card prices wrap after "from" at 360 px) merged; admin shell redesign PR 1 (sidebar with icons, PR 290) merged; the visual comparison is deterministic again (PR 293).
+Last updated: 2026-11-14, catalog docs drift from the 2026-10-16 review fixed and ADR 0053 (ADR 0006 as built; review follow-ups PR A, in review); free-shipping progress in the cart drawer and cart page in review (PR 298, decision 7 of the playful design plan); home hero markup copy removed (PR 297, merged); the documented local checks pass on macOS (PR 296, merged); admin shell redesign PR 2 (buttons and page headers) in review (PR 294); playful default design workstream C (cart drawer and motion kit) merged (PR 292); playful home WS-D (PR 291: hero decoration, section reveals; card prices wrap after "from" at 360 px) merged; admin shell redesign PR 1 (sidebar with icons, PR 290) merged; the visual comparison is deterministic again (PR 293).
 
 ## 1. Current state
 
@@ -132,7 +132,7 @@ Agents must not do these (AGENTS.md is the owner's file) or cannot (keys, contra
 
 ## 4. Open decisions and known gaps (short)
 
-- ADR 0006 vs code: default page size (admin 50, store 24, ADR says 24) and the category filter on admin products (direct assignments only); fix the code or supersede the ADR. Sign-off wanted on ADR 0008 (required variant attributes asked only of active variants at publish).
+- Sign-off wanted on ADR 0008 (required variant attributes asked only of active variants at publish). ADR 0006 vs code (page size, admin category filter, option value removal) is recorded by ADR 0053 (2026-11-14).
 - `openapi-typescript` is not used (peer range excludes TypeScript 6.0.3); `@fluxkit/api-client` is hand-written with contract tests. `"sideEffects": false` for `@fluxkit/core` and `@axe-core/playwright` (MPL-2.0) are not approved.
 - The admin product search by slug is a table scan; a `text_pattern_ops` index needs a migration.
 - Nova Post choices where the evidence was silent (ADR 0030, plan step 7b): `ids[]` filter, no `PUDO`, capped list pages, no address delivery. A note superseding ADR 0029 decision 9 in part may be wanted.

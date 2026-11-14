@@ -34,8 +34,8 @@ The API (`apps/api`) reads facts from the database, calls these functions inside
 
 ## Categories
 
-- `src/catalog/category-tree.ts` - `depthOf`, `subtreeHeight`, `wouldCreateCycle`, `validateMove`, `validateNewNode`, `validateTree`: depth 5, no cycles, existence of parent or node. Pure; takes the whole tree as input.
-- `src/catalog/category-assignments.ts` - `normalizeCategoryAssignments` (exactly one primary when a product has categories), `promotePrimaryAfterRemoval`.
+- `src/catalog/category-tree.ts` - `depthOf`, `subtreeHeight`, `wouldCreateCycle`, `validateMove`, `validateNewNode`, `validateTree`: depth 5, no cycles, existence of parent or node. Pure; takes the whole tree as input. The API does not import `validateTree` (it checks single moves and inserts); it is exported and tested in core only (no caller in the apps or seeds, 2026-11-14).
+- `src/catalog/category-assignments.ts` - `normalizeCategoryAssignments` (exactly one primary when a product has categories), `promotePrimaryAfterRemoval`. The API does not import `promotePrimaryAfterRemoval`: `PUT /admin/products/{id}/categories` replaces the whole list and normalizes it (no caller in the apps or seeds, 2026-11-14).
 
 ## Lifecycle, rules and type changes
 
