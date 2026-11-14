@@ -86,4 +86,7 @@ review by a different model than its author.
 - The spring easing overshoots: the drawer panel carries a decorative `::after` buffer past its end edge (spacing token), so the
   overshoot shows panel background, not the backdrop; layout and content width are unchanged.
 - "View cart" is a secondary (outlined) link, Checkout the primary one (`secondaryLinkButton` in `components/styles.ts`).
+- Visual parity with main (CI, Linux Chromium): an idle page runs no animation (hidden loader dots are still), the empty toast
+  stack has no box, and `ActionButton` clips its labels only with `truncateLabels` (cards): any clipping box inside the product
+  page's add button changed the anti-aliasing of the trust bar text after it (bisected with CSS overrides against main's screenshot).
 - Follow-ups: free-shipping progress (API red zone, see above); admin use of the motion kit.

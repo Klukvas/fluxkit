@@ -523,7 +523,7 @@ describe("ProductPurchaseView", () => {
     expect(sold).toContain('aria-describedby="product-availability"');
     // The server HTML disables every buy button until the island hydrated (below); a sellable variant is named "add to cart".
     expect(view()).toMatch(
-      /<button[^>]*type="submit"[^>]*>[\s\S]*?<span aria-hidden="false" data-visible="true"[^>]*><span class="min-w-0 truncate">§product\.addToCart<\/span>[\s\S]*?<\/button>/,
+      /<button[^>]*type="submit"[^>]*>[\s\S]*?<span aria-hidden="false" data-visible="true"[^>]*>§product\.addToCart<\/span>[\s\S]*?<\/button>/,
     );
     expect(view()).not.toContain("§availability.out_of_stock");
   });
@@ -532,7 +532,7 @@ describe("ProductPurchaseView", () => {
   it("renders the buy button disabled and marked not ready in the server HTML, with a no-script line that says why", () => {
     const html = view();
     expect(html).toMatch(
-      /<button[^>]*type="submit"[^>]*disabled=""[^>]*data-ready="false"[^>]*>[\s\S]*?<span aria-hidden="false" data-visible="true"[^>]*><span class="min-w-0 truncate">§product\.addToCart<\/span>[\s\S]*?<\/button>/,
+      /<button[^>]*type="submit"[^>]*disabled=""[^>]*data-ready="false"[^>]*>[\s\S]*?<span aria-hidden="false" data-visible="true"[^>]*>§product\.addToCart<\/span>[\s\S]*?<\/button>/,
     );
     expect(html).toContain(
       '<noscript><p class="text-sm text-muted-foreground">§productReady.noScript</p></noscript>',
@@ -625,7 +625,7 @@ describe("ProductPurchaseView", () => {
     expect(fine).not.toContain("§product.soldOut.hint");
     const out = view({ product: stocked, preferredSelection: { flavor: "mint", pack: "twelve" } });
     expect(out).toMatch(
-      /<button[^>]*type="submit"[^>]*aria-disabled="true"[^>]*>[\s\S]*?<span aria-hidden="false" data-visible="true"[^>]*><span class="min-w-0 truncate">§availability\.out_of_stock<\/span>[\s\S]*?<\/button>/,
+      /<button[^>]*type="submit"[^>]*aria-disabled="true"[^>]*>[\s\S]*?<span aria-hidden="false" data-visible="true"[^>]*>§availability\.out_of_stock<\/span>[\s\S]*?<\/button>/,
     );
     expect(out).toContain("§product.soldOut.hint");
   });

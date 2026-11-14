@@ -12,6 +12,11 @@ export interface ActionButtonProps extends Omit<ButtonProps, "children"> {
   loadingLabel: ReactNode;
   doneLabel: ReactNode;
   accessibleSuffix?: ReactNode;
+  /**
+   * Opt in only where labels can overflow (e.g. a narrow card): a clipping box inside a button
+   * changes Chromium's text painting of following content.
+   */
+  truncateLabels?: boolean;
 }
 
 /** All labels reserve width in the same cell; only the current one contributes to the accessible name. */
@@ -21,10 +26,12 @@ export function ActionButton({
   loadingLabel,
   doneLabel,
   accessibleSuffix,
+  truncateLabels = false,
   className,
   onClick,
   ...props
 }: ActionButtonProps) {
+  const labels = { idle: idleLabel, loading: loadingLabel, done: doneLabel };
   return (
     <Button
       {...props}
@@ -61,13 +68,11 @@ export function ActionButton({
                 <path d="m5 12 4 4L19 6" />
               </svg>
             ) : null}
-            <span className="min-w-0 truncate">
-              {labelState === "idle"
-                ? idleLabel
-                : labelState === "loading"
-                  ? loadingLabel
-                  : doneLabel}
-            </span>
+            {truncateLabels ? (
+              <span className="min-w-0 truncate">{labels[labelState]}</span>
+            ) : (
+              labels[labelState]
+            )}
           </span>
         ))}
       </span>

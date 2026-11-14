@@ -36,6 +36,15 @@ const failure = (messageKey: string): Failure => ({
 });
 
 describe("the card's add-to-cart button", () => {
+  for (const state of ["idle", "pending", "added"] as const) {
+    it(`keeps every action label truncated in the ${state} state on narrow cards`, () => {
+      const { html } = view({ state });
+      expect(html.match(/<span class="min-w-0 truncate">/g)).toHaveLength(4);
+      expect(html).toContain('<span class="min-w-0 truncate">§product.card.adding</span>');
+      expect(html).toContain('<span class="min-w-0 truncate">§product.card.added</span>');
+    });
+  }
+
   it("is a real button above the card's link layer, named with the label and the product title, 44 px high", () => {
     const { html } = view({ state: "idle" });
     expect(html).toMatch(/^<div class="relative z-10 /);

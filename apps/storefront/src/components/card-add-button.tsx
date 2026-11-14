@@ -99,6 +99,7 @@ export function CardAddButtonView({
           loadingLabel={t("product.card.adding")}
           doneLabel={t("product.card.added")}
           accessibleSuffix={title}
+          truncateLabels
           className="min-h-11 w-full text-sm aria-disabled:opacity-50"
           onClick={(event) => onAdd(event.currentTarget)}
         />
