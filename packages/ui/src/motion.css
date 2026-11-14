@@ -1,0 +1,240 @@
+/* Imported explicitly by a host app; every visual timing follows the theme. */
+@layer components {
+  body:has(dialog[data-drawer][open]) {
+    overflow: hidden;
+  }
+  .fk-drawer {
+    position: fixed;
+    inset: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    background: none;
+    overflow: hidden;
+  }
+  .fk-drawer::backdrop {
+    background: none;
+  }
+  .fk-drawer-panel {
+    --fk-drawer-overshoot: calc(var(--fk-space-unit) * 16);
+    transform: translateX(100%);
+    transition: transform var(--fk-motion-duration-slow) var(--fk-motion-ease-spring);
+    padding-top: env(safe-area-inset-top);
+    padding-inline-end: env(safe-area-inset-right);
+  }
+  .fk-drawer-panel::after {
+    content: "";
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: 100%;
+    inline-size: var(--fk-drawer-overshoot);
+    background: inherit;
+  }
+  .fk-drawer[open] .fk-drawer-panel {
+    transform: translateX(0);
+  }
+  .fk-drawer-backdrop {
+    opacity: 0;
+    transition: opacity var(--fk-motion-duration-base) var(--fk-motion-ease-standard);
+  }
+  .fk-drawer[open] .fk-drawer-backdrop {
+    opacity: 1;
+  }
+  .fk-drawer-footer {
+    padding-bottom: max(calc(var(--fk-space-unit) * 4), env(safe-area-inset-bottom));
+  }
+  @starting-style {
+    .fk-drawer[open] .fk-drawer-panel {
+      transform: translateX(100%);
+    }
+    .fk-drawer[open] .fk-drawer-backdrop {
+      opacity: 0;
+    }
+  }
+  .fk-toast-stack {
+    padding-bottom: max(calc(var(--fk-space-unit) * 4), env(safe-area-inset-bottom));
+  }
+  .fk-toast-item {
+    animation: fk-pop var(--fk-motion-duration-base) var(--fk-motion-ease-spring) both;
+  }
+  .fk-action-label {
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(20%);
+    transition:
+      opacity var(--fk-motion-duration-base) var(--fk-motion-ease-standard),
+      transform var(--fk-motion-duration-base) var(--fk-motion-ease-emphasized);
+  }
+  .fk-action-label[data-visible="true"] {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+  }
+  .fk-action-label[data-visible="true"] .fk-action-check {
+    animation: fk-pop var(--fk-motion-duration-base) var(--fk-motion-ease-spring) both;
+  }
+  .fk-number-roll {
+    height: 1lh;
+    line-height: inherit;
+  }
+  .fk-number-frame {
+    --fk-roll-from: 100%;
+    --fk-roll-to: -100%;
+  }
+  .fk-number-frame[data-direction="down"] {
+    --fk-roll-from: -100%;
+    --fk-roll-to: 100%;
+  }
+  .fk-number-frame[data-rolling="true"]::before {
+    content: attr(data-previous);
+    position: absolute;
+    inset: 0;
+    animation: fk-number-out var(--fk-motion-duration-base) var(--fk-motion-ease-emphasized)
+      forwards;
+  }
+  .fk-number-frame[data-rolling="true"] .fk-number-new {
+    animation: fk-number-in var(--fk-motion-duration-base) var(--fk-motion-ease-emphasized) both;
+  }
+  .fk-loader-dot {
+    animation: fk-hop calc(var(--fk-motion-duration-slow) * 3) var(--fk-motion-ease-standard)
+      infinite;
+  }
+  .fk-loader-dot[data-dot="1"] {
+    animation-delay: calc(var(--fk-motion-duration-fast) / 2);
+  }
+  .fk-loader-dot[data-dot="2"] {
+    animation-delay: var(--fk-motion-duration-fast);
+  }
+  .fk-skeleton-shimmer::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      var(--fk-color-muted),
+      var(--fk-color-background),
+      var(--fk-color-muted)
+    );
+    animation: fk-shimmer calc(var(--fk-motion-duration-slow) * 4) var(--fk-motion-ease-standard)
+      infinite;
+  }
+  .fk-badge-bump {
+    animation: fk-bump var(--fk-motion-duration-base) var(--fk-motion-ease-spring);
+  }
+  .fk-badge-bump-alt {
+    animation: fk-bump-alt var(--fk-motion-duration-base) var(--fk-motion-ease-spring);
+  }
+  .fk-cart-line-enter {
+    animation: fk-pop var(--fk-motion-duration-slow) var(--fk-motion-ease-spring) both;
+  }
+  .fk-cart-line-enter:nth-child(1) {
+    animation-delay: calc(var(--fk-motion-duration-fast) / 3 * 0);
+  }
+  .fk-cart-line-enter:nth-child(2) {
+    animation-delay: calc(var(--fk-motion-duration-fast) / 3 * 1);
+  }
+  .fk-cart-line-enter:nth-child(3) {
+    animation-delay: calc(var(--fk-motion-duration-fast) / 3 * 2);
+  }
+  .fk-cart-line-enter:nth-child(4) {
+    animation-delay: calc(var(--fk-motion-duration-fast) / 3 * 3);
+  }
+  .fk-cart-line-enter:nth-child(5) {
+    animation-delay: calc(var(--fk-motion-duration-fast) / 3 * 4);
+  }
+  .fk-cart-line-enter:nth-child(6),
+  .fk-cart-line-enter:nth-child(n + 7) {
+    animation-delay: calc(var(--fk-motion-duration-fast) / 3 * 5);
+  }
+}
+@keyframes fk-pop {
+  from {
+    opacity: 0;
+    transform: translateY(calc(var(--fk-space-unit) * 2)) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes fk-hop {
+  0%,
+  60%,
+  100% {
+    transform: none;
+  }
+  30% {
+    transform: translateY(-50%);
+  }
+}
+@keyframes fk-shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+@keyframes fk-number-in {
+  from {
+    transform: translateY(var(--fk-roll-from));
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+@keyframes fk-number-out {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(var(--fk-roll-to));
+  }
+}
+@keyframes fk-bump {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+}
+@keyframes fk-bump-alt {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+}
+@layer components {
+  @media (prefers-reduced-motion: reduce) {
+    .fk-toast-item,
+    .fk-action-check,
+    .fk-number-frame[data-rolling="true"]::before,
+    .fk-number-new,
+    .fk-loader-dot,
+    .fk-skeleton-shimmer::after,
+    .fk-badge-bump,
+    .fk-badge-bump-alt,
+    .fk-cart-line-enter {
+      animation: none !important;
+    }
+    .fk-toast-life,
+    .fk-number-frame[data-rolling="true"]::before,
+    .fk-skeleton-shimmer::after {
+      display: none;
+    }
+    .fk-action-label,
+    .fk-drawer-panel,
+    .fk-drawer-backdrop {
+      transition: none;
+    }
+  }
+}

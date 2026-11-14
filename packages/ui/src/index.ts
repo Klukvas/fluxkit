@@ -1,4 +1,10 @@
 export { Alert, type AlertProps, type AlertVariant } from "./alert";
+export { ActionButton, type ActionButtonProps } from "./action-button";
+export { Drawer, type DrawerProps } from "./drawer";
+export { Loader, type LoaderProps } from "./loader";
+export { NumberRoll, numberRollDirection, type NumberRollProps } from "./number-roll";
+export { Toast, ToastStack, type ToastProps, type ToastTone } from "./toast";
+export { createToastTimer, appendToast, type ToastTimer } from "./toast-timer";
 export { Badge, type BadgeProps, type BadgeVariant } from "./badge";
 export {
   BannerCard,
