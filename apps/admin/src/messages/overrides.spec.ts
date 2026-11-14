@@ -73,6 +73,18 @@ describe("overrideProblems (checked by the build, `brand-html.ts`, and here)", (
       expect(overrideProblems(allBaseMessages(locale), OVERRIDE_FILES[locale], locale)).toEqual([]);
     }
   });
+
+  it("accepts fork overrides of retained navigation headings even when they are not shown", () => {
+    for (const locale of localeList) {
+      expect(
+        overrideProblems(
+          allBaseMessages(locale),
+          { "nav.group.sales": "Fork sales", "nav.group.catalog": "Fork catalog" },
+          locale,
+        ),
+      ).toEqual([]);
+    }
+  });
 });
 
 describe("the messages the admin renders", () => {
