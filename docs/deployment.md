@@ -281,7 +281,7 @@ The test server's scripts and timers for these points are described in `docs/pla
 - [ ] Search: `infra/meilisearch.env` written (master key generated), the scoped key made, `SEARCH_ENABLED=true`, `GET /store/config` says `search: true`, a product found after the index is built; the engine's port is not published.
 - [ ] `FEATURES_ENABLED` decided; for each enabled feature the `migrate` log shows its migrations, `GET /store/config` lists it in `features` and its pages answer (section "Optional features").
 - [ ] Swagger UI decision (not routed by the example).
-- [ ] Launch blockers in `docs/HANDOFF.md` reviewed (catalog read rate limits, privacy plan before the EU launch).
+- [ ] Launch blockers in `docs/HANDOFF.md` reviewed (privacy plan before the EU launch). The catalog reads of `/store/*` are limited per address (`catalogRead`) only when `TRUST_PROXY` is right (above), the API is reachable only through the edge, and the storefront's `API_INTERNAL_URL` points at the API itself (the Compose value), not at the public edge.
 - [ ] The Docker images' own licences reviewed before images are handed to a client (below).
 
 ## Smoke test

@@ -54,6 +54,10 @@ export const RATE_LIMITS = Object.freeze({
   // so the search window is half the suggest window (at most 1 200 engine requests a minute per address).
   search: { maxAttempts: 60, windowMinutes: 1 },
   searchSuggest: { maxAttempts: 120, windowMinutes: 1 },
+  // Plan docs/plans/2026-11-14-catalog-rate-limits.md: the plain catalog reads (products, one product, categories, config,
+  // banners) share one window per address. A shopper's browser never calls them (pages are rendered by the Next server),
+  // so the window is for scripts that read `/store/*` through the edge; 5 a second leaves room for an honest integration.
+  catalogRead: { maxAttempts: 300, windowMinutes: 1 },
 } satisfies Record<string, WindowLimit>);
 
 export type RateLimitName = keyof typeof RATE_LIMITS;
@@ -62,8 +66,13 @@ export type RateLimitName = keyof typeof RATE_LIMITS;
  * Who a limit counts: the client address (`request.ip`), the signed-in admin user of an `/admin` route, or a key the
  * service chooses (`account`: a requested email, a customer id), counted by the service itself with
  * `RateLimiter.attempt` because the guard cannot know the key before the body is read.
+ *
+ * `proxiedClientAddress` is the client address of a request that came through the trusted proxies. With `TRUST_PROXY`
+ * above 0 the API must be reachable only through them, so a request that carries no forwarded hop comes from inside the
+ * deployment (the storefront's Next server rendering a page, one address for every shopper) and is not counted. With
+ * `TRUST_PROXY=0` it is the same as `clientAddress`.
  */
-export type RateLimitSubject = "clientAddress" | "adminUser" | "account";
+export type RateLimitSubject = "clientAddress" | "proxiedClientAddress" | "adminUser" | "account";
 
 /**
  * The subject of each named limit. It belongs to the limit, not to the route, so a route cannot count an upload by address
@@ -97,6 +106,7 @@ export const RATE_LIMIT_SUBJECTS: Readonly<Record<RateLimitName, RateLimitSubjec
     accountDelete: "account",
     search: "clientAddress",
     searchSuggest: "clientAddress",
+    catalogRead: "proxiedClientAddress",
   },
 );
 
