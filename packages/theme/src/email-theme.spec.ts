@@ -18,9 +18,13 @@ function lightTokens(): Map<string, string> {
  */
 function mailFontStack(stack: string): string {
   return stack
+    .replace(
+      /var\(--font-[a-z0-9-]+(?:,\s*([^()]*))?\)/gi,
+      (_, fallback: string | undefined) => fallback?.trim() ?? "",
+    )
     .split(",")
     .map((family) => family.trim())
-    .filter((family) => family !== "" && !/^var\(--font-[a-z0-9-]+\)$/.test(family))
+    .filter((family) => family !== "")
     .join(", ");
 }
 
@@ -28,6 +32,12 @@ const kebab = (name: string) => name.replace(/[A-Z]/g, (letter) => `-${letter.to
 
 // Tokens mail does not use, each with its reason; every other light token must be in `emailTheme`.
 const notInMail: Record<string, string> = {
+  ...Object.fromEntries(
+    [
+      ...["fast", "base", "slow"].map((step) => `--fk-motion-duration-${step}`),
+      ...["standard", "emphasized", "spring"].map((step) => `--fk-motion-ease-${step}`),
+    ].map((name) => [name, "mail has no transitions or animations"]),
+  ),
   "--fk-color-border-input": "mail has no form controls",
   "--fk-color-ring": "mail has no keyboard focus to show",
   "--fk-color-danger-foreground": "mail has no count badge or other text on a danger fill",
@@ -91,6 +101,10 @@ describe("emailTheme", () => {
     );
     expect(mailFontStack("ui-monospace, monospace")).toBe("ui-monospace, monospace");
     expect(mailFontStack("var(--font-body)")).toBe("");
+    expect(mailFontStack("var(--font-template-sans, ui-sans-serif), system-ui, sans-serif")).toBe(
+      "ui-sans-serif, system-ui, sans-serif",
+    );
+    expect(mailFontStack("var(--font-body, )")).toBe("");
   });
 
   it("uses the effective token radii, resolved from rem to px (16px per rem)", () => {

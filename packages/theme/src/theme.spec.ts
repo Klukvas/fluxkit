@@ -5,6 +5,7 @@ import { themeModes } from "./index.js";
 import { adminTokens, storefrontTokens } from "./theme-run.testing.js";
 import {
   darkSchemeMedia,
+  reducedMotionMedia,
   effectiveTokens,
   parseTokenBlocks,
   themeSelectors,
@@ -27,7 +28,13 @@ function definedTokens(block: TokenBlock): string[] {
 
 /** Colours and shadows differ between the themes; every other token (fonts, radii, type scale, spacing) is the same in both. */
 const themedToken = /^--fk-(color|shadow)-/;
-const nonColourPrefixes = ["--fk-font-", "--fk-radius-", "--fk-space-", "--fk-line-height-"];
+const nonColourPrefixes = [
+  "--fk-font-",
+  "--fk-radius-",
+  "--fk-space-",
+  "--fk-line-height-",
+  "--fk-motion-",
+];
 
 describe("design tokens", () => {
   it("defines every non-colour token once, in the light block only (dark and system inherit it from :root)", () => {
@@ -39,7 +46,9 @@ describe("design tokens", () => {
         `${name} is neither a colour, a shadow nor a known non-colour token`,
       ).toBe(true);
     }
-    for (const block of blocks.filter((candidate) => candidate !== lightBlock)) {
+    for (const block of blocks.filter(
+      (candidate) => candidate !== lightBlock && candidate.media !== reducedMotionMedia,
+    )) {
       const repeated = definedTokens(block).filter((name) => !themedToken.test(name));
       expect(repeated, `${block.selector} repeats non-colour tokens of the light block`).toEqual(
         [],
@@ -77,12 +86,12 @@ describe("design tokens", () => {
     }
   });
 
-  it("defaults the display (heading) font to the body font, so adding it changed no pixel", () => {
+  it("defaults the display (heading) font to the body font", () => {
     // The template's value. A fork that gives headings their own face changes `--fk-font-display` and passes; one that changes
     // only the body face is told to decide the headings too (they would silently stay in the old system stack).
     // This literal must equal the template's `--fk-font-sans` (and `--fk-font-display`) in tokens.css: change all three together.
     // Read on the storefront's EFFECTIVE light values: a fork sets fonts in its overrides file, not in tokens.css.
-    const templateDisplay = "ui-sans-serif, system-ui, sans-serif";
+    const templateDisplay = "var(--font-template-sans, ui-sans-serif), system-ui, sans-serif";
     const display = storefrontTokens.light.get("--fk-font-display");
     const sans = storefrontTokens.light.get("--fk-font-sans");
     expect(sans).toBeDefined();
@@ -112,16 +121,19 @@ describe("design tokens", () => {
 describe("theme modes (design batch B)", () => {
   const systemBlock = tokenBlock(blocks, themeSelectors.system, darkSchemeMedia);
 
-  it("has exactly the light, dark and system blocks (nothing else can restyle a page)", () => {
+  it("has exactly three theme blocks and the reduced-motion accessibility block", () => {
     expect(blocks.map((block) => [block.selector, block.media])).toEqual([
       [themeSelectors.light, null],
       [themeSelectors.dark, null],
       [themeSelectors.system, darkSchemeMedia],
+      ["html:root", reducedMotionMedia],
     ]);
   });
 
   it('follows the OS dark setting only on a page that opted in with data-theme="system" (the admin keeps light)', () => {
-    for (const block of blocks.filter((candidate) => candidate.media !== null)) {
+    for (const block of blocks.filter(
+      (candidate) => candidate.media !== null && candidate.media !== reducedMotionMedia,
+    )) {
       expect(block.selector).toBe(themeSelectors.system);
       expect(block.media).toBe(darkSchemeMedia);
     }
@@ -240,12 +252,18 @@ describe("effective values (the cascade of tokens.css and an overrides file)", (
 
 /**
  * The admin's font tokens that name a web font variable of the storefront (`var(--font-...)` from `next/font` in
- * `apps/storefront/src/config/fonts.ts`): the admin has no such variable, so the whole `font-family` declaration is invalid
+ * `config/fonts.ts` or `lib/template-fonts.ts`): without an internal fallback the whole `font-family` declaration is invalid
  * there and the browser falls back to its default serif face (Times New Roman), not to the stack after the `var()`.
  */
 export function adminWebFontProblems(tokens: Map<string, string>): string[] {
   return [...tokens]
-    .filter(([name, value]) => name.startsWith("--fk-font-") && /var\(--font-/.test(value))
+    .filter(
+      ([name, value]) =>
+        name.startsWith("--fk-font-") &&
+        [...value.matchAll(/var\(--font-[a-z0-9-]+(?:,([^()]*))?\)/gi)].some(
+          (match) => !match[1]?.trim(),
+        ),
+    )
     .map(
       ([name, value]) =>
         `${name} reaches the admin as "${value}", but the admin has no var(--font-*) (the storefront's next/font): ` +
@@ -254,8 +272,21 @@ export function adminWebFontProblems(tokens: Map<string, string>): string[] {
 }
 
 describe("admin font tokens (the admin follows the shop's overrides, ADR 0047)", () => {
-  it("name no storefront web font variable", () => {
+  it("names no storefront web font variable without an internal fallback", () => {
     expect(adminWebFontProblems(adminTokens)).toEqual([]);
+  });
+
+  it("accepts a non-empty var fallback, but rejects an absent or empty one", () => {
+    expect(
+      adminWebFontProblems(
+        new Map([
+          ["--fk-font-sans", "var(--font-template-sans, ui-sans-serif), system-ui, sans-serif"],
+        ]),
+      ),
+    ).toEqual([]);
+    for (const value of ["var(--font-body)", "var(--font-body,)", "var(--font-body,   )"]) {
+      expect(adminWebFontProblems(new Map([["--fk-font-sans", value]]))).toHaveLength(1);
+    }
   });
 
   it("finds a storefront web font variable and names the file to fix (the check itself)", () => {
@@ -271,5 +302,41 @@ describe("admin font tokens (the admin follows the shop's overrides, ADR 0047)",
     expect(problems[0]).toMatch(
       /restate --fk-font-display in packages\/theme\/src\/admin-overrides.css/,
     );
+  });
+});
+
+describe("motion contract", () => {
+  it("defines exactly six motion tokens in light and maps them to Tailwind", () => {
+    const durations = ["fast", "base", "slow"];
+    const easings = ["standard", "emphasized", "spring"];
+    expect(definedTokens(lightBlock).filter((name) => name.startsWith("--fk-motion-"))).toEqual(
+      [
+        ...durations.map((step) => `--fk-motion-duration-${step}`),
+        ...easings.map((step) => `--fk-motion-ease-${step}`),
+      ].sort(),
+    );
+    for (const step of easings) {
+      expect(tailwindCss).toContain(`--ease-${step}: var(--fk-motion-ease-${step});`);
+    }
+    for (const step of durations) {
+      expect(tailwindCss).toContain(
+        `@utility duration-${step} {\n  --tw-duration: var(--fk-motion-duration-${step});\n  transition-duration: var(--fk-motion-duration-${step});\n}`,
+      );
+    }
+    expect(tailwindCss).toContain("--default-transition-duration: var(--fk-motion-duration-fast);");
+    expect(tailwindCss).toContain(
+      "--default-transition-timing-function: var(--fk-motion-ease-standard);",
+    );
+  });
+
+  it("zeroes exactly the three durations with specificity higher than fork overrides", () => {
+    const reduced = tokenBlock(blocks, "html:root", reducedMotionMedia);
+    expect([...reduced.properties]).toEqual([]);
+    expect([...reduced.tokens]).toEqual(
+      ["fast", "base", "slow"].map((step) => [`--fk-motion-duration-${step}`, "0ms"]),
+    );
+    expect(
+      effectiveTokens(blocks, { theme: "light", osDark: false }).get("--fk-motion-duration-fast"),
+    ).toBe("150ms");
   });
 });

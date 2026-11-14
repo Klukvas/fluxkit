@@ -11,28 +11,46 @@ Source of truth: `packages/theme/src/tokens.css` (the template's values). A clie
 |---|---|---|
 | `--fk-color-background` / `-foreground` | `bg-background` / `text-foreground` | page background and text |
 | `--fk-color-muted` / `-muted-foreground` | `bg-muted` / `text-muted-foreground` | secondary surfaces and text |
-| `--fk-color-border` | `border-border` | decorative borders and dividers (cards, badges, buttons); about 1.2:1, NOT for the line that identifies a control |
+| `--fk-color-border` | `border-border` | decorative borders and dividers (cards, badges, buttons); NOT for the line that identifies a control |
 | `--fk-color-border-input` | `border-border-input` | the border of inputs, textareas, selects and checkboxes (WCAG 1.4.11, at least 3:1; added after the storefront step 10 review) |
 | `--fk-color-primary` / `-primary-foreground` | `bg-primary` / `text-primary-foreground` | primary actions |
-| `--fk-color-accent` / `-accent-foreground` | `bg-accent`, `border-accent` / `text-accent-foreground` | a second brand colour: the `accent` tone of a home banner card (`BannerCard`), otherwise **reserved for client code**. Defaults equal the primary pair (6-digit hex copies, not `var()`), so nothing moved. Added 2026-11-08 |
+| `--fk-color-accent` / `-accent-foreground` | `bg-accent`, `border-accent` / `text-accent-foreground` | a second brand colour: the `accent` tone of a home banner card (`BannerCard`), otherwise **reserved for client code**. Light: ochre `#b17b15` (the concept's butter darkened for contrast), dark: butter `#ffd166`, both with ink text ("Playful defaults" below). Added 2026-11-08 |
 | `--fk-color-danger` | `text-danger`, `bg-danger`, `border-danger` | destructive and error states |
 | `--fk-color-danger-foreground` | `text-danger-foreground` | text on a `danger` fill, such as the header's cart count badge (added 2026-11-02) |
 | `--fk-color-success` | `text-success`, `border-success` | success and availability (added in storefront plan step 4a) |
 | `--fk-color-warning` | `text-warning`, `border-warning` | notices such as changed prices (added in step 4a) |
 | `--fk-color-ring` | `outline-ring`, `ring-ring` | visible keyboard focus (added in step 4a) |
 | `--fk-radius-sm` / `-md` / `-lg` | `rounded-sm` / `rounded-md` / `rounded-lg` | the radius size steps. Kept for forks' own components (additive); the template's code uses the role radii below and these steps only through the guard's exception list |
-| `--fk-radius-control` | `rounded-control` | buttons, fields, selects, chips, pagination, menu entries and header links, focus targets (a focused section's outline), and popups anchored to a field (menus, suggestion and combobox lists, the search hint). Default `0.5rem`. Added 2026-11-09 |
-| `--fk-radius-card` | `rounded-card` | product, banner and order cards (and their skeletons), `Card`, the hero, the admin banner preview frame, the admin search `LocaleCard`. Default `1rem`. Added 2026-11-09 |
-| `--fk-radius-panel` | `rounded-panel` | inline panels inside a page: notices, empty-result boxes, `Alert`, the `TrustBar` list container (the `<ul>` frame, not its items), the `DataTable` scroll hint, admin sections, fieldsets, list rows and the mail preview frame. Default `0.5rem`. Added 2026-11-09 (owner decision on the review of PR 246) |
-| `--fk-radius-overlay` | `rounded-overlay` | free-floating surfaces over the page: `Dialog`, the add-to-cart toast. Default `1rem`. Added 2026-11-09 |
-| `--fk-radius-media` | `rounded-media` | product and banner pictures, gallery thumbnails, `ProductImage`, `StoreImage`, `Skeleton` (it stands in for loading content). Default `0.5rem`. Added 2026-11-09 |
+| `--fk-radius-control` | `rounded-control` | buttons, fields, selects, chips, pagination, menu entries and header links, focus targets (a focused section's outline), and popups anchored to a field (menus, suggestion and combobox lists, the search hint). Default `1.5rem`. Added 2026-11-09 |
+| `--fk-radius-card` | `rounded-card` | product, banner and order cards (and their skeletons), `Card`, the hero, the admin banner preview frame, the admin search `LocaleCard`. Default `1.5rem`. Added 2026-11-09 |
+| `--fk-radius-panel` | `rounded-panel` | inline panels inside a page: notices, empty-result boxes, `Alert`, the `TrustBar` list container (the `<ul>` frame, not its items), the `DataTable` scroll hint, admin sections, fieldsets, list rows and the mail preview frame. Default `1rem`. Added 2026-11-09 (owner decision on the review of PR 246) |
+| `--fk-radius-overlay` | `rounded-overlay` | free-floating surfaces over the page: `Dialog`, the add-to-cart toast. Default `1.5rem`. Added 2026-11-09 |
+| `--fk-radius-media` | `rounded-media` | product and banner pictures, gallery thumbnails, `ProductImage`, `StoreImage`, `Skeleton` (it stands in for loading content). Default `1rem`. Added 2026-11-09 |
 | `--fk-font-sans` / `-mono` | `font-sans` / `font-mono` | font stacks |
-| `--fk-font-display` | `font-display` | the heading face of the `pageTitle` and `sectionTitle` roles and the text logo (`.fk-logo`); default = the `--fk-font-sans` stack, so nothing moved (a test asserts the equality). May be `var(--font-...)` from `apps/storefront/src/config/fonts.ts` (section "Fonts"). Added 2026-11-08 |
+| `--fk-font-display` | `font-display` | the heading face of the `pageTitle` and `sectionTitle` roles and the text logo (`.fk-logo`); default = the `--fk-font-sans` stack (a test asserts the equality). May be `var(--font-...)` from `apps/storefront/src/config/fonts.ts` (section "Fonts"). Added 2026-11-08 |
 | `--fk-shadow-card` | `shadow-card` | card elevation (resting) |
 | `--fk-shadow-raised` | `shadow-raised` | a raised surface: the hovered product card (added 2026-11-03, design batch A) |
 | `--fk-shadow-overlay` | `shadow-overlay` | surfaces over the page: menus, toasts, bars (added 2026-11-03) |
 | `--fk-font-size-{xs,sm,base,lg,xl,2xl,3xl,4xl}` / `--fk-line-height-{same steps}` | `text-xs` ... `text-4xl` (size and line height) | the type scale (added 2026-11-03; values = Tailwind's defaults, so nothing moved) |
 | `--fk-space-unit` | every spacing utility (`p-4` = 4 units, `gap-2`, `m-6`, `size-11`, ...) | the spacing unit, 0.25rem (added 2026-11-03) |
+
+## Playful defaults (2026-11-14)
+
+- Light accent: ochre `#b17b15` with ink text, the concept's butter `#ffd166` darkened until the three accent pairs pass on cream (butter itself is 1.32:1 there, below the 3:1 of `accent`/`background`); the dark theme uses butter as is. No contrast guard is relaxed and no colour token is added. A pure butter fill in light mode needs a new colour token or a changed accent pair: an owner decision.
+
+| Colour role | Light | Dark (also system on a dark device) |
+|---|---|---|
+| background / foreground | `#fff3e3` / `#2b1a12` | `#1f130d` / `#fff3e3` |
+| muted / muted-foreground | `#fae9d3` / `#75543e` | `#352217` / `#d2b397` |
+| border / border-input | `#d9b997` / `#957052` | `#65432e` / `#b58b68` |
+| primary / primary-foreground | `#db3b18` / `#ffffff` | `#ff7959` / `#2b1a12` |
+| accent / accent-foreground | `#b17b15` / `#2b1a12` | `#ffd166` / `#2b1a12` |
+| danger / danger-foreground | `#b83224` / `#ffffff` | `#ff9380` / `#2b1a12` |
+| success / warning | `#326b44` / `#925d0d` | `#9be3c0` / `#ffd166` |
+| ring | `#db3b18` | `#ff7959` |
+
+- Radius roles: control/card/overlay `1.5rem`, panel/media `1rem`; scale sm/md/lg `0.375rem` / `0.75rem` / `1.5rem`. Small marks retain the sm step. Type scale and spacing unit stay unchanged.
+- Shadows: card `3px 3px 0 0`, raised `5px 5px 0 0`, overlay `6px 6px 0 0`, all in ink `#2b1a12` (light) or near-black brown `#090503` (dark); no blur.
 
 Design kit rules (review D-19, plan `docs/plans/2026-11-03-storefront-design-a.md`; enforced by `packages/theme/src/design-guard.spec.ts`): font sizes only
 `text-xs` to `text-4xl`, radii only the roles `rounded-control|card|panel|overlay|media` (plus the shape `rounded-full` and `rounded-none`; the steps
@@ -52,7 +70,7 @@ so a dark theme only sets values. Controls have no colour transition: it would a
 - Mail keeps the size steps (`emailTheme.radius`, no role: the `EmailTheme` contract is unchanged; known limit: mail buttons do not follow
   `--fk-radius-control`).
 - **Known limit, exception list (6 uses in 6 files, `radiusExceptions` in `packages/theme/src/design-guard.spec.ts`, each with its exact
-  count and reason):** the 0.25rem parts have no role (owner decision 2026-11-09) and keep `rounded-sm`: `Checkbox`, `Badge`, the discount
+  count and reason):** the small marks (now 0.375rem) have no role (owner decision 2026-11-09) and keep `rounded-sm`: `Checkbox`, `Badge`, the discount
   badge of `PriceText`, the product card's brand link focus shape, the language flags `.fk-flag`, the admin order line thumbnail. A fork
   restyles them with `--fk-radius-sm`.
 - The guard also refuses the Tailwind v4 forms `rounded-(--var)` and `rounded-(length:--var)`, arbitrary `rounded-[...]`, and a step with the
@@ -112,6 +130,10 @@ a token in the light block of `tokens.css` (since 2026-11-08 non-colour tokens l
 
 ## Fonts (2026-11-08, plan `docs/plans/2026-11-08-design-changeability.md` T1b)
 
+- Template font (2026-11-14, plan `docs/plans/2026-11-14-playful-default-design.md`): template-owned `apps/storefront/src/lib/template-fonts.ts` loads Rubik (variable weight 300–900, SIL OFL 1.1; Cyrillic with Ґ Є І Ї, U+2019 and ₴) from `lib/fonts/`, as `--font-template-sans`. The root layout attaches template variables first, then the fork's `config/fonts.ts` variables. Both font modules are read as text in unit tests (Vitest has no Next font transform).
+- Default body and display stack: `var(--font-template-sans, ui-sans-serif), system-ui, sans-serif`. The fallback INSIDE `var()` keeps the declaration valid in the admin, where Next's variable does not exist; a bare undefined variable invalidates the whole declaration.
+- Fork replacement: its own `--fk-font-sans` and `--fk-font-display` in the light rule of `brand-overrides.css` win (same specificity, later file). It may drop the template face by naming no `--font-template-sans`; the font is then never downloaded because `preload: false`. Mail retains the internal fallback, while dropping a bare `var(--font-*)`.
+
 - A font token may name a web font variable before its fallback stack: `--fk-font-display: var(--font-display-face), ui-sans-serif,
   system-ui, sans-serif;`. The variable comes from `next/font/local` in the storefront's fork-owned `apps/storefront/src/config/fonts.ts`
   (empty upstream; the root layout puts each font's `variable` class on `<html>`). `contrast.spec` reads colours only and the block parser
@@ -124,7 +146,7 @@ a token in the light block of `tokens.css` (since 2026-11-08 non-colour tokens l
   `@font-face` (the admin has no `next/font`), declared in the fork-owned `packages/theme/src/admin-overrides.css` (see "Admin" below).
   Same rules as below.
 
-- **Self-hosted woff2 only.** The CSP has no `font-src`, so `default-src 'self'` applies: same origin only (`next.config.ts`,
+- **Self-hosted font files only** (woff2 for a fork's faces; the template's Rubik is Google's TTF unchanged, because a WOFF2 conversion is a Modified Version under the OFL and the owner approved unmodified files only, see `lib/fonts/README.md`). The CSP has no `font-src`, so `default-src 'self'` applies: same origin only (`next.config.ts`,
   `buildContentSecurityPolicy`). Google Fonts and other font CDNs are blocked on purpose (no third-party request, AGENTS.md 3); `next/font/google`
   is refused by `config/fonts.spec.ts`. Check the font's licence allows self-hosting on the web.
 - `display: "swap"` with fallback metrics (`adjustFontFallback`, which writes a `size-adjust` fallback face), so text shows at once and
@@ -144,7 +166,7 @@ a token in the light block of `tokens.css` (since 2026-11-08 non-colour tokens l
   rebrand in `brand-overrides.css` reaches the admin through its light rule; its dark and system rules never match the admin's page (the
   built-CSS check allows the system media rule because it only matches `[data-theme=system]`). Effective admin values = `tokens.css` light
   block, then the light rule of `brand-overrides.css`, then `admin-overrides.css`.
-- **Web fonts and the admin.** A `var(--font-...)` in a font token of `brand-overrides.css` comes from `next/font` in the storefront and
+- **Web fonts and the admin.** A bare `var(--font-...)` without an internal fallback in a font token of `brand-overrides.css` comes from `next/font` in the storefront and
   does not exist in the admin: there the whole `font-family` is invalid and the browser shows its default serif (Times New Roman), not the
   stack after the `var()`. `theme.spec.ts` fails in that case and names the token: restate that `--fk-font-*` in `admin-overrides.css`
   without the variable (the fallback stack, or a self-hosted `@font-face` there).
@@ -222,7 +244,7 @@ there (see "Admin").
 
 ## Themes and modes (design batch B, 2026-11-03)
 
-`data-theme` on `<html>` selects the theme; `tokens.css` has exactly three blocks (a test refuses any other rule):
+`data-theme` on `<html>` selects the theme; `tokens.css` has three theme blocks plus the checked reduced-motion block (a test refuses any other rule):
 
 | `data-theme` | Block | `color-scheme` | Who sets it |
 |---|---|---|---|
@@ -230,7 +252,7 @@ there (see "Admin").
 | `dark` | `[data-theme="dark"]` (colours and shadows only, the same names as light's; everything else is inherited from `:root`) | `dark` | the storefront |
 | `system` | light, plus `@media (prefers-color-scheme: dark) { [data-theme="system"] { ... } }` on a dark device | `dark` there | the storefront (default) |
 
-- Fonts, radii, the type scale and the spacing unit are defined once, in the light block (single definition since 2026-11-08, plan
+- Fonts, radii, motion, the type scale and the spacing unit are defined once, in the light block (single definition since 2026-11-08, plan
   `docs/plans/2026-11-08-design-changeability.md` T4): the dark block holds only `--fk-color-*` and `--fk-shadow-*`, exactly the names of
   light's colours and shadows. The `system` block is a byte-for-byte copy of the dark block. `packages/theme/src/theme.spec.ts` enforces all
   three rules and that every `var(--fk-*)` in `tailwind.css` is defined in the light block. It is **opt-in**: no rule under the media query matches `:root`, so a page without
@@ -307,12 +329,31 @@ Mail clients do not support CSS variables, so mail templates (`EmailTemplate`, `
 | Member | Source | Value today |
 |---|---|---|
 | `color.background`, `foreground`, `muted`, `mutedForeground`, `border`, `primary`, `primaryForeground`, `danger`, `success`, `warning` | the light value of `--fk-color-<kebab name>` | 6-digit hex |
-| `font.sans`, `font.mono` | `--fk-font-sans`, `--fk-font-mono` with every `var(--font-*)` entry (a fork's web font) stripped | the token stacks |
-| `radius.sm`, `md`, `lg` | `--fk-radius-*`, rem to px (16px per rem) | `4px`, `8px`, `16px` |
+| `font.sans`, `font.mono` | `--fk-font-sans`, `--fk-font-mono` with bare `var(--font-*)` entries stripped and internal `var()` fallbacks retained | the token stacks |
+| `radius.sm`, `md`, `lg` | `--fk-radius-*`, rem to px (16px per rem) | `6px`, `12px`, `24px` |
 | `space.xs` to `space.xl` | mail only | `4px`, `8px`, `16px`, `24px`, `32px` |
 | `fontSize.small`, `body`, `heading` | mail only | `13px`, `15px`, `20px` |
 | `lineHeight` | mail only | `1.5` |
 | `contentWidth` | mail only (pixels, the content table's `width`) | `600` |
 
-Not used in mail: `--fk-color-border-input` (no form controls), `--fk-color-danger-foreground` (no text on a danger fill), `--fk-color-accent` and `-accent-foreground` (no banner or other accent surface in mail; 2026-11-08), `--fk-font-display` (mail headings use `font.sans`; a fork's display face is a web font mail cannot load; 2026-11-08), `--fk-color-ring` (no keyboard focus), `--fk-shadow-card`, `--fk-shadow-raised`, `--fk-shadow-overlay` (box-shadow is poorly supported), `--fk-font-size-*`, `--fk-line-height-*` and `--fk-space-unit` (mail keeps its own px groups `fontSize`, `lineHeight`, `space`). Dark mode is not attempted in mail.
-`packages/theme/src/email-theme.spec.ts` fails when a color, font or radius differs from its light token (fonts are compared after stripping `var(--font-*)` entries, since mail cannot load a web font) or when a light token is neither in `emailTheme` nor in that list. Rebranding mail = changing `tokens.css` and the matching `emailTheme` values (the guard names each one), never a template.
+Not used in mail: `--fk-motion-*` (mail has no transitions or animations), `--fk-color-border-input` (no form controls), `--fk-color-danger-foreground` (no text on a danger fill), `--fk-color-accent` and `-accent-foreground` (no banner or other accent surface in mail; 2026-11-08), `--fk-font-display` (mail headings use `font.sans`; a fork's display face is a web font mail cannot load; 2026-11-08), `--fk-color-ring` (no keyboard focus), `--fk-shadow-card`, `--fk-shadow-raised`, `--fk-shadow-overlay` (box-shadow is poorly supported), `--fk-font-size-*`, `--fk-line-height-*` and `--fk-space-unit` (mail keeps its own px groups `fontSize`, `lineHeight`, `space`). Dark mode is not attempted in mail.
+`packages/theme/src/email-theme.spec.ts` fails when a color, font or radius differs from its light token (fonts retain internal `var()` fallbacks and drop bare `var(--font-*)` entries, since mail cannot load a web font) or when a light token is neither in `emailTheme` nor in that list. Rebranding mail = changing `tokens.css` and the matching `emailTheme` values (the guard names each one), never a template.
+
+## Motion (2026-11-14)
+
+Additive contract (minor); no existing token is renamed or removed.
+
+| Token | Default | Purpose / Tailwind utility |
+|---|---|---|
+| `--fk-motion-duration-fast` | `150ms` | hover/press feedback; `duration-fast` |
+| `--fk-motion-duration-base` | `250ms` | toasts, popovers, number roll; `duration-base` |
+| `--fk-motion-duration-slow` | `400ms` | drawers, page reveals; `duration-slow` |
+| `--fk-motion-ease-standard` | `cubic-bezier(0.4, 0, 0.2, 1)` | existing Tailwind timing; `ease-standard` |
+| `--fk-motion-ease-emphasized` | `cubic-bezier(0.2, 0, 0, 1)` | settling reveals; `ease-emphasized` |
+| `--fk-motion-ease-spring` | `cubic-bezier(0.34, 1.56, 0.64, 1)` | pop-in and drawer overshoot; `ease-spring` |
+
+- Define/retune motion tokens only in the light rule of `brand-overrides.css`; dark and system inherit them.
+- Plain `transition*` utilities use the fast duration and standard easing through `--default-transition-duration` and `--default-transition-timing-function`. Duration utilities set both `--tw-duration` and `transition-duration`, like Tailwind's own duration utility.
+- `@media (prefers-reduced-motion: reduce) { html:root { ... } }` zeroes exactly the three durations (`0ms`), leaves easings intact, and beats fork override selectors by specificity (0,1,1 over 0,1,0), whatever their import order.
+- Code waiting for `transitionend` / `animationend` must not rely on the event under reduced motion: a 0ms transition fires no event. Motion must not block input.
+- Guards refuse numeric `duration-<n>`, arbitrary duration/ease/delay classes and built-in ease-in/out/in-out/linear classes. Raw milliseconds in storefront `globals.css` belong to the separate motion workstream.

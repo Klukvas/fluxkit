@@ -100,6 +100,8 @@ export const themeSelectors = {
   system: '[data-theme="system"]',
 } as const;
 
+export const reducedMotionMedia = "(prefers-reduced-motion: reduce)";
+
 export const darkSchemeMedia = "(prefers-color-scheme: dark)";
 
 /** What a page's `<html>` and device say: the `data-theme` value (`null`: no attribute) and whether the OS asks for dark. */
@@ -136,6 +138,8 @@ export function effectiveTokens(
 ): Map<string, string> {
   const tokens = new Map<string, string>();
   for (const block of blocks) {
+    // Normal-motion evaluation only. theme.spec.ts checks this exact accessibility block separately.
+    if (block.media === reducedMotionMedia && block.selector === "html:root") continue;
     // Every selector and the media are read even when an earlier one decides: an unknown shape always throws.
     const selectors = block.selector.split(",").map((part) => selectorMatches(part.trim(), state));
     if (!mediaMatches(block.media, state) || !selectors.includes(true)) continue;

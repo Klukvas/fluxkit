@@ -98,7 +98,8 @@ function topLevelParts(value: string): string[] {
 const length = /^(0|-?[0-9]*\.?[0-9]+(rem|px|em))$/;
 const shadowPart =
   /^(inset\s+)?(-?[0-9]*\.?[0-9]+(px|rem)?\s+){2,4}(rgba?\([^()]*\)|#[0-9a-f]{3,8})$/i;
-const fontFamily = /^(var\(--font-[a-z0-9-]+\)|"[^"]+"|'[^']+'|[a-z][\w-]*( [a-z][\w-]*)*)$/i;
+const fontFamily =
+  /^(var\(--font-[a-z0-9-]+(?:,\s*(?:"[^"()]+"|'[^'()]+'|[a-z][\w-]*(?: [a-z][\w-]*)*)\s*)?\)|"[^"]+"|'[^']+'|[a-z][\w-]*( [a-z][\w-]*)*)$/i;
 
 /**
  * What is wrong with one token value, for the overrides files and `tokens.css` alike: no empty value, no `!important` (any
@@ -118,6 +119,22 @@ export function valueProblems(name: string, value: string): string[] {
     if (!topLevelParts(value).every((part) => shadowPart.test(part))) {
       return [
         `${name}: "${value}" is not a box shadow (x y [blur [spread]] colour, comma-separated) or none`,
+      ];
+    }
+  }
+  if (name.startsWith("--fk-motion-duration-") && !/^(?:0|[0-9]*\.?[0-9]+(?:ms|s))$/.test(value)) {
+    return [`${name}: "${value}" is not a non-negative duration (0, ms or s)`];
+  }
+  if (name.startsWith("--fk-motion-ease-")) {
+    const number = "(-?(?:[0-9]*\\.)?[0-9]+)";
+    const bezier = new RegExp(
+      `^cubic-bezier\\(\\s*${number}\\s*,\\s*${number}\\s*,\\s*${number}\\s*,\\s*${number}\\s*\\)$`,
+    ).exec(value);
+    const validBezier =
+      bezier !== null && [bezier[1], bezier[3]].every((x) => Number(x) >= 0 && Number(x) <= 1);
+    if (!/^(linear|ease|ease-in|ease-out|ease-in-out)$/.test(value) && !validBezier) {
+      return [
+        `${name}: "${value}" is not an easing (cubic-bezier x coordinates must be in [0, 1])`,
       ];
     }
   }
@@ -391,5 +408,49 @@ describe("the overrides rules (the checker itself)", () => {
     expect(overridesProblems(":root { nonsense }", tokenBlocks).join("")).toMatch(
       /Unreadable declaration "nonsense" in brand-overrides.css/,
     );
+  });
+});
+
+describe("motion and font value validation", () => {
+  it("accepts non-negative durations and rejects malformed or negative values", () => {
+    for (const value of ["0", "0ms", "150ms", "0.25s", ".4s"])
+      expect(valueProblems("--fk-motion-duration-fast", value)).toEqual([]);
+    for (const value of ["-1ms", "250", "ms", "1px", "calc(1s)"])
+      expect(valueProblems("--fk-motion-duration-fast", value)).not.toEqual([]);
+  });
+  it("accepts named easings and bezier overshoot, but constrains x coordinates", () => {
+    for (const value of [
+      "linear",
+      "ease",
+      "ease-in",
+      "ease-out",
+      "ease-in-out",
+      "cubic-bezier(0.34, 1.56, 0.64, 1)",
+    ])
+      expect(valueProblems("--fk-motion-ease-spring", value)).toEqual([]);
+    for (const value of [
+      "banana",
+      "cubic-bezier(-0.1, 0, 1, 1)",
+      "cubic-bezier(0, 0, 1.1, 1)",
+      "cubic-bezier(0, 1, 1)",
+      "cubic-bezier(0, x, 1, 1)",
+    ])
+      expect(valueProblems("--fk-motion-ease-spring", value)).not.toEqual([]);
+  });
+  it("accepts the template var fallback precisely without accepting invalid font expressions", () => {
+    expect(
+      valueProblems(
+        "--fk-font-sans",
+        "var(--font-template-sans, ui-sans-serif), system-ui, sans-serif",
+      ),
+    ).toEqual([]);
+    for (const value of [
+      "var(--font-body,)",
+      "var(--font-body, 12px)",
+      "var(--font-body, url(x))",
+      "garbage()",
+      "12px",
+    ])
+      expect(valueProblems("--fk-font-sans", value)).not.toEqual([]);
   });
 });
