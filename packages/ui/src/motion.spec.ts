@@ -11,6 +11,12 @@ describe("motion stylesheet", () => {
     expect(css).not.toContain("--fk-toast-life");
     expect(css).toContain("var(--fk-motion-ease-spring)");
   });
+  it("disables loader animations in hidden action labels while keeping standalone loaders animated", () => {
+    expect(css).toMatch(
+      /\.fk-action-label:not\(\[data-visible="true"\]\) \.fk-loader-dot\s*\{\s*animation: none;\s*\}/,
+    );
+    expect(css).toMatch(/\.fk-loader-dot\s*\{[^}]*animation: fk-hop[^}]*infinite;/);
+  });
   it("turns off every keyframe animation under reduced motion, including infinite loops", () => {
     const reduced = css.slice(css.indexOf("@media (prefers-reduced-motion: reduce)"));
     for (const selector of [

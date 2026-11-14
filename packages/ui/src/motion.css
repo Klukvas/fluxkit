@@ -55,7 +55,7 @@
       opacity: 0;
     }
   }
-  .fk-toast-stack {
+  .fk-toast-list {
     padding-bottom: max(calc(var(--fk-space-unit) * 4), env(safe-area-inset-bottom));
   }
   .fk-toast-item {
@@ -102,6 +102,9 @@
   .fk-loader-dot {
     animation: fk-hop calc(var(--fk-motion-duration-slow) * 3) var(--fk-motion-ease-standard)
       infinite;
+  }
+  .fk-action-label:not([data-visible="true"]) .fk-loader-dot {
+    animation: none;
   }
   .fk-loader-dot[data-dot="1"] {
     animation-delay: calc(var(--fk-motion-duration-fast) / 2);

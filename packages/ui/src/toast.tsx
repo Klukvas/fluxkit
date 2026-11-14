@@ -24,9 +24,9 @@ export function ToastStack({ children }: { children?: ReactNode }) {
       aria-live="polite"
       aria-atomic="false"
       aria-relevant="additions text"
-      className="fk-toast-stack pointer-events-none fixed inset-x-0 bottom-0 z-50 p-4 sm:start-auto sm:w-full sm:max-w-md"
+      className="fk-toast-stack pointer-events-none fixed inset-x-0 bottom-0 z-50 sm:start-auto sm:w-full sm:max-w-md"
     >
-      <ul className="flex flex-col gap-3">{children}</ul>
+      <ul className="fk-toast-list flex flex-col gap-3 p-4 empty:hidden">{children}</ul>
     </div>
   );
 }

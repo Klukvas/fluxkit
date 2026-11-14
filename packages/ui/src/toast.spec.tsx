@@ -119,7 +119,26 @@ describe("Toast views", () => {
     expect(first(markup, "div").attributes["aria-live"]).toBe("polite");
     expect(first(markup, "div").attributes["aria-atomic"]).toBe("false");
     expect(tags(markup, "ul")).toHaveLength(1);
+    expect(markup).toMatch(/<ul[^>]*><\/ul>/);
+    expect(first(markup, "ul").attributes.class).toContain("empty:hidden");
+    expect(first(markup, "div").attributes.class).not.toMatch(/\bp-4\b/);
     expect(markup).toContain("pointer-events-none");
+  });
+  it("spaces the list when it contains a toast", () => {
+    const markup = render(
+      <ToastStack>
+        <Toast
+          message="Added to cart"
+          dismissLabel="Dismiss"
+          lifetime={5000}
+          onDismiss={() => undefined}
+        />
+      </ToastStack>,
+    );
+    expect(tags(markup, "li")).toHaveLength(1);
+    expect(first(markup, "ul").attributes.class).toContain("p-4");
+    expect(first(markup, "ul").attributes.class).toContain("fk-toast-list");
+    expect(first(markup, "div").attributes.class).not.toMatch(/\bp-4\b/);
   });
   it("renders message, action, immediate dismiss and decorative life bar", () => {
     const markup = render(
