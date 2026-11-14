@@ -7,7 +7,7 @@ import { I18nProvider } from "./i18n/i18n-context";
 import { ADMIN_BASE_PATH, API_PATH_PATTERN } from "./router/base-path";
 import { browserPath } from "./router/paths";
 import { buildRouteObjects, NOT_FOUND_ROUTE_ID } from "./router/route-objects";
-import { ROUTES, routeById, type AppRoute } from "./routes";
+import { FEATURE_ROUTES, ROUTES, featureRouteById, routeById, type AppRoute } from "./routes";
 import { RouteErrorBoundary } from "./views/error-boundaries";
 
 const objects: RouteObject[] = buildRouteObjects();
@@ -142,6 +142,62 @@ describe("route objects for the router", () => {
 
   it("find a route by id", () => {
     expect(routeById("orders").path).toBe("/orders");
+  });
+});
+
+describe("feature slice routes (ADR 0049, E8)", () => {
+  it("are inside the shell under /features/<name>, never under a core path or the API prefix", () => {
+    const core = new Set(ROUTES.map((route) => route.path));
+    for (const route of FEATURE_ROUTES) {
+      expect(route.path.startsWith(`/features/${route.feature}`), route.path).toBe(true);
+      expect(core.has(route.path), route.path).toBe(false);
+      expect(API_PATH_PATTERN.test(browserPath(route.path)), route.path).toBe(false);
+      expect(route.permission, route.id).not.toBe("public");
+      expect(matchedRouteId(route.path.replace(":id", "x")), route.path).toBe(route.id);
+    }
+  });
+
+  it("carry their feature on the route handle, which the shell's gate reads", () => {
+    for (const route of FEATURE_ROUTES) {
+      const matches = matchRoutes(objects, route.path.replace(":id", "x")) ?? [];
+      expect(matches[matches.length - 1]?.route.handle, route.id).toEqual({
+        routeId: route.id,
+        titleKey: route.titleKey,
+        permission: route.permission,
+        feature: route.feature,
+      });
+    }
+    const core = matchRoutes(objects, "/orders") ?? [];
+    expect(core[core.length - 1]?.route.handle).not.toHaveProperty("feature");
+  });
+
+  it("are found by id", () => {
+    for (const route of FEATURE_ROUTES) expect(featureRouteById(route.id)).toBe(route);
+    expect(() => featureRouteById("feature.none.list")).toThrow(
+      'No feature route "feature.none.list"',
+    );
+  });
+
+  it("load lazily with their own message file and the core files they reuse", async () => {
+    for (const route of FEATURE_ROUTES) {
+      if (route.page.kind !== "lazy") throw new Error(`${route.id} must be lazy`);
+      const loaded = await route.page.load();
+      expect(typeof loaded.Component, route.id).toBe("function");
+      expect(loaded.messageFiles, route.id).toContain(`feature:${route.feature}`);
+    }
+  });
+
+  it("without any slice, the router has exactly the core routes", () => {
+    const bare = buildRouteObjects(ROUTES, []);
+    const ids = (nodes: RouteObject[]): string[] =>
+      nodes.flatMap((node) => [
+        ...((node.handle as { routeId?: string } | undefined)?.routeId === undefined
+          ? []
+          : [(node.handle as { routeId: string }).routeId]),
+        ...ids(node.children ?? []),
+      ]);
+    expect(ids(bare).filter((id) => id.startsWith("feature."))).toEqual([]);
+    expect(ids(bare)).toHaveLength(ROUTES.length + 1);
   });
 });
 

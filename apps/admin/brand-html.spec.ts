@@ -116,6 +116,19 @@ describe("messageOverrideProblems (the build refuses a broken src/messages-overr
     ).toEqual([]);
   });
 
+  it("accepts overrides of a feature slice's keys (ADR 0049)", () => {
+    const dir = sourceDir({ uk: { "features.notes.nav": "Нотатки" }, en: {} });
+    expect(messageOverrideProblems(dir)).toHaveLength(1);
+    for (const locale of ["uk", "en"] as const) {
+      mkdirSync(join(dir, "features", "notes", "messages"), { recursive: true });
+      writeFileSync(
+        join(dir, "features", "notes", "messages", `${locale}.json`),
+        '{"features.notes.nav":"N"}',
+      );
+    }
+    expect(messageOverrideProblems(dir)).toEqual([]);
+  });
+
   it("names an unknown key and a value that is not a non-empty string", () => {
     expect(
       messageOverrideProblems(sourceDir({ uk: { "app.nmae": "X" }, en: { "app.name": 1 } })),

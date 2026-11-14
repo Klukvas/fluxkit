@@ -87,10 +87,34 @@ trap cleanup EXIT
 read -r -a EXTRA_BUILD_ARGS <<<"${SMOKE_BUILD_ARGS:-}"
 for target in api storefront edge; do
   echo "building $target"
-  docker build --quiet "${EXTRA_BUILD_ARGS[@]}" --target "$target" \
+  # ${arr[@]+...}: bash 3.2 (macOS) treats an empty array as unset under `set -u`.
+  docker build --quiet ${EXTRA_BUILD_ARGS[@]+"${EXTRA_BUILD_ARGS[@]}"} --target "$target" \
     --build-arg "STOREFRONT_IMAGE_HOSTS=${DOMAIN}" -t "${PREFIX}-${target}:${TAG}" . >/dev/null
 done
 pass "images built: ${PREFIX}-api, ${PREFIX}-storefront, ${PREFIX}-edge"
+
+# Feature migrations ship in the API image (blog plan E1, ADR 0049): every journal entry of every feature with a drizzle/
+# folder has its migration and its hand-written .down.sql (the removal steps run it by hand); the blog must be among them.
+FEATURE_JOURNALS=$(docker run --rm "${PREFIX}-api:${TAG}" node -e '
+const fs = require("node:fs");
+const path = require("node:path");
+const root = "/app/packages/features";
+for (const name of fs.readdirSync(root)) {
+  const folder = path.join(root, name, "drizzle");
+  const journalFile = path.join(folder, "meta", "_journal.json");
+  if (!fs.existsSync(journalFile)) continue;
+  const { entries } = JSON.parse(fs.readFileSync(journalFile, "utf8"));
+  for (const { tag } of entries) {
+    for (const file of [`${tag}.sql`, `${tag}.down.sql`]) {
+      if (!fs.existsSync(path.join(folder, file))) console.log(`missing ${name}/drizzle/${file}`);
+    }
+  }
+  console.log(`journal ${name} ${entries.length}`);
+}
+') || fail "could not read the feature migrations in the API image"
+[[ "$FEATURE_JOURNALS" != *missing* ]] || fail "feature migration files missing in the API image: $FEATURE_JOURNALS"
+[[ "$FEATURE_JOURNALS" == *"journal blog "* ]] || fail "the blog's migration journal is not in the API image"
+pass "feature migrations and their .down.sql files are in the API image ($(tr '\n' ' ' <<<"$FEATURE_JOURNALS"))"
 
 compose config --quiet
 compose up -d --no-build --wait --wait-timeout 180
@@ -134,7 +158,8 @@ request() {
   local method=$1 path=$2
   shift 2
   STATUS=$("${CURL[@]}" -X "$method" -o "$BODY" -D "$HEADERS" -w '%{http_code}' "$@" "${ORIGIN}${path}")
-  tr -d '\r' <"$HEADERS" | sed -E 's/^([^:]+):/\L\1:/' >"$HEADERS.lower"
+  # awk, not `sed \L` (GNU only: BSD sed on macOS writes a literal "L").
+  tr -d '\r' <"$HEADERS" | awk '{ i = index($0, ":"); if (i > 0) print tolower(substr($0, 1, i)) substr($0, i + 1); else print }' >"$HEADERS.lower"
   mv "$HEADERS.lower" "$HEADERS"
 }
 header() { grep -i "^$1:" "$HEADERS" | head -1 | cut -d' ' -f2- || true; }
@@ -307,6 +332,56 @@ ENGINE_ID=$(compose ps -q meilisearch)
 [[ -n "$ENGINE_ID" ]] || fail "no meilisearch container"
 [[ -z "$(docker port "$ENGINE_ID" 2>/dev/null)" ]] || fail "the search engine publishes a port"
 pass "the search engine publishes no port"
+
+# --- an optional feature switched on in the running shop (docs/deployment.md, "Optional features"; blog plan E1) ---
+request GET /uk/blog
+expect_status 404 "GET /uk/blog with the blog off"
+request GET "/store/blog/posts?locale=uk"
+expect_status 404 "GET /store/blog/posts with the blog off"
+pass "the blog is off by default: /uk/blog and /store/blog/* answer 404"
+
+printf 'FEATURES_ENABLED=blog\n' >>"$WORK/production.env"
+# Started before its migration, the API refuses to start (loud, by design). Bounded without `timeout` (not on macOS).
+compose run --rm --no-deps -T api node dist/main.js >"$WORK/refusal.log" 2>&1 &
+REFUSAL_PID=$!
+for _ in $(seq 1 60); do
+  kill -0 "$REFUSAL_PID" 2>/dev/null || break
+  sleep 1
+done
+if kill -0 "$REFUSAL_PID" 2>/dev/null; then
+  kill "$REFUSAL_PID" 2>/dev/null || true
+  fail "the API kept running with the blog enabled and its migration missing"
+fi
+if wait "$REFUSAL_PID"; then fail "the API exited 0 with the blog enabled and its migration missing"; fi
+grep -qF 'Enabled features have migrations that are not applied: "blog"' "$WORK/refusal.log" ||
+  fail "the API did not name the blog's missing migration: $(cat "$WORK/refusal.log")"
+pass "with FEATURES_ENABLED=blog and no migration the API refuses to start, naming the feature"
+
+FEATURE_MIGRATE_LOG=$(compose run --rm --no-deps -T migrate 2>&1) || fail "migrate with the blog: $FEATURE_MIGRATE_LOG"
+[[ "$FEATURE_MIGRATE_LOG" == *'Feature "blog": applied 1 migration'* ]] || fail "migrate did not apply the blog's migration: $FEATURE_MIGRATE_LOG"
+compose up -d --no-build --no-deps --force-recreate --wait --wait-timeout 120 api >/dev/null
+request GET /store/config
+expect_status 200 "GET /store/config with the blog on"
+jq -e '.features == ["blog"]' "$BODY" >/dev/null || fail "GET /store/config features: $(jq -c .features "$BODY")"
+request GET "/store/blog/posts?locale=uk"
+expect_status 200 "GET /store/blog/posts with the blog on"
+pass "env file, migrate step, API restart: the blog's migration ran and its store routes answer"
+
+# The storefront was not rebuilt or restarted: its blog pages come from the slice registry generated inside the Docker build,
+# and the switch reaches it through its config cache (60 s).
+BLOG_PAGE_STATUS=404
+for _ in $(seq 1 18); do
+  request GET /uk/blog
+  BLOG_PAGE_STATUS=$STATUS
+  [[ "$BLOG_PAGE_STATUS" == "200" ]] && break
+  sleep 5
+done
+[[ "$BLOG_PAGE_STATUS" == "200" ]] || fail "GET /uk/blog stayed $BLOG_PAGE_STATUS after the blog was switched on"
+grep -q 'href="/uk/blog"' "$BODY" || fail "/uk/blog has no link to the blog (header or footer)"
+request GET /sitemap.xml
+expect_status 200 "GET /sitemap.xml with the blog on"
+grep -q "<loc>https://${DOMAIN}/uk/blog</loc>" "$BODY" || fail "/sitemap.xml does not list /uk/blog"
+pass "the storefront image's generated registry has the blog: /uk/blog renders with its link, the sitemap lists it"
 
 # --- a recreated API is found again without restarting the edge (resolver + upstream resolve) ---
 compose up -d --no-build --no-deps --force-recreate --wait --wait-timeout 120 api >/dev/null

@@ -70,15 +70,24 @@ export const LAZY_FILES = [
   "help",
   "banners",
 ] as const;
-export type LazyFile = (typeof LAZY_FILES)[number];
+/** A lazy file of the app's own areas. */
+export type CoreLazyFile = (typeof LAZY_FILES)[number];
 
-type FileLoader = () => Promise<Messages>;
+/**
+ * The message file of an optional feature (`src/features/<name>/messages/<locale>.json`, ADR 0049): its keys all start with
+ * `features.<name>.`. Loaded through the feature registry (`features/registry.ts`), never listed here.
+ */
+export type FeatureMessageFile = `feature:${string}`;
+
+export type LazyFile = CoreLazyFile | FeatureMessageFile;
+
+export type FileLoader = () => Promise<Messages>;
 
 /**
  * One dynamic import per file and locale: Vite emits each JSON file as its own small chunk, so an area loads only the
  * language it shows.
  */
-export const LAZY_FILE_LOADERS: Record<LazyFile, Record<Locale, FileLoader>> = {
+export const LAZY_FILE_LOADERS: Record<CoreLazyFile, Record<Locale, FileLoader>> = {
   "catalog-dictionaries": {
     uk: () => import("./uk/catalog-dictionaries.json").then((module) => module.default),
     en: () => import("./en/catalog-dictionaries.json").then((module) => module.default),
@@ -180,15 +189,28 @@ export function messagesWith(
 
 /**
  * Loads lazy files once per file and locale (concurrent callers share one request). A failed load is forgotten, so the
- * next call tries again; the error itself reaches the caller.
+ * next call tries again; the error itself reaches the caller. `features` holds the loaders of the features' message files
+ * (`features/registry.ts`); a file no loader knows is a bug and rejects.
  */
-export function createFileLoader(loaders: Record<LazyFile, Record<Locale, FileLoader>>) {
+export function createFileLoader(
+  loaders: Record<CoreLazyFile, Record<Locale, FileLoader>>,
+  features: Readonly<Record<FeatureMessageFile, Record<Locale, FileLoader>>> = {},
+) {
   const pending = new Map<string, Promise<Messages>>();
+  const loaderOf = (file: LazyFile, locale: Locale): FileLoader | undefined => {
+    if (Object.hasOwn(loaders, file)) return loaders[file as CoreLazyFile][locale];
+    if (Object.hasOwn(features, file)) return features[file as FeatureMessageFile]?.[locale];
+    return undefined;
+  };
   return (file: LazyFile, locale: Locale): Promise<Messages> => {
     const key = `${locale}/${file}`;
     const known = pending.get(key);
     if (known !== undefined) return known;
-    const promise = loaders[file][locale]().catch((error: unknown) => {
+    const loader = loaderOf(file, locale);
+    if (loader === undefined) {
+      return Promise.reject(new Error(`No loader for the message file "${file}" (${locale}).`));
+    }
+    const promise = loader().catch((error: unknown) => {
       pending.delete(key);
       throw error;
     });
@@ -197,4 +219,5 @@ export function createFileLoader(loaders: Record<LazyFile, Record<Locale, FileLo
   };
 }
 
+/** The app's own lazy files only; the SPA loads through `i18n/message-files.ts`, which adds the features' files. */
 export const loadMessageFile = createFileLoader(LAZY_FILE_LOADERS);

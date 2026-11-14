@@ -3,7 +3,8 @@
 Purpose: an optional blog. Admins with the catalog permissions write posts (title, excerpt, Markdown body, SEO title and description,
 cover picture and its alt text, per content locale), keep them as drafts, publish, schedule (a future `publishedAt`), unpublish and delete
 them; the store API serves the public posts with their body as a parsed Markdown AST, never HTML. Plan: `docs/plans/2026-11-13-blog.md`
-(this package is its PR 3: the API part). The storefront pages (plan PR 4b, below) and the admin screens (PR 5) are separate slices.
+(this package is its PR 3: the API part). The storefront pages (plan PR 4b, below) and the admin screens (PR 5) are separate slices; the
+admin slice is `apps/admin/src/features/blog/` (Storefront -> Blog, `apps/admin/README.md`, "Feature slices").
 
 Posts are public shop content: never put personal data in them (no personal author, no names of staff or customers).
 
@@ -95,7 +96,8 @@ guard, CSRF rule and real problem filter are proven by the core specs with the f
 2. If the database ever had the migration, roll it back BEFORE any core down migration (its foreign key references `media_upload`):
    `psql "$DATABASE_URL" -f packages/features/blog/drizzle/0000_blog_post.down.sql`. Every post is lost; cover uploads stay attached
    with their files.
-3. Delete this folder, the storefront slice `apps/storefront/src/app/[locale]/(feature-blog)/` and the e2e files
-   `apps/storefront/e2e/tests/blog.e2e.ts` and `blog-off.e2e.ts` (the blog methods of `apps/storefront/e2e/support/api.ts` may go too), and the
-   admin slice once it exists, then run `pnpm install` to update the lockfile. The storefront's registry is generated again by its next
-   `dev`, `build`, `typecheck` or `test`.
+3. Delete this folder, the storefront slice `apps/storefront/src/app/[locale]/(feature-blog)/` and its e2e files
+   `apps/storefront/e2e/tests/blog.e2e.ts` and `blog-off.e2e.ts` (the blog methods of `apps/storefront/e2e/support/api.ts` may go too), the
+   admin slice `apps/admin/src/features/blog/` (its screens, messages and specs; the admin's feature registry then finds no blog and shows
+   no Blog entry) and its e2e file `apps/admin/e2e/tests/blog.e2e.ts`, then run `pnpm install` to update the lockfile. The storefront's
+   registry is generated again by its next `dev`, `build`, `typecheck` or `test`. Nothing else of the admin names the blog.
