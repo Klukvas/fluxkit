@@ -567,6 +567,12 @@ Plan `docs/plans/2026-11-03-storefront-design-b.md` (before/after measurements a
   with skeletons of the final size (CLS under 0.05 measured), are left out when empty, and show "This section could not be loaded" (logged)
   when the store cannot answer; the hero and the other sections still render. No JSON-LD on the home (no correct, useful type without the
   client's identity).
+- **Playful home (2026-11-14, WS-D):** optional `decoration` on a hero (`blob`, `sticker: { textKey }`, `highlightKey`, `popIn`)
+  and `reveal: "fade-up" | "pop-in"` on every section kind. The template opts in; omitted options keep the previous markup.
+  `components/home-sections-hero.tsx` mirrors `Hero` without changing the UI library; `home-sections-reveal.tsx` wraps only
+  opted-in sections; `home-sections-motion.css` uses existing tokens, view timelines and a no-preference media query.
+  Reduced motion renders static shapes and the full underline, and the LCP picture always stays opaque. Contract:
+  `docs/contracts/home-sections.md`; e2e: `tests/playful-home.e2e.ts` (both locales, 360/1280 px, CLS, reduced motion).
 - **Category banner:** `config/category-page.ts` (`banner` by default, no pictures): the same `Hero` with the category's name (`h1`) and
   description; `plain` keeps the old header.
 - **Dark theme (ADR 0045, proposed):** `config/theme.ts` (`defaultMode: "system"`, `showToggle: true`). The root layout renders

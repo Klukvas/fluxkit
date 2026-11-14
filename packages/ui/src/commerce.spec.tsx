@@ -12,6 +12,17 @@ describe("PriceText", () => {
     expect(tags(markup, "s")).toHaveLength(0);
   });
 
+  it("lets a prefixed price wrap after its prefix instead of overflowing a narrow card", () => {
+    // Regression (PR 291): `whitespace-nowrap` kept "from UAH 1,299.00" on one line, wider than a two-column card at 360 px.
+    const markup = render(<PriceText price={"from UAH 1,299.00"} />);
+    const price = tags(markup, "span").find((tag) =>
+      String(tag.attributes["class"]).includes("font-semibold"),
+    );
+    expect(price).toBeDefined();
+    expect(String(price?.attributes["class"])).not.toMatch(/whitespace-nowrap/);
+    expect(markup).toContain("from UAH 1,299.00");
+  });
+
   it("renders a struck-through compare-at price with accessible text from props", () => {
     const markup = render(
       <PriceText price="800 ₴" priceLabel="Now" compareAt="1 000 ₴" compareAtLabel="Was" />,

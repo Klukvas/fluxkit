@@ -16,21 +16,45 @@ export const templateHomeSections: readonly HomeSection[] = [
     sublineKey: "home.hero.description",
     cta: { labelKey: "home.hero.cta", href: "/catalog" },
     image: { src: "/home/hero.svg", width: 640, height: 480, altKey: null },
+    decoration: {
+      blob: true,
+      sticker: { textKey: "home.hero.sticker" },
+      highlightKey: "home.hero.highlight",
+      popIn: true,
+    },
   },
-  { kind: "banners", source: "admin", id: "home-banners", titleKey: "home.banners.title" },
-  { kind: "categories", id: "home-categories", titleKey: "home.categoryTiles.title", limit: 6 },
+  {
+    kind: "banners",
+    source: "admin",
+    id: "home-banners",
+    titleKey: "home.banners.title",
+    reveal: "fade-up",
+  },
+  {
+    kind: "categories",
+    id: "home-categories",
+    reveal: "pop-in",
+    titleKey: "home.categoryTiles.title",
+    limit: 6,
+  },
   {
     kind: "productRow",
     id: "home-new-products",
+    reveal: "fade-up",
     titleKey: "home.newProducts.title",
     limit: 8,
     source: { sort: "newest" },
     viewAll: { labelKey: "home.newProducts.all" },
   },
-  { kind: "trust", id: "home-trust", titleKey: "home.trust.title" },
-  { kind: "richText", id: "home-about", titleKey: "home.about.title", bodyKey: "home.about.body" },
+  { kind: "trust", id: "home-trust", titleKey: "home.trust.title", reveal: "fade-up" },
+  {
+    kind: "richText",
+    id: "home-about",
+    titleKey: "home.about.title",
+    bodyKey: "home.about.body",
+    reveal: "fade-up",
+  },
 ];
-
 /** True while `sections` is the template's default composition (upstream, or a fork that kept it). */
 export function isTemplateHomeComposition(sections: readonly HomeSection[]): boolean {
   return isDeepStrictEqual(sections, templateHomeSections);

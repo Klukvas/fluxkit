@@ -1,6 +1,6 @@
 # Playful default design (concept 03)
 
-Status: owner-approved decisions (2026-11-14). Workstream A implemented, in review (PR); B, C and D not started here.
+Status: owner-approved decisions (2026-11-14). Workstream A merged (PR 285), B merged (PR 284); C in progress; D implemented, in review (PR).
 
 ## Goal
 

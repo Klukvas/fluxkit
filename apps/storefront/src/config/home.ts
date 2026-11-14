@@ -36,11 +36,29 @@ export const HOME_SECTION_WIDTHS = ["contained", "full"] as const;
 
 export type HomeSectionWidth = (typeof HOME_SECTION_WIDTHS)[number];
 
+/** Progressive CSS-only entry effects; omitted sections keep their original markup. */
+export const HOME_SECTION_REVEALS = ["fade-up", "pop-in"] as const;
+export type HomeSectionReveal = (typeof HOME_SECTION_REVEALS)[number];
+
 interface HomeSectionBase {
   /** Unique on the page: the heading's `id` (`<id>-title`) and the section's key. */
   id: string;
   /** Default and, for the built-in kinds, only value. With every section contained the page keeps ONE container. */
   width?: "contained";
+  /** Optional scroll entry effect, including on custom sections. No wrapper when omitted. */
+  reveal?: HomeSectionReveal;
+}
+
+/** Optional hero ornaments; all motion is disabled under prefers-reduced-motion. */
+export interface HeroDecoration {
+  /** Soft morphing shape behind the picture; ignored without an image. */
+  blob?: boolean;
+  /** Decorative rotating seal; message key of short, niche-agnostic text around a circle. */
+  sticker?: { textKey: string };
+  /** Message key of one exact phrase in the translated headline; the first match gets a marker underline. */
+  highlightKey?: string;
+  /** Stagger heading, subline, action and picture on first paint; picture stays opaque for LCP. */
+  popIn?: boolean;
 }
 
 export interface HeroSection extends HomeSectionBase {
@@ -49,6 +67,8 @@ export interface HeroSection extends HomeSectionBase {
   sublineKey?: string;
   cta?: { labelKey: string; href: string };
   image?: LocalImage;
+  /** Omitted: use the unchanged Hero of @fluxkit/ui. */
+  decoration?: HeroDecoration;
 }
 
 export interface CategoriesSection extends HomeSectionBase {
@@ -185,7 +205,7 @@ const customSectionName = /^[A-Za-z][A-Za-z0-9-]*$/;
 
 /**
  * Refuses a home config the types would refuse too, for values that got past them (a cast, plain JavaScript, JSON): a
- * duplicate id, an unknown `width`, `full` on a built-in kind, a `custom` section without a usable name. Called by every
+ * duplicate id, an unknown `width` or `reveal`, `full` on a built-in kind, a `custom` section without a usable name. Called by every
  * render of the home page, so a broken config fails loudly instead of rendering something unexpected.
  */
 export function checkHomeSections(sections: readonly HomeSection[]): void {
@@ -195,6 +215,12 @@ export function checkHomeSections(sections: readonly HomeSection[]): void {
       throw new Error(`Home section id "${section.id}" is used twice; every id must be unique.`);
     }
     seen.add(section.id);
+    const reveal: unknown = section.reveal;
+    if (reveal !== undefined && !(HOME_SECTION_REVEALS as readonly unknown[]).includes(reveal)) {
+      throw new Error(
+        `Home section "${section.id}" has the reveal ${JSON.stringify(reveal)}; allowed: ${HOME_SECTION_REVEALS.join(", ")}.`,
+      );
+    }
     const width: unknown = section.width;
     if (width !== undefined && !(HOME_SECTION_WIDTHS as readonly unknown[]).includes(width)) {
       throw new Error(
@@ -279,22 +305,42 @@ export const homeSections: readonly HomeSection[] = [
     sublineKey: "home.hero.description",
     cta: { labelKey: "home.hero.cta", href: "/catalog" },
     image: { src: "/home/hero.svg", width: 640, height: 480, altKey: null },
+    decoration: {
+      blob: true,
+      sticker: { textKey: "home.hero.sticker" },
+      highlightKey: "home.hero.highlight",
+      popIn: true,
+    },
   },
-  { kind: "banners", source: "admin", id: "home-banners", titleKey: "home.banners.title" },
+  {
+    kind: "banners",
+    source: "admin",
+    id: "home-banners",
+    titleKey: "home.banners.title",
+    reveal: "fade-up",
+  },
   {
     kind: "categories",
     id: "home-categories",
+    reveal: "pop-in",
     titleKey: "home.categoryTiles.title",
     limit: 6,
   },
   {
     kind: "productRow",
     id: "home-new-products",
+    reveal: "fade-up",
     titleKey: "home.newProducts.title",
     limit: 8,
     source: { sort: "newest" },
     viewAll: { labelKey: "home.newProducts.all" },
   },
-  { kind: "trust", id: "home-trust", titleKey: "home.trust.title" },
-  { kind: "richText", id: "home-about", titleKey: "home.about.title", bodyKey: "home.about.body" },
+  { kind: "trust", id: "home-trust", titleKey: "home.trust.title", reveal: "fade-up" },
+  {
+    kind: "richText",
+    id: "home-about",
+    titleKey: "home.about.title",
+    bodyKey: "home.about.body",
+    reveal: "fade-up",
+  },
 ];
