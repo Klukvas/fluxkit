@@ -117,7 +117,10 @@ export function AuditLogPage() {
         query={query}
         adminEmails={adminEmails}
         rangeError={request.ok ? null : { field: request.field, reason: request.reason }}
-        onApply={(next) => setParams(writeAuditQuery(next))}
+        onApply={(next) => {
+          // Remount the keyed form synchronously so its replacement cannot discard newly typed text.
+          setParams(writeAuditQuery(next), { flushSync: true });
+        }}
       />
       <p className="text-sm text-muted-foreground">{t("audit.list.timeZoneHint")}</p>
       {request.ok ? (

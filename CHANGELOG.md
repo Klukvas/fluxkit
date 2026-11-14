@@ -5,6 +5,7 @@
 One line per user-visible or schema change.
 
 ## Unreleased
+- Admin Email message and Audit log filters no longer drop text typed right after "Apply", and the privacy requests' Status filter keeps the keyboard focus when changed.
 - Store cart API (additive, minor): required nullable `freeShipping` carries the lowest offered valid `free_over` threshold and server-computed remaining amount from the cart subtotal, including in checkout's `cart_changed` cart; the drawer and cart-page summary show the server remainder with accessible, token-styled native progress and a reached state (including zero-cost `free_over` methods); no migration.
 - `@fluxkit/ui` `Hero` gains a phrasing-only `ReactNode` title, section `data-*` attributes, `mediaClassName` and an ornament slot (additive); the decorated home reuses it with unchanged markup.
 - Added: `--fk-color-scrim` (additive, minor); Fixed: drawer and dialog backdrops dim the page in dark mode.
