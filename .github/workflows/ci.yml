@@ -152,7 +152,8 @@ jobs:
   e2e:
     name: End-to-end (Playwright, Chromium)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # The default run, then the blog scenarios of both suites with the feature on.
+    timeout-minutes: 45
     env:
       # Both suites (storefront, then admin) WIPE this database at the start of their run (apps/storefront/e2e/README.md,
       # apps/admin/e2e/README.md): a dedicated one, never the verify job's.
@@ -202,7 +203,19 @@ jobs:
       - name: Install Chromium
         run: pnpm --filter @fluxkit/storefront exec playwright install --with-deps chromium
       # The storefront suite, then the admin suite; the first failure stops the step and pnpm names the failing package.
+      # The default run is the template's (no feature): it also checks the blog switched off (blog-off.e2e.ts, blog.e2e.ts).
       - run: pnpm test:e2e
+      # The optional blog (ADR 0049) switched on: each suite again with its API on FEATURES_ENABLED=blog (and the blog's
+      # migration), its blog files only (the other files are written for the template without a feature link in the header).
+      # Both wipe E2E_DATABASE_URL at their start like the default run.
+      - name: Storefront blog scenarios (E2E_FEATURES=blog)
+        env:
+          E2E_FEATURES: blog
+        run: pnpm --filter @fluxkit/storefront test:e2e blog
+      - name: Admin blog scenarios (ADMIN_E2E_FEATURES=blog)
+        env:
+          ADMIN_E2E_FEATURES: blog
+        run: pnpm --filter @fluxkit/admin test:e2e blog
       - name: Upload the Playwright report and traces
         if: failure()
         uses: actions/upload-artifact@v7

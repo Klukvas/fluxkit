@@ -105,6 +105,39 @@ $C up -d --no-deps --force-recreate --wait api
 - Never publish the engine's port and never route it through the edge: the index holds public data only, but the engine API must stay private (ADR 0034).
 - The engine needs memory for indexing (`mem_limit: 1g` in the example, enough for a small catalog; raise it with the catalog). Losing `meili-data` costs a rebuild, not data.
 
+## Optional features
+
+Feature packages (ADR 0049; the blog, `packages/features/blog/README.md`) are in every image and off until `FEATURES_ENABLED` names
+them: the API image holds each feature's package, its `drizzle/` migrations and their hand-written `.down.sql` files; the storefront image
+holds the slices found when its registry was generated inside the Docker build (`pnpm build`); the admin SPA holds its slices. One switch,
+the API's `FEATURES_ENABLED`, drives all three: the storefront and the admin read `features` of `GET /store/config` and
+`GET /admin/config`. No image is rebuilt to switch a feature on or off.
+
+Switching one on (the blog here):
+
+```bash
+C="docker compose --env-file infra/production.env -f infra/docker-compose.prod.yml"
+# 1. Back up (next sections), then add the name to infra/production.env (comma-separated): FEATURES_ENABLED=blog
+# 2. Its migrations: the migrate service reads the same env file. Prints `Feature "blog": applied 1 migration:` and the migration tag
+$C run --rm --no-deps migrate
+# 3. Start the API with the new env file
+$C up -d --no-deps --force-recreate --wait api
+```
+
+- Order: migrate, then the API. An API started with a feature in `FEATURES_ENABLED` whose migrations are missing refuses to start and
+  names the feature and the missing tags (loud, by design); run step 2 and start it again. With the deploy workflow, editing the env file
+  and deploying the next release is enough: `migrate` runs before every API start.
+- The storefront shows the feature's pages and links within 60 s (its config cache), without a restart; the admin shows its screens on
+  its next read of the config (a page load).
+- Switching off: remove the name and run step 3. The routes answer `404` at once, the storefront's pages within 60 s. The tables and
+  their rows stay (switching on again brings them back); nothing is migrated.
+- Removing a feature and its data (the `.down.sql` drops the feature's tables and every row in them: blog posts are gone): switch it off, back up, then run the feature's `.down.sql` files from the newest, BEFORE any core
+  down migration (a feature table may reference a core table, `blog_post` references `media_upload`; core never references a feature
+  table). From the API image, so a host with only `infra/` can do it:
+  `$C run --rm --no-deps -T api cat /app/packages/features/blog/drizzle/0000_blog_post.down.sql | $C exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1`.
+  The feature's folders then leave the fork (its README, "Removing the feature") and the next images are built without it.
+- Checked by `scripts/deploy-smoke.sh` (section "Smoke test"); not yet done on a real host.
+
 ## TLS
 
 The nginx edge reads `fullchain.pem` and `privkey.pem` from `FLUXKIT_CERTS_DIR` (mounted read-only; the files must be readable by uid 101). It does not obtain certificates itself. Options:
@@ -165,7 +198,7 @@ What was checked (2026-10-30, a scratch database migrated to `0011`, PostgreSQL 
 2. `git pull` (or new image tags), then `docker compose ... build` and `docker compose ... up -d --wait`. With the deploy workflow this step and the backup are automatic (next section).
 3. Compose recreates the changed containers: `migrate` runs the new migrations while the old API is still serving, then the new API replaces the old one. Expect a few seconds of `502` from the edge while the single API restarts: **the example has no zero-downtime rollout** (one instance is required today). Additive migrations (the project's rule) keep the old API working while they run.
 4. If `migrate` fails, Compose does not start the new API (it waits for `service_completed_successfully`). Whether the old API container is still serving at that moment was not tested here: plan for downtime. Read `docker compose ... logs migrate`, fix, run `up` again.
-5. Rollback: stop the API, run the newest `apps/api/drizzle/NNNN_name.down.sql` against the database (`docker compose ... exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 < apps/api/drizzle/NNNN_name.down.sql`), one migration at a time from the newest, then start the previous image tag. The migrator refuses to run code older than the database.
+5. Rollback: stop the API, run the newest `apps/api/drizzle/NNNN_name.down.sql` against the database (`docker compose ... exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 < apps/api/drizzle/NNNN_name.down.sql`), one migration at a time from the newest, then start the previous image tag. The migrator refuses to run code older than the database. An enabled feature's migrations roll back first, before any core one (section "Optional features").
 6. Old images stay on the host after an update (each release built there adds about 1.5 GB of images plus build cache). Keep the running tag and the previous one for rollback, remove older `fluxkit-*` tags (section "Disk space").
 
 ## Automatic deployment (GitHub Actions and Docker Hub)
@@ -246,13 +279,14 @@ The test server's scripts and timers for these points are described in `docs/pla
 - [ ] `STOREFRONT_IMAGE_HOSTS` set before the storefront image was built; an uploaded image shows in the storefront (hairpin works).
 - [ ] Backups of Postgres and the media volume scheduled and a restore tested.
 - [ ] Search: `infra/meilisearch.env` written (master key generated), the scoped key made, `SEARCH_ENABLED=true`, `GET /store/config` says `search: true`, a product found after the index is built; the engine's port is not published.
+- [ ] `FEATURES_ENABLED` decided; for each enabled feature the `migrate` log shows its migrations, `GET /store/config` lists it in `features` and its pages answer (section "Optional features").
 - [ ] Swagger UI decision (not routed by the example).
 - [ ] Launch blockers in `docs/HANDOFF.md` reviewed (catalog read rate limits, privacy plan before the EU launch).
 - [ ] The Docker images' own licences reviewed before images are handed to a client (below).
 
 ## Smoke test
 
-`bash scripts/deploy-smoke.sh` builds the three images, starts the Compose example (including the search engine: it creates the scoped key, switches search on and checks `/store/config` and `/store/search`) under the project name `fluxkit-smoke` on `127.0.0.1:18080` and `127.0.0.1:18443` with a throwaway env file and a self-signed certificate in `infra/.smoke/` (git-ignored), runs the checks and removes everything (`--keep` leaves the stack up). Needs Docker with Compose and BuildKit, `openssl`, `curl`, `jq`. Behind a TLS-intercepting proxy, pass a base image that trusts its CA: `SMOKE_BUILD_ARGS="--build-arg NODE_IMAGE=<your node image>"` (the `NODE_IMAGE` argument of the Dockerfile; that is how it ran in the agent sandbox).
+`bash scripts/deploy-smoke.sh` builds the three images, checks that every feature migration and its `.down.sql` are in the API image (the blog's among them), starts the Compose example (including the search engine: it creates the scoped key, switches search on and checks `/store/config` and `/store/search`; then it switches the blog on in the running stack as in "Optional features": `/uk/blog` and `/store/blog/*` are `404` before, the API refuses to start before the blog's migration, `migrate` applies it, and after the API restart the store route answers and the storefront, neither rebuilt nor restarted, renders `/uk/blog` with its link and lists it in `/sitemap.xml`, which shows the slice registry was generated in the Docker build) under the project name `fluxkit-smoke` on `127.0.0.1:18080` and `127.0.0.1:18443` with a throwaway env file and a self-signed certificate in `infra/.smoke/` (git-ignored), runs the checks and removes everything (`--keep` leaves the stack up). Needs Docker with Compose and BuildKit, `openssl`, `curl`, `jq`. Behind a TLS-intercepting proxy, pass a base image that trusts its CA: `SMOKE_BUILD_ARGS="--build-arg NODE_IMAGE=<your node image>"` (the `NODE_IMAGE` argument of the Dockerfile; that is how it ran in the agent sandbox).
 
 ## Licences of the images
 

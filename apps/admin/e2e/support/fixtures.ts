@@ -41,16 +41,26 @@ export function unique(testInfo: TestInfo): string {
   return `r${String(testInfo.retry)}e${String(testInfo.repeatEachIndex)}${randomBytes(4).toString("hex")}`;
 }
 
+/** The message files of the feature slices (`src/features/<name>/messages/<language>.json`, ADR 0049). */
+function featureMessageFiles(language: string): string[] {
+  const root = resolve(import.meta.dirname, "../../src/features");
+  return readdirSync(root, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => resolve(root, entry.name, "messages", `${language}.json`));
+}
+
 /** Every message text of the SPA (both languages), to tell the SPA's own sentences from an API detail it might show. */
 const SPA_MESSAGES: ReadonlySet<string> = new Set(
   ["en", "uk"].flatMap((language) => {
     const folder = resolve(import.meta.dirname, "../../src/messages", language);
-    return readdirSync(folder)
-      .filter((file) => file.endsWith(".json"))
+    return [
+      ...readdirSync(folder)
+        .filter((file) => file.endsWith(".json"))
+        .map((file) => resolve(folder, file)),
+      ...featureMessageFiles(language),
+    ]
       .flatMap((file) =>
-        Object.values(
-          JSON.parse(readFileSync(resolve(folder, file), "utf8")) as Record<string, string>,
-        ),
+        Object.values(JSON.parse(readFileSync(file, "utf8")) as Record<string, string>),
       )
       .map((text) => text.trim());
   }),

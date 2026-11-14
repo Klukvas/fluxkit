@@ -7,7 +7,7 @@ Existing:
 - `branding.md` - the storefront brand config `apps/storefront/src/config/brand.ts` (fork-owned): logo, icons, theme colour, default social picture.
 - `card-registry.md` - storefront product card registry (fork-owned `cards/custom.ts`, `ProductCardModel`) and the `view` URL parameter (draft).
 - `config.md` - environment variables and the feature package contract.
-- "Feature extension points" below (ADR 0049) - the API kit, feature migrations, a feature's personal-data inventory, `features` on the config routes, the storefront slice of a feature.
+- "Feature extension points" below (ADR 0049) - the API kit, feature migrations, a feature's personal-data inventory, `features` on the config routes, the storefront slice of a feature, the admin feature slices (manifest, registry, gating).
 - `header-footer.md` - storefront header and footer composition: the fork-owned `config/header.ts` and `config/footer.ts` (blocks, order, controls, category count, link groups with headings, text lines) (draft; the plan `docs/plans/2026-11-08-design-changeability.md` calls it `layout-config.md`).
 - `home-sections.md` - storefront home sections: the per-section `width` and the `custom` kind with the fork-owned `config/custom-sections.ts` (draft).
 - `events.md` - domain events (the outbox), the handler metadata key, the delivery rules and the order ports.
@@ -25,8 +25,8 @@ Entry format: name, since-version, description, shape, status (stable / deprecat
 
 ## Feature extension points (stable, ADR 0049)
 
-E1 to E4 of `docs/plans/2026-11-13-blog.md`, and the storefront slice (E5 to E7, below); the admin slice (E8) and the safe Markdown (E9)
-are added when they exist. Kept in this file until the planned `features.md` exists (a documentation-file hook blocked creating it in PR 1). The package
+E1 to E4 of `docs/plans/2026-11-13-blog.md`, the storefront slice (E5 to E7) and the admin slice (E8), all below; the safe Markdown (E9)
+is `markdown.md`. Kept in this file until the planned `features.md` exists (a documentation-file hook blocked creating it in PR 1). The package
 contract itself (manifest, `featureModule`, `FEATURES_ENABLED`) is in `config.md`, "Feature package contract".
 
 **API kit (`@fluxkit/api-kit`).** A feature imports these from the package's public entry, never from `apps/api` (module boundary) and
@@ -91,6 +91,22 @@ the route group `apps/storefront/src/app/[locale]/(feature-<name>)/`, deleted wi
 | Data | `featureData(name).read(operation, call, read?)` (`runtime.server.ts`, `StoreData.featureRead`): the slice's own request (`call({baseUrl, fetch, options})` answers a `StoreResult`) with the catalog reads' timeout, data cache (tag `feature:<name>`, 60 s unless `read.revalidateSeconds`), logging and `StoreUnavailableError`, but never the in-memory last-good copy: an outage shows the error view instead of content the shop may have taken back. |
 | Header and footer | The enabled features' links are appended (`docs/contracts/header-footer.md`, "Feature links"); none, and the markup is unchanged. |
 | Sitemap | `/sitemap.xml` asks each enabled feature's `sitemap` and lists the pages after the shop pages, in every locale (a page with `locales`: in those, with alternates and `x-default` among them; `x-default` is the default locale when listed, else the first; a locale the storefront does not have fails the sitemap); every path follows the link rule above (its own pages only); a failed read fails the sitemap. Without any slice on disk the config is not read for it. |
+
+**Admin feature slices (E8).** A feature's admin screens are one folder `apps/admin/src/features/<name>/` (`<name>` = the feature name in
+`FEATURES_ENABLED`), found by `apps/admin/src/features/registry.ts` (`import.meta.glob("./*/feature.ts")`); no other admin code imports it
+and slices never import each other (dependency-cruiser). Deleting the folder removes the screens, the entry and the messages.
+
+| Part | Shape and rule |
+|---|---|
+| `feature.ts` | exports `feature: AdminFeatureManifest` (`apps/admin/src/features/manifest.ts`): `{name, routes, navigation, messages}`; imports nothing of the slice but small constants (it is in the entry chunk) |
+| `routes[]` | `{id, path, permission, titleKey, load}`: `id` is `feature.<name>.<screen>`; `path` starts with `/features/<name>` (relative to `/admin-ui`); `permission` an admin permission or `authenticated` (never `public`); `load: () => import(...)` resolving to `{Component, messageFiles}` (`messageFiles`: `feature:<name>` and any core lazy file the screen reuses) |
+| `navigation` | `{group, labelKey, routeId}`: `group` one of `catalog`, `storefront`, `sales`, `settings`, `help`; the entry is appended to that group and names one of the slice's routes |
+| `messages` | `{uk, en}`, each `() => import("./messages/<locale>.json")` resolving to the messages; every key starts with `features.<name>.` and every value is a non-empty string; a fork overrides them in `apps/admin/src/messages-overrides/` |
+| Gating | a slice's route and entry show only when `<name>` is in `GET /admin/config` `features` and the role has the route's permission; otherwise its address is "Page not found". Known limit: opening a slice's address (a deep link or a typed URL) while its feature is off still downloads that slice's screens chunk, because the router resolves a route's `lazy` module before the shell, which reads the config, renders; holding the route on that read would hold the first render of every page. Nothing of the feature is called or shown, and its messages are not loaded (they load only for an enabled feature) |
+| Requests | `adminFeatureTransport` (`apps/admin/src/lib/api.ts`) with the slice's own `TransportOperation`s (`createTransport` of `@fluxkit/api-client`); never an addition to `@fluxkit/api-client`'s operation tables |
+
+The rules are checked in development and by `apps/admin/src/features/registry.spec.ts` over every slice of the build; a production
+build leaves the checks out. Details and the slice's reuse of admin code: `apps/admin/README.md`, "Feature slices".
 
 ## Admin text overrides (draft, PR-I2b)
 

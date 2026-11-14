@@ -22,6 +22,8 @@ import { NotAllowedView } from "../views/status-views";
 import { routeById } from "../routes";
 import { ScreenAccessProvider, type ScreenAccess } from "../router/screen-access";
 import { contextHelpFor, helpArticlePath } from "./context-help";
+import { featureRouteGate, shownFeatures, useEnabledFeatures } from "./enabled-features";
+import { FeatureRouteFallback, fallbackTitleKey } from "./feature-route-view";
 import { LanguageSwitch } from "./language-switch";
 import { isCurrentPath, visibleNavigation } from "./navigation";
 import { mayOpenRoute } from "./route-gate";
@@ -32,6 +34,8 @@ export interface RouteHandle {
   routeId: string;
   titleKey: string;
   permission: AdminOperationPermission;
+  /** The feature slice a screen belongs to (ADR 0049); absent on core screens. */
+  feature?: string;
 }
 
 export function isRouteHandle(value: unknown): value is RouteHandle {
@@ -205,30 +209,38 @@ export function Shell() {
     .map((match) => match.handle)
     .filter(isRouteHandle)
     .pop();
+  const me = session.state.me;
+  const features = useEnabledFeatures(
+    me === null ? null : `${String(session.state.generation)}:${me.user.id}`,
+  );
+  // A feature slice's screen waits for `GET /admin/config` (ADR 0049): it shows only when its feature is enabled.
+  const featureGate = featureRouteGate(handle?.feature, features.state);
+  const heldBack = featureGate !== null && featureGate !== "open" ? featureGate : null;
   // A page may name itself (a help article); the name counts only while its own path is shown.
   const [pageTitle, setPageTitle] = useState<PageTitleOverride | null>(null);
   useDocumentTitle(
-    handle?.titleKey ?? "notFound.title",
+    heldBack !== null ? fallbackTitleKey(heldBack) : (handle?.titleKey ?? "notFound.title"),
     pageTitle !== null && pageTitle.pathname === location.pathname ? pageTitle.text : null,
   );
 
   const allowed = mayOpenRoute(handle, (permission) => session.can(permission));
   const help =
-    allowed && handle !== undefined
+    allowed && handle !== undefined && handle.feature === undefined
       ? contextHelpFor(handle.routeId, new URLSearchParams(location.search).get("tab"))
       : null;
-  const groups: SideNavGroup[] = visibleNavigation(session.state.me?.permissions ?? null).map(
-    (group) => ({
-      id: group.id,
-      heading: t(group.headingKey),
-      items: group.items.map((item) => ({
-        id: item.routeId,
-        label: t(item.labelKey),
-        href: item.href,
-        current: isCurrentPath(location.pathname, item.href),
-      })),
-    }),
-  );
+  const groups: SideNavGroup[] = visibleNavigation(
+    me?.permissions ?? null,
+    shownFeatures(features.state),
+  ).map((group) => ({
+    id: group.id,
+    heading: t(group.headingKey),
+    items: group.items.map((item) => ({
+      id: item.routeId,
+      label: t(item.labelKey),
+      href: item.href,
+      current: isCurrentPath(location.pathname, item.href),
+    })),
+  }));
 
   return (
     <PageTitleProvider value={setPageTitle}>
@@ -248,7 +260,18 @@ export function Shell() {
             }
           >
             <Fragment key={session.state.generation}>
-              {allowed ? <Outlet /> : <NotAllowedView t={t} />}
+              {heldBack !== null ? (
+                <FeatureRouteFallback
+                  t={t}
+                  gate={heldBack}
+                  state={features.state}
+                  onRetry={features.retry}
+                />
+              ) : allowed ? (
+                <Outlet />
+              ) : (
+                <NotAllowedView t={t} />
+              )}
             </Fragment>
           </ShellFrame>
           {session.state.status === "expired" ? <ReauthDialog /> : null}

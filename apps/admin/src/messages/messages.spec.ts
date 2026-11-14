@@ -269,7 +269,9 @@ describe("message keys used in the source", () => {
       "g",
     );
     let used = 0;
-    for (const file of sourceFiles(sourceRoot)) {
+    // A feature slice (`src/features/<name>/`) checks its own keys against its own files (`<slice>-messages.spec.ts`).
+    const isSlice = (file: string) => /^features[/\\][^/\\]+[/\\]/.test(relative(sourceRoot, file));
+    for (const file of sourceFiles(sourceRoot).filter((path) => !isSlice(path))) {
       const area = areaOf(file);
       const lazy = area === null ? [] : (AREA_FOLDERS[area] ?? []);
       const text = readFileSync(file, "utf8");

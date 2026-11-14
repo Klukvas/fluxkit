@@ -32,6 +32,13 @@ export {
   type AdminResult,
 } from "./admin-client.js";
 export type { CallOptions, FetchLike } from "./transport.js";
+// For callers of routes outside the operation tables: an optional feature's own routes (ADR 0049; the admin feature slices).
+export {
+  createTransport,
+  type CallParts,
+  type TransportOperation,
+  type TransportOptions,
+} from "./transport.js";
 export {
   ApiClientError,
   InvalidRequestError,
