@@ -1,5 +1,27 @@
 /* Imported explicitly by a host app; every visual timing follows the theme. */
 @layer components {
+  .fk-progress {
+    appearance: none;
+    border: 0;
+    block-size: calc(var(--fk-space-unit) * 2);
+    border-radius: var(--fk-radius-control);
+    background: var(--fk-color-muted);
+    overflow: hidden;
+  }
+  .fk-progress::-webkit-progress-bar {
+    background: var(--fk-color-muted);
+    border-radius: var(--fk-radius-control);
+  }
+  .fk-progress::-webkit-progress-value {
+    background: var(--fk-color-primary);
+    border-radius: var(--fk-radius-control);
+    transition: width var(--fk-motion-duration-base) var(--fk-motion-ease-standard);
+  }
+  .fk-progress::-moz-progress-bar {
+    background: var(--fk-color-primary);
+    border-radius: var(--fk-radius-control);
+  }
+
   body:has(dialog[data-drawer][open]) {
     overflow: hidden;
   }
@@ -235,6 +257,7 @@
     .fk-skeleton-shimmer::after {
       display: none;
     }
+    .fk-progress::-webkit-progress-value,
     .fk-action-label,
     .fk-drawer-panel,
     .fk-drawer-backdrop {

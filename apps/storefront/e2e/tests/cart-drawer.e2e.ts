@@ -1,3 +1,4 @@
+import type { Cart } from "@fluxkit/api-client";
 import { expect, test } from "../support/fixtures.ts";
 import { formatMoney } from "../../src/lib/money.ts";
 import { waitForHydration } from "../support/flows.ts";
@@ -77,4 +78,65 @@ test("the empty drawer links to the catalog and its real backdrop button closes 
     .first()
     .click({ position: { x: 10, y: 10 } });
   await expect(drawer).toHaveCount(0);
+});
+
+test.describe("free-shipping progress", () => {
+  test.afterEach(async ({ admin }) => {
+    await admin.deactivateShippingMethods();
+  });
+
+  test("drawer shows the server remainder and unlocks free delivery at the threshold", async ({
+    page,
+    admin,
+    shopper,
+  }, testInfo) => {
+    const product = await shopper.product("demo-screwdriver");
+    const variant = product.variants[0];
+    if (variant === undefined) throw new Error("Seed screwdriver has no variant");
+    await admin.createShippingMethod({
+      code: `drawer_free_${String(testInfo.retry)}`,
+      title: "Free-over courier",
+      kind: "address",
+      pricing: { type: "free_over", amount: 9000, freeFrom: variant.price.amount * 2 },
+    });
+    await page.goto("/en/c/demo-tools");
+    await waitForHydration(page);
+    const added = page.waitForResponse(
+      (response) =>
+        response.url().endsWith("/store/cart/items") && response.request().method() === "POST",
+    );
+    await page.getByRole("button", { name: "Add to cart Demo Screwdriver" }).click();
+    const response = await added;
+    expect(response.ok()).toBe(true);
+    const cart = (await response.json()) as Cart;
+    const freeShipping = cart.freeShipping;
+    expect(freeShipping).not.toBeNull();
+    if (freeShipping === null) throw new Error("Cart response has no free-shipping progress");
+    const drawer = page.getByRole("dialog", { name: /^Cart/ });
+    await expect(drawer).toBeVisible();
+    await expect(drawer.getByRole("progressbar")).toBeVisible();
+    await expect(drawer.getByRole("progressbar")).toHaveAttribute(
+      "value",
+      String(cart.subtotal.amount),
+    );
+    await expect(drawer.getByRole("progressbar")).toHaveAttribute(
+      "max",
+      String(freeShipping.threshold.amount),
+    );
+    await expect(
+      drawer.getByText(`${formatMoney(freeShipping.remaining, 2, "en")} more for free delivery`, {
+        exact: true,
+      }),
+    ).toBeVisible();
+    const saved = page.waitForResponse(
+      (response) =>
+        response.url().includes("/store/cart/items/") && response.request().method() === "PATCH",
+    );
+    await drawer.getByRole("button", { name: "Increase quantity of Demo Screwdriver" }).click();
+    const updatedResponse = await saved;
+    expect(updatedResponse.ok()).toBe(true);
+    const updated = (await updatedResponse.json()) as Cart;
+    expect(updated.freeShipping?.remaining.amount).toBe(0);
+    await expect(drawer.getByText("Free delivery unlocked", { exact: true })).toBeVisible();
+  });
 });
