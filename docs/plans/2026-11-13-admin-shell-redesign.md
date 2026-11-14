@@ -1,6 +1,6 @@
 # Admin shell redesign
 
-- Status: PR 1 merged (PR 290); PR 2 merged (PR 294); PR 3 built on feature/admin-home, PR pending; local checks pass, Playwright execution delegated to the orchestrator.
+- Status: PR 1 merged (PR 290); PR 2 merged (PR 294); PR 3 in review (PR 299, branch feature/admin-home); local checks and the admin Playwright suite pass (except the pre-existing local `email.e2e.ts` failure).
 - Owner request: 2026-11-13, make `apps/admin` easier to navigate through three separate PRs.
 - Scope: admin core presentation; permission filtering, routes, session operations and domain behaviour stay intact.
 
