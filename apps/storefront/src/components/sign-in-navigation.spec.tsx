@@ -3,11 +3,53 @@ import {
   createSignInNavigation,
   focusSignInDestination,
   isSignInModalActive,
+  isSignInOpenerLink,
   shouldRedirectAccountGuest,
   signInCloseAction,
 } from "../lib/sign-in-navigation";
 
 const origin = "/en/catalog?sort=price_asc";
+
+describe("login-link opener filter", () => {
+  const loginPath = "/en/account/login";
+  const currentHref = `https://shop.test${loginPath}?next=%2Fen%2Fcheckout`;
+
+  it.each([
+    "#login-email",
+    `${currentHref}#login-email`,
+    "/en/account/login?next=%2Fen%2Fcheckout#login-password",
+    "#",
+  ])("ignores same-document fragment activation %s", (href) => {
+    expect(isSignInOpenerLink({ href, currentHref, loginPath, insideDialog: false })).toBe(false);
+  });
+
+  it("ignores login links inside a dialog even when they change the query", () => {
+    expect(
+      isSignInOpenerLink({ href: loginPath, currentHref, loginPath, insideDialog: true }),
+    ).toBe(false);
+  });
+
+  it.each([loginPath, `${loginPath}?next=%2Fen%2Fcheckout`, `${loginPath}#login-email`])(
+    "records real login navigation %s from a different document",
+    (href) => {
+      expect(
+        isSignInOpenerLink({
+          href,
+          currentHref: `https://shop.test${origin}`,
+          loginPath,
+          insideDialog: false,
+        }),
+      ).toBe(true);
+    },
+  );
+
+  it.each(["https://other.test/en/account/login", "/en/account/register", "/uk/account/login"])(
+    "ignores non-login or off-origin links %s",
+    (href) => {
+      expect(isSignInOpenerLink({ href, currentHref, loginPath, insideDialog: false })).toBe(false);
+    },
+  );
+});
 
 describe("sign-in navigation decisions", () => {
   it("recognizes the actual Next 16 modal segments, keeping the gate's original next", () => {

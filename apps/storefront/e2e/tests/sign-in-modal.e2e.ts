@@ -195,6 +195,62 @@ test("failed sign-in keeps its error summary and focus inside the modal", async 
   await expect(dialog.locator('[aria-invalid="true"]')).toHaveCount(0);
 });
 
+for (const dismissal of ["Close", "Back"] as const) {
+  test(`field-error link preserves history and account-summary focus after ${dismissal}`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: dismissal === "Back" ? "reduce" : "no-preference" });
+    await page.goto("/en/catalog?sort=price_asc");
+    const origin = page.url();
+    const dialog = await openSignIn(page);
+    const loginUrl = page.url();
+    const historyLength = await page.evaluate(() => window.history.length);
+    await dialog.getByRole("button", { name: "Sign in", exact: true }).click();
+    const emailLink = dialog.locator('a[href="#login-email"]');
+    await expect(emailLink).toBeVisible();
+    if (dismissal === "Back") {
+      // Exercise an absolute same-document URL as well as the form's normal fragment-only href.
+      await emailLink.evaluate((anchor) => {
+        anchor.setAttribute("href", new URL("#login-email", window.location.href).href);
+      });
+    }
+    await emailLink.click();
+    await expect(dialog.getByLabel("Email", { exact: true })).toBeFocused();
+    await expect(page).toHaveURL(loginUrl);
+    expect(await page.evaluate(() => window.history.length)).toBe(historyLength);
+    if (dismissal === "Close") {
+      await dialog.getByRole("button", { name: "Close", exact: true }).click();
+    } else {
+      await page.goBack();
+    }
+    await expect(dialog).toHaveCount(0);
+    await expect(page).toHaveURL(origin);
+    await expect(
+      page.getByRole("banner").getByRole("button", { name: "Account menu" }),
+    ).toBeFocused();
+  });
+}
+
+test("Close can be retried when a legacy fragment entry retains the dialog after Back", async ({
+  page,
+}) => {
+  await page.goto("/en/catalog");
+  const origin = page.url();
+  const dialog = await openSignIn(page);
+  const loginUrl = page.url();
+  // Simulate a pre-existing fragment entry; new in-dialog anchor activations no longer create one.
+  await page.evaluate(() => {
+    window.location.hash = "login-email";
+  });
+  await expect(page).toHaveURL(`${loginUrl}#login-email`);
+  await dialog.getByRole("button", { name: "Close", exact: true }).click();
+  await expect(page).toHaveURL(loginUrl);
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "Close", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page).toHaveURL(origin);
+});
+
 test("successful header sign-in uses the form destination and updates the shared header", async ({
   page,
   otherShopper,

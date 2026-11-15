@@ -9,6 +9,7 @@ One line per user-visible or schema change.
 
 ## Unreleased
 
+- Storefront sign-in dialog error-summary links focus their fields without adding history or overwriting the account-summary opener; Close remains usable after a traversal that retains the dialog.
 - Storefront sign-in dismissal uses the browser's same-origin Back availability, with home fallback; the dialog owns post-close focus after teardown, so RouteFocus reruns cannot cancel it; opener Tab order is preserved and successful sign-in gives destination-heading focus to RouteFocus.
 - Storefront client sign-in links open a native dialog over the current page, with keyboard dismissal/history and opener focus; direct and no-JavaScript visits keep the canonical full page.
 - Storefront playful polish (concept 03 gaps of 2026-11-15; storefront and UI library only: no API, schema, token, configuration or dependency change): the cart drawer floats as a card (inset by the spacing unit, safe areas respected, `--fk-radius-overlay`, 2px foreground outline, `--fk-shadow-overlay`) and enters with the spring plus a slight rotate; the drawer and `/cart` empty states share one floating bag illustration (off under reduced motion); grid product cards tilt about 1.5° (alternating) and their image hops on hover with a hovering pointer and motion allowed; the free-shipping bar is 14 px with an ink outline and a spring fill. `@fluxkit/ui` `EmptyState` gains an optional `illustration` (additive; unchanged markup without it).

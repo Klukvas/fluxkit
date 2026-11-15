@@ -16,6 +16,28 @@ export function signInCloseAction(canGoBack: boolean | undefined): "back" | "hom
   return canGoBack === true ? "back" : "home";
 }
 
+/** Includes a bare #, which also creates a same-document history entry under native navigation. */
+export function isSameDocumentFragment(href: string, currentHref: string): boolean {
+  const url = new URL(href, currentHref);
+  return url.href.includes("#") && url.href.split("#")[0] === currentHref.split("#")[0];
+}
+
+export function isSignInOpenerLink({
+  href,
+  currentHref,
+  loginPath,
+  insideDialog,
+}: {
+  href: string;
+  currentHref: string;
+  loginPath: string;
+  insideDialog: boolean;
+}): boolean {
+  if (insideDialog || isSameDocumentFragment(href, currentHref)) return false;
+  const url = new URL(href, currentHref);
+  return url.origin === new URL(currentHref).origin && url.pathname === loginPath;
+}
+
 interface Activation {
   origin: string;
   opener: SignInOpener;

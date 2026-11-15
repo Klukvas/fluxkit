@@ -1,10 +1,14 @@
 "use client";
 
 import { Button } from "@fluxkit/ui";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useId, useRef, type ReactNode, type Ref } from "react";
 import { localizedHref } from "../lib/locale-path";
-import { focusSignInDestination, signInCloseAction } from "../lib/sign-in-navigation";
+import {
+  focusSignInDestination,
+  isSameDocumentFragment,
+  signInCloseAction,
+} from "../lib/sign-in-navigation";
 import { useI18n } from "./i18n-provider";
 import { useAccount } from "./session-provider";
 import { useSignInNavigation } from "./sign-in-navigation";
@@ -47,6 +51,44 @@ export function SignInModalView({
       ref={dialogRef}
       aria-labelledby={titleId}
       className="fk-sign-in-modal m-auto max-w-md rounded-overlay border border-border bg-background p-6 text-foreground shadow-card backdrop:bg-scrim"
+      onClickCapture={(event) => {
+        if (
+          event.defaultPrevented ||
+          event.button !== 0 ||
+          event.metaKey ||
+          event.ctrlKey ||
+          event.shiftKey ||
+          event.altKey
+        )
+          return;
+        const anchor = event.target instanceof Element ? event.target.closest("a") : null;
+        if (
+          !(anchor instanceof HTMLAnchorElement) ||
+          anchor.download ||
+          (anchor.target && anchor.target !== "_self") ||
+          !isSameDocumentFragment(anchor.href, event.currentTarget.ownerDocument.URL)
+        )
+          return;
+        // Field-error links must not add a history entry ahead of the dialog's dismissal target.
+        event.preventDefault();
+        let id: string;
+        try {
+          id = decodeURIComponent(new URL(anchor.href).hash.slice(1));
+        } catch {
+          // A malformed percent-encoded fragment has no decodable target id.
+          return;
+        }
+        if (!id) return;
+        const target = event.currentTarget.querySelector<HTMLElement>(`#${CSS.escape(id)}`);
+        if (!target) return;
+        target.focus({ preventScroll: true });
+        target.scrollIntoView({
+          block: "nearest",
+          behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+            ? "instant"
+            : "smooth",
+        });
+      }}
       onCancel={(event) => {
         event.preventDefault();
         onDismiss();
@@ -66,12 +108,18 @@ export function SignInModalView({
 export function SignInModal({ children }: { children: ReactNode }) {
   const { locale, t } = useI18n();
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const coordinator = useSignInNavigation()?.coordinator ?? null;
   const { store } = useAccount();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const mounted = useRef(false);
   const closing = useRef(false);
   const titleId = useId();
+  useEffect(() => {
+    // A committed traversal can retain this slot; allow another dismissal in that case.
+    closing.current = false;
+  }, [pathname, searchParams]);
   useEffect(() => {
     const dialog = dialogRef.current;
     if (dialog === null) return;

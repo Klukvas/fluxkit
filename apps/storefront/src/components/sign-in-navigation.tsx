@@ -4,7 +4,11 @@ import type { Locale } from "@fluxkit/ui";
 import { useSelectedLayoutSegments } from "next/navigation";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { localizedHref } from "../lib/locale-path";
-import { createSignInNavigation, isSignInModalActive } from "../lib/sign-in-navigation";
+import {
+  createSignInNavigation,
+  isSignInModalActive,
+  isSignInOpenerLink,
+} from "../lib/sign-in-navigation";
 
 interface Navigation {
   active: boolean;
@@ -39,10 +43,13 @@ export function SignInNavigation({ locale, children }: { locale: Locale; childre
         (anchor.target && anchor.target !== "_self")
       )
         return;
-      const url = new URL(anchor.href);
       if (
-        url.origin !== window.location.origin ||
-        url.pathname !== localizedHref(locale, "/account/login")
+        !isSignInOpenerLink({
+          href: anchor.href,
+          currentHref: document.URL,
+          loginPath: localizedHref(locale, "/account/login"),
+          insideDialog: anchor.closest("dialog") !== null,
+        })
       )
         return;
       const opener = anchor.closest("header")
