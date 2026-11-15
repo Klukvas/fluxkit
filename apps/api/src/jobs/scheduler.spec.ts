@@ -464,12 +464,12 @@ describe("the scheduler: advisory lock, ticks, shutdown (real Postgres)", () => 
       expect(closed).toBe(true);
     });
 
-    it("leaves GET /health exactly as it was", async () => {
+    it("keeps GET /health independent of the scheduler", async () => {
       const ticking = await startApp({ schedulerEnabled: true, schedulerIntervalSeconds: 60 });
       try {
         const response = await fetch(`${ticking.baseUrl}/health`);
         expect(response.status).toBe(200);
-        expect(await response.json()).toEqual({ status: "ok" });
+        expect(await response.json()).toEqual({ status: "ok", rateLimitStore: "memory" });
       } finally {
         await ticking.app.close();
       }

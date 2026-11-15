@@ -80,3 +80,8 @@ The export lists which of these the shop uses, so a person sees who received the
 ## 7. Before an EU launch
 
 Ask a lawyer and an accountant: whether the rules apply to your shop and whether an EU representative is needed (O1); processor roles, terms and data locations (O2, O7); the final privacy notice, terms and cookie text (O3); which identity check you accept for requests by email (O4); which order fields tax and accounting law require you to keep, and for how long, to set `ORDER_CONTACT_RETENTION_DAYS` (O5); whether a record of processing or a notification to an authority is required (O6); your breach contacts and procedure (O8).
+
+
+## Ephemeral rate-limit counters
+
+With `RATE_LIMIT_STORE=redis`, Redis holds security counters (legitimate interest, abuse prevention), isolated by database name. Subject keys are HMAC-SHA256 of the normalized address (IPv6 /64), email or account id using an HKDF-SHA256 key derived from `ORDER_TOKEN_SECRET`, empty salt, info `rate-limit`. They are pseudonymous/linkable with the secret, not anonymous; no raw address, email or id is stored. Values are only numeric counts. Every key expires at the end of its fixed window (at most 24 hours); denied requests do not renew retention. Counters are excluded from subject exports and expire automatically rather than being erased early (which would reopen abuse windows). Restrict Redis access and keep it private. Logs contain only the fixed failure code, never the subject or transport exception. Memory mode and runtime Redis fallback keep bounded local windows only. See [ADR 0055](../adr/0055-shared-state-for-several-instances.md) and the [inventory notes](../../apps/api/src/privacy/inventory/README.md).

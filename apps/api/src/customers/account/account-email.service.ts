@@ -110,7 +110,7 @@ export class AccountEmailService {
     if (!email.ok || errors.length > 0) {
       throw validationFailed(errors);
     }
-    const perEmail = this.limiter.attempt("passwordResetEmail", `email:${email.email}`);
+    const perEmail = await this.limiter.attempt("passwordResetEmail", `email:${email.email}`);
     if (!perEmail.allowed) {
       throw tooManyRequests("Too many requests. Try again later.", perEmail.retryAfterSeconds);
     }
@@ -231,7 +231,7 @@ export class AccountEmailService {
     if (row.emailVerifiedAt !== null) {
       throw this.alreadyVerified();
     }
-    const limit = this.limiter.attempt("verificationResend", `customer:${row.id}`);
+    const limit = await this.limiter.attempt("verificationResend", `customer:${row.id}`);
     if (!limit.allowed) {
       throw tooManyRequests("Too many requests. Try again later.", limit.retryAfterSeconds);
     }

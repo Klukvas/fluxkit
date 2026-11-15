@@ -65,7 +65,7 @@ export class AuthService {
    * hash to check or the account may not sign in), so neither the body nor the response time tells which case it was.
    */
   async login(body: LoginBody, clientId: string): Promise<LoginResult> {
-    const decision = this.throttle.attempt(clientId);
+    const decision = await this.throttle.attempt(clientId);
     if (!decision.allowed) {
       // Before any lookup or hashing: a throttled client learns nothing about accounts and costs us no scrypt.
       throw this.refused("ip_throttled", tooManyRequests(THROTTLED, decision.retryAfterSeconds));

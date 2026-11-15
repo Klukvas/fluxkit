@@ -73,14 +73,14 @@ export function throttleKeyOf(address: string): string {
 
 /**
  * Per client address limit: a fixed window kept IN MEMORY (ADR 0009, ADR 0016). One instance is one named limit; the
- * admin login throttle (`LoginThrottle`) and the store limits (`RateLimiter`) are built from it.
+ * memory store and Redis outage fallback are built from it (ADR 0055).
  *
  * Limits of this design, on purpose:
  * - IPv6 clients are counted per /64 prefix, so one subscriber cannot multiply the limit by rotating addresses; the
  *   price is that everybody behind one /64 shares a window.
  * - Single process only. Each API instance counts alone and a restart forgets everything, so N instances allow N
  *   times the limit. The per-account lockout (database columns) is the limit that spans instances; a shared IP limit
- *   needs Redis and is a follow-up of the plan.
+ *   uses the optional RedisWindowStore instead.
  * - Behind a reverse proxy `request.ip` is the proxy's address unless `TRUST_PROXY` (the number of trusted hops, which
  *   `createApp` hands to Express `trust proxy`) is set, and then every client shares the proxy's window. Set the exact
  *   hop count: too high lets a client choose its key with `X-Forwarded-For`, too low keeps the shop-wide window.
