@@ -163,7 +163,14 @@ export const noPersonalDataTables: Inventory = {
     "position",
     "created_at",
   ),
-  product_type_option: none("D24", "product_type_id", "option_id", "position", "created_at"),
+  product_type_option: none(
+    "D24",
+    "product_type_id",
+    "option_id",
+    "splits_listing",
+    "position",
+    "created_at",
+  ),
   shipping_method: none(
     "D24",
     "id",
@@ -212,6 +219,7 @@ export const noPersonalDataTables: Inventory = {
     "locale",
     "live_index_uid",
     "build_index_uid",
+    "build_rebuild_key",
     "settings_hash",
     "document_version",
     "currency",

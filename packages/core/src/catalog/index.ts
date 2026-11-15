@@ -4,6 +4,7 @@ export * from "./category-assignments.js";
 export * from "./category-tree.js";
 export * from "./i18n.js";
 export * from "./lifecycle.js";
+export * from "./listing.js";
 export * from "./limits.js";
 export * from "./product-option-change.js";
 export * from "./publish-timestamp.js";

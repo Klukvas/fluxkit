@@ -74,6 +74,7 @@ export const searchIndexState = pgTable(
     locale: text("locale").primaryKey(),
     liveIndexUid: text("live_index_uid"),
     buildIndexUid: text("build_index_uid"),
+    buildRebuildKey: text("build_rebuild_key"),
     // What the live index was built and configured with (core deriveIndexSettings).
     settingsHash: text("settings_hash"),
     documentVersion: integer("document_version"),

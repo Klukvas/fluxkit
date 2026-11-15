@@ -62,6 +62,7 @@
   "errors.reason.option_in_use_by_products": "Products still use this option.",
   "errors.reason.option_value_in_use": "Products still use this option value.",
   "errors.reason.option_not_allowed": "The product type does not allow this option.",
+  "errors.reason.split_option_already_set": "Another option already splits this product type's listings. Clear it before selecting this option.",
   "errors.reason.option_pair_incomplete": "Choose the option and its value together.",
   "errors.reason.options_frozen": "The options of a published product cannot be changed. You can add values only.",
   "errors.reason.too_many_options": "A product can have at most 3 options.",
