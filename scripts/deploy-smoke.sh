@@ -74,6 +74,7 @@ FLUXKIT_HTTPS_PORT=127.0.0.1:${HTTPS_PORT}
 POSTGRES_USER=fluxkit
 POSTGRES_PASSWORD=$(openssl rand -hex 24)
 POSTGRES_DB=fluxkit
+REDIS_PASSWORD=$(openssl rand -hex 32)
 ORDER_TOKEN_SECRET=$(openssl rand -hex 32)
 TRUST_PROXY=1
 STOREFRONT_IMAGE_HOSTS=${DOMAIN}
@@ -144,7 +145,7 @@ pass "every provider and feature package resolves the API's @nestjs/common ($(tr
 
 compose config --quiet
 compose up -d --no-build --wait --wait-timeout 180
-pass "stack healthy (postgres, meilisearch, migrate, api, storefront, edge)"
+pass "stack healthy (postgres, meilisearch, redis, migrate, api, storefront, edge)"
 
 [[ "$(docker inspect -f '{{.State.ExitCode}}' "$(compose ps -a -q migrate)")" == "0" ]] || fail "migrate did not exit 0"
 MIGRATE_LOG=$(compose logs --no-color migrate)
@@ -358,6 +359,18 @@ ENGINE_ID=$(compose ps -q meilisearch)
 [[ -n "$ENGINE_ID" ]] || fail "no meilisearch container"
 [[ -z "$(docker port "$ENGINE_ID" 2>/dev/null)" ]] || fail "the search engine publishes a port"
 pass "the search engine publishes no port"
+
+# --- redis (shared state of the API instances, multi-instance plan): internal only, password, nothing persisted ---
+REDIS_ID=$(compose ps -q redis)
+[[ -n "$REDIS_ID" ]] || fail "no redis container"
+[[ -z "$(docker port "$REDIS_ID" 2>/dev/null)" ]] || fail "redis publishes a port"
+[[ "$(compose exec -T redis redis-cli ping)" == "PONG" ]] || fail "redis does not answer PING with the password"
+[[ "$(compose exec -T -e REDISCLI_AUTH= redis redis-cli ping 2>&1)" == *NOAUTH* ]] || fail "redis answers without the password"
+[[ "$(compose exec -T redis redis-cli config get save | sed -n 2p)" == "" ]] || fail "redis takes RDB snapshots"
+[[ "$(compose exec -T redis redis-cli config get appendonly | sed -n 2p)" == "no" ]] || fail "redis writes an append-only file"
+[[ "$(compose exec -T redis redis-cli config get maxmemory-policy | sed -n 2p)" == "volatile-ttl" ]] ||
+  fail "redis eviction policy is not volatile-ttl"
+pass "redis publishes no port, needs its password and persists nothing (no RDB, no AOF, volatile-ttl)"
 
 # --- an optional feature switched on in the running shop (docs/deployment.md, "Optional features"; blog plan E1) ---
 request GET /uk/blog
