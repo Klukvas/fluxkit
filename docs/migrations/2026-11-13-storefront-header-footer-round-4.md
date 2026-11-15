@@ -69,8 +69,8 @@ Owner's decision, plan `docs/plans/2026-11-15-header-categories-position.md`. No
 - **To keep "Categories" before the logo** on a desktop, list `navigation` before `menu` in `config/header.ts`:
   `blocks: ["navigation", "menu", "logo", "search", "controls"]` (a supported order: only `navigation` precedes the menu, and it is
   hidden on a phone). Then regenerate or delete the fork-deletable `header-footer-defaults.upstream.spec.tsx` snapshots as above.
-- **A fork that placed `navigation` elsewhere** now sees the "Categories" button there from `xl`; the panel opens towards the start
-  when a shown search box precedes it, otherwise towards the end.
+- **A fork that placed `navigation` elsewhere** now sees the "Categories" button there from `xl`; its panel takes the header row's
+  end edge when a shown search box precedes it, otherwise the row's start edge.
 
 ## Internal changes (only for a fork that edited the code)
 

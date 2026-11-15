@@ -336,7 +336,7 @@ describe("SiteHeader: the picker display and the theme control (round 4)", () =>
     expect(categories).toBeLessThan(html.indexOf("fk-header-end"));
     // No aria-label on the picker's summary: its text names it; the whole disclosure is hidden below `xl`.
     expect(html).toMatch(
-      /<details class="group relative shrink-0 max-xl:hidden"><summary role="button" aria-expanded="false" class="fk-header-button"><span>§nav\.categories<\/span>/,
+      /<details class="group relative shrink-0 max-xl:hidden xl:static"><summary role="button" aria-expanded="false" class="fk-header-button"><span>§nav\.categories<\/span>/,
     );
     expect(html).toContain(
       '<ul class="fk-picker"><li><a class="fk-menu-item" href="/en/c/shoes">§cat-shoes</a><ul><li><a class="fk-menu-item" href="/en/c/boots">§cat-boots</a></li>',

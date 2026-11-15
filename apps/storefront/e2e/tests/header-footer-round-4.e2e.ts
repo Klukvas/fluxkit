@@ -25,8 +25,15 @@ interface TabStop {
   y: number;
 }
 
-/** The header's Tab stops from the top of the page, in order, with their place on screen (a closed header). */
+/**
+ * The header's Tab stops from the top of the page, in order, with their place on screen (a closed header). Waits for the
+ * cart and account islands first, so a control still loading cannot change the sequence.
+ */
 async function headerTabStops(page: Page): Promise<TabStop[]> {
+  await waitForHydration(page);
+  const banner = page.getByRole("banner");
+  await expect(banner.getByText("Loading the account", { exact: true })).toHaveCount(0);
+  await expect(banner.getByText("Loading the cart", { exact: true })).toHaveCount(0);
   const stops: TabStop[] = [];
   for (let step = 0; step < 30; step += 1) {
     await page.keyboard.press("Tab");
@@ -47,6 +54,17 @@ async function headerTabStops(page: Page): Promise<TabStop[]> {
     stops.push(stop);
   }
   throw new Error(`the focus never left the header: ${stops.map((stop) => stop.name).join(" > ")}`);
+}
+
+/** Left to right in Tab order, all in the one header row (the tops within a few pixels of each other). */
+function expectOneRowInTabOrder(stops: readonly TabStop[]): void {
+  const tops = stops.map((stop) => stop.y);
+  expect(Math.max(...tops) - Math.min(...tops)).toBeLessThan(24);
+  for (const [index, stop] of stops.entries()) {
+    if (index === 0) continue;
+    const before = stops[index - 1];
+    expect(stop.x, `${stop.name} after ${before?.name ?? ""}`).toBeGreaterThan(before?.x ?? 0);
+  }
 }
 
 async function setTheme(page: Page, value: string): Promise<void> {
@@ -81,6 +99,10 @@ test.describe("desktop", () => {
     const panel = await box(page.locator("header details[open] > div"));
     expect(panel.x).toBeGreaterThanOrEqual(0);
     expect(panel.x + panel.width).toBeLessThanOrEqual(DESKTOP.width);
+    // Anchored to the header row, not to the button, so a wider logo before it cannot push it off the screen.
+    const row = await box(page.locator("header .fk-header-row"));
+    expect(panel.x).toBe(row.x);
+    expect(panel.x + panel.width).toBeLessThanOrEqual(row.x + row.width);
 
     // Tab goes into the panel, in reading order.
     await page.keyboard.press("Tab");
@@ -110,16 +132,18 @@ test.describe("desktop", () => {
     await expect(banner.getByRole("button", { name: "Menu", exact: true })).toBeHidden();
     const stops = await headerTabStops(page);
     const names = stops.map((stop) => stop.name);
-    expect(names.indexOf("Categories")).toBe(1);
-    expect(names.slice(2, 4)).toEqual(["Search products", "Search"]);
-    expect(names).not.toContain("Menu");
+    expect(names).toEqual([
+      "Fluxkit",
+      "Categories",
+      "Search products",
+      "Search",
+      "Site language: English",
+      "Theme",
+      "Cart0 items in the cart",
+      "Account menu",
+    ]);
     // One row, left to right, in Tab order.
-    for (const [index, stop] of stops.entries()) {
-      if (index === 0) continue;
-      expect(stop.x, `${stop.name} after ${names[index - 1] ?? ""}`).toBeGreaterThan(
-        stops[index - 1]?.x ?? 0,
-      );
-    }
+    expectOneRowInTabOrder(stops);
     // One "Main navigation" at this width, and only while the picker is open.
     const nav = banner.getByRole("navigation", { name: "Main navigation" });
     await expect(nav).toHaveCount(0);
@@ -216,18 +240,24 @@ test.describe("phone", () => {
     await expect(banner.getByRole("button", { name: "Categories", exact: true })).toBeHidden();
     const stops = await headerTabStops(page);
     const names = stops.map((stop) => stop.name);
-    expect(names[0]).toBe("Menu");
-    expect(names).not.toContain("Categories");
-    for (const [index, stop] of stops.entries()) {
-      if (index === 0) continue;
-      expect(stop.x, `${stop.name} after ${names[index - 1] ?? ""}`).toBeGreaterThan(
-        stops[index - 1]?.x ?? 0,
-      );
-    }
+    expect(names).toEqual([
+      "Menu",
+      "Fluxkit",
+      "Search",
+      "Site language: English",
+      "Cart0 items in the cart",
+      "Account menu",
+    ]);
+    expectOneRowInTabOrder(stops);
     const nav = banner.getByRole("navigation", { name: "Main navigation" });
     await expect(nav).toHaveCount(0);
-    await banner.getByRole("button", { name: "Menu", exact: true }).click();
+    // Back to the menu button, open it by keyboard, and Tab goes into its list.
+    const menu = banner.getByRole("button", { name: "Menu", exact: true });
+    await menu.focus();
+    await page.keyboard.press("Enter");
     await expect(nav).toHaveCount(1);
+    await page.keyboard.press("Tab");
+    await expect(nav.getByRole("link", { name: "Clothing", exact: true })).toBeFocused();
   });
 
   test("the menu keeps the flat list, carries the theme switch, and the footer has two columns", async ({

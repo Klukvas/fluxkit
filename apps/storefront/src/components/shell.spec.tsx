@@ -81,7 +81,7 @@ describe("SiteShell landmarks and accessibility", () => {
     expect(mains).toHaveLength(2);
     // The menu button is named "Menu" (below `xl`), the picker's summary by its text "Categories" (from `xl`), after the logo.
     expect(html).toMatch(
-      /<details class="group relative shrink-0 xl:hidden"><summary role="button" aria-expanded="false" aria-label="§nav\.menu".*?class="fk-logo".*?<details class="group relative shrink-0 max-xl:hidden"><summary role="button" aria-expanded="false" class="fk-header-button"><span>§nav\.categories<\/span>/,
+      /<details class="group relative shrink-0 xl:hidden"><summary role="button" aria-expanded="false" aria-label="§nav\.menu".*?class="fk-logo".*?<details class="group relative shrink-0 max-xl:hidden xl:static"><summary role="button" aria-expanded="false" class="fk-header-button"><span>§nav\.categories<\/span>/,
     );
     expect(html).toContain('aria-label="§locale.switcher.label"');
     for (const nav of navs.filter((tag) => tag.includes("aria-labelledby"))) {

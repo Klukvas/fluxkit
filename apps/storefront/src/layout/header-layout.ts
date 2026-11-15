@@ -118,9 +118,11 @@ export function menuPanelAlign(config: HeaderConfig): PanelAlign {
 }
 
 /**
- * Where the `picker` panel (`xl:w-3xl`) opens. From `xl` the search box grows (`lg:flex-1`) and `controls` sits at the end
- * (`ms-auto`), so a picker after a shown search box is at the end of the row and opens towards the start (`end`); anywhere
- * else it packs at the start of the row and opens towards the end (`start`). Measured at 1280 px for the supported orders
+ * Which edge of the header row the `picker` panel (`w-3xl`) is aligned with: from `xl` the row is the panel's containing block
+ * (`.fk-picker-panel` in `app/globals.css`), so the panel stays inside the row whatever comes before the button (a wide logo
+ * included). The search box grows (`lg:flex-1`) and `controls` sits at the end (`ms-auto`), so a picker after a shown search box
+ * is at the end of the row and its panel takes the row's end edge (`end`); anywhere else the picker packs at the start and the
+ * panel takes the start edge (`start`), each the edge nearer the button. Checked in a browser at 1280 px for the default order
  * (`e2e/tests/header-footer-round-4.e2e.ts`).
  */
 export function pickerPanelAlign(

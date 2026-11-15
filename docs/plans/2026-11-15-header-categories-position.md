@@ -61,7 +61,13 @@ As built (branch `fix/header-categories-position`):
 
 - `layout/header-layout.ts`: in `picker` mode `menu` gives the `row` menu (top-level categories and links, flat, theme switch below
   `sm`) and `navigation` gives the `picker` view (no `withTheme`); `pickerPanelAlign`.
-- `components/site-header.tsx`: `PickerBlock` is `max-xl:hidden`, its summary the "Categories" text and chevron only.
+- `components/site-header.tsx`: `PickerBlock` is `max-xl:hidden xl:static`, its summary the "Categories" text and chevron only. From
+  `xl` the header row is the panel's containing block (`.fk-header-row` `xl:relative`), so the panel stays inside the row however wide
+  a fork's logo is (independent review finding: with the panel under the button, a 480 px logo and no search box pushed it past
+  1280 px); the narrow-width `.fk-picker*` rules are gone (the disclosure is hidden there).
+- Independent review (Codex, 2026-11-15): approve with fixes; fixed: the panel anchoring above, complete Tab sequences with the
+  islands loaded and one-row alignment in the e2e, keyboard entry into the phone menu, a comment that claimed more browser
+  measurement than was done.
 - Header markup 7 707 bytes in `shell.spec.tsx`'s worst case (cap 8 000; 6 969 before).
 - Docs: contract row, `config/header.ts` comment, `docs/customization.md`, `CHANGELOG.md`, the update section of
   `docs/migrations/2026-11-13-storefront-header-footer-round-4.md` (how to keep "Categories" before the logo), `docs/files/storefront.md`,

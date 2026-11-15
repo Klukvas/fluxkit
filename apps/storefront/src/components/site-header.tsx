@@ -123,7 +123,7 @@ function PickerBlock({
         </>
       }
       align={align}
-      className="shrink-0 max-xl:hidden"
+      className="shrink-0 max-xl:hidden xl:static"
       panelClassName="fk-picker-panel"
     >
       <nav aria-label={t("nav.main.label")}>
