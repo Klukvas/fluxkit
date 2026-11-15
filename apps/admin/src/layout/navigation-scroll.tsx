@@ -17,31 +17,6 @@ export function scrollEdges({
   return { above: position > 1, below: maximum - position > 1 };
 }
 
-export function useScrollEdges(ref: RefObject<HTMLDivElement | null>): ScrollEdges {
-  const [edges, setEdges] = useState<ScrollEdges>({ above: false, below: false });
-  useEffect(() => {
-    const box = ref.current;
-    if (!box) return;
-    const update = () => {
-      const next = scrollEdges(box);
-      setEdges((previous) =>
-        previous.above === next.above && previous.below === next.below ? previous : next,
-      );
-    };
-    update();
-    box.addEventListener("scroll", update, { passive: true });
-    const observer = new ResizeObserver(update);
-    observer.observe(box);
-    // The nav's size changes even when the scroll box itself stays the same size.
-    if (box.firstElementChild) observer.observe(box.firstElementChild);
-    return () => {
-      box.removeEventListener("scroll", update);
-      observer.disconnect();
-    };
-  }, [ref]);
-  return edges;
-}
-
 export function revealDelta(
   item: Pick<DOMRect, "top" | "bottom">,
   viewport: Pick<DOMRect, "top" | "bottom">,
@@ -52,26 +27,43 @@ export function revealDelta(
 }
 
 /** Reveal only inside this sidebar: never move document scroll or keyboard focus. */
-export function useRevealCurrentItem(ref: RefObject<HTMLDivElement | null>, pathname?: string) {
+export function useNavigationScroll(
+  ref: RefObject<HTMLDivElement | null>,
+  pathname?: string,
+): ScrollEdges {
+  const [edges, setEdges] = useState<ScrollEdges>({ above: false, below: false });
   useEffect(() => {
     const box = ref.current;
     if (!box) return;
+    const update = () => {
+      const next = scrollEdges(box);
+      setEdges((previous) =>
+        previous.above === next.above && previous.below === next.below ? previous : next,
+      );
+    };
     const reveal = () => {
       const current = box.querySelector('a[aria-current="page"]');
-      if (!current || box.clientHeight === 0) return;
-      const top = box.getBoundingClientRect().top + box.clientTop;
-      box.scrollTop += revealDelta(current.getBoundingClientRect(), {
-        top,
-        bottom: top + box.clientHeight,
-      });
+      if (current && box.clientHeight !== 0) {
+        const top = box.getBoundingClientRect().top + box.clientTop;
+        box.scrollTop += revealDelta(current.getBoundingClientRect(), {
+          top,
+          bottom: top + box.clientHeight,
+        });
+      }
+      update();
     };
     reveal();
+    box.addEventListener("scroll", update, { passive: true });
     const observer = new ResizeObserver(reveal);
     observer.observe(box);
     // Feature links can grow the nav without resizing its scroll box.
     if (box.firstElementChild) observer.observe(box.firstElementChild);
-    return () => observer.disconnect();
+    return () => {
+      box.removeEventListener("scroll", update);
+      observer.disconnect();
+    };
   }, [ref, pathname]);
+  return edges;
 }
 
 export function NavigationScrollHint({

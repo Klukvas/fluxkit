@@ -28,7 +28,7 @@ import { featureRouteGate, shownFeatures, useEnabledFeatures } from "./enabled-f
 import { FeatureRouteFallback, fallbackTitleKey } from "./feature-route-view";
 import { LanguageSwitch } from "./language-switch";
 import { isCurrentPath, visibleNavigation } from "./navigation";
-import { NavigationScrollHint, useRevealCurrentItem, useScrollEdges } from "./navigation-scroll";
+import { NavigationScrollHint, useNavigationScroll } from "./navigation-scroll";
 import { mayOpenRoute } from "./route-gate";
 import { useSidebarCollapsed } from "./use-sidebar-collapsed";
 import { UserMenu } from "./user-menu";
@@ -106,8 +106,7 @@ function ShellNavigation({
   pathname?: string;
 }) {
   const scrollBox = useRef<HTMLDivElement>(null);
-  const edges = useScrollEdges(scrollBox);
-  useRevealCurrentItem(scrollBox, pathname);
+  const edges = useNavigationScroll(scrollBox, pathname);
   const renderNav = (groups: SideNavGroup[], label: string) => (
     <SideNav
       label={label}
