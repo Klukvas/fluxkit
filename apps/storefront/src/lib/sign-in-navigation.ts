@@ -76,6 +76,23 @@ export function focusSignInDestination(
   else focusPageHeading(doc);
 }
 
+/**
+ * Whether a protected page's gate is only the retained background of the sign-in modal. Next can commit the login pathname a
+ * render before the slot's segments mark the modal active; a gate that acted on that render took the login page for its own
+ * path and redirected again to a bare login address (its auth-page `next` dropped).
+ */
+export function isAccountGateBehindSignIn({
+  pathname,
+  loginPath,
+  modalActive,
+}: {
+  pathname: string;
+  loginPath: string;
+  modalActive: boolean;
+}): boolean {
+  return modalActive || pathname === loginPath;
+}
+
 export function shouldRedirectAccountGuest(status: string, modalActive: boolean): boolean {
   return status === "guest" && !modalActive;
 }

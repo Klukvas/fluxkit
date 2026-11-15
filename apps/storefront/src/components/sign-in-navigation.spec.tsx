@@ -4,6 +4,7 @@ import {
   focusSignInDestination,
   isSignInModalActive,
   isSignInOpenerLink,
+  isAccountGateBehindSignIn,
   shouldRedirectAccountGuest,
   signInCloseAction,
 } from "../lib/sign-in-navigation";
@@ -98,6 +99,19 @@ describe("sign-in navigation decisions", () => {
     navigation.recordOpener({ origin, opener });
     opener.isConnected = false;
     expect(navigation.openerFor(origin)).toBeNull();
+  });
+
+  it("treats a gate as the modal's background as soon as the login pathname is committed", () => {
+    const loginPath = "/en/account/login";
+    expect(isAccountGateBehindSignIn({ pathname: loginPath, loginPath, modalActive: false })).toBe(
+      true,
+    );
+    expect(
+      isAccountGateBehindSignIn({ pathname: "/en/account/orders", loginPath, modalActive: true }),
+    ).toBe(true);
+    expect(
+      isAccountGateBehindSignIn({ pathname: "/en/account/orders", loginPath, modalActive: false }),
+    ).toBe(false);
   });
 
   it("prevents gate re-entry while the modal is active", () => {
