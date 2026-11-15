@@ -59,6 +59,24 @@ async function onServer(baseUrl: string, statement: string): Promise<void> {
   }
 }
 
+/**
+ * Ends the pool and resolves once every client of it has closed its connection. `pool.end()` alone resolves as soon as the
+ * pool forgets its clients, while their sockets are still closing; a forced `drop database` right after it terminated such
+ * a backend and the client raised an unhandled FATAL 57P01. pg-pool emits `remove` when a client's `end()` has finished.
+ */
+export async function closePool(pool: pg.Pool): Promise<void> {
+  let open = pool.totalCount;
+  const allClosed = new Promise<void>((resolve) => {
+    if (open === 0) resolve();
+    pool.on("remove", () => {
+      open -= 1;
+      if (open === 0) resolve();
+    });
+  });
+  await pool.end();
+  await allClosed;
+}
+
 /** An empty database next to the `_test` one; its name ends in `_test` too. */
 export async function createScratchDatabase(): Promise<ScratchDatabase> {
   const baseUrl = requireTestDatabaseUrl();
@@ -72,7 +90,7 @@ export async function createScratchDatabase(): Promise<ScratchDatabase> {
     url: url.toString(),
     pool,
     drop: async () => {
-      await pool.end();
+      await closePool(pool);
       await onServer(baseUrl, `drop database if exists ${quoted} with (force)`);
     },
   };

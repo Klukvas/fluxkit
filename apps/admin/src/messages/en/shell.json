@@ -1,6 +1,8 @@
 {
   "shell.skipLink": "Skip to content",
   "shell.navLabel": "Admin sections",
+  "shell.navMoreBelow": "More below",
+  "shell.navMoreAbove": "More above",
   "shell.userLabel": "Your account",
   "shell.signedInAs": "Signed in as {email}",
   "shell.account": "My account",

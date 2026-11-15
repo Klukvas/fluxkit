@@ -28,6 +28,7 @@ export interface SideNavLinkProps {
 export interface SideNavProps {
   collapsed?: boolean;
   currentTone?: "solid" | "muted";
+  density?: "comfortable" | "compact";
   /** Accessible name of the nav landmark. */
   label: string;
   groups: SideNavGroup[];
@@ -47,10 +48,12 @@ export function SideNav({
   renderLink = defaultLink,
   collapsed = false,
   currentTone = "solid",
+  density,
 }: SideNavProps) {
   const instanceId = useId();
+  const compact = density === "compact";
   return (
-    <nav aria-label={label} className="flex flex-col gap-6">
+    <nav aria-label={label} className={compact ? "flex flex-col gap-2" : "flex flex-col gap-6"}>
       {groups.map((group) => {
         const headingId = `${instanceId}-side-nav-${group.id}`;
         return (
@@ -68,10 +71,12 @@ export function SideNav({
             ) : null}
             <ul
               aria-labelledby={group.heading ? headingId : undefined}
-              className="flex flex-col gap-1"
+              className={compact ? "flex flex-col gap-0.5" : "flex flex-col gap-1"}
             >
               {group.items.map((item) => (
-                <li key={item.id}>{renderItem(item, renderLink, collapsed, currentTone)}</li>
+                <li key={item.id}>
+                  {renderItem(item, renderLink, collapsed, currentTone, compact)}
+                </li>
               ))}
             </ul>
           </div>
@@ -86,12 +91,14 @@ function renderItem(
   renderLink: NonNullable<SideNavProps["renderLink"]>,
   collapsed: boolean,
   currentTone: "solid" | "muted",
+  compact: boolean,
 ): ReactNode {
   const link = renderLink({
     href: item.href,
     ...(item.current ? { "aria-current": "page" as const } : {}),
     className: cn(
-      "flex min-h-11 items-center gap-3 rounded-control px-3 py-2 font-medium",
+      "flex items-center gap-3 rounded-control px-3 font-medium",
+      compact ? "min-h-9 py-1 text-sm pointer-coarse:min-h-11" : "min-h-11 py-2",
       collapsed && item.icon ? "justify-center" : undefined,
       focusRing,
       item.current

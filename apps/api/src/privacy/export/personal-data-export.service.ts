@@ -98,7 +98,7 @@ export class PersonalDataExportService {
    * completed self-service export request (no contact data in the row) in the same transaction that read the data.
    */
   async selfService(customerId: string): Promise<PersonalDataExport> {
-    const limit = this.limiter.attempt("dataExport", `customer:${customerId}`);
+    const limit = await this.limiter.attempt("dataExport", `customer:${customerId}`);
     if (!limit.allowed) {
       throw tooManyRequests("Too many exports. Try again later.", limit.retryAfterSeconds);
     }

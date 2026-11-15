@@ -1,3 +1,5 @@
+import { MemoryWindowStore, type WindowStore } from "../rate-limit/window-store.js";
+import type { WindowLimit } from "../rate-limit/ip-window-limiter.js";
 import {
   DEFAULT_MAX_CLIENTS,
   IpWindowLimiter,
@@ -22,17 +24,25 @@ export interface LoginThrottleOptions {
   maxClients?: number;
 }
 
-/**
- * Per client address limit on ADMIN login attempts (ADR 0009, plan "Login throttling"): the generic in-memory window
- * (`IpWindowLimiter`, which documents its limits: single process, IPv6 by /64, `trust proxy`) with the admin
- * limit. Customer login uses the named `login` limit of `RateLimiter`, a separate window.
- */
-export class LoginThrottle extends IpWindowLimiter {
-  constructor(clock: Clock, options: LoginThrottleOptions = {}) {
-    super(clock, {
+/** Admin login has its own named window; customer login uses `login` in RateLimiter. */
+export class LoginThrottle {
+  private readonly store: WindowStore;
+  private readonly limit: WindowLimit;
+  constructor(clock: Clock, options: LoginThrottleOptions = {}, store?: WindowStore) {
+    this.limit = {
       maxAttempts: options.maxAttempts ?? LOGIN_THROTTLE_DEFAULTS.maxAttempts,
       windowMinutes: options.windowMinutes ?? LOGIN_THROTTLE_DEFAULTS.windowMinutes,
       maxClients: options.maxClients ?? LOGIN_THROTTLE_DEFAULTS.maxClients,
-    });
+    };
+    new IpWindowLimiter(clock, this.limit);
+    this.store = store ?? new MemoryWindowStore(clock);
+  }
+
+  get size(): number {
+    return this.store instanceof MemoryWindowStore ? this.store.size("adminLogin") : 0;
+  }
+
+  async attempt(client: string): Promise<ThrottleDecision> {
+    return this.store.hit("adminLogin", client, this.limit);
   }
 }

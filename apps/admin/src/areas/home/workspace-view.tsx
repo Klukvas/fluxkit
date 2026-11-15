@@ -4,7 +4,7 @@ import { Link } from "react-router";
 import { describeFailure } from "../../lib/problem-messages";
 import type { ResourceView } from "../../lib/use-resource";
 import { PATHS } from "../../router/paths";
-import { ghostLinkClass, secondaryLinkClass, standaloneLinkClass } from "../../views/links";
+import { secondaryLinkClass, standaloneLinkClass } from "../../views/links";
 import type { WorkspaceAction, WorkspaceCounter } from "./workspace-model";
 
 const actionIcons = { newProduct: PlusIcon, processOrders: OrdersIcon, customers: CustomersIcon };
@@ -114,11 +114,7 @@ export function WorkspaceView({
             {actions.map((action) => {
               const Icon = actionIcons[action.id];
               return (
-                <Link
-                  key={action.id}
-                  to={action.target}
-                  className={action.variant === "secondary" ? secondaryLinkClass : ghostLinkClass}
-                >
+                <Link key={action.id} to={action.target} className={secondaryLinkClass}>
                   <span
                     aria-hidden="true"
                     className="inline-flex size-5 shrink-0 items-center justify-center"

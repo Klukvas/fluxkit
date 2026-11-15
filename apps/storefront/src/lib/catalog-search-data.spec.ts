@@ -1,7 +1,13 @@
 import type { SearchResult } from "@fluxkit/api-client";
 import { describe, expect, it } from "vitest";
 import { loadCatalogSearchPage } from "./catalog-search-data";
-import type { SearchData, SearchOutcome, SearchReadOptions } from "./search-data";
+import {
+  createSearchData,
+  type SearchData,
+  type SearchOutcome,
+  type SearchReadOptions,
+} from "./search-data";
+import { problem } from "./test-fetch";
 import type { SearchQuery } from "./search-query";
 import type { CatalogOutcome, StoreData } from "./store-data";
 import { category, summary } from "./test-fixtures";
@@ -73,7 +79,7 @@ describe("catalog and category pages with search on (plan section 9, question 3)
     const read = { ...empty, facets: ["opt.size:m"], sort: "price_asc" as const };
     const page = await loadCatalogSearchPage(store, search, "en", { query: read });
     expect(page).toEqual({ kind: "search", result, category: null, trail: [] });
-    expect(searches).toEqual([{ locale: "en", query: read, read: undefined }]);
+    expect(searches).toEqual([{ locale: "en", query: read, read: { groupBy: "listing" } }]);
     expect(listings).toEqual([]);
   });
 
@@ -125,7 +131,7 @@ describe("catalog and category pages with search on (plan section 9, question 3)
       expect(entry).toEqual({
         locale: "en",
         query: { ...empty, sort: "price_asc", facets: ["category:category-tops"], page: 1 },
-        read: { shared: true },
+        read: { groupBy: "listing", shared: true },
       });
     }
   });
@@ -135,7 +141,10 @@ describe("catalog and category pages with search on (plan section 9, question 3)
     const page = await loadCatalogSearchPage(store, search, "en", { query: { ...empty, page: 2 } });
     expect(page.kind).toBe("search");
     expect(searches.map((entry) => entry.query.page)).toEqual([1, 2]);
-    expect(searches.map((entry) => entry.read)).toEqual([{ shared: true }, { shared: true }]);
+    expect(searches.map((entry) => entry.read)).toEqual([
+      { groupBy: "listing", shared: true },
+      { groupBy: "listing", shared: true },
+    ]);
   });
 
   it("falls back when page 1 cannot be read, without reading the page itself", async () => {
@@ -155,7 +164,9 @@ describe("catalog and category pages with search on (plan section 9, question 3)
     await loadCatalogSearchPage(store, search, "en", {
       query: { ...empty, facets: ["brand:a"], page: 2 },
     });
-    expect(searches.map((entry) => [entry.query.page, entry.read])).toEqual([[2, undefined]]);
+    expect(searches.map((entry) => [entry.query.page, entry.read])).toEqual([
+      [2, { groupBy: "listing" }],
+    ]);
   });
 
   it("shares the unfiltered list between shoppers and keeps filtered reads private", async () => {
@@ -164,7 +175,10 @@ describe("catalog and category pages with search on (plan section 9, question 3)
     await loadCatalogSearchPage(store, search, "en", {
       query: { ...empty, facets: ["brand:a"] },
     });
-    expect(searches.map((entry) => entry.read)).toEqual([{ shared: true }, undefined]);
+    expect(searches.map((entry) => entry.read)).toEqual([
+      { groupBy: "listing", shared: true },
+      { groupBy: "listing" },
+    ]);
   });
 
   for (const outcome of [
@@ -184,7 +198,7 @@ describe("catalog and category pages with search on (plan section 9, question 3)
       expect(page.listing.products.items.map((item) => item.slug)).toEqual(["sql"]);
       // The SQL listing applies what it can: the category, one brand and the page.
       expect(listings).toEqual([
-        ["en", { limit: 24, offset: 0, category: "tops", brand: "demo-brand" }],
+        ["en", { groupBy: "listing", limit: 24, offset: 0, category: "tops", brand: "demo-brand" }],
       ]);
     });
   }
@@ -221,4 +235,25 @@ describe("catalog and category pages with search on (plan section 9, question 3)
     );
     expect(listings).toEqual([]);
   });
+});
+
+it("uses the existing SQL outage fallback when listing search is not v4-ready (503)", async () => {
+  const { store, listings } = fakes({ kind: "disabled" });
+  const urls: string[] = [];
+  const search = createSearchData({
+    baseUrl: () => "http://api.internal",
+    fetch: async (url) => {
+      urls.push(url);
+      return problem(503, "search_unavailable");
+    },
+  });
+  const page = await loadCatalogSearchPage(store, search, "en", {
+    categorySlug: "tops",
+    query: empty,
+  });
+  expect(page).toMatchObject({ kind: "fallback", dropped: false });
+  expect(new URL(urls[0] ?? "").searchParams.get("groupBy")).toBe("listing");
+  expect(listings).toEqual([
+    ["en", { groupBy: "listing", limit: 24, offset: 0, category: "tops" }],
+  ]);
 });

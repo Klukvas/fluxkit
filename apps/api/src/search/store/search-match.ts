@@ -30,12 +30,28 @@ export function matchOfProduct(
   selection: SearchSelection,
   definitions: SearchDefinitions,
   shopCurrency: string,
+  listingOption?: { readonly optionCode: string; readonly valueCode: string } | null,
 ): StoreSearchMatch | null {
   // The locale only changes texts, which the filter fields do not hold.
   const context = buildContextFor(definitions, record.productTypeId, "und", "und");
+  const groupIds = new Set(
+    record.facts.variants
+      .filter(
+        (variant) =>
+          listingOption == null ||
+          variant.optionValues.some(
+            (pair) =>
+              pair.optionCode === listingOption.optionCode &&
+              pair.valueCode === listingOption.valueCode,
+          ),
+      )
+      .map((variant) => variant.id),
+  );
   const matching = new Set(
     buildSearchFilterDocuments(record.facts, context)
-      .filter((document) => matchesSearchSelection(document, selection))
+      .filter(
+        (document) => groupIds.has(document.id) && matchesSearchSelection(document, selection),
+      )
       .map((document) => document.id),
   );
   // `readSearchProducts` lists the variants in the product's order (position, id): ties keep the first.

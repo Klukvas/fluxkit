@@ -116,7 +116,7 @@ function readInheritedKeys(path: string): VisualException[] {
   return value.flatMap((entry: unknown) => {
     if (typeof entry !== "object" || entry === null) return [];
     const record = entry as Record<string, unknown>;
-    const { page, theme, selector, property } = record;
+    const { page, theme, selector, property, reason } = record;
     if (typeof page !== "string" || typeof selector !== "string" || typeof property !== "string") {
       return [];
     }
@@ -125,7 +125,7 @@ function readInheritedKeys(path: string): VisualException[] {
         page,
         selector,
         property,
-        reason: "inherited",
+        reason: typeof reason === "string" ? reason.trim() : "",
         ...(typeof theme === "string" ? { theme } : {}),
       },
     ];
@@ -142,8 +142,8 @@ function main(): number {
     }
     if (args.mode === "own") {
       const current = readExceptions(args.current);
-      // The merge-base's entries are only keys to subtract: not validated against this harness (an old entry may name a
-      // selector this tree removed; it declares nothing either way).
+      // The merge-base's entries are only keys (with their reasons) to subtract: not validated against this harness (an
+      // old entry may name a selector this tree removed; it declares nothing either way).
       const inherited = args.inherited === undefined ? [] : readInheritedKeys(args.inherited);
       const own = ownExceptions(current, inherited);
       writeFileSync(args.write, `${JSON.stringify(own, null, 2)}\n`);

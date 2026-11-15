@@ -42,14 +42,22 @@ class CustomerProbeController {
   /** Marked: anonymous callers get 401. */
   @Get("me")
   @CustomerAuthenticated()
-  me(@CurrentCustomer() customer: CustomerPrincipal): CustomerPrincipal {
-    return customer;
+  me(@CurrentCustomer() customer: CustomerPrincipal): Omit<CustomerPrincipal, "tokenHash"> {
+    return {
+      customerId: customer.customerId,
+      email: customer.email,
+      sessionId: customer.sessionId,
+    };
   }
 
   @Post("write")
   @CustomerAuthenticated()
-  write(@CurrentCustomer() customer: CustomerPrincipal): CustomerPrincipal {
-    return customer;
+  write(@CurrentCustomer() customer: CustomerPrincipal): Omit<CustomerPrincipal, "tokenHash"> {
+    return {
+      customerId: customer.customerId,
+      email: customer.email,
+      sessionId: customer.sessionId,
+    };
   }
 
   /** Public: the store default. */
@@ -114,13 +122,21 @@ class CustomerProbeController {
 @CustomerAuthenticated()
 class ClassMarkedProbeController {
   @Get("one")
-  one(@CurrentCustomer() customer: CustomerPrincipal): CustomerPrincipal {
-    return customer;
+  one(@CurrentCustomer() customer: CustomerPrincipal): Omit<CustomerPrincipal, "tokenHash"> {
+    return {
+      customerId: customer.customerId,
+      email: customer.email,
+      sessionId: customer.sessionId,
+    };
   }
 
   @Delete("two")
-  two(@CurrentCustomer() customer: CustomerPrincipal): CustomerPrincipal {
-    return customer;
+  two(@CurrentCustomer() customer: CustomerPrincipal): Omit<CustomerPrincipal, "tokenHash"> {
+    return {
+      customerId: customer.customerId,
+      email: customer.email,
+      sessionId: customer.sessionId,
+    };
   }
 }
 

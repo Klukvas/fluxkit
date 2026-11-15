@@ -1,4 +1,5 @@
 import type { Availability } from "../inventory/availability.js";
+import { partitionListingVariants } from "../catalog/listing.js";
 import { isVariantSellable } from "../catalog/sellable.js";
 import { resolveTextWithFallback } from "../catalog/i18n.js";
 import { isPublicAttribute } from "../catalog/store-attributes.js";
@@ -42,6 +43,7 @@ export interface SearchVariantFacts {
 }
 
 export interface SearchProductFacts {
+  readonly optionCodes?: readonly string[];
   readonly id: string;
   readonly slug: string;
   readonly status: ProductStatus;
@@ -57,6 +59,7 @@ export interface SearchProductFacts {
 }
 
 export interface SearchBuildContext {
+  readonly splitOptionCode?: string | null;
   readonly locale: string;
   readonly defaultLocale: string;
   /** Attribute assignments of the product's type, in the order their texts should appear. */
@@ -69,6 +72,7 @@ export type SearchAttributeFieldValue = string | number | boolean | readonly str
 export interface SearchDocumentFields {
   readonly id: string;
   readonly productId: string;
+  readonly listingKey: string;
   readonly productSlug: string;
   readonly title: string;
   readonly brandName?: string;
@@ -200,7 +204,7 @@ function cut(text: string, length: number): string {
  */
 export type SearchFilterDocument = Pick<
   SearchDocumentFields,
-  "id" | "productId" | "brand" | "categories" | "price" | "inStock"
+  "id" | "productId" | "listingKey" | "brand" | "categories" | "price" | "inStock"
 > & {
   readonly [field in OptionFieldName]?: string;
 } & {
@@ -208,6 +212,7 @@ export type SearchFilterDocument = Pick<
 };
 
 interface SellableVariantFields {
+  readonly listingKey: string;
   readonly variant: SearchVariantFacts;
   readonly shopPrice: number;
   readonly optionLabels: readonly string[];
@@ -226,6 +231,25 @@ function sellableVariantFields(
   product: SearchProductFacts,
   context: SearchBuildContext,
 ): SellableVariantFields[] {
+  const groups = partitionListingVariants({
+    productId: product.id,
+    productStatus: product.status,
+    optionCodes:
+      product.optionCodes ??
+      unique(
+        product.variants.flatMap((variant) => variant.optionValues.map((pair) => pair.optionCode)),
+      ),
+    splitOptionCode: context.splitOptionCode ?? null,
+    variants: product.variants.map((variant) => ({
+      ...variant,
+      hasShopPrice: variant.shopPrice !== null,
+    })),
+  });
+  const keys = new Map(
+    groups.flatMap((group) =>
+      group.variants.map((variant) => [variant.id, group.listingKey] as const),
+    ),
+  );
   const publicAssignments = context.attributes.filter(({ definition }) =>
     isPublicAttribute(definition),
   );
@@ -275,7 +299,10 @@ function sellableVariantFields(
         }
       }
     }
+    const listingKey = keys.get(variant.id);
+    if (listingKey === undefined) throw new Error("Sellable search variant has no listing group.");
     result.push({
+      listingKey,
       variant,
       shopPrice: variant.shopPrice,
       optionLabels,
@@ -327,6 +354,7 @@ export function buildSearchDocuments(
     const document: SearchDocument = {
       id: variant.id,
       productId: product.id,
+      listingKey: fields.listingKey,
       productSlug: product.slug,
       title,
       ...(brandName !== undefined && { brandName }),
@@ -362,6 +390,7 @@ export function buildSearchFilterDocuments(
   return sellableVariantFields(product, context).map((fields) => ({
     id: fields.variant.id,
     productId: product.id,
+    listingKey: fields.listingKey,
     ...(product.brand !== null && { brand: product.brand.slug }),
     categories: categoryIds,
     price: fields.shopPrice,

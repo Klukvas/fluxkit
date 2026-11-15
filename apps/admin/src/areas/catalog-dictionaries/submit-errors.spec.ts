@@ -68,6 +68,22 @@ describe("formErrorsFromProblem", () => {
     expect(result.other).toEqual([]);
   });
 
+  it("puts the one-split-option conflict at the checkbox, using the translated reason", () => {
+    const conflict = problem({
+      code: "rule_violation",
+      status: 409,
+      rule: "split_option_already_set",
+      field: "splitsListing",
+    });
+    expect(formErrorsFromProblem(conflict, 409, ["splitsListing", "position"])).toEqual({
+      fields: { splitsListing: { key: "errors.reason.split_option_already_set" } },
+      other: [],
+    });
+    expect(formErrorsFromProblem(conflict, 409, ["position"]).other).toEqual([
+      { key: "errors.reason.split_option_already_set" },
+    ]);
+  });
+
   it("explains a 409 on no field of the form in the summary", () => {
     const result = formErrorsFromProblem(
       problem({ code: "conflict", status: 409, field: "other" }),

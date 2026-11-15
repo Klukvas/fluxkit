@@ -125,3 +125,38 @@ test("sign-out asks before unsaved input is discarded: from the header and from 
   await expect(page).toHaveURL(new RegExp(`${SPA}/login`));
   await expect(page.getByRole("heading", { level: 1, name: "Sign in to the admin" })).toBeVisible();
 });
+
+test("password rotation keeps the browser signed in after reload", async ({
+  page,
+  owner,
+}, testInfo) => {
+  const email = `rotation-${unique(testInfo)}@example.test`;
+  const password = "initial rotation password 123";
+  const nextPassword = "replacement rotation password 456";
+  await owner.post("/admin/users", { email, password, role: "viewer" });
+  expect(
+    (
+      await page.request.post("/admin/auth/login", { headers: CSRF, data: { email, password } })
+    ).status(),
+  ).toBe(200);
+  const before = (await page.context().cookies()).find(
+    (cookie) => cookie.name === "fluxkit_admin_session",
+  );
+  expect(before).toBeDefined();
+  await page.goto(`${SPA}/account`);
+  await page.getByLabel("Current password", { exact: true }).fill(password);
+  await page.getByLabel("New password", { exact: true }).fill(nextPassword);
+  await page.getByLabel("Repeat the new password", { exact: true }).fill(nextPassword);
+  await page.getByRole("button", { name: "Change password", exact: true }).click();
+  await expect(
+    page.getByText("Password changed. Your other sessions were signed out."),
+  ).toBeVisible();
+  const after = (await page.context().cookies()).find(
+    (cookie) => cookie.name === "fluxkit_admin_session",
+  );
+  expect(after?.value).toBeDefined();
+  expect(after?.value).not.toBe(before?.value);
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Account menu", exact: true })).toBeVisible();
+  expect((await page.request.get("/admin/auth/me")).status()).toBe(200);
+});

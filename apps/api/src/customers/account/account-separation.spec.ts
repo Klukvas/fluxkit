@@ -7,7 +7,7 @@ import { createTestAdminUser, deleteTestAdminUsers } from "../../test/admin-user
 import { startApp, type RunningApp } from "../../test/app.js";
 import { login as adminLogin, loginCookie as adminLoginCookie } from "../../test/auth-http.js";
 import { createTestCustomer, deleteTestCustomers } from "../../test/customer-fixtures.js";
-import { customerLogin, customerLoginCookie } from "../../test/customer-http.js";
+import { customerCookieOf, customerLogin, customerLoginCookie } from "../../test/customer-http.js";
 import { FakeClock } from "../../test/fake-clock.js";
 import { http } from "../../test/http.js";
 import { ensureMigrated } from "../../test/migrate.js";
@@ -186,6 +186,8 @@ describe("customer and admin principals are separate on the real routes", () => 
       headers: { cookie: customerCookie },
     });
     expect(changedCustomer.status).toBe(204);
+    const rotatedCustomerCookie = customerCookieOf(changedCustomer);
+    if (rotatedCustomerCookie === undefined) throw new Error("Expected rotated customer cookie");
     expect(
       (await http(running.baseUrl, "GET", "/admin/auth/me", { headers: { cookie: adminCookie } }))
         .status,
@@ -203,7 +205,7 @@ describe("customer and admin principals are separate on the real routes", () => 
     expect(
       (
         await http(running.baseUrl, "GET", "/store/account/me", {
-          headers: { cookie: customerCookie },
+          headers: { cookie: rotatedCustomerCookie },
         })
       ).status,
     ).toBe(200);

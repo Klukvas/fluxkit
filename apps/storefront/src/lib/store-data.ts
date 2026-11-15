@@ -231,7 +231,7 @@ export function createStoreData(dependencies: StoreDataDependencies): StoreData 
     listProducts: (locale, query = {}, read = {}) =>
       run(
         "GET /store/products",
-        `products:${locale}:${JSON.stringify(query)}`,
+        `products:${locale}:${query.groupBy ?? "product"}:${JSON.stringify(query)}`,
         STORE_TAGS.products,
         isCacheableProductQuery(query) ? read : { ...read, noStore: true },
         (client, options) => client.listProducts({ ...query, ...options, locale }),

@@ -145,3 +145,13 @@ describe("statusAfterAdd", () => {
     ).toEqual({ state: "failed", messageKey: "errors.rule.quantity_limit" });
   });
 });
+
+it("keeps the split title and merged href in the unhydrated add link", () => {
+  const { html } = view(
+    { state: "idle" },
+    { ready: false, title: "Shirt — Red", href: "/en/p/shirt?opt.color=red&opt.size=m" },
+  );
+  expect(html).toContain('href="/en/p/shirt?opt.color=red&amp;opt.size=m"');
+  expect(html).toContain('<span class="sr-only">Shirt — Red</span>');
+  expect(html).not.toContain("<button");
+});

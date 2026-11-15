@@ -8,6 +8,10 @@ import {
 } from "./workspace-model";
 
 describe("workspace model", () => {
+  it("keeps presentation variants out of quick-action definitions", () => {
+    for (const action of QUICK_ACTIONS) expect(action).not.toHaveProperty("variant");
+  });
+
   it("selects only operations allowed by permissions, including missing and empty lists", () => {
     for (const permissions of [null, []])
       expect(selectWorkspace(permissions)).toEqual({ counters: [], actions: [] });

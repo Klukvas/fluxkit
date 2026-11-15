@@ -624,6 +624,14 @@ export interface BrandRef {
 }
 
 export interface ProductSummary {
+  /** Always returned by current APIs; optional for consumers of older summary payloads. */
+  listingKey?: string;
+  listingOption?: {
+    optionCode: string;
+    valueCode: string;
+    optionName: string;
+    valueName: string;
+  } | null;
   id: string;
   slug: string;
   title: string;

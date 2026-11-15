@@ -11,8 +11,8 @@ Additive: a new kind, field or view is minor; a rename or removal is major with 
 | `CardRegistry` (`cards/types.ts`) | `Readonly<Record<string, CardKindEntry>>` | Kinds by name. |
 | `CardKindEntry` | `{ Card: CardComponent; listClassName: string; maxEagerImages: number }` | `listClassName`: literal Tailwind classes of the `<ul>` (no arbitrary values, design guard); `maxEagerImages`: leading images loaded eagerly. |
 | `CardComponent` / `CardProps` | `(props: { card: ProductCardModel; headingLevel: "h2" \| "h3"; eager: boolean; locale; t }) => ReactNode` | A SERVER component; never a `'use client'` file (`client-boundary.spec.ts`). `t` is for the card's own extra text (`custom.*` keys). |
-| `ProductCardModel` (`lib/product-card-model.ts`, built by `cardDisplay`) | `{ id, title, href, image: { src, alt }, brand: { name, href } \| null, price, priceLabel, note, availability: { text, variant, badge } \| null, purchase }` | Plain data, all texts translated, links localized. A card renders this, never the API's list item. `purchase` (additive, 2026-11-13): `{ kind: "add", variantId }` (the API's `defaultVariantId`: the product's only sellable variant), `{ kind: "choose", label, shortLabel }` (several variants: link to `href` to choose; `shortLabel` is shown below `sm`, and both purchase actions keep their words on one line so the action stays 44 px high) or `null` (the shown availability is out of stock or unknown). |
-| `CardPurchaseAction` (`components/cards/card-purchase.tsx`) | `(props: { card: ProductCardModel }) => ReactNode` | What the built-in cards render for `purchase`: the client island `CardAddButton` (`components/card-add-button.tsx`, `{ variantId, title }`: adds one unit through the shared cart store) or the choose link. A fork's card may render it, or `CardAddButton` itself; it must sit outside the product link. |
+| `ProductCardModel` (`lib/product-card-model.ts`, built by `cardDisplay`) | `{ id, listingKey, title, href, image: { src, alt }, brand: { name, href } \| null, price, priceLabel, note, availability: { text, variant, badge } \| null, purchase }` | Plain data, all texts translated, links localized. A card renders this, never the API's list item. `purchase` (additive, 2026-11-13): `{ kind: "add", variantId }` (the API's `defaultVariantId`: the listing group's only sellable variant), `{ kind: "choose", label, shortLabel }` (several variants: link to `href` to choose; `shortLabel` is shown below `sm`, and both purchase actions keep their words on one line so the action stays 44 px high) or `null` (the shown availability is out of stock or unknown). |
+| `CardPurchaseAction` (`components/cards/card-purchase.tsx`) | `(props: { card: ProductCardModel }) => ReactNode` | What the built-in cards render for `purchase`: the client island `CardAddButton` (`components/card-add-button.tsx`, `{ variantId, title, href }`: adds one unit through the shared cart store) or the choose link. A fork's card may render it, or `CardAddButton` itself; it must sit outside the product link. |
 | Built-in kinds | `grid` (default; the card of before the registry, markup unchanged), `list` (one per row, image beside the text) | The effective kind is `grid` or `list` (from `?view=`). `resolveCard(kind)`: an unknown kind renders `grid` and logs `console.error` (never silent). It falls back instead of failing because `grid` is a complete stand-in: the shopper still sees the same products. Custom home sections have no such stand-in and fail instead (`home-sections.md`). |
 
 Accessibility rules every kind keeps (the built-in kinds are the reference): one link to the product (the title, stretched over the card),
@@ -41,3 +41,24 @@ never part of a cache key, a canonical URL, hreflang or the sitemap. The switch 
 (`components/view-toggle.tsx`, messages `catalog.view.label`, `catalog.view.grid`, `catalog.view.list`).
 
 Not contract: the markup and classes of the built-in cards and of the switch, the position of the switch, default values.
+
+## Listing cards (ADR 0052 step 3, additive/minor)
+
+- Visible catalog, category, search and home rows request `groupBy=listing`; sitemap and suggestions stay product-level.
+- `id` remains product identity and may repeat. `listingKey` is the opaque identity for row keys, DOM ids and card-specific state;
+  older summaries fall back to `id`. Do not deduplicate card models by product id or parse listing keys.
+- `title` is ready to display: split cards use `catalog.card.splitTitle` (`{title} — {value}` in uk/en). Render it in link and action
+  names, including visually hidden suffixes. Product page/SEO titles remain unsuffixed.
+- `href` carries `opt.<optionCode>=<valueCode>` via `URLSearchParams`. A match adds its other option values; the split value wins.
+  While catching up (`match: null`), split links retain only the authoritative split value, dropping unvalidated filter values.
+  Use this same href for title, choose and unhydrated/no-JS add links. `image` is the API's group image (or placeholder), never selected
+  again by a card. The group's `defaultVariantId` alone authorizes add; one filtered match must not turn a multi-size card into add.
+- Slots receive each listing model separately. Use `card.listingKey` for card-specific state and `card.id` for product-wide actions
+  such as a product wishlist. The built-in cards already pass the suffixed title and full href to `CardPurchaseAction`.
+- Deploy the listing-capable API first; older APIs reject `groupBy`. Before live v4 search readiness, the existing catalog/category
+  SQL outage fallback requests listing mode too. Shared-cache identity includes grouping, retaining the page-1 guard and
+  500-entry LRU, 60 s fresh / 5 min stale-on-error policy. Failures are never cached.
+
+Fork audit: the supplied slot and custom-card examples consume `card.title`, `card.href` and `card.image` directly; no card-state
+map or product deduplication exists there. `cards/custom.ts` remains fork-owned and unchanged. See the
+[upgrade note](../migrations/0014-split-listing.md) for fork adjustments.

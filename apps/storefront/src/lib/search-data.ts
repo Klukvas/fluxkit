@@ -65,6 +65,8 @@ export interface SearchDataDependencies {
 export interface SearchReadOptions {
   /** One answer for every shopper (bounded addresses only: no words, facet values or price), kept by `sharedCache`. */
   shared?: boolean;
+  /** Visible lists use listing groups; product mode remains available for product-level consumers. */
+  groupBy?: "product" | "listing";
 }
 
 export interface SearchData {
@@ -75,17 +77,19 @@ export function createSearchData(dependencies: SearchDataDependencies): SearchDa
   return {
     async search(locale, query, read) {
       await dependencies.beforeRequest?.();
+      const groupBy = read?.groupBy ?? "listing";
       const cache = read?.shared === true ? dependencies.sharedCache : undefined;
-      if (cache === undefined) return readSearch(dependencies, locale, query);
+      if (cache === undefined) return readSearch(dependencies, locale, query, groupBy);
       const key = JSON.stringify([
         locale,
+        groupBy,
         query.q,
         query.facets,
         query.price,
         query.sort,
         query.page,
       ]);
-      return cache.read(key, () => readSearch(dependencies, locale, query));
+      return cache.read(key, () => readSearch(dependencies, locale, query, groupBy));
     },
   };
 }
@@ -94,6 +98,7 @@ async function readSearch(
   dependencies: SearchDataDependencies,
   locale: string,
   query: SearchQuery,
+  groupBy: "product" | "listing",
 ): Promise<SearchOutcome> {
   const forwarded = (await dependencies.forwardedFor?.()) ?? null;
   const inner: FetchLike = dependencies.fetch ?? globalThis.fetch.bind(globalThis);
@@ -118,6 +123,7 @@ async function readSearch(
   try {
     outcome = await client.searchProducts({
       locale,
+      groupBy,
       ...(query.q === "" ? {} : { q: query.q }),
       ...(query.facets.length === 0 ? {} : { f: query.facets }),
       ...(query.price === null

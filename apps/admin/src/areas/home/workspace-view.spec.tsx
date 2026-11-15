@@ -5,6 +5,7 @@ import { messagesWith } from "../../messages";
 import enHome from "../../messages/en/home.json";
 import ukHome from "../../messages/uk/home.json";
 import { renderInRouter } from "../../test-helpers";
+import { ghostLinkClass, secondaryLinkClass } from "../../views/links";
 import { HomeView } from "./home-page";
 import { COUNTERS, QUICK_ACTIONS, formatTotal } from "./workspace-model";
 import { CounterView, WorkspaceView } from "./workspace-view";
@@ -21,6 +22,17 @@ const states: ResourceView<{ total: number }>[] = [
 ];
 
 describe("workspace view", () => {
+  it("renders every quick action as an outlined secondary link without a ghost or primary look", () => {
+    const html = renderInRouter(<WorkspaceView t={t} counters={[]} actions={QUICK_ACTIONS} />);
+    const links = [...html.matchAll(/<a\b[^>]*class="([^"]*)"[^>]*>/g)];
+    expect(links).toHaveLength(QUICK_ACTIONS.length);
+    for (const [, className] of links) {
+      expect(className).toBe(secondaryLinkClass);
+      expect(className).not.toBe(ghostLinkClass);
+      expect(className).not.toContain("bg-primary");
+    }
+  });
+
   it("shows independent states, native link names and a labelled retry outside the link", () => {
     const counters = COUNTERS.map((counter, index) => {
       const state = states[index];
