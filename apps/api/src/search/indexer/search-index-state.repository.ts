@@ -60,7 +60,11 @@ export class SearchIndexStateRepository {
     return new Map(result.rows.map((row) => [row.locale, row.requested]));
   }
 
-  /** Records a new build; `answered` is the request the starting run read before the definitions (cleared if unchanged). */
+  /**
+   * Records a new build; `answered` is the request the starting run read before the definitions (cleared if unchanged).
+   * Only while the locale has no build: false when a competing run recorded one first, so no run overwrites another's
+   * uid (the index of an overwritten uid would be known to nobody).
+   */
   async startBuild(
     db: DbExecutor,
     locale: string,
@@ -68,8 +72,8 @@ export class SearchIndexStateRepository {
     buildRebuildKey: string,
     answered: string | null,
     now: Date,
-  ): Promise<void> {
-    await db
+  ): Promise<boolean> {
+    const rows = await db
       .update(searchIndexState)
       .set({
         buildIndexUid,
@@ -80,7 +84,9 @@ export class SearchIndexStateRepository {
         rebuildRequestedAt: answeredRequest(answered),
         updatedAt: now,
       })
-      .where(eq(searchIndexState.locale, locale));
+      .where(and(eq(searchIndexState.locale, locale), isNull(searchIndexState.buildIndexUid)))
+      .returning({ locale: searchIndexState.locale });
+    return rows.length > 0;
   }
 
   /**
@@ -99,9 +105,17 @@ export class SearchIndexStateRepository {
       .where(eq(searchIndexState.locale, locale));
   }
 
-  /** Drops an expired, incompatible or missing build's bookkeeping. */
-  async dropBuild(db: DbExecutor, locale: string, now: Date): Promise<void> {
-    await db
+  /**
+   * Drops an expired, incompatible or missing build's bookkeeping, only while it is still `buildIndexUid` (the build the
+   * run deleted): false when a competing run replaced it meanwhile.
+   */
+  async dropBuild(
+    db: DbExecutor,
+    locale: string,
+    buildIndexUid: string,
+    now: Date,
+  ): Promise<boolean> {
+    const rows = await db
       .update(searchIndexState)
       .set({
         buildIndexUid: null,
@@ -111,7 +125,11 @@ export class SearchIndexStateRepository {
         buildDocumentsCount: 0,
         updatedAt: now,
       })
-      .where(eq(searchIndexState.locale, locale));
+      .where(
+        and(eq(searchIndexState.locale, locale), eq(searchIndexState.buildIndexUid, buildIndexUid)),
+      )
+      .returning({ locale: searchIndexState.locale });
+    return rows.length > 0;
   }
 
   async advanceBuild(

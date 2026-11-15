@@ -31,6 +31,7 @@ import {
 import { budgetOf, SearchWorld, UNLIMITED_BUDGET } from "../../test/search-world.js";
 import { StockWorld, type StockedVariant } from "../../test/stock-world.js";
 import { SearchQueueRepository } from "../queue/search-queue.repository.js";
+import { SearchIndexStateRepository } from "./search-index-state.repository.js";
 import type { SearchIndexer } from "./index.js";
 
 /**
@@ -714,6 +715,24 @@ describe("SearchIndexer (real Postgres, real Meilisearch)", () => {
 
     it("a swap whose old index can not be deleted deletes it at the next run instead of leaking it", async () => {
       await rebuildAfterFailedStep("indexes.delete");
+    });
+
+    it("a run never overwrites or drops a build uid another run recorded meanwhile", async () => {
+      const states = new SearchIndexStateRepository();
+      const locale = "xx";
+      const now = new Date();
+      await states.ensureRows(database, [locale]);
+      try {
+        expect(await states.startBuild(database, locale, "first", "key", null, now)).toBe(true);
+        // A competing run planned before "first" was recorded: its start and its drop of an older build both lose.
+        expect(await states.startBuild(database, locale, "second", "key", null, now)).toBe(false);
+        expect(await states.dropBuild(database, locale, "older", now)).toBe(false);
+        expect((await states.loadAll(database)).get(locale)?.buildIndexUid).toBe("first");
+        expect(await states.dropBuild(database, locale, "first", now)).toBe(true);
+        expect((await states.loadAll(database)).get(locale)?.buildIndexUid).toBeNull();
+      } finally {
+        await pool.query("delete from search_index_state where locale = $1", [locale]);
+      }
     });
 
     it("a key without the needed actions is reported as engine_unauthorized", async () => {

@@ -281,8 +281,9 @@ export class SearchIndexer {
     try {
       for (const plan of plans) {
         const requested = requests.get(plan.locale) ?? null;
-        if (plan.action.kind === "continue_build" && plan.state?.buildIndexUid != null) {
-          if (!(await this.indexMissing(plan.state.buildIndexUid))) {
+        const recordedBuild = plan.state?.buildIndexUid ?? null;
+        if (plan.action.kind === "continue_build" && recordedBuild !== null) {
+          if (!(await this.indexMissing(recordedBuild))) {
             if (requested !== null && mayStartOver) {
               // Requested while this build ran: its earlier pages may predate the change. Start over in the same build
               // index (documents are replaced by id) instead of a second full build after the swap.
@@ -291,14 +292,19 @@ export class SearchIndexer {
             }
             continue;
           }
-          // The build index is gone (engine restarted empty): start that locale again.
-          await this.states.dropBuild(this.database, plan.locale, now);
-        } else if (plan.state?.buildIndexUid != null) {
-          await this.deleteOwnedIndex(plan.state.buildIndexUid);
-          await this.states.dropBuild(this.database, plan.locale, now);
         }
-        await this.startBuild(plan, requested, now);
-        started += 1;
+        // A stale build, or one the engine does not have (restarted empty, or its creation still queued by a run that
+        // died): deleted before it is forgotten. The engine runs an index's tasks in order, so a creation still queued
+        // ends before this delete and no index outlives its record.
+        if (recordedBuild !== null) {
+          await this.deleteOwnedIndex(recordedBuild);
+          if (!(await this.states.dropBuild(this.database, plan.locale, recordedBuild, now))) {
+            continue;
+          }
+        }
+        if (await this.startBuild(plan, requested, now)) {
+          started += 1;
+        }
       }
 
       const fresh = await this.states.loadAll(this.database);
@@ -470,10 +476,14 @@ export class SearchIndexer {
    * knows: the next run continues in it, or deletes it when the build is stale (an index the engine never created is
    * found missing and the locale starts again). Without that order every such failure left one more index for ever.
    */
-  private async startBuild(plan: LocalePlan, requested: string | null, now: Date): Promise<void> {
+  private async startBuild(
+    plan: LocalePlan,
+    requested: string | null,
+    now: Date,
+  ): Promise<boolean> {
     const engine = this.requireEngine();
     if (!this.config.enabled) {
-      return;
+      return false;
     }
     // A recovered claim must never recreate a uid a paused run can still submit in a swap.
     const uid = searchBuildIndexUid(
@@ -482,7 +492,7 @@ export class SearchIndexer {
       now,
       randomBytes(16).toString("hex"),
     );
-    await this.states.startBuild(
+    const recorded = await this.states.startBuild(
       this.database,
       plan.locale,
       uid,
@@ -490,12 +500,17 @@ export class SearchIndexer {
       requested,
       now,
     );
+    if (!recorded) {
+      // A competing run recorded its build first: this run continues in that one.
+      return false;
+    }
     await engine.waitForTask(await engine.createIndex(uid), this.taskTimeoutMs());
     // A run that stops before this line leaves the index without settings: `swapIn` applies them before every swap.
     await engine.waitForTask(
       await engine.updateSettings(uid, plan.derived.settings),
       this.taskTimeoutMs(),
     );
+    return true;
   }
 
   private async addDocuments(
