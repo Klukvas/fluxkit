@@ -11,10 +11,10 @@ Every state-changing request needs `X-Fluxkit-CSRF: 1` (and `Content-Type: appli
 
 | Endpoint | Auth | Purpose | Request | Response | Errors |
 |---|---|---|---|---|---|
-| `POST /admin/auth/login` | public | Sign in; a new session on every call, never reusing a token the caller sent | `{email, password}` (strict; email trimmed and lower-cased; both texts at most 1024 characters) | `200 {user: {id, email, role, isActive, lastLoginAt}}` and the session cookie in `Set-Cookie` | `400` structure; `401 unauthorized` for every failure (unknown email, wrong password, locked, inactive: same body, no cookie); `429 too_many_requests` with `Retry-After` |
+| `POST /admin/auth/login` | public | Sign in; a new session on every call, never reusing a token the caller sent; revokes the presented session after success only | `{email, password}` (strict; email trimmed and lower-cased; both texts at most 1024 characters) | `200 {user: {id, email, role, isActive, lastLoginAt}}` and the session cookie in `Set-Cookie` | `400` structure; `401 unauthorized` for every failure (unknown email, wrong password, locked, inactive: same body, no cookie); `429 too_many_requests` with `Retry-After` |
 | `POST /admin/auth/logout` | signed in | Delete the current session and clear the cookie | none | `204` | `401` |
 | `GET /admin/auth/me` | signed in | The signed-in user and the permissions of their role, read from the database | none | `200 {user, permissions: [...]}` | `401` |
-| `POST /admin/auth/change-password` | signed in | Change the own password; ends all OTHER sessions of the user (the current stays) | `{currentPassword, newPassword}` (strict) | `204` | `400` structure or password policy (`errors[].path` is `newPassword`: `too_short`, `too_long`, `equals_email`, `contains_nul`, `same_as_current`); `400` with `path: "currentPassword"`, `code: "incorrect"` for a wrong or locked-out current password; `401` |
+| `POST /admin/auth/change-password` | signed in | Change the own password; ends all OTHER sessions and rotates the current token without extending its absolute lifetime | `{currentPassword, newPassword}` (strict) | `204` and rotated session cookie in `Set-Cookie` (remaining lifetime) | `400` structure or password policy (`errors[].path` is `newPassword`: `too_short`, `too_long`, `equals_email`, `contains_nul`, `same_as_current`); `400` with `path: "currentPassword"`, `code: "incorrect"` for a wrong or locked-out current password; `401` |
 
 ### Login rules
 
@@ -24,6 +24,8 @@ Every state-changing request needs `X-Fluxkit-CSRF: 1` (and `Content-Type: appli
 - **Success** also stamps `last_login_at`, stores a fresh hash when the stored scrypt parameters are not the current ones, deletes that user's expired sessions and creates the new session, all in one transaction under the user's row lock (a concurrent password reset or change therefore ends the new session too).
 - **Locked out?** Wait 15 minutes, have another owner reset the password (`POST /admin/users/{id}/reset-password` clears the lock), or run `pnpm admin:unlock --email <address>` on the server (README, Admin sign-in; ADR 0010).
 - **No caching.** Every response under `/admin`, errors and `401`, `403`, `429` included, carries `Cache-Control: no-store`. `/store/*` catalog routes and `/health` do not (the account, cart, checkout and order routes do, `docs/api/customers.md`).
+
+Password-change rotation follows [ADR 0054](../adr/0054-session-token-rotation.md). Store the new `Set-Cookie`: the old token immediately answers `401`. A failed change sends no cookie; if the session was deleted or its hash replaced after authentication, the change answers `401` and rolls back the password and other-session revocations. In-flight requests using the old token may need to sign in again. No periodic rotation.
 
 ## Users
 
