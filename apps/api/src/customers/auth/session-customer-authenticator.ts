@@ -27,6 +27,7 @@ export class SessionCustomerAuthenticator implements CustomerAuthenticator {
       customerId: resolved.customer.id,
       email: resolved.customer.email,
       sessionId: resolved.sessionId,
+      tokenHash: resolved.tokenHash,
     };
   }
 }

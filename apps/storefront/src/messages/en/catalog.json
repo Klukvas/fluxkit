@@ -24,6 +24,7 @@
   "catalog.pagination.previous": "Previous",
   "catalog.pagination.next": "Next",
   "catalog.pagination.page": "Page {page}",
+  "catalog.card.splitTitle": "{title} — {value}",
   "catalog.price.from": "from {price}",
   "catalog.view.label": "Product list view",
   "catalog.view.grid": "Grid",

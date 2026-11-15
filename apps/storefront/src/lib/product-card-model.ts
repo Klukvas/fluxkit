@@ -13,8 +13,10 @@ import type { CardOffer } from "./search-facets";
  * Plain data only (strings, numbers, `null`): no API object, no function, no React element.
  */
 export interface ProductCardModel {
-  /** The product id (a stable React key). */
+  /** Product identity; several listing cards can share it. */
   id: string;
+  /** Opaque card identity, used for row keys and card-specific state. */
+  listingKey: string;
   title: string;
   /** The product page, localized; a search hit's link carries its matching options (`opt.<code>=<value>`). */
   href: string;
@@ -35,7 +37,7 @@ export interface ProductCardModel {
   availability: { text: string; variant: BadgeVariant; badge: boolean } | null;
   /**
    * What the card offers to buy (owner design 2026-11-13), always next to the product link, never inside it:
-   * - `add`: the product's only sellable variant (`defaultVariantId` of the API), added to the cart from the card;
+   * - `add`: the card group's only sellable variant (`defaultVariantId` of the API), added to the cart from the card;
    * - `choose`: several variants, so a link to the product page (`href`, with a search hit's options) where one is chosen;
    *   `label` is its translated text;
    * - `null`: nothing to buy here: the shown availability is out of stock, or unknown while the search index catches up.
@@ -106,7 +108,19 @@ export function cardDisplay({
         : { kind: "add", variantId: product.defaultVariantId };
   const price = offer.kind === "matched" ? offer.price : product.price;
   const path = localizedHref(locale, `/p/${encodeURIComponent(product.slug)}`);
-  const linkQuery = offer.kind === "product" ? "" : offer.linkQuery;
+  const split = product.listingOption;
+  // A stale filter may no longer exist with this split value; an impossible combination resets the whole picker.
+  const link = new URLSearchParams(
+    offer.kind === "product" || (split != null && offer.kind === "catchingUp")
+      ? ""
+      : offer.linkQuery,
+  );
+  if (split != null) link.set(`opt.${split.optionCode}`, split.valueCode);
+  const linkQuery = link.toString();
+  const title =
+    split == null
+      ? product.title
+      : t("catalog.card.splitTitle", { title: product.title, value: split.valueName });
   const note =
     offer.kind === "catchingUp"
       ? t("search.card.dependsOnOption")
@@ -115,11 +129,12 @@ export function cardDisplay({
         : null;
   return {
     id: product.id,
-    title: product.title,
+    listingKey: product.listingKey ?? product.id,
+    title,
     href: linkQuery === "" ? path : `${path}?${linkQuery}`,
     image: {
       src: allowedImageUrl(product.image?.url, imageHosts),
-      alt: product.image?.alt ?? product.title,
+      alt: product.image?.alt ?? title,
     },
     brand:
       product.brand === null

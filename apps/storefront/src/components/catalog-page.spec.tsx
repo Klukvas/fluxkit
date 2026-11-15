@@ -243,7 +243,7 @@ describe("the catalog route with search on", () => {
     expect(reads.searched).toEqual([
       {
         query: { q: "", facets: [], price: null, sort: null, page: 1 },
-        read: { shared: true },
+        read: { groupBy: "listing", shared: true },
       },
     ]);
     expect(reads.listings).toEqual([]);
@@ -271,7 +271,7 @@ describe("the catalog route with search on", () => {
     // The chip removes the size and keeps the sort; "clear" keeps the sort too.
     expect(html).toContain('href="/en/catalog?sort=price_asc"');
     expect(html).not.toContain("/en/search?");
-    expect(reads.searched[0]?.read).toBeUndefined();
+    expect(reads.searched[0]?.read).toEqual({ groupBy: "listing" });
   });
 
   it("reads the list once per view: generateMetadata never searches", async () => {
@@ -326,7 +326,9 @@ describe("the catalog route with search on", () => {
       expect(html).toContain(en["catalog.fallback.title"]);
       expect(html).toContain(en["catalog.fallback.dropped"]);
       // The brand is applied by the SQL listing and shown as before.
-      expect(reads.sqlListings).toEqual([["en", { limit: 24, offset: 0, brand: "demo-brand" }]]);
+      expect(reads.sqlListings).toEqual([
+        ["en", { groupBy: "listing", limit: 24, offset: 0, brand: "demo-brand" }],
+      ]);
       // Try again and the pages keep the address, so the filters come back with search.
       expect(html).toContain(
         'href="/en/catalog?f=opt.size%3Am&amp;f=brand%3Ademo-brand&amp;sort=price_asc"',
@@ -343,7 +345,9 @@ describe("the catalog route with search on", () => {
       reads.outcome = { kind: "unavailable", retryAfterSeconds: null };
       const html = await catalog(address);
       expect(html).toContain(en["catalog.fallback.title"]);
-      expect(reads.sqlListings).toEqual([["en", { limit: 24, offset: 0, brand: "demo-brand" }]]);
+      expect(reads.sqlListings).toEqual([
+        ["en", { groupBy: "listing", limit: 24, offset: 0, brand: "demo-brand" }],
+      ]);
       // The brand's name comes from a listed product that carries it (`§brand` in the fixtures).
       expect(html).toContain(
         `<span>${createTranslator(en, "en")("catalog.filter.brand", { brand: "§brand" })}</span>`,
@@ -407,7 +411,9 @@ describe("the category route with search on", () => {
     reads.outcome = { kind: "unavailable", retryAfterSeconds: null };
     const html = await categoryView({});
     expect(html).toContain(en["catalog.fallback.title"]);
-    expect(reads.sqlListings).toEqual([["en", { limit: 24, offset: 0, category: "tools" }]]);
+    expect(reads.sqlListings).toEqual([
+      ["en", { groupBy: "listing", limit: 24, offset: 0, category: "tools" }],
+    ]);
   });
 
   it("keeps the category's own canonical and metadata", async () => {

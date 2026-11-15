@@ -238,7 +238,12 @@ export class CustomerAccountService {
    * `change-password`), then every OTHER session of the customer ends and the reset links still out stop working
    * (ADR 0031 decision 9).
    */
-  async changePassword(principal: CustomerPrincipal, body: ChangePasswordBody): Promise<void> {
+  async changePassword(
+    principal: CustomerPrincipal,
+    body: ChangePasswordBody,
+  ): Promise<{ token: string; maxAgeSeconds: number }> {
+    if (principal.tokenHash === undefined) throw unauthorized();
+    const tokenHash = principal.tokenHash;
     const now = this.clock.now();
     const row = await this.customers.findById(principal.customerId);
     if (row === undefined || !row.isActive) {
@@ -263,7 +268,7 @@ export class CustomerAccountService {
       throw validationFailed(errors);
     }
     const newHash = await this.hasher.hash(body.newPassword);
-    await withTransaction(this.db, async (transaction) => {
+    return withTransaction(this.db, async (transaction) => {
       const locked = await this.customers.findByIdForUpdate(row.id, transaction);
       // Re-checked under the row lock: failures or another password change may have landed during the scrypt work.
       if (
@@ -281,6 +286,14 @@ export class CustomerAccountService {
       );
       await this.sessions.revokeAllForCustomer(row.id, principal.sessionId, transaction);
       await this.accountEmail.invalidateResetTokens(transaction, row.id, now);
+      const rotated = await this.sessions.rotate(principal.sessionId, tokenHash, transaction);
+      return {
+        token: rotated.token,
+        maxAgeSeconds: Math.max(
+          1,
+          Math.floor((rotated.expiresAt.getTime() - this.clock.now().getTime()) / 1000),
+        ),
+      };
     });
   }
 

@@ -714,6 +714,8 @@ describe("store API (public, real app, real Postgres)", () => {
       const [first, second] = page.items;
       expect(first).toEqual({
         id: ids["p1"],
+        listingKey: ids["p1"],
+        listingOption: null,
         slug: slug("p1"),
         title: "Товар p1",
         brand: { slug: slug("brand-a"), name: "Бренд А" },
@@ -733,6 +735,8 @@ describe("store API (public, real app, real Postgres)", () => {
           "availability",
           "brand",
           "defaultVariantId",
+          "listingKey",
+          "listingOption",
           "id",
           "image",
           "price",
@@ -977,6 +981,53 @@ describe("store API (public, real app, real Postgres)", () => {
   });
 
   describe("GET /store/products/:slug", () => {
+    it("orders variant optionValues by product option position instead of code or insertion order", async () => {
+      ids["reordered-options"] = await createProduct("reordered-options");
+      await chooseOption("reordered-options", "optColor", 20, ["valRed"]);
+      await chooseOption("reordered-options", "optSize", 3, ["valS"]);
+      await createVariant("reordered-options", "REORDERED", {
+        signature: `color_${runId}=red;size_${runId}=s`,
+        isDefault: true,
+        position: 0,
+        optionValues: [
+          ["optColor", "valRed"],
+          ["optSize", "valS"],
+        ],
+      });
+      const product = await getOk<StoreProductDetail>(
+        `/store/products/${slug("reordered-options")}`,
+      );
+      expect(product.options.map((option) => option.code)).toEqual([
+        `size_${runId}`,
+        `color_${runId}`,
+      ]);
+      expect(product.variants).toHaveLength(1);
+      expect(product.variants[0]?.optionValues).toEqual([
+        { optionCode: `size_${runId}`, valueCode: "s" },
+        { optionCode: `color_${runId}`, valueCode: "red" },
+      ]);
+
+      // Reverse only product option positions; the variant's stored values stay the same.
+      await pool.query(
+        `update product_option set position = case when option_id = $2 then 3 else 20 end
+         where product_id = $1`,
+        [ids["reordered-options"], ids["optColor"]],
+      );
+      const reordered = await getOk<StoreProductDetail>(
+        `/store/products/${slug("reordered-options")}`,
+      );
+      expect(reordered.options.map((option) => option.code)).toEqual([
+        `color_${runId}`,
+        `size_${runId}`,
+      ]);
+      expect(reordered.variants).toHaveLength(1);
+      expect(reordered.variants[0]?.id).toBe(product.variants[0]?.id);
+      expect(reordered.variants[0]?.optionValues).toEqual([
+        { optionCode: `color_${runId}`, valueCode: "red" },
+        { optionCode: `size_${runId}`, valueCode: "s" },
+      ]);
+    });
+
     it("returns the full product in uk", async () => {
       const product = await getOk<StoreProductDetail>(`/store/products/${slug("p1")}?locale=uk`);
       expect(product).toEqual({

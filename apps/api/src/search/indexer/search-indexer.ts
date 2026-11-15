@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { Logger } from "@nestjs/common";
 import {
   buildSearchDocuments,
@@ -26,9 +27,14 @@ import {
   nextActiveProductIds,
   readSearchDefinitions,
   readSearchProducts,
+  readSplitOptionsByType,
   type SearchDefinitions,
 } from "./search-catalog.reader.js";
-import { SearchIndexStateRepository, type IndexStateRow } from "./search-index-state.repository.js";
+import {
+  SearchIndexStateRepository,
+  type IndexStateRow,
+  type SwappedLocale,
+} from "./search-index-state.repository.js";
 
 /** What a job may still do in this run (the scheduler's `JobBudget`). */
 export interface IndexerBudget {
@@ -198,7 +204,12 @@ export class SearchIndexer {
       }
       scanned += claimed.length;
       try {
-        await this.applyToLiveIndexes(claimed, plans, definitions);
+        // Read split assignments after claims: a newly claimed option change must use its committed flag.
+        const currentDefinitions = {
+          ...definitions,
+          splitOptionByType: await readSplitOptionsByType(this.database),
+        };
+        await this.applyToLiveIndexes(claimed, plans, currentDefinitions);
       } catch (error) {
         const code = engineCodeOf(error);
         await this.queue.recordFailure(this.database, claimed, code, now);
@@ -400,6 +411,7 @@ export class SearchIndexer {
                 currency: state.currency,
                 rebuildRequestedAt: state.rebuildRequestedAt,
                 buildIndexUid: state.buildIndexUid,
+                buildRebuildKey: state.buildRebuildKey,
                 buildStartedAt: state.buildStartedAt,
               },
         derived,
@@ -458,13 +470,26 @@ export class SearchIndexer {
     if (!this.config.enabled) {
       return;
     }
-    const uid = searchBuildIndexUid(this.config.indexPrefix, plan.locale, now);
+    // A recovered claim must never recreate a uid a paused run can still submit in a swap.
+    const uid = searchBuildIndexUid(
+      this.config.indexPrefix,
+      plan.locale,
+      now,
+      randomBytes(16).toString("hex"),
+    );
     await engine.waitForTask(await engine.createIndex(uid), this.taskTimeoutMs());
     await engine.waitForTask(
       await engine.updateSettings(uid, plan.derived.settings),
       this.taskTimeoutMs(),
     );
-    await this.states.startBuild(this.database, plan.locale, uid, requested, now);
+    await this.states.startBuild(
+      this.database,
+      plan.locale,
+      uid,
+      plan.derived.rebuildKey,
+      requested,
+      now,
+    );
   }
 
   private async addDocuments(
@@ -500,21 +525,15 @@ export class SearchIndexer {
     const states = await this.states.loadAll(this.database);
     const fresh = await this.plan(definitions, now);
     const pairs: { indexes: readonly [string, string]; rename: boolean }[] = [];
-    const swapped: {
-      locale: string;
-      liveIndexUid: string;
-      settingsHash: string;
-      documentVersion: number;
-      currency: string;
-      documentsCount: number;
-    }[] = [];
+    const swapped: SwappedLocale[] = [];
     for (const plan of plans) {
       const state = states.get(plan.locale);
       const buildUid = state?.buildIndexUid;
-      if (buildUid == null) {
-        throw new Error(`Locale ${plan.locale} has no build to swap in.`);
-      }
       const derived = fresh.find((entry) => entry.locale === plan.locale)?.derived ?? plan.derived;
+      if (buildUid == null || state?.buildRebuildKey !== derived.rebuildKey) {
+        this.logger.warn(`Search swap skipped for locale ${plan.locale}: swap_claim_lost`);
+        return 0;
+      }
       await engine.waitForTask(
         await engine.updateSettings(buildUid, derived.settings),
         this.taskTimeoutMs(),
@@ -528,12 +547,22 @@ export class SearchIndexer {
       );
       swapped.push({
         locale: plan.locale,
+        buildIndexUid: buildUid,
+        buildRebuildKey: derived.rebuildKey,
         liveIndexUid: plan.liveUid,
         settingsHash: derived.settingsHash,
         documentVersion: SEARCH_DOCUMENT_VERSION,
         currency: this.pricing.shopCurrency,
         documentsCount: await engine.documentCount(buildUid),
       });
+    }
+    // The engine swap and Postgres completion cannot commit together. Persist uncertainty first: if either call fails
+    // or the process dies, recovery must rebuild, since the build uid could now hold documents from the old live index.
+    if (!(await this.states.markSwapPending(this.database, swapped, now))) {
+      this.logger.warn(
+        `Search swap skipped for locales ${plans.map((plan) => plan.locale).join(",")}: swap_claim_lost`,
+      );
+      return 0;
     }
     await engine.swapIndexes(pairs);
     // KNOWN LIMITATION (v1.55.0, pinned in search-engine.spec.ts): a key scoped to indexes can not read the swap task (it
@@ -553,14 +582,21 @@ export class SearchIndexer {
         });
       }
     }
-    await this.states.completeSwap(this.database, swapped, now);
+    const completed = await this.states.completeSwap(this.database, swapped, now);
     // After a swap the build uid names the OLD live index (or nothing after a rename): delete it.
-    for (const pair of pairs) {
-      if (!pair.rename) {
+    for (const [index, entry] of swapped.entries()) {
+      if (!completed.includes(entry.locale)) {
+        this.logger.warn(
+          `Search swap completion skipped for locale ${entry.locale}: swap_completion_lost`,
+        );
+        continue;
+      }
+      const pair = pairs[index];
+      if (pair !== undefined && !pair.rename) {
         await this.deleteOwnedIndex(pair.indexes[1]);
       }
     }
-    return pairs.length;
+    return completed.length;
   }
 
   private async deleteOwnedIndex(uid: string): Promise<void> {

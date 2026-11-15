@@ -221,8 +221,10 @@ describe("logout, me and change-password", () => {
       const second = await loginCookie(running.baseUrl, user.email, PASSWORD);
       const third = await loginCookie(running.baseUrl, user.email, PASSWORD);
       const stranger = await loginCookie(running.baseUrl, other.email, PASSWORD);
-      expect((await changePassword(current, PASSWORD, NEW_PASSWORD)).status).toBe(204);
-      expect((await call("GET", "/admin/auth/me", current)).status).toBe(200);
+      const changed = await changePassword(current, PASSWORD, NEW_PASSWORD);
+      expect(changed.status).toBe(204);
+      expect((await call("GET", "/admin/auth/me", current)).status).toBe(401);
+      expect((await call("GET", "/admin/auth/me", sessionCookieOf(changed))).status).toBe(200);
       expect((await call("GET", "/admin/auth/me", second)).status).toBe(401);
       expect((await call("GET", "/admin/auth/me", third)).status).toBe(401);
       expect((await call("GET", "/admin/auth/me", stranger)).status).toBe(200);

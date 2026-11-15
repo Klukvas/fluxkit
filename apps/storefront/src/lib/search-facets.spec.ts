@@ -313,3 +313,34 @@ describe("cardOffer: what a card shows from the item's match (PR 214 `match`, pl
     ).toEqual({ kind: "catchingUp", linkQuery: "" });
   });
 });
+
+it("keeps a group-local match separate from the group's add authority", () => {
+  const item = {
+    ...summary("shirt", {
+      listingKey: "shirt:color:red",
+      listingOption: {
+        optionCode: "color",
+        valueCode: "red",
+        optionName: "Colour",
+        valueName: "Red",
+      },
+      defaultVariantId: null,
+    }),
+    match: {
+      variantId: "red-m",
+      variantCount: 1,
+      price: { from: 100, to: 100, currency: "UAH" },
+      availability: "in_stock" as const,
+      optionValues: [
+        { optionCode: "color", valueCode: "red" },
+        { optionCode: "size", valueCode: "m" },
+      ],
+    },
+  };
+  expect(cardOffer(item, { facets: ["opt.size:m"], price: null })).toMatchObject({
+    kind: "matched",
+    linkQuery: "opt.color=red&opt.size=m",
+    variantCount: 1,
+  });
+  expect(item.defaultVariantId).toBeNull();
+});
