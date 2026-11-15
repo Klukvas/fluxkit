@@ -100,13 +100,11 @@ function ShellNavigation({
   helpNavigation = [],
   collapsed = false,
   desktop = false,
-  pathname,
 }: Pick<ShellFrameProps, "t" | "navigation" | "helpNavigation" | "collapsed"> & {
   desktop?: boolean;
-  pathname?: string;
 }) {
   const scrollBox = useRef<HTMLDivElement>(null);
-  const edges = useNavigationScroll(scrollBox, pathname);
+  const edges = useNavigationScroll(scrollBox, useLocation().pathname);
   const renderNav = (groups: SideNavGroup[], label: string) => (
     <SideNav
       label={label}
@@ -228,7 +226,6 @@ export function ShellFrame({
 }: ShellFrameProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
-  const { pathname } = useLocation();
   useEffect(() => {
     setMenuOpen(false);
   }, [navigationKey]);
@@ -252,7 +249,7 @@ export function ShellFrame({
           collapsed ? "w-20" : "w-64",
         )}
       >
-        <ShellNavigation {...navProps} collapsed={collapsed} desktop pathname={pathname} />
+        <ShellNavigation {...navProps} collapsed={collapsed} desktop />
         <CollapseControl t={t} collapsed={collapsed} onToggle={onToggleCollapsed} />
       </aside>
       <aside

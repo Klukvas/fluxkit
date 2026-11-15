@@ -23,8 +23,17 @@ describe("SideNav", () => {
       const markup = render(<SideNav label="Main" groups={groups} density={density} />);
       expect(first(markup, "nav").attributes.class).toBe("flex flex-col gap-6");
       expect(first(markup, "ul").attributes.class).toBe("flex flex-col gap-1");
-      expect(first(markup, "a").attributes.class).toContain(
-        "flex min-h-11 items-center gap-3 rounded-control px-3 py-2 font-medium",
+      expect(String(first(markup, "a").attributes.class).split(" ")).toEqual(
+        expect.arrayContaining([
+          "flex",
+          "min-h-11",
+          "items-center",
+          "gap-3",
+          "rounded-control",
+          "px-3",
+          "py-2",
+          "font-medium",
+        ]),
       );
       expect(markup).not.toContain("pointer-coarse:");
     }

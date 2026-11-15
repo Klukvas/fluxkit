@@ -12,9 +12,11 @@ export function scrollEdges({
   clientHeight,
   scrollHeight,
 }: Pick<HTMLElement, "scrollTop" | "clientHeight" | "scrollHeight">): ScrollEdges {
-  const maximum = Math.max(0, scrollHeight - clientHeight);
-  const position = Math.max(0, Math.min(scrollTop, maximum));
-  return { above: position > 1, below: maximum - position > 1 };
+  const maximum = scrollHeight - clientHeight;
+  return {
+    above: maximum > 1 && scrollTop > 1,
+    below: maximum > 1 && scrollTop < maximum - 1,
+  };
 }
 
 export function revealDelta(
@@ -22,8 +24,7 @@ export function revealDelta(
   viewport: Pick<DOMRect, "top" | "bottom">,
 ): number {
   if (item.top < viewport.top) return item.top - viewport.top;
-  if (item.bottom > viewport.bottom) return item.bottom - viewport.bottom;
-  return 0;
+  return Math.max(0, item.bottom - viewport.bottom);
 }
 
 /** Reveal only inside this sidebar: never move document scroll or keyboard focus. */
@@ -67,7 +68,7 @@ export function useNavigationScroll(
 }
 
 export function NavigationScrollHint({
-  edges,
+  edges: { above, below },
   collapsed,
   t,
 }: {
@@ -75,21 +76,19 @@ export function NavigationScrollHint({
   collapsed: boolean;
   t: Translator;
 }) {
-  const direction = edges.below ? "below" : edges.above ? "above" : "none";
+  const direction = below ? "below" : above ? "above" : "none";
   return (
     <div
       aria-hidden="true"
       data-nav-scroll-hint={direction}
       className="flex h-5 shrink-0 items-center justify-center gap-1 text-xs text-muted-foreground"
     >
-      {direction !== "none" ? (
+      {(above || below) && (
         <>
-          <ChevronIcon className={cn("size-4", direction === "above" && "rotate-180")} />
-          {collapsed
-            ? null
-            : t(direction === "below" ? "shell.navMoreBelow" : "shell.navMoreAbove")}
+          <ChevronIcon className={cn("size-4", !below && "rotate-180")} />
+          {!collapsed && t(below ? "shell.navMoreBelow" : "shell.navMoreAbove")}
         </>
-      ) : null}
+      )}
     </div>
   );
 }
