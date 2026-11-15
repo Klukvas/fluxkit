@@ -278,6 +278,15 @@ export class SearchIndexer {
     // Starting over delays the swap; while a locale has no live index at all, a working index comes first and a request
     // made meanwhile is built after the swap instead.
     const mayStartOver = plans.every((plan) => plan.state?.liveIndexUid != null);
+    // A competing run (possible only once the scheduler lock was lost) changed a build this run planned on: this run
+    // yields and writes nothing more, since an add to an index another run deleted would recreate it unrecorded.
+    const yielded = (): RebuildResult => ({
+      ...DISABLED_REBUILD,
+      enabled: true,
+      started,
+      restarted,
+      documents,
+    });
     try {
       for (const plan of plans) {
         const requested = requests.get(plan.locale) ?? null;
@@ -299,12 +308,13 @@ export class SearchIndexer {
         if (recordedBuild !== null) {
           await this.deleteOwnedIndex(recordedBuild);
           if (!(await this.states.dropBuild(this.database, plan.locale, recordedBuild, now))) {
-            continue;
+            return yielded();
           }
         }
-        if (await this.startBuild(plan, requested, now)) {
-          started += 1;
+        if (!(await this.startBuild(plan, requested, now))) {
+          return yielded();
         }
+        started += 1;
       }
 
       const fresh = await this.states.loadAll(this.database);
@@ -313,7 +323,7 @@ export class SearchIndexer {
         const state = fresh.get(plan.locale);
         const buildUid = state?.buildIndexUid;
         if (buildUid == null) {
-          throw new Error(`The build of locale ${plan.locale} has no index after it was started.`);
+          return yielded();
         }
         let cursor = state?.buildCursor ?? null;
         for (;;) {
@@ -329,6 +339,9 @@ export class SearchIndexer {
           if (ids.length === 0) {
             break;
           }
+          if (!(await this.states.isBuilding(this.database, plan.locale, buildUid))) {
+            return yielded();
+          }
           const added = await this.addDocuments(buildUid, plan.locale, ids, definitions);
           const last = ids[ids.length - 1] ?? cursor;
           if (last === null) {
@@ -336,7 +349,18 @@ export class SearchIndexer {
           }
           cursor = last;
           documents += added;
-          await this.states.advanceBuild(this.database, plan.locale, cursor, added, now);
+          if (
+            !(await this.states.advanceBuild(
+              this.database,
+              plan.locale,
+              buildUid,
+              cursor,
+              added,
+              now,
+            ))
+          ) {
+            return yielded();
+          }
         }
         if (!complete) {
           break;

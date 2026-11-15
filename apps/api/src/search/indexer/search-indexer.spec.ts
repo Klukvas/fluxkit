@@ -728,6 +728,15 @@ describe("SearchIndexer (real Postgres, real Meilisearch)", () => {
         expect(await states.startBuild(database, locale, "second", "key", null, now)).toBe(false);
         expect(await states.dropBuild(database, locale, "older", now)).toBe(false);
         expect((await states.loadAll(database)).get(locale)?.buildIndexUid).toBe("first");
+        // A run still writing pages of a replaced build sees it and stops (it must not recreate a deleted index).
+        expect(await states.isBuilding(database, locale, "second")).toBe(false);
+        expect(await states.advanceBuild(database, locale, "second", randomUUID(), 1, now)).toBe(
+          false,
+        );
+        expect(await states.isBuilding(database, locale, "first")).toBe(true);
+        expect(await states.advanceBuild(database, locale, "first", randomUUID(), 1, now)).toBe(
+          true,
+        );
         expect(await states.dropBuild(database, locale, "first", now)).toBe(true);
         expect((await states.loadAll(database)).get(locale)?.buildIndexUid).toBeNull();
       } finally {

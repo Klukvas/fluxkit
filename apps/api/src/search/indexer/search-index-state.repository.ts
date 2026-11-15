@@ -132,21 +132,38 @@ export class SearchIndexStateRepository {
     return rows.length > 0;
   }
 
+  /** True while `buildIndexUid` is still the locale's recorded build (no competing run dropped or swapped it). */
+  async isBuilding(db: DbExecutor, locale: string, buildIndexUid: string): Promise<boolean> {
+    const rows = await db
+      .select({ locale: searchIndexState.locale })
+      .from(searchIndexState)
+      .where(
+        and(eq(searchIndexState.locale, locale), eq(searchIndexState.buildIndexUid, buildIndexUid)),
+      );
+    return rows.length > 0;
+  }
+
+  /** Records a finished page of `buildIndexUid`; false when that build is no longer the locale's recorded one. */
   async advanceBuild(
     db: DbExecutor,
     locale: string,
+    buildIndexUid: string,
     cursor: string,
     addedDocuments: number,
     now: Date,
-  ): Promise<void> {
-    await db
+  ): Promise<boolean> {
+    const rows = await db
       .update(searchIndexState)
       .set({
         buildCursor: cursor,
         buildDocumentsCount: sql`${searchIndexState.buildDocumentsCount} + ${addedDocuments}`,
         updatedAt: now,
       })
-      .where(eq(searchIndexState.locale, locale));
+      .where(
+        and(eq(searchIndexState.locale, locale), eq(searchIndexState.buildIndexUid, buildIndexUid)),
+      )
+      .returning({ locale: searchIndexState.locale });
+    return rows.length > 0;
   }
 
   /**
