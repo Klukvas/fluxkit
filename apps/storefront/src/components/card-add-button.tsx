@@ -46,9 +46,9 @@ export async function addOnce(
 }
 
 export interface CardAddButtonViewProps {
-  /** The product title: part of the control's name, so twenty "Add to cart" controls stay distinct for a screen reader. */
+  /** The displayed card title, including its split suffix: keeps repeated "Add to cart" controls distinct. */
   title: string;
-  /** The product page: where the control leads before hydration (or without a script), as a plain link. */
+  /** The card's preselected href: a working link before hydration or without a script. */
   href: string;
   status: CardAddStatus;
   /**

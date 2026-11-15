@@ -10,7 +10,8 @@ import type { SearchData, SearchOutcome, SearchReadOptions } from "./search-data
 import type { SearchQuery } from "./search-query";
 import type { StoreData } from "./store-data";
 
-const SHARED: SearchReadOptions = { shared: true };
+const LISTING: SearchReadOptions = { groupBy: "listing" };
+const SHARED: SearchReadOptions = { ...LISTING, shared: true };
 
 /**
  * The catalog and category pages while search is on (plan 2026-10-29-search.md, section 9 and "Failure handling"; owner
@@ -79,7 +80,7 @@ export async function loadCatalogSearchPage(
   const request = catalogSearchRequest(query, category?.id ?? null);
   let outcome: SearchOutcome;
   if (!isCacheableCatalogSearch(query)) {
-    outcome = await search.search(locale, request);
+    outcome = await search.search(locale, request, LISTING);
   } else {
     // Page 1 of the same list says how many pages exist: a page past the last one is answered from that shared entry,
     // never read (review F1: bogus page numbers would each be a read and an entry).

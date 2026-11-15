@@ -21,7 +21,7 @@ export type HeaderTopSlotProps = SlotBaseProps;
 
 /** `product-card.badges` and `product-card.actions`: on a built-in product card (`grid` or `list`). */
 export interface ProductCardSlotProps extends SlotBaseProps {
-  /** The card's plain view model (`cardDisplay`): id, title, localized link, price text, availability. */
+  /** The card's plain view model (`cardDisplay`): product id, listingKey, suffixed title, localized preselected link, price text, availability. */
   card: ProductCardModel;
   /** The card kind that renders the slot: `grid` or `list` (a fork's own card passes its own kind). */
   kind: string;
