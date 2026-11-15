@@ -60,6 +60,19 @@ describe("admin variants API (real app, real Postgres)", () => {
     return result.body;
   }
 
+  /** A different product already owns the 64-character SKU base of this long slug. */
+  async function setLongSlugWithTakenSku(productId: string): Promise<string> {
+    const slug = `long-${fx.runId}-${counter}-${"a".repeat(90)}`;
+    const updated = await call("PATCH", `/admin/products/${productId}`, { slug });
+    expect(updated.status, JSON.stringify(updated.body)).toBe(200);
+    const blocker = await createProduct();
+    const blocked = await call("PATCH", variantPath(blocker.id, blocker.variants[0]?.id), {
+      sku: slug.slice(0, 64).toUpperCase(),
+    });
+    expect(blocked.status, JSON.stringify(blocked.body)).toBe(200);
+    return slug;
+  }
+
   async function putOptions(
     productId: string,
     ...selections: ReturnType<typeof sel>[]
@@ -225,6 +238,70 @@ describe("admin variants API (real app, real Postgres)", () => {
   });
 
   describe("POST /admin/products/:id/variants/generate", () => {
+    it("finds taken truncated SKU prefixes when generating variants for a long slug", async () => {
+      const product = await createProduct();
+      const slug = await setLongSlugWithTakenSku(product.id);
+      const generated = await putOptions(product.id, sel(fx.color, ["red", "blue"]));
+      expect(generated.variants.map((variant) => variant.sku)).toEqual([
+        `${slug.slice(0, 62)}-2`.toUpperCase(),
+        `${slug.slice(0, 62)}-3`.toUpperCase(),
+      ]);
+      expect((await getProduct(product.id)).variants).toEqual(generated.variants);
+    });
+
+    it("assigns consecutive positions from zero on first generation", async () => {
+      const product = await createProduct();
+      const generated = await putOptions(
+        product.id,
+        sel(fx.color, ["red", "blue"]),
+        sel(fx.size, ["s", "m"]),
+      );
+      expect(
+        generated.variants.map((variant) => [variant.optionSignature, variant.position]),
+      ).toEqual([
+        [`${fx.color.code}=red;${fx.size.code}=s`, 0],
+        [`${fx.color.code}=red;${fx.size.code}=m`, 1],
+        [`${fx.color.code}=blue;${fx.size.code}=s`, 2],
+        [`${fx.color.code}=blue;${fx.size.code}=m`, 3],
+      ]);
+      expect((await getProduct(product.id)).variants).toEqual(generated.variants);
+    });
+
+    it("appends consecutive positions after the maximum when adding option values", async () => {
+      const product = await createProduct();
+      const initial = await putOptions(
+        product.id,
+        sel(fx.color, ["red"]),
+        sel(fx.size, ["s", "m"]),
+      );
+      // Sparse positions distinguish max+1 from the count of existing variants.
+      for (const [index, variant] of initial.variants.entries()) {
+        await pool.query("update variant set position = $1 where id = $2", [
+          index === 0 ? 5 : 12,
+          variant.id,
+        ]);
+      }
+      const expanded = await putOptions(
+        product.id,
+        sel(fx.color, ["red", "blue", "green"]),
+        sel(fx.size, ["s", "m"]),
+      );
+      expect(
+        expanded.variants.map((variant) => [variant.optionSignature, variant.position]),
+      ).toEqual([
+        [`${fx.color.code}=red;${fx.size.code}=s`, 5],
+        [`${fx.color.code}=red;${fx.size.code}=m`, 12],
+        [`${fx.color.code}=blue;${fx.size.code}=s`, 13],
+        [`${fx.color.code}=blue;${fx.size.code}=m`, 14],
+        [`${fx.color.code}=green;${fx.size.code}=s`, 15],
+        [`${fx.color.code}=green;${fx.size.code}=m`, 16],
+      ]);
+      expect(expanded.variants.slice(0, 2).map((variant) => variant.id)).toEqual(
+        initial.variants.map((variant) => variant.id),
+      );
+      expect((await getProduct(product.id)).variants).toEqual(expanded.variants);
+    });
+
     it("creates nothing for a simple product", async () => {
       const product = await createProduct();
       const result = await call<GenerateVariantsResponse>(
@@ -432,6 +509,38 @@ describe("admin variants API (real app, real Postgres)", () => {
       expect((await call("DELETE", variantPath(product.id, removed.id))).status).toBe(204);
       return { product, removed };
     }
+
+    it("finds taken truncated SKU prefixes when manually creating a variant for a long slug", async () => {
+      const { product } = await withFreeSlot();
+      const slug = await setLongSlugWithTakenSku(product.id);
+      const result = await call<VariantResponse>("POST", variantPath(product.id), {
+        optionValueIds: [fx.color.values.red, fx.size.values.m],
+      });
+      expect(result.status, JSON.stringify(result.body)).toBe(201);
+      expect(result.body.sku).toBe(`${slug.slice(0, 62)}-2`.toUpperCase());
+      expect(
+        (await getProduct(product.id)).variants.find((variant) => variant.id === result.body.id),
+      ).toEqual(result.body);
+    });
+
+    it("assigns max position plus one when manually creating a variant", async () => {
+      const { product, removed } = await withFreeSlot();
+      const remaining = product.variants.filter((variant) => variant.id !== removed.id);
+      for (const [index, variant] of remaining.entries()) {
+        await pool.query("update variant set position = $1 where id = $2", [
+          10 + index * 7,
+          variant.id,
+        ]);
+      }
+      const result = await call<VariantResponse>("POST", variantPath(product.id), {
+        optionValueIds: [fx.color.values.red, fx.size.values.m],
+      });
+      expect(result.status, JSON.stringify(result.body)).toBe(201);
+      expect(result.body.position).toBe(39);
+      const stored = await getProduct(product.id);
+      expect(stored.variants.map((variant) => variant.position)).toEqual([10, 17, 24, 31, 38, 39]);
+      expect(stored.variants.at(-1)?.id).toBe(result.body.id);
+    });
 
     it("creates a variant from one value of every option, proposing the SKU", async () => {
       const { product } = await withFreeSlot();
