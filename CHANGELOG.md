@@ -1,5 +1,7 @@
 # Changelog
 
+- Search sync: a queue claim no longer leases more rows than its page limit when the database statistics are stale (the limited page is materialized once), so job 13 keeps its budget and leaves the rest due.
+
 - Storefront: visible lists use split listing groups (ADR 0052), with distinct card keys, translated value suffixes, group images and preselected product/no-JS links; product sitemap and all-false catalog stay unchanged (deploy the listing-capable API first).
 - Inventory schema (owner-approved review follow-up PR E): migration `0015_inventory_reserved_upper_bound` bounds `inventory_level.reserved` to 0 through 1 000 000 000, matching core `MAX_RESERVED`. It refuses with a readable error if existing rows exceed the bound; reconcile those rows before retrying. The hand-written down script restores `reserved >= 0` and removes its migration journal row without changing inventory data.
 
