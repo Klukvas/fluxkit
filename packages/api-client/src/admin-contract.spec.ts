@@ -479,6 +479,7 @@ const paymentList: Shape<Admin.AdminPaymentList> = { object: { items: { array: p
 const paymentPage: Shape<Admin.AdminPaymentPage> = {
   object: {
     items: { array: { object: { orderId: "string", orderNumber: "string", payment } } },
+    total: "integer",
     limit: "integer",
     nextCursor: { nullable: "string" },
   },

@@ -8,6 +8,7 @@
 One line per user-visible or schema change.
 
 ## Unreleased
+- Admin payments API (additive, minor): `GET /admin/payments` includes the full filtered `total`, independent of cursor and limit; Start adds a sixth, permission-filtered payments-to-review counter and a three-column large-screen grid.
 - Admin: the desktop sidebar keeps every item reachable at laptop heights (compact `SideNav` density, additive prop; a "More below/above" hint at the scroll edges; the current item scrolls into view in the panel); all Start quick actions share the outlined style; the current language is shown without the accent colour; the Start subtitle no longer names areas the user cannot open.
 - Storefront playful polish (concept 03 gaps of 2026-11-15; storefront and UI library only: no API, schema, token, configuration or dependency change): the cart drawer floats as a card (inset by the spacing unit, safe areas respected, `--fk-radius-overlay`, 2px foreground outline, `--fk-shadow-overlay`) and enters with the spring plus a slight rotate; the drawer and `/cart` empty states share one floating bag illustration (off under reduced motion); grid product cards tilt about 1.5° (alternating) and their image hops on hover with a hovering pointer and motion allowed; the free-shipping bar is 14 px with an ink outline and a spring fill. `@fluxkit/ui` `EmptyState` gains an optional `illustration` (additive; unchanged markup without it).
 - Storefront: the home hero demo picture becomes a niche-neutral shopping bag, swinging tag and parcel illustration in the Playful palette.
