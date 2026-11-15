@@ -18,21 +18,24 @@ export interface FocusableDocument {
   querySelector(selector: "main h1" | "main"): FocusableElement | null;
 }
 
+export function focusPageHeading(doc: FocusableDocument): void {
+  const target = doc.querySelector("main h1") ?? doc.querySelector("main");
+  if (target === null) return;
+  // A heading is not focusable by default; -1 permits script focus without adding a tab stop.
+  if (!target.hasAttribute("tabindex")) target.setAttribute("tabindex", "-1");
+  target.focus({ preventScroll: true });
+}
+
 export function createNavigationFocus(getDocument: () => FocusableDocument): {
-  onPathname(pathname: string): void;
+  onPathname(pathname: string, skip?: boolean): void;
 } {
   let previous: string | null = null;
   return {
-    onPathname(pathname) {
+    onPathname(pathname, skip = false) {
       const before = previous;
       previous = pathname;
-      if (before === null || before === pathname) return;
-      const doc = getDocument();
-      const target = doc.querySelector("main h1") ?? doc.querySelector("main");
-      if (target === null) return;
-      // A heading is not focusable by default; -1 makes it focusable by script without adding a tab stop.
-      if (!target.hasAttribute("tabindex")) target.setAttribute("tabindex", "-1");
-      target.focus({ preventScroll: true });
+      if (skip || before === null || before === pathname) return;
+      focusPageHeading(getDocument());
     },
   };
 }

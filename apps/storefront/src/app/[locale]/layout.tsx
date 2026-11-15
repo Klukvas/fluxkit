@@ -67,8 +67,9 @@ export async function generateViewport(): Promise<Viewport> {
 
 export default async function LocaleLayout({
   children,
+  modal,
   params,
-}: LocaleParams & { children: ReactNode }) {
+}: LocaleParams & { children: ReactNode; modal: ReactNode }) {
   const { locale } = await params;
   if (!isLocale(locale)) {
     notFound();
@@ -94,6 +95,7 @@ export default async function LocaleLayout({
     >
       <body className="flex min-h-screen flex-col bg-background text-foreground">
         <SiteShell
+          modal={modal}
           locale={locale}
           messages={messages}
           t={t}

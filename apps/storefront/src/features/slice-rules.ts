@@ -101,12 +101,12 @@ export function featureSlicePages(localeRoot: string): string[] {
 
 /**
  * The first URL segment below the locale of a page (`(feature-blog)/blog/[slug]/page.tsx` -> `blog`): route groups and
- * nothing else are skipped. `null` for a page at the group's root (it would be the home page).
+ * parallel slot folders are skipped. `null` for a page at the group's root (it would be the home page).
  */
 export function firstUrlSegment(localeRoot: string, page: string): string | null {
   const segments = relative(localeRoot, dirname(page))
     .split(/[\\/]/)
-    .filter((segment) => segment !== "" && !/^\(.*\)$/.test(segment));
+    .filter((segment) => segment !== "" && !/^\(.*\)$/.test(segment) && !segment.startsWith("@"));
   return segments[0] ?? null;
 }
 
@@ -115,7 +115,8 @@ export function coreFirstSegments(localeRoot: string): Set<string> {
   const segments = new Set<string>();
   for (const entry of readdirSync(localeRoot)) {
     const path = join(localeRoot, entry);
-    if (entry.startsWith("(feature-") || !statSync(path).isDirectory()) continue;
+    if (entry.startsWith("(feature-") || entry.startsWith("@") || !statSync(path).isDirectory())
+      continue;
     for (const page of filesNamed(path, PAGE_FILES)) {
       const segment = firstUrlSegment(localeRoot, page);
       if (segment !== null && !segment.startsWith("[")) segments.add(segment);

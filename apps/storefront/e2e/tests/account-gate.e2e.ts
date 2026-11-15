@@ -4,10 +4,33 @@ import { waitForHydration } from "../support/flows.ts";
 test("a guest on a protected page is sent to the sign-in page with the page AND its query string as next (review L6)", async ({
   page,
 }) => {
+  // A fresh tab has no same-origin predecessor: close must replace with home.
   await page.goto("/en/account/orders?page=3");
-  await waitForHydration(page);
   await expect(page).toHaveURL(/\/en\/account\/login\?next=%2Fen%2Faccount%2Forders%3Fpage%3D3$/);
-  await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
+  const dialog = page.getByRole("dialog", { name: "Sign in", exact: true });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("link", { name: "Create an account" })).toHaveAttribute(
+    "href",
+    "/en/account/register?next=%2Fen%2Faccount%2Forders%3Fpage%3D3",
+  );
+  await dialog.getByRole("button", { name: "Close", exact: true }).click();
+  await expect(page).toHaveURL(/\/en$/);
+  await expect(dialog).toHaveCount(0);
+  // lib/navigation-focus.ts: the heading of the new page, or `main` while home is still its loading view (home is the one
+  // page with a loading.tsx, ADR 0048), so either is the reading position.
+  await expect(page.locator("main:focus, main h1:focus")).toHaveCount(1);
+});
+
+test("a gate replacement closes to the same-origin page before the protected visit", async ({
+  page,
+}) => {
+  await page.goto("/en/catalog");
+  await page.goto("/en/account/orders?page=3");
+  const dialog = page.getByRole("dialog", { name: "Sign in", exact: true });
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page).toHaveURL(/\/en\/catalog$/);
+  await expect(dialog).toHaveCount(0);
 });
 
 test("a next that points at an auth page, even with a trailing slash, is not followed after signing in", async ({

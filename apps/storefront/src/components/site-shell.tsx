@@ -7,6 +7,7 @@ import { ToastProvider } from "./toast-provider";
 import { MAIN_CONTENT_ID, type NavigationLink } from "../layout/navigation";
 import { pickClientMessages } from "../lib/client-messages";
 import { I18nProvider } from "./i18n-provider";
+import { SignInNavigation } from "./sign-in-navigation";
 import { RouteFocus } from "./route-focus";
 import { SessionNotices } from "./session-notices";
 import { SessionProvider } from "./session-provider";
@@ -35,6 +36,7 @@ export function SiteShell({
   themeMode,
   featureLinks = NO_FEATURE_LINKS,
   children,
+  modal,
 }: {
   locale: Locale;
   messages: Messages;
@@ -48,33 +50,37 @@ export function SiteShell({
   /** The header and footer links of the enabled feature slices (`features/registry.ts`); none by default. */
   featureLinks?: FeatureLinks;
   children: ReactNode;
+  modal?: ReactNode;
 }) {
   return (
     <I18nProvider locale={locale} messages={pickClientMessages(messages)}>
       <SessionProvider locale={locale}>
         <ToastProvider>
           <CartDrawerProvider drawer={<CartDrawerSettings />}>
-            <RouteFocus />
-            <SkipLink targetId={MAIN_CONTENT_ID}>{t("skip.content")}</SkipLink>
-            <SiteHeader
-              locale={locale}
-              t={t}
-              categories={categories}
-              searchEnabled={searchEnabled}
-              themeMode={themeMode}
-              featureLinks={featureLinks.header}
-            />
-            <main id={MAIN_CONTENT_ID} tabIndex={-1} className="flex-1 focus:outline-none">
-              <SessionNotices />
-              {children}
-            </main>
-            <SiteFooter
-              locale={locale}
-              t={t}
-              year={year}
-              themeMode={themeMode}
-              featureLinks={featureLinks.footer}
-            />
+            <SignInNavigation locale={locale}>
+              <RouteFocus />
+              <SkipLink targetId={MAIN_CONTENT_ID}>{t("skip.content")}</SkipLink>
+              <SiteHeader
+                locale={locale}
+                t={t}
+                categories={categories}
+                searchEnabled={searchEnabled}
+                themeMode={themeMode}
+                featureLinks={featureLinks.header}
+              />
+              <main id={MAIN_CONTENT_ID} tabIndex={-1} className="flex-1 focus:outline-none">
+                <SessionNotices />
+                {children}
+              </main>
+              {modal}
+              <SiteFooter
+                locale={locale}
+                t={t}
+                year={year}
+                themeMode={themeMode}
+                featureLinks={featureLinks.footer}
+              />
+            </SignInNavigation>
           </CartDrawerProvider>
         </ToastProvider>
       </SessionProvider>
