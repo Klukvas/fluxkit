@@ -6,8 +6,9 @@ import { CATALOG_LIMITS } from "../catalog/limits.js";
  */
 // 2: `publishedAt` in milliseconds (search finish review F2); 3: the filter field of every public attribute, filterable
 // or not, so `isFilterable` is a settings change (finding F2 of the measurements at scale).
-// 4: omit products without usable titles or referenced active-variant option text (shared store SQL predicate).
-export const SEARCH_DOCUMENT_VERSION = 4;
+// 4: type-local listing keys for split-listing search (ADR 0052).
+// 5: PR C omits products without usable titles or referenced active-variant option text (shared store SQL predicate).
+export const SEARCH_DOCUMENT_VERSION = 5;
 
 /** Search limits, ADR 0034. Enforced by these rules and by the API at the boundary. */
 export const SEARCH_LIMITS = Object.freeze({

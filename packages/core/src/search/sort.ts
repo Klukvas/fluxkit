@@ -29,17 +29,23 @@ export function parseSearchSort(raw: string | undefined, hasQuery: boolean): Sea
 export function engineSort(
   sort: SearchSort,
   sortable: readonly string[] = SORTABLE_FIELDS,
+  groupBy: "product" | "listing" = "product",
 ): string[] | undefined {
+  const ties = groupBy === "listing" ? ["productId:desc", "listingKey:asc"] : [];
   switch (sort) {
     case "relevance":
       return undefined;
     case "newest":
       return sortable.includes(SEARCH_FIELDS.productId)
-        ? ["publishedAt:desc", "productId:desc"]
+        ? [
+            "publishedAt:desc",
+            "productId:desc",
+            ...(groupBy === "listing" ? ["listingKey:asc"] : []),
+          ]
         : ["publishedAt:desc"];
     case "price_asc":
-      return ["price:asc"];
+      return ["price:asc", ...ties];
     case "price_desc":
-      return ["price:desc"];
+      return ["price:desc", ...ties];
   }
 }

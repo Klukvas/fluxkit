@@ -52,10 +52,33 @@ describe("index uids", () => {
     expect(searchLiveIndexUid("shop_a_", "en-us")).toBe("shop_a_catalog_en_us");
   });
 
-  it("names a build index after the live one with a UTC stamp to the second", () => {
-    expect(searchBuildIndexUid("fluxkit_", "uk", new Date("2026-01-02T03:04:05.678Z"))).toBe(
-      "fluxkit_catalog_uk_20260102030405",
+  it("names each build generation with the live uid, UTC second and supplied nonce", () => {
+    const generation = "0123456789abcdef0123456789abcdef";
+    const now = new Date("2026-01-02T03:04:05.678Z");
+    const first = searchBuildIndexUid("fluxkit_", "uk", now, generation);
+    expect(first).toBe(`fluxkit_catalog_uk_20260102030405_${generation}`);
+    const second = searchBuildIndexUid("fluxkit_", "uk", now, "f".repeat(32));
+    expect(second).not.toBe(first);
+    expect(isOwnedIndexUid(first, "fluxkit_")).toBe(true);
+    expect(isOwnedIndexUid(second, "fluxkit_")).toBe(true);
+    expect(isOwnedIndexUid(first, "other_")).toBe(false);
+    expect(searchBuildIndexUid("shop_a_", "en-us", now, generation)).toBe(
+      `shop_a_catalog_en_us_20260102030405_${generation}`,
     );
+  });
+
+  it("keeps build generations within the uid charset and length limits", () => {
+    const prefix = `${"a".repeat(32)}_`;
+    const locale = "abcdefgh-abcdefgh-abcdefgh-abcdefgh-abc";
+    const generation = "a".repeat(32);
+    const uid = searchBuildIndexUid(prefix, locale, NOW, generation);
+    expect(uid).toHaveLength(128);
+    expect(SEARCH_INDEX_UID_PATTERN.test(uid)).toBe(true);
+    expect(isOwnedIndexUid(uid, prefix)).toBe(true);
+    expect(() => searchBuildIndexUid(prefix, `${locale}d`, NOW, generation)).toThrow(RangeError);
+    for (const bad of ["", "a".repeat(31), "a".repeat(33), "A".repeat(32), "-".repeat(32)]) {
+      expect(() => searchBuildIndexUid("fluxkit_", "uk", NOW, bad)).toThrow(RangeError);
+    }
   });
 
   it("refuses a prefix or locale that would make an unsafe uid", () => {
@@ -172,8 +195,8 @@ describe("decideIndexAction", () => {
     currency: "UAH",
     rebuildRequestedAt: null,
     buildIndexUid: null,
-    buildStartedAt: null,
     buildRebuildKey: null,
+    buildStartedAt: null,
   };
 
   it("does nothing for a fresh live index", () => {
@@ -233,7 +256,7 @@ describe("decideIndexAction", () => {
   it("discards incompatible running builds, including inherited builds without a key", () => {
     for (const buildRebuildKey of [
       null,
-      searchRebuildKey(3, "UAH", "uk"),
+      searchRebuildKey(SEARCH_DOCUMENT_VERSION - 1, "UAH", "uk"),
       searchRebuildKey(SEARCH_DOCUMENT_VERSION, "EUR", "uk"),
     ]) {
       expect(
@@ -257,8 +280,8 @@ describe("decideIndexAction", () => {
       ...live,
       rebuildRequestedAt: minutes(-10),
       buildIndexUid: "fluxkit_catalog_uk_20261029115000",
-      buildStartedAt: minutes(-10),
       buildRebuildKey: derived.rebuildKey,
+      buildStartedAt: minutes(-10),
     };
     expect(decideIndexAction({ locale: "uk", state: building, derived, now: NOW })).toEqual({
       kind: "continue_build",

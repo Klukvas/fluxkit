@@ -43,6 +43,8 @@ import type {
   StoreProductListItem,
   StoreProductsQuery,
 } from "./store.schemas.js";
+import { summarizeListingGroups } from "./store-listing.js";
+import type { ListingReference } from "./store-listing.repository.js";
 import { isStoreSlug } from "./store.schemas.js";
 
 /** A product row of an active product always has `published_at` (CHECK `product_published_at_check`). */
@@ -190,20 +192,22 @@ export class StoreService {
     for (const id of omittedProductIds) {
       catalogText(undefined, locale, `Product "${id}"`);
     }
-    return toPage(await this.toListItems(rows, locale), total, query);
+    return toPage(await this.toListItems(rows, locale, query.groupBy), total, query);
   }
 
-  /** The list items of product rows: three batched reads for the whole page, whatever its size. */
+  /** Current summaries: three batched reads per page, plus current option/assignment facts in listing mode. */
   private async toListItems(
     rows: readonly ProductListRow[],
     locale: StoreLocale,
+    groupBy: "product" | "listing" = "product",
   ): Promise<StoreProductListItem[]> {
-    const productIds = rows.map((row) => row.id);
-    // Three batched reads for the whole page, whatever its size.
-    const [media, variants, levels] = await Promise.all([
+    const productIds = [...new Set(rows.map((row) => row.id))];
+    // Reads are batched by product, so sibling cards never add database statements.
+    const [media, variants, levels, listingFacts] = await Promise.all([
       this.store.listMediaForProducts(productIds),
       this.store.listSellableVariants(productIds, this.pricing.shopCurrency),
       this.store.listStockLevels(productIds),
+      groupBy === "listing" ? this.store.listListingFacts(productIds) : Promise.resolve([]),
     ]);
     const pricedVariants = priceVariants(variants, levels, this.pricing);
     const items = rows.flatMap((row) => {
@@ -222,21 +226,56 @@ export class StoreService {
       if (summary === undefined) {
         return [];
       }
-      return [
-        {
-          id: row.id,
-          slug: row.slug,
-          title,
-          brand: toBrand(row, locale),
-          image: pickListImage(
-            media.filter((entry) => entry.productId === row.id),
-            locale,
-          ),
-          publishedAt: publishedAtOf(row),
-          ...summary,
-          defaultVariantId: defaultVariantIdOf(sellableIds),
-        },
-      ];
+      const groups =
+        groupBy === "listing"
+          ? summarizeListingGroups(
+              row.id,
+              variants,
+              pricedVariants,
+              listingFacts,
+              locale,
+              this.pricing.shopCurrency,
+            )
+          : [
+              {
+                ...summary,
+                listingKey: row.id,
+                listingOption: null,
+                optionValueId: null,
+                variantIds: sellableIds,
+              },
+            ];
+      return groups
+        .filter((group) => row.listingKey === undefined || group.listingKey === row.listingKey)
+        .map((group) => {
+          const productMedia = media.filter((entry) => entry.productId === row.id);
+          const valueImage =
+            group.optionValueId === null
+              ? undefined
+              : productMedia.find((entry) => entry.optionValueId === group.optionValueId);
+          const image =
+            group.listingOption === null
+              ? pickListImage(productMedia, locale)
+              : pickListImage(
+                  valueImage === undefined
+                    ? productMedia.filter((entry) => entry.optionValueId === null)
+                    : [valueImage],
+                  locale,
+                );
+          return {
+            id: row.id,
+            slug: row.slug,
+            title,
+            brand: toBrand(row, locale),
+            image,
+            publishedAt: publishedAtOf(row),
+            listingKey: group.listingKey,
+            listingOption: group.listingOption,
+            price: group.price,
+            availability: group.availability,
+            defaultVariantId: defaultVariantIdOf(group.variantIds),
+          };
+        });
     });
     return items;
   }
@@ -269,6 +308,39 @@ export class StoreService {
         return item === undefined ? [] : [item];
       }),
       missing: productIds.filter((id) => !byId.has(id)),
+    };
+  }
+
+  /** Hydrate only engine-requested groups in hit order; obsolete keys never turn into another group. */
+  async listItemsByListingReferences(
+    references: readonly ListingReference[],
+    requestedLocale: string,
+  ): Promise<{ items: StoreProductListItem[]; missing: string[] }> {
+    const locale = this.resolveLocale(requestedLocale);
+    if (references.length === 0) return { items: [], missing: [] };
+    const ids = [...new Set(references.map((reference) => reference.productId))];
+    const { rows, omittedProductIds } = await this.store.listProductsByIds(
+      ids,
+      this.pricing.shopCurrency,
+    );
+    for (const id of omittedProductIds) {
+      catalogText(undefined, locale, `Product "${id}"`);
+    }
+    const items = await this.toListItems(rows, locale, "listing");
+    const byKey = new Map(items.map((item) => [item.listingKey, item]));
+    const itemFor = (reference: ListingReference) => {
+      const item = byKey.get(reference.listingKey);
+      return item?.id === reference.productId ? item : undefined;
+    };
+    return {
+      items: references.flatMap((reference) => itemFor(reference) ?? []),
+      missing: [
+        ...new Set(
+          references
+            .filter((reference) => itemFor(reference) === undefined)
+            .map((reference) => reference.productId),
+        ),
+      ],
     };
   }
 

@@ -462,7 +462,7 @@ describe("SearchIndexer (real Postgres, real Meilisearch)", () => {
       }>(
         "select locale, build_index_uid, build_rebuild_key from search_index_state order by locale",
       );
-      // Simulate the completed page of a v3 process, which still indexed this product's text.
+      // Simulate the completed page of main's v4 process, which still indexed this product's text.
       for (const build of builds.rows) {
         expect(build.build_rebuild_key).toBe(`${SEARCH_DOCUMENT_VERSION}:UAH:${build.locale}`);
         const documents = [
@@ -479,7 +479,7 @@ describe("SearchIndexer (real Postgres, real Meilisearch)", () => {
         await waitForMasterTask(((await response.json()) as { taskUid: number }).taskUid);
       }
       await pool.query(
-        "update search_index_state set document_version = 3, build_rebuild_key = '3:UAH:' || locale, build_cursor = $1, build_documents_count = 2",
+        "update search_index_state set document_version = 4, build_rebuild_key = '4:UAH:' || locale, build_cursor = $1, build_documents_count = 2",
         [[hidden.productId, visible.productId].sort().at(-1)],
       );
       await pool.query("update product set title = $2::jsonb where id = $1", [

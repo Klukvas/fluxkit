@@ -23,6 +23,7 @@ import {
   variantOptionValue,
 } from "../../database/schema/index.js";
 import { hasUsableProductText } from "./store-visibility.js";
+import { listProductGroups, readListingFacts } from "./store-listing.repository.js";
 import type { I18nText } from "../../database/schema/catalog.js";
 
 type AttributeRow = typeof attribute.$inferSelect;
@@ -37,6 +38,7 @@ export interface ActiveCategoryRow {
 }
 
 export interface ProductListRow {
+  listingKey?: string;
   id: string;
   slug: string;
   title: I18nText;
@@ -222,11 +224,22 @@ export class StoreRepository {
    */
   async listProducts(
     filter: ProductListFilter,
-    page: { limit: number; offset: number },
+    page: { limit: number; offset: number; groupBy?: "product" | "listing" },
   ): Promise<{ rows: ProductListRow[]; total: number; omittedProductIds: string[] }> {
     const baseWhere = this.activeProductsWhere(filter);
     const usableText = hasUsableProductText(this.db);
     const where = and(baseWhere, usableText);
+    const omittedQuery = this.db
+      .select({ id: product.id })
+      .from(product)
+      .where(and(baseWhere, not(usableText)));
+    if (page.groupBy === "listing") {
+      const [groups, omitted] = await Promise.all([
+        listProductGroups(this.db, where, filter.shopCurrency, page),
+        omittedQuery,
+      ]);
+      return { ...groups, omittedProductIds: omitted.map((row) => row.id) };
+    }
     const [rows, total, omitted] = await Promise.all([
       this.db
         .select({
@@ -244,12 +257,13 @@ export class StoreRepository {
         .limit(page.limit)
         .offset(page.offset),
       this.db.$count(product, where),
-      this.db
-        .select({ id: product.id })
-        .from(product)
-        .where(and(baseWhere, not(usableText))),
+      omittedQuery,
     ]);
     return { rows, total, omittedProductIds: omitted.map((row) => row.id) };
+  }
+
+  listListingFacts(productIds: readonly string[]) {
+    return readListingFacts(this.db, productIds);
   }
 
   /** The listable products among `productIds` (active, with a sellable variant), in no particular order. */

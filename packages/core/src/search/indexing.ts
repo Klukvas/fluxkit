@@ -83,9 +83,17 @@ function stamp(now: Date): string {
     .replace(/[-:T]/g, "");
 }
 
-/** The uid of a new build of a locale's index: the live uid plus a UTC stamp to the second. */
-export function searchBuildIndexUid(prefix: string, locale: string, now: Date): string {
-  const uid = `${searchLiveIndexUid(prefix, locale)}_${stamp(now)}`;
+/** A build generation: live uid, UTC stamp and a fresh 128-bit hex nonce supplied by the caller. */
+export function searchBuildIndexUid(
+  prefix: string,
+  locale: string,
+  now: Date,
+  generation: string,
+): string {
+  if (!/^[a-f0-9]{32}$/.test(generation)) {
+    throw new RangeError("The build generation must be 128 bits of lower-case hex");
+  }
+  const uid = `${searchLiveIndexUid(prefix, locale)}_${stamp(now)}_${generation}`;
   if (!SEARCH_INDEX_UID_PATTERN.test(uid)) {
     throw new RangeError("The build index uid would be too long");
   }
@@ -114,8 +122,8 @@ export interface IndexStateFacts {
   readonly currency: string | null;
   readonly rebuildRequestedAt: Date | null;
   readonly buildIndexUid: string | null;
-  readonly buildStartedAt: Date | null;
   readonly buildRebuildKey: string | null;
+  readonly buildStartedAt: Date | null;
 }
 
 export type IndexAction =
@@ -142,6 +150,7 @@ export function decideIndexAction(input: {
 }): IndexAction {
   const { state, derived, now } = input;
   if (state !== null && state.buildIndexUid !== null) {
+    // Null also marks an uncertain swap: the build uid may now hold the OLD live index.
     if (state.buildRebuildKey !== derived.rebuildKey) {
       return { kind: "rebuild", cause: "stale_build" };
     }

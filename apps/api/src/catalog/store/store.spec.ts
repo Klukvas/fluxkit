@@ -944,6 +944,8 @@ describe("store API (public, real app, real Postgres)", () => {
       const [first, second] = page.items;
       expect(first).toEqual({
         id: ids["p1"],
+        listingKey: ids["p1"],
+        listingOption: null,
         slug: slug("p1"),
         title: "Товар p1",
         brand: { slug: slug("brand-a"), name: "Бренд А" },
@@ -963,6 +965,8 @@ describe("store API (public, real app, real Postgres)", () => {
           "availability",
           "brand",
           "defaultVariantId",
+          "listingKey",
+          "listingOption",
           "id",
           "image",
           "price",

@@ -27,6 +27,7 @@ import {
   price,
   product,
   productCategory,
+  productOption,
   productTypeAttribute,
   productTypeOption,
   variant,
@@ -43,6 +44,7 @@ import {
 
 /** The definitions shared by every product of a run. */
 export interface SearchDefinitions {
+  readonly splitOptionByType: ReadonlyMap<string, string>;
   /** Attribute assignments per product type, in the type's position order. */
   readonly assignmentsByType: ReadonlyMap<string, readonly SearchAttributeAssignment[]>;
   /** Every assignment of every type: the settings and the facets are derived from them. */
@@ -124,7 +126,11 @@ export async function readSearchDefinitions(db: DbExecutor): Promise<SearchDefin
       .map((value) => ({ code: value.code, label: value.label })),
   }));
   const typeOptionRows = await db
-    .selectDistinct({ code: option.code })
+    .select({
+      code: option.code,
+      productTypeId: productTypeOption.productTypeId,
+      splitsListing: productTypeOption.splitsListing,
+    })
     .from(productTypeOption)
     .innerJoin(option, eq(option.id, productTypeOption.optionId))
     .orderBy(asc(option.code));
@@ -160,10 +166,25 @@ export async function readSearchDefinitions(db: DbExecutor): Promise<SearchDefin
     assignmentsByType,
     allAssignments,
     options,
-    typeOptionCodes: typeOptionRows,
+    typeOptionCodes: [
+      ...new Map(typeOptionRows.map((row) => [row.code, { code: row.code }])).values(),
+    ],
+    splitOptionByType: new Map(
+      typeOptionRows.filter((row) => row.splitsListing).map((row) => [row.productTypeId, row.code]),
+    ),
     categories,
     attributeNames: new Map(attributeRows.map((row) => [row.code, row.name])),
   };
+}
+
+/** Read after queue claims, so a newly claimed flag change never uses the run's earlier definitions. */
+export async function readSplitOptionsByType(db: DbExecutor): Promise<ReadonlyMap<string, string>> {
+  const rows = await db
+    .select({ productTypeId: productTypeOption.productTypeId, code: option.code })
+    .from(productTypeOption)
+    .innerJoin(option, eq(option.id, productTypeOption.optionId))
+    .where(eq(productTypeOption.splitsListing, true));
+  return new Map(rows.map((row) => [row.productTypeId, row.code]));
 }
 
 export function buildContextFor(
@@ -177,6 +198,7 @@ export function buildContextFor(
     defaultLocale,
     attributes: definitions.assignmentsByType.get(productTypeId) ?? [],
     options: definitions.options,
+    splitOptionCode: definitions.splitOptionByType.get(productTypeId) ?? null,
   };
 }
 
@@ -214,6 +236,11 @@ export async function readSearchProducts(
     return [];
   }
   const ids = productRows.map((row) => row.id);
+  const chosenOptions = await db
+    .select({ productId: productOption.productId, code: option.code })
+    .from(productOption)
+    .innerJoin(option, eq(option.id, productOption.optionId))
+    .where(inArray(productOption.productId, ids));
   const variantRows = await db
     .select({
       id: variant.id,
@@ -278,6 +305,9 @@ export async function readSearchProducts(
     productTypeId: row.productTypeId,
     facts: {
       id: row.id,
+      optionCodes: chosenOptions
+        .filter((entry) => entry.productId === row.id)
+        .map((entry) => entry.code),
       slug: row.slug,
       status: productStatusSchema.parse(row.status),
       publishedAt: row.publishedAt?.toISOString() ?? null,
