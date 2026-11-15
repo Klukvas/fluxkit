@@ -2,6 +2,7 @@
 
 import { VisuallyHidden, type Locale, type Translator } from "@fluxkit/ui";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useRef, type ReactNode } from "react";
 import { accountLinks, guestLinks, sessionLinks } from "../layout/navigation";
 import { failureText, type Failure } from "../lib/failure";
@@ -24,12 +25,14 @@ export function AccountLinkView({
   t,
   locale,
   signOut = null,
+  canonicalLogin = false,
 }: {
   state: SessionState;
   t: Translator;
   locale: Locale;
   /** The "Sign out" entry of a signed-in customer's menu (`SignOutItem`, which needs the router). */
   signOut?: ReactNode;
+  canonicalLogin?: boolean;
 }) {
   if (state.status === "loading") {
     return (
@@ -74,9 +77,15 @@ export function AccountLinkView({
       <ul className="flex flex-col">
         {(signedIn ? accountLinks : guestLinks).map((link) => (
           <li key={link.href}>
-            <Link href={localizedHref(locale, link.href)} className={menuItem}>
-              {t(link.labelKey)}
-            </Link>
+            {canonicalLogin && link.href === sessionLinks.signIn ? (
+              <a href={localizedHref(locale, link.href)} className={menuItem}>
+                {t(link.labelKey)}
+              </a>
+            ) : (
+              <Link href={localizedHref(locale, link.href)} className={menuItem}>
+                {t(link.labelKey)}
+              </Link>
+            )}
           </li>
         ))}
         {signedIn ? <li className="mt-1 border-t border-border pt-1">{signOut}</li> : null}
@@ -143,8 +152,10 @@ function SignOutItem() {
 export function AccountLink() {
   const { locale, t } = useI18n();
   const { state } = useAccount();
+  const pathname = usePathname();
   return (
     <AccountLinkView
+      canonicalLogin={pathname === localizedHref(locale, sessionLinks.signIn)}
       state={state.session}
       t={t}
       locale={locale}

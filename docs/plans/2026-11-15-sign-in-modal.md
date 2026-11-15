@@ -1,7 +1,7 @@
 # Sign-in modal — presentation plan
 
-- Status: proposed; no implementation in this task. Branch: `feature/sign-in-modal`.
-- Scope: this plan only. A later implementation will change presentation and navigation wiring, not authentication.
+- Status: implemented. Branch: `feature/sign-in-modal`; local verification below, real-service Chromium and independent QA pending.
+- Scope: storefront presentation and navigation wiring; authentication remains unchanged.
 - Decision: [round 4, item 10](2026-11-13-storefront-ui-round-4.md) keeps `/{locale}/account/login` canonical and adds a native-dialog intercepting route.
 - Existing evidence: [storefront README](../../apps/storefront/README.md), [ADR 0048](../adr/0048-first-html-budget-and-loading-boundaries.md), the route tree, forms, guards and requested browser specs; installed Next 16.4.3 docs `apps/storefront/node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/{parallel-routes,intercepting-routes}.md`.
 - Paths below are relative to `apps/storefront/` unless prefixed with `packages/` or `docs/`.
@@ -110,7 +110,15 @@
 
 - `apps/storefront/README.md` will describe the navigation matrix, first-HTML guarantees, gate-close behaviour, default account destination and actual no-JS limitation.
 - `docs/files/storefront.md` will map the slot, wrapper and coordinator; `apps/storefront/e2e/README.md` will list the new scenarios and tooling limitations.
-- `CHANGELOG.md` will record the presentation change; `docs/HANDOFF.md` will record actual implementation/verification status and update its date. This plan-only task will edit none of them.
+- `CHANGELOG.md` will record the presentation change; `docs/HANDOFF.md` will record actual implementation/verification status and update its date.
+
+## Implementation notes (2026-11-15)
+
+- The null catch-all is `src/app/[locale]/@modal/[...rest]/page.tsx`: installed Next 16.4.3 rejects the planned `[...catchAll]` as an ambiguous pattern alongside the existing canonical `[...rest]`. Matching the existing parameter name preserves the same URL coverage without changing canonical routes or adding a children fallback.
+- The first-segment walk in `config/shop-pages.spec.ts` skips parallel slots, which have no URL segment. The orchestrator explicitly permits config tests; fork-owned config value files remain unchanged.
+- Source guards remain unchanged: gate navigation calls `loginHref` directly, canonical-login header navigation uses its plain anchor, and dialog CSS lives in the existing component layer. The header-search navigation mock now includes the selected-slot hook.
+- Default root build: 17/18 tasks succeed; storefront reaches compile then Turbopack fails because sandboxing forbids binding its PostCSS worker port (`Operation not permitted`). The default build must be repeated outside this sandbox. `pnpm --filter @fluxkit/storefront build --webpack` passes (compile, TypeScript, 47 static pages and traces).
+- No RTL/jsdom or no-JS header fallback, as ruled below. Behavioural scenarios use Chromium; they are not run here because the real services are unavailable. The orchestrator owns independent QA, browser/first-HTML/feature-matrix and visual acceptance; no commit, push, deploy or next task is performed.
 
 ## Red zone
 

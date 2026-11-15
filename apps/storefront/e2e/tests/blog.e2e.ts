@@ -1,4 +1,5 @@
 import type { Page } from "@playwright/test";
+import { openAccountMenu, waitForHydration } from "../support/flows.ts";
 import { E2E_FEATURES, E2E_ORIGIN } from "../support/env.ts";
 import { expect, test } from "../support/fixtures.ts";
 
@@ -119,6 +120,21 @@ test("a draft is a real 404; a published post renders with its metadata, JSON-LD
       "href",
       "/uk/blog",
     );
+    await waitForHydration(page);
+    await openAccountMenu(page, "Меню акаунта");
+    await page.getByRole("banner").getByRole("link", { name: "Увійти", exact: true }).click();
+    const signIn = page.getByRole("dialog", { name: "Увійти", exact: true });
+    await expect(signIn).toBeVisible();
+    await expect(
+      main.getByRole("heading", { level: 1, name: "Догляд за льоном", includeHidden: true }),
+    ).toHaveCount(1);
+    await page.keyboard.press("Escape");
+    await expect(page).toHaveURL(new RegExp(`/uk/blog/${slug}$`));
+    await expect(signIn).toHaveCount(0);
+    await expect(
+      page.getByRole("banner").getByRole("button", { name: "Меню акаунта" }),
+    ).toBeFocused();
+
     const crumbs = page.getByRole("navigation", { name: "Навігаційний ланцюжок" });
     await expect(crumbs.getByRole("link", { name: "Блог" })).toHaveAttribute("href", "/uk/blog");
     await expect(crumbs.getByText("Догляд за льоном")).toHaveAttribute("aria-current", "page");

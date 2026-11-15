@@ -4,10 +4,20 @@ import { waitForHydration } from "../support/flows.ts";
 test("a guest on a protected page is sent to the sign-in page with the page AND its query string as next (review L6)", async ({
   page,
 }) => {
+  // A real predecessor makes an accidental Back dismissal distinguishable from home replacement.
+  await page.goto("/en/catalog");
   await page.goto("/en/account/orders?page=3");
-  await waitForHydration(page);
   await expect(page).toHaveURL(/\/en\/account\/login\?next=%2Fen%2Faccount%2Forders%3Fpage%3D3$/);
-  await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
+  const dialog = page.getByRole("dialog", { name: "Sign in", exact: true });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("link", { name: "Create an account" })).toHaveAttribute(
+    "href",
+    "/en/account/register?next=%2Fen%2Faccount%2Forders%3Fpage%3D3",
+  );
+  await dialog.getByRole("button", { name: "Close", exact: true }).click();
+  await expect(page).toHaveURL(/\/en$/);
+  await expect(dialog).toHaveCount(0);
+  await expect(page.locator("main h1")).toBeFocused();
 });
 
 test("a next that points at an auth page, even with a trailing slash, is not followed after signing in", async ({

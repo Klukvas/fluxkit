@@ -19,14 +19,14 @@ export interface FocusableDocument {
 }
 
 export function createNavigationFocus(getDocument: () => FocusableDocument): {
-  onPathname(pathname: string): void;
+  onPathname(pathname: string, skip?: boolean): void;
 } {
   let previous: string | null = null;
   return {
-    onPathname(pathname) {
+    onPathname(pathname, skip = false) {
       const before = previous;
       previous = pathname;
-      if (before === null || before === pathname) return;
+      if (skip || before === null || before === pathname) return;
       const doc = getDocument();
       const target = doc.querySelector("main h1") ?? doc.querySelector("main");
       if (target === null) return;

@@ -24,10 +24,12 @@ test("a shopper registers with a guest cart, checks out as a customer and finds 
   // The account icon's menu (2026-11-02): a guest gets "Sign in" and "Register".
   await openAccountMenu(page);
   await page.getByRole("link", { name: "Sign in" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
-  await page.getByRole("link", { name: "Create an account" }).click();
+  const signIn = page.getByRole("dialog", { name: "Sign in", exact: true });
+  await expect(signIn).toBeVisible();
+  await signIn.getByRole("link", { name: "Create an account" }).click();
   // Wait for the new page: a field filled while the old page is still there would be filled on the wrong form.
   await expect(page.getByRole("heading", { level: 1, name: "Create an account" })).toBeVisible();
+  await expect(signIn).toHaveCount(0);
   await page.getByLabel("Email", { exact: true }).fill(email);
   await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   await page.getByLabel("First name", { exact: true }).fill("Olena");

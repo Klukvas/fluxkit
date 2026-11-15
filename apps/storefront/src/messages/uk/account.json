@@ -1,4 +1,5 @@
 {
+  "account.modal.close": "Закрити",
   "account.title": "Мій акаунт",
   "account.loading": "Завантажуємо ваш акаунт",
   "account.field.email": "Електронна пошта",

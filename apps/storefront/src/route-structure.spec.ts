@@ -108,6 +108,22 @@ function loadingFilesAbove(page: string): string[] {
 }
 
 describe("route structure", () => {
+  it("keeps the modal slot outside route groups, with null fallbacks and no loading view", () => {
+    const slot = join(localeRoot, "@modal");
+    for (const name of ["default.tsx", "page.tsx", "[...rest]/page.tsx"]) {
+      expect(readFileSync(join(slot, name), "utf8")).toMatch(/return null;/);
+    }
+    expect(loadingFiles(slot)).toEqual([]);
+    const intercepted = join(slot, "(.)account/login/page.tsx");
+    expect(loadingFilesAbove(intercepted)).toEqual([]);
+    const source = readFileSync(intercepted, "utf8");
+    expect(source).toContain("await ensureStorefrontLocales()");
+    expect(source).toContain("return privateMetadata(");
+    expect(source).toContain("<LoginForm");
+    expect(source).toContain("<SignInModal>");
+    expect(existsSync(join(localeRoot, "default.tsx"))).toBe(false);
+  });
+
   it.each(mustAnswerRealNotFound)("%s exists and has no loading.tsx above it", (route) => {
     const page = join(localeRoot, route);
     expect(existsSync(page), route).toBe(true);

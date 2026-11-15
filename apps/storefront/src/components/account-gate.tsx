@@ -12,7 +12,9 @@ import {
 } from "@fluxkit/ui";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { shouldRedirectAccountGuest } from "../lib/sign-in-navigation";
+import { useSignInNavigation } from "./sign-in-navigation";
 import type { SessionState } from "../lib/account-store";
 import { currentPath, loginHref } from "../lib/safe-next";
 import { useI18n } from "./i18n-provider";
@@ -89,19 +91,33 @@ export function AccountGate({
   const { state, store } = useAccount();
   const router = useRouter();
   const pathname = usePathname();
+  const navigation = useSignInNavigation();
+  const protectedPath = useRef(pathname);
   // The query string (`?page=3`) is read in the browser only, after hydration: the server render has none, and the link must
   // not differ between the two. The redirect reads it again at the moment it happens, so it never uses a stale value.
   const [search, setSearch] = useState("");
   useEffect(() => {
+    if (navigation?.active) return;
+    protectedPath.current = pathname;
     setSearch(window.location.search);
-  }, [pathname]);
-  const signInHref = loginHref(locale, currentPath(pathname, search));
+  }, [pathname, navigation?.active]);
+  const signInHref = loginHref(locale, currentPath(protectedPath.current, search));
 
   useEffect(() => {
-    if (state.session.status === "guest") {
-      router.replace(loginHref(locale, currentPath(pathname, window.location.search)));
+    if (shouldRedirectAccountGuest(state.session.status, navigation?.active ?? false)) {
+      const destination = loginHref(
+        locale,
+        currentPath(protectedPath.current, window.location.search),
+      );
+      navigation?.coordinator.prepare({
+        kind: "replace",
+        destination,
+        origin: currentPath(protectedPath.current, window.location.search),
+        opener: null,
+      });
+      router.replace(loginHref(locale, currentPath(protectedPath.current, window.location.search)));
     }
-  }, [state.session.status, router, locale, pathname]);
+  }, [state.session.status, router, locale, pathname, navigation?.active, navigation?.coordinator]);
 
   return (
     <AccountGateView

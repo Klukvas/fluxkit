@@ -5,6 +5,7 @@ import { locales } from "@fluxkit/ui";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   coreFirstSegments,
+  firstUrlSegment,
   featureSlicePages,
   featureSliceProblems,
   layoutProblems,
@@ -259,4 +260,14 @@ describe("feature slice route rules (plan 2026-11-13-blog.md, E5)", () => {
     expect(featureSliceProblems(localeRoot, options)).toEqual([]);
     expect(featureSlicePages(localeRoot)).toHaveLength(2);
   });
+});
+
+it("does not count parallel slots as URLs and keeps account reserved", () => {
+  expect(
+    firstUrlSegment(realLocaleRoot, join(realLocaleRoot, "@modal/account/login/page.tsx")),
+  ).toBe("account");
+  const segments = coreFirstSegments(realLocaleRoot);
+  expect(segments.has("@modal")).toBe(false);
+  expect(segments.has("(.)account")).toBe(false);
+  expect(segments.has("account")).toBe(true);
 });

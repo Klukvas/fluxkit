@@ -664,6 +664,27 @@ height, altKey }`, `href`, optional `tone`; pictures in `public/home/` (their ow
   sideways scroll, a banner created through the admin API showing within the cache window while an inactive, a future and an expired one
   never do) and the dark contrast walk of `design-b.e2e.ts`, which asserts the banners are on the page.
 
+## Sign-in modal (2026-11-15)
+
+`/{locale}/account/login` stays the canonical full page. Client navigation to it uses the locale-level `@modal` parallel slot and `(.)account/login` interception, reusing `LoginForm` inside a native `<dialog>`. The existing session provider, validation, native POST and safe destination builders are unchanged. No feature flag, new dependency or public contract is added.
+
+| Navigation | Result |
+| --- | --- |
+| Header Sign in, checkout Sign in, or an emailed-link page's login link | Dialog over the current page; the href and any explicit safe `next` stay unchanged. |
+| Protected account page or expired session | The existing replace opens the dialog with the protected path and query as `next`; the gate does not redirect again while the slot is active. |
+| Escape or Close after a known pushed link | Back to the origin, with focus restored to its opener (the account menu summary for header entry); Forward reopens. |
+| Escape or Close after gate replacement or an unknown entry | Replace with the locale home page, avoiding a protected-page redirect loop or an external predecessor. |
+| Successful sign-in | The existing form replaces with its safe `next`, or `/{locale}/account` by default; the slot clears and the shared header updates. |
+| Register, Forgot password or other destination | Full destination page; null slot routes clear the dialog and normal page-heading focus resumes. |
+| Header Sign in on the canonical login page | Plain anchor to the full page, avoiding duplicate form IDs. |
+| Direct visit, external link, new tab or reload | Full login page; no dialog opens during hydration. |
+
+The dialog uses existing theme tokens, a translated Close button, the contained form's `h1` as its accessible name, native background inertness/focus containment and a scoped scroll lock. Initial focus goes to the heading; failed sign-in keeps the form's focused error summary. Backdrop clicks do nothing.
+
+ADR 0048 remains in force: no new loading view or Suspense around the shell; the canonical page's form stays in its first HTML. Without JavaScript, direct login visits show the full page and its native POST safely returns the form without authenticating. The header account island still needs JavaScript to expose its sign-in link; no `noscript` header fallback is added (orchestrator decision).
+
+Verification: the default root build reaches compile but Turbopack cannot bind its PostCSS worker port in this sandbox (`Operation not permitted`); `pnpm --filter @fluxkit/storefront build --webpack` passes; rerun the default build outside it. Pure coordinator/static-markup Vitest coverage plus `e2e/tests/sign-in-modal.e2e.ts` and the updated account scenarios. The new browser scenarios are written but not run locally (services unavailable); real focus/history, first HTML, 404/feature behaviour and Safari/device scrolling still need the orchestrator's browser pass.
+
 ## Shop pages, contacts and footer (2026-11-06)
 
 Plan `docs/plans/2026-11-06-storefront-shop-pages.md` (repair batch 2 of the owner's UX review: no contacts, delivery, returns, FAQ, About or size guide; placeholder and `TODO` text on the page; a minimal footer).
