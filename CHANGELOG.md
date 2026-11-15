@@ -1,6 +1,8 @@
 # Changelog
 
 - Email pacing: `RATE_LIMIT_STORE=redis` shares provider slots across instances using Redis TIME and expiring timestamp-only keys; runtime failures use per-process pacing with the existing throttled store error and degraded readiness (ADR 0055, multi-instance PR 3). All modes bound admission by the lease/deadline, defer without spending an attempt, guarantee ownership through the lease without admission database reads, and preserve local start spacing through delayed timers and Redis fallback/recovery. Stale shared slots are reacquired within the remaining budget; reservation spacing accounts for observed Redis reply latency separately from timer lateness.
+- Search sync: a queue claim no longer leases more rows than its page limit when the database statistics are stale (the limited page is materialized once), so job 13 keeps its budget and leaves the rest due.
+
 - Storefront: visible lists use split listing groups (ADR 0052), with distinct card keys, translated value suffixes, group images and preselected product/no-JS links; product sitemap and all-false catalog stay unchanged (deploy the listing-capable API first).
 - Inventory schema (owner-approved review follow-up PR E): migration `0015_inventory_reserved_upper_bound` bounds `inventory_level.reserved` to 0 through 1 000 000 000, matching core `MAX_RESERVED`. It refuses with a readable error if existing rows exceed the bound; reconcile those rows before retrying. The hand-written down script restores `reserved >= 0` and removes its migration journal row without changing inventory data.
 

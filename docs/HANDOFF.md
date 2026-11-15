@@ -130,6 +130,7 @@ Agents must not do these (AGENTS.md is the owner's file) or cannot (keys, contra
 - Monobank S1 and S2 (`packages/providers/monobank/README.md`, "Plan S1"): a TEST token as `MONOBANK_TOKEN`, a public `https` staging URL for the webhook. How an external partial refund is reported, and whether Monobank refuses an over-refund, are unverified.
 - Nova Post: a real pickup-point order for the label (production answers `422`), the estimate, status codes other than `1` and `2` (`docs/plans/2026-10-25-nova-post-plugin.md`); a sandbox key; whether production shipments are billed.
 - **Rotate the Nova Post key that was pasted into a chat earlier.**
+- Redis on the test server: add `REDIS_PASSWORD` (generate with `openssl rand -hex 32` on the server) to `/etc/fluxkit/production.env` BEFORE PR 303 is merged (without it the deploy stops at `compose pull`); then merge PR 303, then switch the API to `RATE_LIMIT_STORE=redis` (`docs/deployment.md`).
 - A verified sending domain (SPF, DKIM, DMARC) for `EMAIL_FROM`; a Monobank merchant contract for production.
 - A real host: certificate, DNS, restore from backup, an update of a running shop (`docs/deployment.md`); search on production hardware (only a shared sandbox was measured, plan sections "Measurements at scale (2026-10-31)" and "Re-measurement at 20 000 products (2026-11-01)").
 
