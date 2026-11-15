@@ -100,7 +100,11 @@ describe("buildSearchFilterDocuments", () => {
     expect(filter.map((entry) => entry.id)).toEqual(["v1", "v2"]);
     expect(filter).toEqual(
       full.map((entry) => {
-        const picked: Record<string, unknown> = { id: entry.id, productId: entry.productId };
+        const picked: Record<string, unknown> = {
+          id: entry.id,
+          productId: entry.productId,
+          listingKey: entry.listingKey,
+        };
         for (const [key, value] of Object.entries(entry)) {
           if (
             ["brand", "categories", "price", "inStock"].includes(key) ||

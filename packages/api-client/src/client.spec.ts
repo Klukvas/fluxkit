@@ -197,6 +197,20 @@ describe("every store operation", () => {
 });
 
 describe("search", () => {
+  it("serializes opt-in grouping on both list operations and leaves it absent by default", async () => {
+    const { fetch, calls } = fakeFetch(() => jsonOk({}));
+    const client = createStoreClient({ baseUrl: "", fetch });
+    await client.listProducts({ groupBy: "listing", brand: "x&y" });
+    await client.searchProducts({ groupBy: "listing", f: ["opt.constructor:red"] });
+    await client.listProducts({ groupBy: "product" });
+    await client.searchProducts();
+    expect(calls.map((call) => call.url)).toEqual([
+      "/store/products?brand=x%26y&groupBy=listing",
+      "/store/search?f=opt.constructor%3Ared&groupBy=listing",
+      "/store/products?groupBy=product",
+      "/store/search",
+    ]);
+  });
   it("sends the facet selection as repeated f parameters and suggest's text as q", async () => {
     const { fetch, calls } = fakeFetch(() => jsonOk({}));
     const client = createStoreClient({ baseUrl: "", fetch });

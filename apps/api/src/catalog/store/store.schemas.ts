@@ -52,6 +52,7 @@ export function isStoreSlug(value: string): boolean {
 export const storeCategoriesQuerySchema = z.strictObject({ locale: localeQuery });
 
 export const storeProductsQuerySchema = z.strictObject({
+  groupBy: z.enum(["product", "listing"]).optional(),
   locale: localeQuery,
   ...paginationQuery,
   category: slugQuery
@@ -146,6 +147,18 @@ export const storeConfigSchema = z.object({
 export type StoreConfig = z.output<typeof storeConfigSchema>;
 
 export const storeProductListItemSchema = z.object({
+  listingKey: z.string().meta({
+    description:
+      "Opaque summary identity; product id in product mode, current group identity in listing mode. Product ids may repeat only in listing mode.",
+  }),
+  listingOption: z
+    .object({
+      optionCode: z.string(),
+      valueCode: z.string(),
+      optionName: z.string(),
+      valueName: z.string(),
+    })
+    .nullable(),
   id: uuidSchema,
   slug: z.string(),
   title: z.string(),
@@ -156,7 +169,7 @@ export const storeProductListItemSchema = z.object({
   availability: availabilitySchema,
   defaultVariantId: uuidSchema.nullable().meta({
     description:
-      "The id of the product's only sellable variant (active and priced in the shop currency), so a list can add it to the cart without opening the product; null when the product has several sellable variants (the shopper chooses on the product page). Set whatever the variant's availability: an out-of-stock variant still has its id here.",
+      "The id of the product/group's only sellable variant (active and priced in the shop currency), so a list can add it to the cart without opening the product; null when the product/group has several sellable variants (the shopper chooses on the product page). Set whatever the variant's availability: an out-of-stock variant still has its id here.",
   }),
 });
 
