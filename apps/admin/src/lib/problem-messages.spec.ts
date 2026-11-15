@@ -55,6 +55,7 @@ const NOT_ERROR_CODES = new Set([
   "fluxkit_customer_session",
   "in_stock",
   "inventory_level",
+  "inventory_level_reserved_check",
   "ip_throttled",
   "last_login_at",
   "last_seen_at",
