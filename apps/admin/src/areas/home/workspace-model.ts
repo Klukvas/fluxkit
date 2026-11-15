@@ -38,14 +38,13 @@ export const COUNTERS = [
 export type WorkspaceCounter = (typeof COUNTERS)[number];
 
 export const QUICK_ACTIONS = [
-  { id: "newProduct", operation: "createProduct", target: PATHS.productNew, variant: "secondary" },
+  { id: "newProduct", operation: "createProduct", target: PATHS.productNew },
   {
     id: "processOrders",
     operation: "listOrders",
     target: `${PATHS.orders}?status=paid`,
-    variant: "secondary",
   },
-  { id: "customers", operation: "listCustomers", target: PATHS.customers, variant: "ghost" },
+  { id: "customers", operation: "listCustomers", target: PATHS.customers },
 ] as const;
 export type WorkspaceAction = (typeof QUICK_ACTIONS)[number];
 
