@@ -1,3 +1,7 @@
+import {
+  expectSeedSplitOptions,
+  expectSeedSplitFlagsPreserved,
+} from "../test/seed-listing-checks.js";
 import { existsSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -814,6 +818,10 @@ describe("catalog seed (real app, real Postgres)", () => {
 
   describe("idempotency", () => {
     it("runs a second time without errors, duplicates or new rows", async () => {
+      await expectSeedSplitOptions(pool, catalogSeed);
+      await expectSeedSplitFlagsPreserved(pool, catalogSeed, () =>
+        runSeedCommand(TEST_DATASET, env),
+      );
       const before = await tableCounts();
       const demoRows = async () => ({
         price: await seedRowCount("price"),

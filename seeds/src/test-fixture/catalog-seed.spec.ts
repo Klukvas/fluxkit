@@ -61,6 +61,19 @@ describe("catalog seed data", () => {
     ]);
   });
 
+  it("splits clothing by colour only, reusing its size variants and existing images", () => {
+    expect(
+      productTypes
+        .filter((type) => type.splitListingOptionCode !== undefined)
+        .map((type) => [type.code, type.splitListingOptionCode]),
+    ).toEqual([["clothing", "color"]]);
+    expect(
+      products
+        .find((product) => product.slug === "demo-t-shirt")
+        ?.media.filter((image) => image.optionValue !== undefined),
+    ).toHaveLength(2);
+  });
+
   it("has unique, well-formed codes and slugs", () => {
     expect(unique(attributes.map((attribute) => attribute.code))).toBe(true);
     expect(unique(options.map((option) => option.code))).toBe(true);

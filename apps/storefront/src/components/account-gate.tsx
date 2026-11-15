@@ -12,7 +12,11 @@ import {
 } from "@fluxkit/ui";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { isAccountGateBehindSignIn, shouldRedirectAccountGuest } from "../lib/sign-in-navigation";
+import { localizedHref } from "../lib/locale-path";
+import { sessionLinks } from "../layout/navigation";
+import { useSignInNavigation } from "./sign-in-navigation";
 import type { SessionState } from "../lib/account-store";
 import { currentPath, loginHref } from "../lib/safe-next";
 import { useI18n } from "./i18n-provider";
@@ -89,19 +93,28 @@ export function AccountGate({
   const { state, store } = useAccount();
   const router = useRouter();
   const pathname = usePathname();
+  const navigation = useSignInNavigation();
+  const protectedPath = useRef(pathname);
+  const behindSignIn = isAccountGateBehindSignIn({
+    pathname,
+    loginPath: localizedHref(locale, sessionLinks.signIn),
+    modalActive: navigation?.active ?? false,
+  });
   // The query string (`?page=3`) is read in the browser only, after hydration: the server render has none, and the link must
   // not differ between the two. The redirect reads it again at the moment it happens, so it never uses a stale value.
   const [search, setSearch] = useState("");
   useEffect(() => {
+    if (behindSignIn) return;
+    protectedPath.current = pathname;
     setSearch(window.location.search);
-  }, [pathname]);
-  const signInHref = loginHref(locale, currentPath(pathname, search));
+  }, [pathname, behindSignIn]);
+  const signInHref = loginHref(locale, currentPath(protectedPath.current, search));
 
   useEffect(() => {
-    if (state.session.status === "guest") {
-      router.replace(loginHref(locale, currentPath(pathname, window.location.search)));
+    if (shouldRedirectAccountGuest(state.session.status, behindSignIn)) {
+      router.replace(loginHref(locale, currentPath(protectedPath.current, window.location.search)));
     }
-  }, [state.session.status, router, locale, pathname]);
+  }, [state.session.status, router, locale, pathname, behindSignIn]);
 
   return (
     <AccountGateView

@@ -52,14 +52,16 @@
 # GET /store/config:
 #   search-off   migrate and seed the test fixture with SEARCH_ENABLED=false, start the API the same way: expect "Search: disabled",
 #                search false, 404 on every search route (store and admin), and not one row written to the search tables
-#                by the seed's catalog writes, its demo synonym groups or the scheduler's first tick (no DB side effects)
+#                by the seed's catalog writes, its demo synonym groups or the scheduler's first tick (no DB side effects).
+#                SQL listing mode returns seven distinct clothing colour cards; product/default modes still return three.
 #   search-on    start the API with SEARCH_ENABLED=true, an engine that is NOT reachable and an invented key: it must start
 #                (no engine call at startup), report "Search: enabled (<prefix>)", search true, and never print the key.
 #                Then, against the real engine (MEILI_URL, MEILI_MASTER_KEY): create a key scoped to a fresh prefix,
 #                migrate and seed the test fixture (`--dataset test`; the catalog writes mark products in the queue, the demo synonym groups are written),
 #                `search:reindex` (builds, swaps, drains the queue, applies the groups), start the API and find a seeded
 #                product with GET /store/search (also by a partial last word, ADR 0037, and by a demo synonym, `spanner`)
-#                and its suggest.
+#                and its suggest. Listing-mode identities/counts match SQL (seven clothing cards vs three products);
+#                colour + size filters select the right groups without collapsing their multi-size purchase state.
 #                The key and the prefix's indexes are deleted at the end.
 set -euo pipefail
 
@@ -153,6 +155,74 @@ run_api() {
   echo "API did not become healthy; log:" >&2
   cat /tmp/fluxkit-matrix-api.log >&2
   exit 1
+}
+
+# The same SQL identities are required with search on and off; index mode must agree after reindex.
+assert_split_listings() {
+  node --input-type=module - "$port" "$1" <<'SPLIT'
+import assert from "node:assert/strict";
+const base = `http://127.0.0.1:${process.argv[2]}`;
+async function get(path, params = {}) {
+  const response = await fetch(`${base}${path}?${new URLSearchParams({ locale: "en", ...params })}`);
+  assert.equal(response.status, 200, `${path}: ${await response.clone().text()}`);
+  return response.json();
+}
+const detail = await get("/store/products/demo-t-shirt");
+const category = detail.categories.find((category) => category.slug === "demo-clothing");
+assert.ok(category);
+const sql = await get("/store/products", { category: "demo-clothing", groupBy: "listing", limit: "100" });
+const expected = { "demo-t-shirt": ["black", "red", "white"], "demo-hoodie": ["black", "blue"], "demo-linen-shirt": ["blue", "white"] };
+assert.equal(sql.total, 7);
+assert.equal(sql.items.length, 7);
+assert.equal(new Set(sql.items.map((item) => item.listingKey)).size, 7);
+for (const [slug, values] of Object.entries(expected)) {
+  const cards = sql.items.filter((item) => item.slug === slug);
+  assert.deepEqual(cards.map((item) => item.listingOption?.valueCode).sort(), values);
+  for (const card of cards) {
+    assert.equal(card.listingOption.optionCode, "color");
+    assert.equal(card.listingKey, `${card.id}:color:${card.listingOption.valueCode}`);
+    assert.equal(card.defaultVariantId, null, "size variants remain inside each card");
+  }
+}
+const products = await get("/store/products", { category: "demo-clothing", groupBy: "product", limit: "100" });
+const defaultMode = await get("/store/products", { category: "demo-clothing", limit: "100" });
+assert.equal(products.total, 3);
+assert.deepEqual(defaultMode, products);
+for (const item of products.items) {
+  assert.equal(item.listingKey, item.id);
+  assert.equal(item.listingOption, null);
+}
+if (process.argv[3] === "search") {
+  const params = { f: `category:${category.id}`, groupBy: "listing", limit: "24" };
+  const indexed = await get("/store/search", params);
+  assert.equal(indexed.total, sql.total);
+  assert.deepEqual(indexed.items.map((item) => item.listingKey).sort(), sql.items.map((item) => item.listingKey).sort());
+  const legacy = await get("/store/search", { ...params, groupBy: "product" });
+  assert.equal(legacy.total, 3);
+  assert.deepEqual(legacy.items.map((item) => item.id).sort(), products.items.map((item) => item.id).sort());
+  for (const item of legacy.items) {
+    assert.equal(item.listingOption, null);
+    assert.equal(item.listingKey, item.id);
+  }
+  const filteredParams = new URLSearchParams({ locale: "en", groupBy: "listing", limit: "24" });
+  for (const value of [`category:${category.id}`, "opt.color:black", "opt.size:l"]) filteredParams.append("f", value);
+  const response = await fetch(`${base}/store/search?${filteredParams}`);
+  assert.equal(response.status, 200);
+  const filtered = await response.json();
+  assert.equal(filtered.total, 2);
+  assert.deepEqual(filtered.items.map((item) => item.listingKey).sort(), sql.items.filter((item) => item.listingOption.valueCode === "black").map((item) => item.listingKey).sort());
+  for (const item of filtered.items) {
+    assert.equal(item.match.variantCount, 1);
+    assert.deepEqual(item.match.optionValues, [{ optionCode: "color", valueCode: "black" }, { optionCode: "size", valueCode: "l" }]);
+    assert.equal(item.defaultVariantId, null);
+  }
+  const color = indexed.facets.find((facet) => facet.key === "opt.color");
+  assert.ok(color);
+  assert.equal(color.counted, false);
+  assert.ok(color.values.every((value) => value.count === null));
+}
+console.log(`split listings (${process.argv[3]}): 7 colour cards, 3 legacy products; identities agree`);
+SPLIT
 }
 
 case "$mode" in
@@ -475,6 +545,7 @@ GUARD
       echo "$path -> HTTP $code"
       [ "$code" = "404" ] || { echo "expected 404 on $path with search off" >&2; exit 1; }
     done
+    assert_split_listings sql
     # Give the scheduler's first tick (jobs 13 and 14 included) a moment to run.
     sleep 3
     after="$(search_rows)"
@@ -529,6 +600,7 @@ GUARD
     esac
     MATRIX_SEARCH_ENABLED=true run_api "" "" "none" ""
     trap cleanup_search EXIT
+    assert_split_listings search
     results="$(curl -fsS "http://127.0.0.1:${port}/store/search?q=screwdriver&locale=en")"
     echo "store/search?q=screwdriver -> $results"
     echo "$results" | grep -q '"title":"Demo Screwdriver"' \

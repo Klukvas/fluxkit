@@ -89,6 +89,31 @@ describe("coffee demo dataset", () => {
     expect(productTypes.filter((type) => type.optionGuidePage !== undefined)).toEqual([]);
   });
 
+  it("adds a separate flavour demo without changing the existing syrup and ware attributes", () => {
+    expect(
+      productTypes
+        .filter((type) => type.splitListingOptionCode !== undefined)
+        .map((type) => [type.code, type.splitListingOptionCode]),
+    ).toEqual([["demo_flavoured_syrup", "demo_flavour"]]);
+    const demo = products.find((product) => product.slug === "demo-flavoured-syrup");
+    expect(demo?.variants).toHaveLength(4);
+    expect(new Set(demo?.variants.map((variant) => variant.amount)).size).toBe(4);
+    expect(demo?.options).toEqual([
+      { optionCode: "demo_flavour", valueCodes: ["vanilla", "caramel"] },
+      { optionCode: "volume", valueCodes: ["250ml", "1l"] },
+    ]);
+    expect(
+      demo?.media.flatMap((image) => (image.optionValue === undefined ? [] : [image.optionValue])),
+    ).toEqual([
+      { optionCode: "demo_flavour", valueCode: "vanilla" },
+      { optionCode: "demo_flavour", valueCode: "caramel" },
+    ]);
+    for (const code of ["syrup_flavour", "ware_color"]) {
+      expect(attributes.some((attribute) => attribute.code === code)).toBe(true);
+      expect(options.some((option) => option.code === code)).toBe(false);
+    }
+  });
+
   it("has unique, well-formed codes, slugs and SKUs", () => {
     for (const code of [...attributes, ...options, ...productTypes].map((entity) => entity.code)) {
       expect(isValidCode(code), code).toBe(true);
@@ -220,6 +245,15 @@ describe("coffee demo dataset", () => {
       const files = product.media.map((item) => item.file);
       expect(unique(files), product.slug).toBe(true);
       for (const file of files) expect(file).toMatch(/^coffee\/[a-z0-9-]+\.webp$/);
+      for (const image of product.media) {
+        if (image.optionValue !== undefined) {
+          expect(
+            product.options.find((option) => option.optionCode === image.optionValue?.optionCode)
+              ?.valueCodes,
+            product.slug,
+          ).toContain(image.optionValue.valueCode);
+        }
+      }
     }
   });
 

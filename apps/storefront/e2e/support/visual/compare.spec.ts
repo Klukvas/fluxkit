@@ -198,13 +198,13 @@ describe("parseExceptions", () => {
     expect(skipsElementShot(["page.body"], "card.article")).toBe(false);
   });
 
-  it("keeps only the entries a PR added (an inherited entry declares nothing, even with a new reason)", () => {
+  it("keeps only the entries a PR added (an unchanged inherited entry declares nothing)", () => {
     const inherited = parseExceptions([
       { ...valid, reason: "an earlier PR" },
       { ...valid, selector: "main.h1", property: "color", reason: "an earlier PR" },
     ]);
     const current = parseExceptions([
-      { ...valid, reason: "reworded by this PR" },
+      { ...valid, reason: "an earlier PR" },
       { ...valid, selector: "main.h1", property: "color", theme: "dark", reason: "this PR" },
       { ...valid, selector: "card.article", property: "screenshot", reason: "this PR" },
     ]);
@@ -213,6 +213,12 @@ describe("parseExceptions", () => {
       "card.article",
     ]);
     expect(ownExceptions(current, [])).toHaveLength(3);
+  });
+
+  it("lets a later PR declare the same frame again by replacing the earlier entry with its own reason", () => {
+    const inherited = parseExceptions([{ ...valid, reason: "an earlier PR" }]);
+    const current = parseExceptions([{ ...valid, reason: "a later PR changes this frame again" }]);
+    expect(ownExceptions(current, inherited)).toEqual(current);
   });
 });
 

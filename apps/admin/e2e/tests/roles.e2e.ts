@@ -16,11 +16,27 @@ test("the viewer browses the catalog read-only and is not allowed in orders", as
   guard,
 }) => {
   await signIn("viewer");
+  await expect(page.getByRole("heading", { level: 1, name: "Start", exact: true })).toBeVisible();
+  await expect(
+    page
+      .getByRole("main")
+      .getByText("Your work area: counters, quick actions and setup steps you have access to.", {
+        exact: true,
+      }),
+  ).toBeVisible();
+  await expect(page.getByRole("main")).not.toContainText(
+    /Review orders, customers and products, or choose a quick action\./i,
+  );
   const workspace = page.getByRole("region", { name: "Overview", exact: true });
   await expect(workspace.getByRole("link")).toHaveCount(2);
   await expect(workspace.getByRole("link", { name: /Draft products/ })).toBeVisible();
   await expect(workspace.getByRole("link", { name: /Active products/ })).toBeVisible();
-  for (const label of ["Orders awaiting payment", "Paid orders awaiting fulfilment", "Customers"]) {
+  for (const label of [
+    "Orders awaiting payment",
+    "Paid orders awaiting fulfilment",
+    "Payments to review",
+    "Customers",
+  ]) {
     await expect(workspace.getByRole("link", { name: new RegExp(label) })).toHaveCount(0);
   }
   await expect(page.getByRole("region", { name: "Quick actions", exact: true })).toHaveCount(0);
@@ -108,6 +124,7 @@ test("the viewer browses the catalog read-only and is not allowed in orders", as
 
   // Direct addresses of screens the role cannot use.
   await expectNotAllowed(page, "/orders");
+  await expectNotAllowed(page, "/payments");
   await expectNotAllowed(page, "/catalog/attributes/new");
   await expectNotAllowed(page, "/users");
   await expectNotAllowed(page, "/shipping");
@@ -124,7 +141,7 @@ test("the viewer browses the catalog read-only and is not allowed in orders", as
 
   expect(guard.writes(), "the viewer's pages send no write").toEqual([]);
   const forbiddenReads = guard.requests.filter((request) =>
-    /^\/admin\/(orders|customers|users|shipping|email|privacy|audit-events)/.test(
+    /^\/admin\/(orders|payments|customers|users|shipping|email|privacy|audit-events)/.test(
       new URL(request.url).pathname,
     ),
   );
@@ -138,10 +155,11 @@ test("the manager has no users area but manages shipping and email", async ({
 }) => {
   await signIn("manager");
   const workspace = page.getByRole("region", { name: "Overview", exact: true });
-  await expect(workspace.getByRole("link")).toHaveCount(5);
+  await expect(workspace.getByRole("link")).toHaveCount(6);
   for (const label of [
     "Orders awaiting payment",
     "Paid orders awaiting fulfilment",
+    "Payments to review",
     "Customers",
     "Draft products",
     "Active products",

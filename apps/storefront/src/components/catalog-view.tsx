@@ -161,7 +161,7 @@ export function Subcategories({
           <li key={child.id}>
             <Link
               href={localizedHref(locale, `/c/${encodeURIComponent(child.slug)}`)}
-              className={`inline-flex min-h-11 items-center rounded-control border border-border px-3 text-foreground ${focusRing}`}
+              className={`inline-flex min-h-11 items-center rounded-control border-2 border-foreground px-3 text-foreground ${focusRing}`}
             >
               {child.name}
             </Link>

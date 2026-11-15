@@ -18,6 +18,47 @@ const groups: SideNavGroup[] = [
 ];
 
 describe("SideNav", () => {
+  it("preserves comfortable spacing by default and when explicitly requested", () => {
+    for (const density of [undefined, "comfortable"] as const) {
+      const markup = render(<SideNav label="Main" groups={groups} density={density} />);
+      expect(first(markup, "nav").attributes.class).toBe("flex flex-col gap-6");
+      expect(first(markup, "ul").attributes.class).toBe("flex flex-col gap-1");
+      expect(String(first(markup, "a").attributes.class).split(" ")).toEqual(
+        expect.arrayContaining([
+          "flex",
+          "min-h-11",
+          "items-center",
+          "gap-3",
+          "rounded-control",
+          "px-3",
+          "py-2",
+          "font-medium",
+        ]),
+      );
+      expect(markup).not.toContain("pointer-coarse:");
+    }
+  });
+
+  it("opts into compact spacing while retaining coarse-pointer targets and focus styles", () => {
+    const markup = render(<SideNav label="Main" groups={groups} density="compact" />);
+    expect(first(markup, "nav").attributes.class).toBe("flex flex-col gap-2");
+    expect(first(markup, "ul").attributes.class).toBe("flex flex-col gap-0.5");
+    for (const link of tags(markup, "a")) {
+      const classes = String(link.attributes.class).split(" ");
+      expect(classes).toEqual(
+        expect.arrayContaining([
+          "min-h-9",
+          "py-1",
+          "text-sm",
+          "pointer-coarse:min-h-11",
+          "focus-visible:outline-ring",
+        ]),
+      );
+      expect(classes).not.toContain("min-h-11");
+      expect(classes).not.toContain("py-2");
+    }
+  });
+
   it("opts into muted current items, hidden names and labelled group separators", () => {
     const iconGroups = groups.map((group) => ({
       ...group,

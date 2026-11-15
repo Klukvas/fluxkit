@@ -161,9 +161,9 @@ Not contract (internal): the number of days and minutes behind the defaults beyo
 
 | Item | Rule |
 |---|---|
-| Routes and permissions | `GET /admin/orders/{id}/payments` (`orders.read`), `POST /admin/orders/{id}/payments/{paymentId}/refunds` `{amount, note}` with `Idempotency-Key` (`payments.refund`; `202 {refund, payment}`, `200` for a replay), `POST /admin/orders/{id}/payments/{paymentId}/resync` (`orders.write`), `GET /admin/payments` (`needsAttention`, `limit`, `cursor`; `orders.read`; `{items: [{orderId, orderNumber, payment}], limit, nextCursor}`), `POST /admin/payments/{paymentId}/attention/clear` (no body; `payments.refund`) |
+| Routes and permissions | `GET /admin/orders/{id}/payments` (`orders.read`), `POST /admin/orders/{id}/payments/{paymentId}/refunds` `{amount, note}` with `Idempotency-Key` (`payments.refund`; `202 {refund, payment}`, `200` for a replay), `POST /admin/orders/{id}/payments/{paymentId}/resync` (`orders.write`), `GET /admin/payments` (`needsAttention`, `limit`, `cursor`; `orders.read`; `{items: [{orderId, orderNumber, payment}], total, limit, nextCursor}`), `POST /admin/payments/{paymentId}/attention/clear` (no body; `payments.refund`) |
 | Problem codes | `409 rule_violation` rules `refund_not_allowed`, `refund_exceeds_remaining`, `partial_refund_not_supported`, `payment_not_available` (resync of a provider that is not enabled); `409 idempotency_key_reused`; `503 payment_provider_unavailable` with `Retry-After` (resync); `400` `currency_mismatch` |
-| Rules | A refund never changes the order status; a lost refund answer is `unknown` and never resent; the cursor is opaque; limits `paymentRefund`, `paymentResync` per admin user (numbers internal) |
+| Rules | A refund never changes the order status; a lost refund answer is `unknown` and never resent; the cursor is opaque; `total` is the non-negative integer count of payment attempts matching `needsAttention` (`true`, `false`, absent = all), independent of cursor and limit; page and count are separate reads and may briefly disagree during concurrent changes; limits `paymentRefund`, `paymentResync` per admin user (numbers internal) |
 
 ### Payment webhook (payments plan step 5, ADR 0032 decision 12, `docs/api/payments.md`)
 

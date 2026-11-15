@@ -1,10 +1,11 @@
 /* Imported explicitly by a host app; every visual timing follows the theme. */
 @layer components {
-  /* Rounded by the host's `rounded-control` utility; `overflow: hidden` clips the fill to that shape. */
+  /* Rounded by the host's `rounded-control` utility; `overflow: hidden` clips the fill to that shape. The ink outline sits
+     inside the bar's height (the host's preflight sizes every box by its outer edge). */
   .fk-progress {
     appearance: none;
-    border: 0;
-    block-size: calc(var(--fk-space-unit) * 2);
+    border: 2px solid var(--fk-color-foreground);
+    block-size: calc(var(--fk-space-unit) * 3.5);
     /* The border colour, not muted: a muted track disappears on the page background. */
     background: var(--fk-color-border);
     overflow: hidden;
@@ -14,10 +15,11 @@
   }
   .fk-progress::-webkit-progress-value {
     background: var(--fk-color-primary);
-    transition: width var(--fk-motion-duration-base) var(--fk-motion-ease-standard);
+    transition: width var(--fk-motion-duration-base) var(--fk-motion-ease-spring);
   }
   .fk-progress::-moz-progress-bar {
     background: var(--fk-color-primary);
+    transition: width var(--fk-motion-duration-base) var(--fk-motion-ease-spring);
   }
 
   body:has(dialog[data-drawer][open]) {
@@ -27,36 +29,36 @@
     position: fixed;
     inset: 0;
     margin: 0;
-    padding: 0;
+    padding: max(calc(var(--fk-space-unit) * 3), env(safe-area-inset-top))
+      max(calc(var(--fk-space-unit) * 3), env(safe-area-inset-right))
+      max(calc(var(--fk-space-unit) * 3), env(safe-area-inset-bottom))
+      max(calc(var(--fk-space-unit) * 3), env(safe-area-inset-left));
     border: 0;
     width: 100%;
     height: 100%;
     max-width: none;
     max-height: none;
     background: none;
-    /* The overshoot buffer must never become scrollable overflow. */
+    /* Transformed entry and spring overshoot must never create scrollable overflow. */
     overflow: clip;
   }
   .fk-drawer::backdrop {
     background: none;
   }
   .fk-drawer-panel {
-    --fk-drawer-overshoot: calc(var(--fk-space-unit) * 16);
-    transform: translateX(100%);
+    transform-origin: top right;
+    /* Clear the inset and sticker shadow too; this rotation moves the lower edge right. */
+    transform: translateX(
+        calc(
+          100% + max(calc(var(--fk-space-unit) * 3), env(safe-area-inset-right)) +
+            calc(var(--fk-space-unit) * 16)
+        )
+      )
+      rotate(-3deg);
     transition: transform var(--fk-motion-duration-slow) var(--fk-motion-ease-spring);
-    padding-top: env(safe-area-inset-top);
-    padding-inline-end: env(safe-area-inset-right);
-  }
-  .fk-drawer-panel::after {
-    content: "";
-    position: absolute;
-    inset-block: 0;
-    inset-inline-start: 100%;
-    inline-size: var(--fk-drawer-overshoot);
-    background: inherit;
   }
   .fk-drawer[open] .fk-drawer-panel {
-    transform: translateX(0);
+    transform: translateX(0) rotate(0deg);
   }
   .fk-drawer-backdrop {
     opacity: 0;
@@ -65,15 +67,43 @@
   .fk-drawer[open] .fk-drawer-backdrop {
     opacity: 1;
   }
-  .fk-drawer-footer {
-    padding-bottom: max(calc(var(--fk-space-unit) * 4), env(safe-area-inset-bottom));
-  }
   @starting-style {
     .fk-drawer[open] .fk-drawer-panel {
-      transform: translateX(100%);
+      transform: translateX(
+          calc(
+            100% + max(calc(var(--fk-space-unit) * 3), env(safe-area-inset-right)) +
+              calc(var(--fk-space-unit) * 16)
+          )
+        )
+        rotate(-3deg);
     }
     .fk-drawer[open] .fk-drawer-backdrop {
       opacity: 0;
+    }
+  }
+  .fk-empty-cart-float {
+    transform-origin: center;
+    animation: fk-empty-cart-float calc(var(--fk-motion-duration-slow) * 6)
+      var(--fk-motion-ease-standard) infinite alternate;
+  }
+  @media (hover: hover) and (prefers-reduced-motion: no-preference) {
+    .fk-card-tilt {
+      transition:
+        transform var(--fk-motion-duration-base) var(--fk-motion-ease-standard),
+        box-shadow var(--fk-motion-duration-base) var(--fk-motion-ease-standard);
+    }
+    .fk-card-tilt:hover {
+      transform: translateY(calc(var(--fk-space-unit) * -1)) rotate(-1.5deg);
+    }
+    li:nth-child(even) > .fk-card-tilt:hover,
+    :not(li) > .fk-card-tilt:nth-child(even):hover {
+      transform: translateY(calc(var(--fk-space-unit) * -1)) rotate(1.5deg);
+    }
+    .fk-card-hop {
+      transition: transform var(--fk-motion-duration-slow) var(--fk-motion-ease-spring);
+    }
+    .fk-card-tilt:hover .fk-card-hop {
+      transform: translateY(calc(var(--fk-space-unit) * -1)) rotate(-1deg) scale(1.04);
     }
   }
   .fk-toast-list {
@@ -175,6 +205,14 @@
     animation-delay: calc(var(--fk-motion-duration-fast) / 3 * 5);
   }
 }
+@keyframes fk-empty-cart-float {
+  from {
+    transform: translateY(0) rotate(0deg);
+  }
+  to {
+    transform: translateY(calc(var(--fk-space-unit) * -1)) rotate(-2deg);
+  }
+}
 @keyframes fk-pop {
   from {
     opacity: 0;
@@ -247,6 +285,7 @@
     .fk-skeleton-shimmer::after,
     .fk-badge-bump,
     .fk-badge-bump-alt,
+    .fk-empty-cart-float,
     .fk-cart-line-enter {
       animation: none !important;
     }
@@ -259,6 +298,10 @@
     .fk-action-label,
     .fk-drawer-panel,
     .fk-drawer-backdrop {
+      transition: none;
+    }
+    /* A rule of its own: Blink drops a whole selector list that holds an unknown -moz- pseudo-element. */
+    .fk-progress::-moz-progress-bar {
       transition: none;
     }
   }

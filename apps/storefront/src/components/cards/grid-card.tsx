@@ -22,14 +22,18 @@ export function GridCard({ card, headingLevel: Heading, eager, locale, t }: Card
   const badges = renderSlot("product-card.badges", slotProps, slots);
   const actions = renderSlot("product-card.actions", slotProps, slots);
   const image = (
-    <StoreImage
-      src={card.image.src}
-      alt={card.image.alt}
-      width={480}
-      height={480}
-      sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
-      eager={eager}
-    />
+    <div className="overflow-hidden rounded-media">
+      <div className="fk-card-hop">
+        <StoreImage
+          src={card.image.src}
+          alt={card.image.alt}
+          width={480}
+          height={480}
+          sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
+          eager={eager}
+        />
+      </div>
+    </div>
   );
   // With actions, the image gets a frame of its own and the actions sit in its bottom right corner: away from the availability
   // badge (top left, core) at every width, above the card's link layer (`z-10`), and before the brand and title in the focus
@@ -54,7 +58,7 @@ export function GridCard({ card, headingLevel: Heading, eager, locale, t }: Card
       </Badge>
     ) : null;
   return (
-    <article className="group relative flex h-full flex-col gap-2 rounded-card border border-border bg-background p-3 transition-shadow hover:border-border-input hover:shadow-raised focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring motion-reduce:transition-none">
+    <article className="group relative flex h-full flex-col gap-2 rounded-card border-2 border-foreground bg-background p-3 fk-card-tilt hover:shadow-raised focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring motion-reduce:transition-none">
       {badges === null ? (
         imageBlock
       ) : (
