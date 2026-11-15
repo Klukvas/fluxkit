@@ -108,6 +108,25 @@ describe("ResourceFallback", () => {
 });
 
 describe("language switch while a switch runs (step 13 review, L3)", () => {
+  it("uses secondary buttons and a token-based selected look in either language", () => {
+    for (const locale of ["uk", "en"] as const) {
+      const html = renderToStaticMarkup(
+        <LanguageSwitchView t={t} locale={locale} onChange={noop} />,
+      );
+      const toggles = [...html.matchAll(/<button\b[^>]*>/g)].map(([button]) => button);
+      expect(toggles).toHaveLength(2);
+      for (const [index, button] of toggles.entries()) {
+        expect(button).not.toContain("bg-primary");
+        expect(button).toContain("border border-border bg-background text-foreground");
+        expect(button).toContain(`aria-pressed="${["uk", "en"][index] === locale}"`);
+        expect(button).toContain("aria-pressed:bg-muted");
+        expect(button).toContain("aria-pressed:font-semibold");
+        expect(button).toContain("aria-pressed:border-foreground");
+        expect(button).toContain("min-h-11");
+      }
+    }
+  });
+
   /** The language buttons of the view's element tree (the view has no hooks, so it can be called directly). */
   function buttons(element: ReactNode): ReactElement<{ lang?: string; onClick?: () => void }>[] {
     if (!isValidElement(element)) return [];
