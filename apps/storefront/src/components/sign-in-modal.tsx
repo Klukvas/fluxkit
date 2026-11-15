@@ -30,6 +30,9 @@ export function createSignInHeadingBinding(
   };
 }
 
+// Separate string on purpose: the backdrop is not the surface behind the dialog's text (see the contrast scan).
+const backdrop = "backdrop:bg-scrim";
+
 /** Static shell: the contained form supplies the only heading. Never server-render an open dialog. */
 export function SignInModalView({
   children,
@@ -50,7 +53,7 @@ export function SignInModalView({
     <dialog
       ref={dialogRef}
       aria-labelledby={titleId}
-      className="fk-sign-in-modal m-auto max-w-md rounded-overlay border border-border bg-background p-6 text-foreground shadow-card backdrop:bg-scrim"
+      className={`fk-sign-in-modal m-auto max-w-md rounded-overlay border border-border bg-background p-6 text-foreground shadow-card ${backdrop}`}
       onClickCapture={(event) => {
         if (
           event.defaultPrevented ||

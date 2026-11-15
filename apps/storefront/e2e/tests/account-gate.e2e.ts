@@ -16,7 +16,9 @@ test("a guest on a protected page is sent to the sign-in page with the page AND 
   await dialog.getByRole("button", { name: "Close", exact: true }).click();
   await expect(page).toHaveURL(/\/en$/);
   await expect(dialog).toHaveCount(0);
-  await expect(page.locator("main h1")).toBeFocused();
+  // lib/navigation-focus.ts: the heading of the new page, or `main` while home is still its loading view (home is the one
+  // page with a loading.tsx, ADR 0048), so either is the reading position.
+  await expect(page.locator("main:focus, main h1:focus")).toHaveCount(1);
 });
 
 test("a gate replacement closes to the same-origin page before the protected visit", async ({
