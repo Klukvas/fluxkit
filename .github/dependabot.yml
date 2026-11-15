@@ -9,6 +9,11 @@ updates:
       # TypeScript is pinned to 6.0.3 until typescript-eslint and dependency-cruiser support 7 (AGENTS.md, ADR 0003).
       - dependency-name: typescript
         update-types: ["version-update:semver-major"]
+    groups:
+      # Nest packages must move together: every workspace package that imports @nestjs/common pins the API's exact
+      # version (apps/api/src/common/workspace-runtime-dependencies.spec.ts), so one-package bumps always fail.
+      nestjs:
+        patterns: ["@nestjs/*"]
   - package-ecosystem: github-actions
     directory: /
     schedule:

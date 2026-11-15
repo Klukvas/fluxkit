@@ -103,14 +103,20 @@ const fontFamily =
 
 /**
  * What is wrong with one token value, for the overrides files and `tokens.css` alike: no empty value, no `!important` (any
- * spacing), colours as 6-digit hex (the contrast check reads no other format; also for colours outside its pairs), lengths
+ * spacing), colours as 6-digit hex except the scrim as 8-digit hex with alpha, lengths
  * for radii, sizes and the spacing unit, `none` or `x y [blur [spread]] colour` shadows, and a list of font families.
  */
 export function valueProblems(name: string, value: string): string[] {
   if (value.trim() === "") return [`${name} has no value`];
   if (/!\s*important/i.test(value)) return [`${name} uses !important`];
-  if (name.startsWith("--fk-color-") && !/^#[0-9a-f]{6}$/i.test(value)) {
-    return [`${name}: "${value}" is not a 6-digit hex colour (#rrggbb)`];
+  if (name.startsWith("--fk-color-")) {
+    const scrim = name === "--fk-color-scrim";
+    const format = scrim ? /^#[0-9a-f]{8}$/i : /^#[0-9a-f]{6}$/i;
+    if (!format.test(value)) {
+      return [
+        `${name}: "${value}" is not ${scrim ? "an 8-digit hex colour (#rrggbbaa)" : "a 6-digit hex colour (#rrggbb)"}`,
+      ];
+    }
   }
   if (/^--fk-(radius|font-size|line-height|space)-/.test(name) && !length.test(value)) {
     return [`${name}: "${value}" is not a length (0, rem, px or em)`];
@@ -402,6 +408,25 @@ describe("the overrides rules (the checker itself)", () => {
           .trim(),
         valid,
       ).toBe("");
+    }
+  });
+
+  it("accepts 8-digit scrim overrides in all three theme rules", () => {
+    const css = `${light}\n${dark}\n${system}`
+      .replaceAll("--fk-color-primary", "--fk-color-scrim")
+      .replaceAll("#1f5f4a", "#2b1a1280")
+      .replaceAll("#62b796", "#09050380");
+    expect(overridesProblems(css, tokenBlocks)).toEqual([]);
+  });
+
+  it("reserves alpha hex for the scrim and refuses unsupported scrim formats", () => {
+    expect(valueProblems("--fk-color-primary", "#2b1a1280")).toEqual([
+      '--fk-color-primary: "#2b1a1280" is not a 6-digit hex colour (#rrggbb)',
+    ]);
+    for (const value of ["#090503", "#0008", "rgba(9, 5, 3, 0.5)"]) {
+      expect(valueProblems("--fk-color-scrim", value)).toEqual([
+        `--fk-color-scrim: "${value}" is not an 8-digit hex colour (#rrggbbaa)`,
+      ]);
     }
   });
 

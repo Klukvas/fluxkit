@@ -16,12 +16,14 @@ import {
   slugParam,
 } from "./store.schemas.js";
 import { StoreService } from "./store.service.js";
+import { RateLimit } from "../../rate-limit/rate-limit.decorator.js";
 
 @StoreController("products")
 export class StoreProductsController {
   constructor(private readonly store: StoreService) {}
 
   @Get()
+  @RateLimit("catalogRead")
   @ApiOperation({
     summary:
       "List active products, newest first (published_at desc, id desc); filter by category (with descendants) and brand",
@@ -51,6 +53,7 @@ export class StoreProductsController {
     schema: { type: "string" },
   })
   @ApiZodResponse(200, pageSchema(storeProductListItemSchema), "A page of products.")
+  @ApiProblemResponses(429)
   list(
     @Query(new ZodValidationPipe(storeProductsQuerySchema)) query: StoreProductsQuery,
   ): Promise<Page<StoreProductListItem>> {
@@ -58,13 +61,14 @@ export class StoreProductsController {
   }
 
   @Get(":slug")
+  @RateLimit("catalogRead")
   @ApiOperation({
     summary: "Get an active product by slug with options, variants, media and public attributes",
   })
   @ApiParam({ name: "slug", description: "Product slug." })
   @ApiQuery({ name: "locale", required: false, schema: { type: "string" } })
   @ApiZodResponse(200, storeProductDetailSchema, "The product.")
-  @ApiProblemResponses(404)
+  @ApiProblemResponses(404, 429)
   get(
     @Param("slug", slugParam()) slug: string,
     @Query(new ZodValidationPipe(storeProductQuerySchema)) query: StoreProductQuery,

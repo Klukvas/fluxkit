@@ -417,7 +417,7 @@ The independent review of the storefront (`docs/plans/2026-10-18-storefront.md`,
   - L1: the checkout cart fingerprint covers the cart id, not the lines. A lost `201` followed by refilling the cart with the same total and sending the same body returns `200` with the OLD order (the new lines are not ordered). Small impact (the old order holds the same products); the owner decided to record it, not to change the API or the storefront.
   - Focus after navigation is by path: a change of the query string only (paging, a brand link) keeps the focus where it is. The route announcer still announces the new title.
   - L4: every 404 and error page is an empty shell without JavaScript (above).
-  - The API's catalog reads are not rate limited (launch blocker in `docs/HANDOFF.md`); brand-filtered lists are uncached, so each view is one API call.
+  - The API limits the catalog reads per client address (`catalogRead`, `docs/api/catalog.md` Store), but not the Next server's own reads (they reach the API without a forwarded hop), so page views are not limited: brand-filtered lists are uncached, and each view is one API call. Limiting page requests belongs to the edge proxy (`docs/plans/2026-11-14-catalog-rate-limits.md`, follow-ups).
 
 ## Delivery and shipping (shipping plan step 10)
 

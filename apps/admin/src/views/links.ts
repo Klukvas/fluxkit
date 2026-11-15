@@ -17,3 +17,8 @@ const focusClass =
  * it sits two pixels outside the box, on the page background, so the contrast scan must not pair it with the button fill.
  */
 export const primaryLinkClass = `inline-flex items-center justify-center rounded-control bg-primary px-4 py-2 font-medium text-primary-foreground ${focusClass}`;
+
+/** Navigation with the quiet Button variants, including the same focus treatment. */
+const quietLinkClass = `inline-flex items-center justify-center gap-2 rounded-control px-4 py-2 font-medium pointer-coarse:min-h-11 bg-background text-foreground hover:bg-muted ${focusClass}`;
+export const secondaryLinkClass = `${quietLinkClass} border border-border`;
+export const ghostLinkClass = quietLinkClass;

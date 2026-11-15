@@ -1,5 +1,5 @@
 /*
- * Maps design tokens (tokens.css) to Tailwind semantic utilities: bg-background, text-foreground, bg-primary, text-success, text-warning,
+ * Maps design tokens (tokens.css) to Tailwind semantic utilities: bg-background, text-foreground, bg-primary, bg-scrim, text-success, text-warning,
  * ring-ring, outline-ring, rounded-control, rounded-card, shadow-raised, ... The type scale (text-xs to text-4xl) and the spacing unit (p-4, gap-2, ...) also
  * come from tokens, so the stock utilities follow a rebrand; steps outside the scale are refused by design-guard.spec.ts.
  */
@@ -19,6 +19,7 @@
   --color-success: var(--fk-color-success);
   --color-warning: var(--fk-color-warning);
   --color-ring: var(--fk-color-ring);
+  --color-scrim: var(--fk-color-scrim);
   --radius-sm: var(--fk-radius-sm);
   --radius-md: var(--fk-radius-md);
   --radius-lg: var(--fk-radius-lg);
