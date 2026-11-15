@@ -278,11 +278,21 @@ export class SearchIndexer {
     // Starting over delays the swap; while a locale has no live index at all, a working index comes first and a request
     // made meanwhile is built after the swap instead.
     const mayStartOver = plans.every((plan) => plan.state?.liveIndexUid != null);
+    // A competing run (possible only once the scheduler lock was lost) changed a build this run planned on: this run
+    // yields and writes nothing more, since an add to an index another run deleted would recreate it unrecorded.
+    const yielded = (): RebuildResult => ({
+      ...DISABLED_REBUILD,
+      enabled: true,
+      started,
+      restarted,
+      documents,
+    });
     try {
       for (const plan of plans) {
         const requested = requests.get(plan.locale) ?? null;
-        if (plan.action.kind === "continue_build" && plan.state?.buildIndexUid != null) {
-          if (!(await this.indexMissing(plan.state.buildIndexUid))) {
+        const recordedBuild = plan.state?.buildIndexUid ?? null;
+        if (plan.action.kind === "continue_build" && recordedBuild !== null) {
+          if (!(await this.indexMissing(recordedBuild))) {
             if (requested !== null && mayStartOver) {
               // Requested while this build ran: its earlier pages may predate the change. Start over in the same build
               // index (documents are replaced by id) instead of a second full build after the swap.
@@ -291,13 +301,19 @@ export class SearchIndexer {
             }
             continue;
           }
-          // The build index is gone (engine restarted empty): start that locale again.
-          await this.states.dropBuild(this.database, plan.locale, now);
-        } else if (plan.state?.buildIndexUid != null) {
-          await this.deleteOwnedIndex(plan.state.buildIndexUid);
-          await this.states.dropBuild(this.database, plan.locale, now);
         }
-        await this.startBuild(plan, requested, now);
+        // A stale build, or one the engine does not have (restarted empty, or its creation still queued by a run that
+        // died): deleted before it is forgotten. The engine runs an index's tasks in order, so a creation still queued
+        // ends before this delete and no index outlives its record.
+        if (recordedBuild !== null) {
+          await this.deleteOwnedIndex(recordedBuild);
+          if (!(await this.states.dropBuild(this.database, plan.locale, recordedBuild, now))) {
+            return yielded();
+          }
+        }
+        if (!(await this.startBuild(plan, requested, now))) {
+          return yielded();
+        }
         started += 1;
       }
 
@@ -307,7 +323,7 @@ export class SearchIndexer {
         const state = fresh.get(plan.locale);
         const buildUid = state?.buildIndexUid;
         if (buildUid == null) {
-          throw new Error(`The build of locale ${plan.locale} has no index after it was started.`);
+          return yielded();
         }
         let cursor = state?.buildCursor ?? null;
         for (;;) {
@@ -323,6 +339,9 @@ export class SearchIndexer {
           if (ids.length === 0) {
             break;
           }
+          if (!(await this.states.isBuilding(this.database, plan.locale, buildUid))) {
+            return yielded();
+          }
           const added = await this.addDocuments(buildUid, plan.locale, ids, definitions);
           const last = ids[ids.length - 1] ?? cursor;
           if (last === null) {
@@ -330,7 +349,18 @@ export class SearchIndexer {
           }
           cursor = last;
           documents += added;
-          await this.states.advanceBuild(this.database, plan.locale, cursor, added, now);
+          if (
+            !(await this.states.advanceBuild(
+              this.database,
+              plan.locale,
+              buildUid,
+              cursor,
+              added,
+              now,
+            ))
+          ) {
+            return yielded();
+          }
         }
         if (!complete) {
           break;
@@ -464,11 +494,20 @@ export class SearchIndexer {
     }
   }
 
-  /** Creates the build index with the derived settings and records it; answers the request this run read, if any. */
-  private async startBuild(plan: LocalePlan, requested: string | null, now: Date): Promise<void> {
+  /**
+   * Records the build, then creates its index with the derived settings; answers the request this run read, if any. The
+   * uid is recorded BEFORE the index exists, so a run that fails or dies after creating it never leaves an index nobody
+   * knows: the next run continues in it, or deletes it when the build is stale (an index the engine never created is
+   * found missing and the locale starts again). Without that order every such failure left one more index for ever.
+   */
+  private async startBuild(
+    plan: LocalePlan,
+    requested: string | null,
+    now: Date,
+  ): Promise<boolean> {
     const engine = this.requireEngine();
     if (!this.config.enabled) {
-      return;
+      return false;
     }
     // A recovered claim must never recreate a uid a paused run can still submit in a swap.
     const uid = searchBuildIndexUid(
@@ -477,12 +516,7 @@ export class SearchIndexer {
       now,
       randomBytes(16).toString("hex"),
     );
-    await engine.waitForTask(await engine.createIndex(uid), this.taskTimeoutMs());
-    await engine.waitForTask(
-      await engine.updateSettings(uid, plan.derived.settings),
-      this.taskTimeoutMs(),
-    );
-    await this.states.startBuild(
+    const recorded = await this.states.startBuild(
       this.database,
       plan.locale,
       uid,
@@ -490,6 +524,17 @@ export class SearchIndexer {
       requested,
       now,
     );
+    if (!recorded) {
+      // A competing run recorded its build first: this run continues in that one.
+      return false;
+    }
+    await engine.waitForTask(await engine.createIndex(uid), this.taskTimeoutMs());
+    // A run that stops before this line leaves the index without settings: `swapIn` applies them before every swap.
+    await engine.waitForTask(
+      await engine.updateSettings(uid, plan.derived.settings),
+      this.taskTimeoutMs(),
+    );
+    return true;
   }
 
   private async addDocuments(
@@ -582,18 +627,20 @@ export class SearchIndexer {
         });
       }
     }
+    // After the verified swap the build uid names the OLD live index (or nothing after a rename), which nothing reads any
+    // more: delete it BEFORE the completion clears the uid from the state. A failed delete keeps the uid recorded with
+    // the uncertain-swap mark, so the next run deletes it again; deleting after the completion lost it for ever.
+    for (const pair of pairs) {
+      if (!pair.rename) {
+        await this.deleteOwnedIndex(pair.indexes[1]);
+      }
+    }
     const completed = await this.states.completeSwap(this.database, swapped, now);
-    // After a swap the build uid names the OLD live index (or nothing after a rename): delete it.
-    for (const [index, entry] of swapped.entries()) {
+    for (const entry of swapped) {
       if (!completed.includes(entry.locale)) {
         this.logger.warn(
           `Search swap completion skipped for locale ${entry.locale}: swap_completion_lost`,
         );
-        continue;
-      }
-      const pair = pairs[index];
-      if (pair !== undefined && !pair.rename) {
-        await this.deleteOwnedIndex(pair.indexes[1]);
       }
     }
     return completed.length;

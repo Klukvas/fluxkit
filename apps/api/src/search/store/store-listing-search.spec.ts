@@ -537,13 +537,14 @@ describe("listing search v5 (real Postgres, Redis and Meilisearch)", () => {
       }>(
         "select locale, build_index_uid, build_rebuild_key, document_version from search_index_state order by locale",
       );
+      // The swap is done and the old index (named by the build uid) was deleted before the completion, so the uid can
+      // not be lost with an index still behind it.
+      const remaining = await listIndexUids(world.prefix);
       for (const state of pending.rows) {
         const live = await allDocuments(world.liveUid(state.locale));
-        const old = await allDocuments(state.build_index_uid);
         expect(live.length).toBeGreaterThan(0);
-        expect(old).toHaveLength(live.length);
         expect(live.every((doc) => typeof doc["listingKey"] === "string")).toBe(true);
-        expect(old.every((doc) => !("listingKey" in doc))).toBe(true);
+        expect(remaining).not.toContain(state.build_index_uid);
         expect(state.document_version).toBe(3);
         expect(state.build_rebuild_key).toBeNull();
       }
@@ -590,19 +591,18 @@ describe("listing search v5 (real Postgres, Redis and Meilisearch)", () => {
     const completion = vi
       .spyOn(SearchIndexStateRepository.prototype, "completeSwap")
       .mockImplementationOnce(async () => {
-        // The engine really swapped: live holds v5 and the build uid now holds v3 with equal document counts.
+        // The engine really swapped: live holds v5, and the old v3 index the build uid named is already deleted.
         const states = await pool.query<{
           locale: string;
           build_index_uid: string;
           document_version: number;
         }>("select locale, build_index_uid, document_version from search_index_state");
+        const remaining = await listIndexUids(world.prefix);
         for (const state of states.rows) {
           const live = await allDocuments(world.liveUid(state.locale));
-          const old = await allDocuments(state.build_index_uid);
           expect(live.length).toBeGreaterThan(0);
-          expect(old).toHaveLength(live.length);
           expect(live.every((doc) => typeof doc["listingKey"] === "string")).toBe(true);
-          expect(old.every((doc) => !("listingKey" in doc))).toBe(true);
+          expect(remaining).not.toContain(state.build_index_uid);
           expect(state.document_version).toBe(3);
         }
         throw crash;
@@ -626,6 +626,9 @@ describe("listing search v5 (real Postgres, Redis and Meilisearch)", () => {
       },
     );
     await assertLiveCurrent();
+    expect(await listIndexUids(world.prefix)).toEqual(
+      [world.liveUid("en"), world.liveUid("uk")].sort(),
+    );
   });
 
   it("leaves a lost batch claim unchanged and refuses completion for an unclaimed or replaced build", async () => {

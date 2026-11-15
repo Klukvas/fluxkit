@@ -25,11 +25,13 @@ import {
   indexSettings,
   listIndexUids,
   meiliUrl,
+  SCOPED_KEY_ACTIONS,
   waitForMasterTask,
 } from "../../test/search-engine.js";
 import { budgetOf, SearchWorld, UNLIMITED_BUDGET } from "../../test/search-world.js";
 import { StockWorld, type StockedVariant } from "../../test/stock-world.js";
 import { SearchQueueRepository } from "../queue/search-queue.repository.js";
+import { SearchIndexStateRepository } from "./search-index-state.repository.js";
 import type { SearchIndexer } from "./index.js";
 
 /**
@@ -675,6 +677,71 @@ describe("SearchIndexer (real Postgres, real Meilisearch)", () => {
         { failed_attempts: 0, last_error_code: null },
         { failed_attempts: 0, last_error_code: null },
       ]);
+    });
+
+    /** Fails one engine step of a rebuild with a key lacking `missing`, then rebuilds healthily after the backoff. */
+    async function rebuildAfterFailedStep(missing: string): Promise<void> {
+      const product = await world.variant({ onHand: 2 });
+      await syncAll();
+      await pool.query("update search_index_state set rebuild_requested_at = now()");
+      const weakKey = await createScopedKey(
+        search.prefix,
+        SCOPED_KEY_ACTIONS.filter((action) => action !== missing),
+      );
+      const now = new Date();
+      try {
+        const failed = await search
+          .indexer(database, { key: weakKey.key })
+          .rebuild(now, UNLIMITED_BUDGET);
+        expect(failed.failures).toEqual([{ code: "engine_unauthorized", locales: ["uk", "en"] }]);
+      } finally {
+        await deleteKey(weakKey.uid);
+      }
+      const later = await indexer.rebuild(new Date(now.getTime() + 61_000), UNLIMITED_BUDGET);
+      expect(later).toMatchObject({ swapped: 2, failures: [] });
+      expect(await listIndexUids(search.prefix)).toEqual([
+        search.liveUid("en"),
+        search.liveUid("uk"),
+      ]);
+      for (const locale of ["uk", "en"]) {
+        expect(await documentsOf(locale, product.productId)).toHaveLength(1);
+      }
+    }
+
+    it("a build that fails right after creating its index leaves no orphan index behind", async () => {
+      // The index is created, its settings are refused: the next run continues in it instead of leaking it.
+      await rebuildAfterFailedStep("settings.update");
+    });
+
+    it("a swap whose old index can not be deleted deletes it at the next run instead of leaking it", async () => {
+      await rebuildAfterFailedStep("indexes.delete");
+    });
+
+    it("a run never overwrites or drops a build uid another run recorded meanwhile", async () => {
+      const states = new SearchIndexStateRepository();
+      const locale = "xx";
+      const now = new Date();
+      await states.ensureRows(database, [locale]);
+      try {
+        expect(await states.startBuild(database, locale, "first", "key", null, now)).toBe(true);
+        // A competing run planned before "first" was recorded: its start and its drop of an older build both lose.
+        expect(await states.startBuild(database, locale, "second", "key", null, now)).toBe(false);
+        expect(await states.dropBuild(database, locale, "older", now)).toBe(false);
+        expect((await states.loadAll(database)).get(locale)?.buildIndexUid).toBe("first");
+        // A run still writing pages of a replaced build sees it and stops (it must not recreate a deleted index).
+        expect(await states.isBuilding(database, locale, "second")).toBe(false);
+        expect(await states.advanceBuild(database, locale, "second", randomUUID(), 1, now)).toBe(
+          false,
+        );
+        expect(await states.isBuilding(database, locale, "first")).toBe(true);
+        expect(await states.advanceBuild(database, locale, "first", randomUUID(), 1, now)).toBe(
+          true,
+        );
+        expect(await states.dropBuild(database, locale, "first", now)).toBe(true);
+        expect((await states.loadAll(database)).get(locale)?.buildIndexUid).toBeNull();
+      } finally {
+        await pool.query("delete from search_index_state where locale = $1", [locale]);
+      }
     });
 
     it("a key without the needed actions is reported as engine_unauthorized", async () => {

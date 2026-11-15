@@ -1,6 +1,7 @@
 # Changelog
 
 - Email pacing: `RATE_LIMIT_STORE=redis` shares provider slots across instances using Redis TIME and expiring timestamp-only keys; runtime failures use per-process pacing with the existing throttled store error and degraded readiness (ADR 0055, multi-instance PR 3). All modes bound admission by the lease/deadline, defer without spending an attempt, guarantee ownership through the lease without admission database reads, and preserve local start spacing through delayed timers and Redis fallback/recovery. Stale shared slots are reacquired within the remaining budget; reservation spacing accounts for observed Redis reply latency separately from timer lateness.
+- Search rebuild: job 14 no longer leaks a Meilisearch index when a run fails or stops after creating its build index, or when deleting the old index after a swap fails; the build uid is recorded before the index exists and the old index is deleted before the swap completion, so the next run continues in it or deletes it.
 - Search sync: a queue claim no longer leases more rows than its page limit when the database statistics are stale (the limited page is materialized once), so job 13 keeps its budget and leaves the rest due.
 
 - Storefront: visible lists use split listing groups (ADR 0052), with distinct card keys, translated value suffixes, group images and preselected product/no-JS links; product sitemap and all-false catalog stay unchanged (deploy the listing-capable API first).
