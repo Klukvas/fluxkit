@@ -8,6 +8,7 @@ import { cartLine, cartOf } from "../lib/test-fixtures";
 import { messagesByLocale } from "../messages";
 import { CartLineView, CartPageView, LineQuantityView, type CartPageViewProps } from "./cart-page";
 import { idleAutosave } from "../lib/quantity-autosave";
+import { EmptyCartIllustration } from "./empty-cart-illustration";
 import {
   findElements,
   leftoverText,
@@ -177,9 +178,21 @@ describe("CartPageView: states", () => {
       ),
     );
     expect(html).toContain("§cart.empty.title");
+    const illustration = renderToStaticMarkup(<EmptyCartIllustration />);
+    expect(html).toContain(illustration);
+    expect(html.indexOf(illustration)).toBeLessThan(html.indexOf("§cart.empty.title"));
     expect(html).toContain('href="/uk/catalog"');
     expect(html).not.toContain("§cart.checkout");
     expect(html).not.toContain("§cart.summary.title");
+  });
+  it("keeps the bag out of loading, error and populated states", () => {
+    for (const state of [
+      initialCartState,
+      { ...initialCartState, status: "error" as const },
+      ready(cartOf([cartLine("a")])),
+    ]) {
+      expect(view(state)).not.toContain("fk-empty-cart-float");
+    }
   });
 
   it("keeps a live region mounted in every state, so a later change is announced", () => {
