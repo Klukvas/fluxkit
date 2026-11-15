@@ -1,5 +1,7 @@
 # Changelog
 
+- Inventory schema (owner-approved review follow-up PR E): migration `0015_inventory_reserved_upper_bound` bounds `inventory_level.reserved` to 0 through 1 000 000 000, matching core `MAX_RESERVED`. It refuses with a readable error if existing rows exceed the bound; reconcile those rows before retrying. The hand-written down script restores `reserved >= 0` and removes its migration journal row without changing inventory data.
+
 - Admin shell: add a remembered collapsible desktop icon sidebar, daily-work navigation and pinned Help, plus a compact account disclosure; mobile keeps the expanded Menu panel. The daily group keeps id `sales`, feature entries append with `ExtensionIcon`, and unused sales/catalog heading messages remain valid fork overrides. Rebased entry: 447 298 / 133 774 → 456 996 / 136 998 raw/gzip bytes (3 chunks, Node 22, gzip level 9); caps 461 600 / 138 400.
 
 One line per user-visible or schema change.
