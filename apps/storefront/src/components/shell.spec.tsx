@@ -139,7 +139,7 @@ describe("header and footer size (a loose sanity cap, ADR 0048)", () => {
   // the header and footer cannot hide them. The real guards are the e2e tests `pre-hydration-forms` (uk and en) and
   // `first-html` (the raw HTML: the form is not in a hidden segment and no loading view precedes it). These caps only catch
   // a runaway header or footer (every page carries them); a client fork may raise them with a reason.
-  it("keeps the header under 8 000 bytes", () => {
+  it("keeps the header under 9 000 bytes", () => {
     // Four children each (the demo seed has up to four): the `picker` display shows them (round 4).
     const longNames = Array.from({ length: headerConfig.navigation.categoryLimit }, (_, index) => ({
       slug: `category-${String(index)}`,
@@ -163,7 +163,11 @@ describe("header and footer size (a loose sanity cap, ADR 0048)", () => {
       </SiteShell>,
     );
     const header = html.slice(html.indexOf("<header"), html.indexOf("</header>"));
-    expect(new TextEncoder().encode(header).length).toBeLessThan(8000); // 3 427 bytes on 2026-11-05 (six categories, no search box); 6 969 on 2026-11-13 (round 4: the picker with four children each, the theme control and its phone copy); 7 707 on 2026-11-15 (the picker after the logo, the phone menu its own copy)
+    // 3 427 bytes on 2026-11-05 (six categories, no search box); 6 969 on 2026-11-13 (round 4: the picker with four children
+    // each, the theme control and its phone copy); 2026-11-15, the picker after the logo (the phone menu is its own copy of the
+    // top-level links again, as in the `row` display): 7 707 here, 8 008 in the brand-fork run, so the cap went from 8 000 to
+    // 9 000 (plan 2026-11-15-header-categories-position.md; the e2e `first-html` and `pre-hydration-forms` are the real guards).
+    expect(new TextEncoder().encode(header).length).toBeLessThan(9000);
   });
 
   it("keeps the footer under 4 000 bytes", () => {

@@ -1,5 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 import { E2E_ORIGIN } from "../support/env.ts";
+import { SHOP_NAME } from "../support/shop-name.ts";
 import { expect, test } from "../support/fixtures.ts";
 import { tabTo, waitForHydration } from "../support/flows.ts";
 
@@ -133,7 +134,7 @@ test.describe("desktop", () => {
     const stops = await headerTabStops(page);
     const names = stops.map((stop) => stop.name);
     expect(names).toEqual([
-      "Fluxkit",
+      SHOP_NAME.en,
       "Categories",
       "Search products",
       "Search",
@@ -242,7 +243,7 @@ test.describe("phone", () => {
     const names = stops.map((stop) => stop.name);
     expect(names).toEqual([
       "Menu",
-      "Fluxkit",
+      SHOP_NAME.en,
       "Search",
       "Site language: English",
       "Cart0 items in the cart",
