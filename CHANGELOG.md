@@ -7,6 +7,7 @@
 One line per user-visible or schema change.
 
 ## Unreleased
+- Store/search (additive, minor; ADR 0052 step 2): opt-in listing-group SQL/search pages, group offers and localized listing identity; v4 search documents rebuild automatically with an inherited-build guard, unique build generations, conservative restart after an interrupted swap and listing readiness fallback; product mode remains the default.
 - Catalog/admin (additive, minor; ADR 0052 step 1): migration 0014 adds default-false `product_type_option.splits_listing` (one true option per type) and nullable `search_index_state.build_rebuild_key`; assignment PUT accepts optional `splitsListing`, responses include it, omission preserves stored flags, conflicts return `409 split_option_already_set`, and flag changes mark search transactionally. Store behavior is unchanged; upgrade/rollback: `docs/migrations/0014-split-listing.md`.
 - Admin: Start becomes a permission-aware workspace with five independent counters, quick navigation actions and the existing setup checklist below.
 - Docs: `docs/deployment.md` gains "Proxy hops" (the `TRUST_PROXY` value and `STOREFRONT_FORWARD_CLIENT_ADDRESS` for the nginx and Caddy edges, a CDN in front, development) and "Checking per-address limits" (a two-network check); `.env.example` no longer gives "1 for a single Next.js server" as an example (the `next dev` rewrite passes a browser-sent `X-Forwarded-For` through, ADR 0026, so that value would let a client choose its rate-limit key). No code or configuration change.

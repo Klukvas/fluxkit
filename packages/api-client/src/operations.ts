@@ -101,11 +101,11 @@ export const OPERATIONS = {
   listCategories: operation("GET", "/store/categories", [200], { query: LOCALE }),
   getConfig: operation("GET", "/store/config", [200]),
   listProducts: operation("GET", "/store/products", [200], {
-    query: ["brand", "category", "offset", "limit", "locale"],
+    query: ["brand", "category", "offset", "limit", "locale", "groupBy"],
   }),
   getProduct: operation("GET", "/store/products/{slug}", [200], { query: LOCALE }),
   searchProducts: operation("GET", "/store/search", [200], {
-    query: ["q", "locale", "f", "price", "sort", "page", "limit"],
+    query: ["q", "locale", "f", "price", "sort", "page", "limit", "groupBy"],
   }),
   suggestProducts: operation("GET", "/store/search/suggest", [200], { query: ["q", "locale"] }),
   getShippingOptions: operation("GET", "/store/shipping/options", [200], {

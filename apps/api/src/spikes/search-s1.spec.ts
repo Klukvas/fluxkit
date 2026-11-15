@@ -449,4 +449,56 @@ describe("Meilisearch spike S1: index swap and scoped keys", () => {
     // KNOWN LIMITATION: listing indexes needs indexes.get, which this action list leaves out on purpose
     expect((await engine("GET", "/indexes", undefined, key)).status).toBe(403);
   });
+  it("listingKey distinct counts cards while raw option facets retain every size on split and unsplit types (ADR 0052)", async () => {
+    const documents = ["split", "plain"].flatMap((productId) =>
+      ["red", "blue"].flatMap((color, colorIndex) =>
+        ["s", "m"].map((size, sizeIndex) => ({
+          id: `${productId}_${color}_${size}`,
+          productId,
+          listingKey: productId === "split" ? `split:color:${color}` : productId,
+          color,
+          size,
+          brand: "demo",
+          price: colorIndex * 3000 + sizeIndex * 1200,
+        })),
+      ),
+    );
+    const uid = await createIndex(
+      "listing",
+      { filterableAttributes: ["productId", "listingKey", "brand", "color", "size", "price"] },
+      documents,
+    );
+    const grouped = await search(uid, {
+      q: "",
+      distinct: "listingKey",
+      page: 1,
+      hitsPerPage: 20,
+      facets: ["brand", "size"],
+    });
+    expect(grouped.totalHits).toBe(3);
+    expect(grouped.facetDistribution?.["brand"]).toEqual({ demo: 3 });
+    expect(
+      Object.values(grouped.facetDistribution?.["size"] ?? {}).reduce((a, b) => a + b, 0),
+    ).toBe(3);
+    const raw = await search(uid, { q: "", facets: ["size", "color", "price"], limit: 0 });
+    expect(raw.facetDistribution?.["size"]).toEqual({ m: 4, s: 4 });
+    expect(raw.facetDistribution?.["color"]).toEqual({ blue: 4, red: 4 });
+    expect(raw.facetStats?.["price"]).toEqual({ min: 0, max: 4200 });
+    const intersection = await search(uid, {
+      q: "",
+      distinct: "listingKey",
+      page: 1,
+      hitsPerPage: 20,
+      filter: 'size = "m" AND color = "red" AND price < 1000',
+    });
+    expect(intersection.totalHits).toBe(0);
+    const federation = await multiSearch({
+      federation: { distinct: "listingKey", page: 1, hitsPerPage: 20 },
+      queries: [
+        { indexUid: uid, q: "" },
+        { indexUid: uid, q: "" },
+      ],
+    });
+    expect(federation.totalHits).toBe(3);
+  });
 });

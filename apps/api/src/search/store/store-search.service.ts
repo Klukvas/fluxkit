@@ -22,14 +22,14 @@ import {
   type SearchSelection,
   type TextQuery,
 } from "@fluxkit/core";
-import { inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import type { StoreService } from "../../catalog/store/store.service.js";
 import type { PricingConfig } from "../../common/pricing-config.js";
 import { validationFailed, ProblemException } from "../../common/problem.js";
 import type { SearchPort } from "../../common/search-port.js";
 import { withTransaction } from "../../common/transaction.js";
 import type { Database } from "../../database/database.module.js";
-import { brand } from "../../database/schema/index.js";
+import { brand, searchIndexState } from "../../database/schema/index.js";
 import { SearchEngineError, type SearchEngine } from "../engine/index.js";
 import {
   readSearchDefinitions,
@@ -56,7 +56,7 @@ import type {
 export const DEFINITIONS_TTL_MS = 30_000;
 
 interface EngineSearchResult {
-  hits?: { productId?: unknown }[];
+  hits?: { productId?: unknown; listingKey?: unknown }[];
   totalHits?: number;
   totalPages?: number;
   facetDistribution?: Record<string, Record<string, number>>;
@@ -68,6 +68,7 @@ type Strategy = "all" | "last";
 interface LiveFields {
   readonly filterable: readonly string[];
   readonly sortable: readonly string[];
+  readonly displayed?: readonly string[];
 }
 
 /** The engine could not answer in time (or has no live index yet): the store answers 503, the storefront falls back. */
@@ -134,7 +135,8 @@ export class StoreSearchService {
     const uid = searchLiveIndexUid(this.config.indexPrefix, locale.locale);
     const { definitions, specs: derived } = await this.definitions();
     // Only facets the live index can already filter: a definition change waits for job 13 without taking search down.
-    const live = await this.liveFieldsOf(uid, text, signal);
+    const groupBy = query.groupBy ?? "product";
+    const live = await this.liveFieldsOf(uid, text, signal, groupBy === "listing");
     const specs = liveFacetSpecs(derived, live.filterable);
     const f = query.f === undefined ? [] : Array.isArray(query.f) ? query.f : [query.f];
     const selected = parseSelectionParams(
@@ -157,8 +159,36 @@ export class StoreSearchService {
     );
     const textQueries = planTextQueries(text, locale.locale, "results");
 
-    const rules = engineSort(sort, live.sortable);
-    let results = await this.run(uid, textQueries, plan.queries, rules, "all", text, signal);
+    if (groupBy === "listing") {
+      const [state] = await this.database
+        .select({
+          version: searchIndexState.documentVersion,
+          liveUid: searchIndexState.liveIndexUid,
+        })
+        .from(searchIndexState)
+        .where(eq(searchIndexState.locale, locale.locale));
+      if (
+        state?.version == null ||
+        state.version < 4 ||
+        state.liveUid !== uid ||
+        !live.filterable.includes("listingKey") ||
+        !live.sortable.includes("listingKey") ||
+        !(live.displayed?.includes("listingKey") === true || live.displayed?.includes("*") === true)
+      )
+        throw searchUnavailable();
+    }
+    const distinct = groupBy === "listing" ? "listingKey" : "productId";
+    const rules = engineSort(sort, live.sortable, groupBy);
+    let results = await this.run(
+      uid,
+      textQueries,
+      plan.queries,
+      rules,
+      "all",
+      text,
+      signal,
+      distinct,
+    );
     let relaxed = false;
     const hits = results.find((entry) => entry.planned.purpose === "hits")?.result;
     if ((hits?.totalHits ?? 0) === 0 && text.words.length >= 1) {
@@ -166,16 +196,31 @@ export class StoreSearchService {
       // may also drop words from the end. Complete words that found something never reach this pass.
       const relaxedQueries = planTextQueries(text, locale.locale, "relaxed");
       const strategy: Strategy = text.words.length >= 2 ? "last" : "all";
-      results = await this.run(uid, relaxedQueries, plan.queries, rules, strategy, text, signal);
+      results = await this.run(
+        uid,
+        relaxedQueries,
+        plan.queries,
+        rules,
+        strategy,
+        text,
+        signal,
+        distinct,
+      );
       relaxed = true;
     }
     const main = results.find((entry) => entry.planned.purpose === "hits")?.result ?? {};
     const productIds = uniqueProductIds(main);
-    const hydrated = await this.store.listItemsByIds(productIds, locale.locale);
+    const hydrated =
+      groupBy === "listing"
+        ? await this.store.listItemsByListingReferences(
+            uniqueListingReferences(main),
+            locale.locale,
+          )
+        : await this.store.listItemsByIds(productIds, locale.locale);
     const matched = hasVariantLevelSelection(selection, specs)
-      ? await this.withMatches(hydrated.items, selection, definitions)
+      ? await this.withMatches(hydrated.items, selection, definitions, groupBy)
       : { items: hydrated.items, stale: [] };
-    const stale = [...hydrated.missing, ...matched.stale];
+    const stale = [...new Set([...hydrated.missing, ...matched.stale])];
     if (stale.length > 0) {
       // The index is behind: the product is no longer for sale, or none of its variants fits the selection any more.
       // Mark it so the next sync rewrites or removes its documents.
@@ -249,13 +294,14 @@ export class StoreSearchService {
     items: readonly StoreSearchItem[],
     selection: SearchSelection,
     definitions: SearchDefinitions,
+    groupBy: "product" | "listing",
   ): Promise<{ items: StoreSearchItem[]; stale: string[] }> {
     if (items.length === 0) {
       return { items: [], stale: [] };
     }
     const records = await readSearchProducts(
       this.database,
-      items.map((item) => item.id),
+      [...new Set(items.map((item) => item.id))],
       definitions,
       this.pricing,
     );
@@ -266,7 +312,13 @@ export class StoreSearchService {
       const match =
         record === undefined
           ? null
-          : matchOfProduct(record, selection, definitions, this.pricing.shopCurrency);
+          : matchOfProduct(
+              record,
+              selection,
+              definitions,
+              this.pricing.shopCurrency,
+              groupBy === "listing" ? item.listingOption : undefined,
+            );
       if (match === null) {
         stale.push(item.id);
       }
@@ -307,6 +359,7 @@ export class StoreSearchService {
     strategy: Strategy,
     text: NormalizedSearchQuery,
     signal: AbortSignal | undefined,
+    distinct: "productId" | "listingKey",
   ): Promise<{ planned: PlannedQuery; result: EngineSearchResult }[]> {
     const [single, ...others] = textQueries;
     if (others.length === 0) {
@@ -319,13 +372,13 @@ export class StoreSearchService {
           : { attributesToSearchOn: [...textQuery.attributesToSearchOn] }),
         ...(entry.filter === null ? {} : { filter: entry.filter }),
         ...(entry.purpose === "hits" && rules !== undefined ? { sort: rules } : {}),
-        ...(entry.distinct ? { distinct: "productId" } : {}),
+        ...(entry.distinct ? { distinct } : {}),
         ...(entry.pagination.kind === "page"
           ? { page: entry.pagination.page, hitsPerPage: entry.pagination.hitsPerPage }
           : { limit: 0 }),
         ...(entry.facets.length > 0 ? { facets: [...entry.facets] } : {}),
         matchingStrategy: strategy,
-        attributesToRetrieve: ["productId"],
+        attributesToRetrieve: ["productId", "listingKey"],
       }));
       const results = await this.guard(
         uid,
@@ -350,7 +403,7 @@ export class StoreSearchService {
       entry,
       body: {
         federation: {
-          ...(entry.distinct ? { distinct: "productId" } : {}),
+          ...(entry.distinct ? { distinct } : {}),
           ...(entry.pagination.kind === "page"
             ? { page: entry.pagination.page, hitsPerPage: entry.pagination.hitsPerPage }
             : { limit: 0 }),
@@ -367,7 +420,7 @@ export class StoreSearchService {
           ...(entry.filter === null ? {} : { filter: entry.filter }),
           ...(entry.purpose === "hits" && rules !== undefined ? { sort: rules } : {}),
           matchingStrategy: strategy,
-          attributesToRetrieve: ["productId"],
+          attributesToRetrieve: ["productId", "listingKey"],
         })),
       },
     }));
@@ -389,33 +442,42 @@ export class StoreSearchService {
   }
 
   /**
-   * The fields the live index can filter and sort by, read once per `DEFINITIONS_TTL_MS` (two cheap `settings.get`, in
+   * The fields the live index can filter and sort by (plus displayed fields for listing readiness), read once per
+   * `DEFINITIONS_TTL_MS` (two or three bounded `settings.get`, in
    * parallel under one admission).
    */
   private async liveFieldsOf(
     uid: string,
     text: NormalizedSearchQuery,
     signal: AbortSignal | undefined,
+    listing: boolean,
   ): Promise<LiveFields> {
     const now = Date.now();
     const known = this.liveFields.get(uid);
-    if (known !== undefined && now - known.at <= DEFINITIONS_TTL_MS) {
+    if (
+      known !== undefined &&
+      now - known.at <= DEFINITIONS_TTL_MS &&
+      (!listing || known.displayed !== undefined)
+    ) {
       return known;
     }
     const timeout = this.config.tuning.searchTimeoutMs;
-    const [filterable, sortable] = await this.guard(
+    const [filterable, sortable, displayed] = await this.guard(
       uid,
       () =>
-        this.engine.withAdmission(2, { timeoutMs: timeout, signal }, (admission) =>
+        this.engine.withAdmission(listing ? 3 : 2, { timeoutMs: timeout, signal }, (admission) =>
           Promise.all([
             this.engine.filterableAttributes(uid, timeout, { admission }),
             this.engine.sortableAttributes(uid, timeout, { admission }),
+            listing
+              ? this.engine.displayedAttributes(uid, timeout, { admission })
+              : Promise.resolve(undefined),
           ]),
         ),
       text,
     );
-    this.liveFields.set(uid, { at: now, filterable, sortable });
-    return { filterable, sortable };
+    this.liveFields.set(uid, { at: now, filterable, sortable, displayed });
+    return { filterable, sortable, displayed };
   }
 
   private call<T>(
@@ -607,6 +669,19 @@ function planOrRefuse<T>(plan: () => T): T {
     }
     throw error;
   }
+}
+
+function uniqueListingReferences(
+  result: EngineSearchResult,
+): { productId: string; listingKey: string }[] {
+  const references = new Map<string, { productId: string; listingKey: string }>();
+  for (const hit of result.hits ?? []) {
+    if (typeof hit.productId !== "string" || typeof hit.listingKey !== "string")
+      throw new SearchEngineError("engine_bad_response", { operation: "search" });
+    if (!references.has(hit.listingKey))
+      references.set(hit.listingKey, { productId: hit.productId, listingKey: hit.listingKey });
+  }
+  return [...references.values()];
 }
 
 function uniqueProductIds(result: EngineSearchResult): string[] {

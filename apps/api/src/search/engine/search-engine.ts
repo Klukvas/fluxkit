@@ -716,49 +716,48 @@ export class SearchEngine {
     return stats.numberOfDocuments;
   }
 
-  /**
-   * The `filterableAttributes` the index has APPLIED (`settings.get`); `engine_index_missing` when it does not exist. The
-   * store asks only for facets in this list (review F1). Only plain field names count: the API never writes the
-   * object form, so an object entry (set by someone else) offers nothing. Interactive lane (the store's call).
-   */
-  async filterableAttributes(
+  /** Applied filterable field names; object-form entries from outside writers offer no plain facet. */
+  filterableAttributes(
     uid: string,
     timeoutMs?: number,
     interactive?: InteractiveCallOptions,
   ): Promise<string[]> {
-    const answer = await this.request<unknown>(
-      "GET",
-      `/indexes/${encodeURIComponent(uid)}/settings/filterable-attributes`,
-      undefined,
-      "settings",
-      { timeoutMs, lane: "interactive", idempotent: true, interactive },
-    );
-    if (!Array.isArray(answer)) {
-      throw new SearchEngineError("engine_bad_response", { operation: "settings" });
-    }
-    return answer.filter((entry): entry is string => typeof entry === "string");
+    return this.indexFields(uid, "filterable", timeoutMs, interactive);
   }
 
-  /**
-   * The `sortableAttributes` the index has APPLIED (`settings.get`); `engine_index_missing` when it does not exist. The
-   * store asks for the product id tie-break of `newest` only when it is in this list (review F2 of the search finish).
-   * Interactive lane (the store's call).
-   */
-  async sortableAttributes(
+  /** Applied sortable fields: old live indexes may not yet support a new tie-breaker. */
+  sortableAttributes(
     uid: string,
+    timeoutMs?: number,
+    interactive?: InteractiveCallOptions,
+  ): Promise<string[]> {
+    return this.indexFields(uid, "sortable", timeoutMs, interactive);
+  }
+
+  /** Applied displayed fields: listing hits must expose their identity to the hydrator. */
+  displayedAttributes(
+    uid: string,
+    timeoutMs?: number,
+    interactive?: InteractiveCallOptions,
+  ): Promise<string[]> {
+    return this.indexFields(uid, "displayed", timeoutMs, interactive);
+  }
+
+  private async indexFields(
+    uid: string,
+    field: "filterable" | "sortable" | "displayed",
     timeoutMs?: number,
     interactive?: InteractiveCallOptions,
   ): Promise<string[]> {
     const answer = await this.request<unknown>(
       "GET",
-      `/indexes/${encodeURIComponent(uid)}/settings/sortable-attributes`,
+      `/indexes/${encodeURIComponent(uid)}/settings/${field}-attributes`,
       undefined,
       "settings",
       { timeoutMs, lane: "interactive", idempotent: true, interactive },
     );
-    if (!Array.isArray(answer)) {
+    if (!Array.isArray(answer))
       throw new SearchEngineError("engine_bad_response", { operation: "settings" });
-    }
     return answer.filter((entry): entry is string => typeof entry === "string");
   }
 
