@@ -1,3 +1,6 @@
+import { cardDisplay } from "./product-card-model";
+import { sentinelTranslator } from "../components/test-helpers";
+import { summary } from "./test-fixtures";
 import { describe, expect, it } from "vitest";
 import { option, product, variant } from "./test-fixtures";
 import {
@@ -351,4 +354,28 @@ describe("option codes that are names of Object.prototype members (review L2)", 
     expect(Object.hasOwn(next, "__proto__")).toBe(true);
     expect(findVariant(grid, next)?.id).toBe("v-yq");
   });
+});
+
+it("opens a split card on its colour, keeping size selection inside the product page", () => {
+  const card = cardDisplay({
+    product: summary("shirt", {
+      listingOption: {
+        optionCode: "color",
+        valueCode: "red",
+        optionName: "Colour",
+        valueName: "Red",
+      },
+    }),
+    locale: "en",
+    t: sentinelTranslator(),
+    exponent: 2,
+    imageHosts: [],
+    brandPath: null,
+  });
+  const preferred = selectionFromParams(
+    Object.fromEntries(new URL(card.href, "https://example.com").searchParams),
+  );
+  const selection = initialSelection(shirt, preferred);
+  expect(selection.color).toBe("red");
+  expect(findVariant(shirt, selectValue(shirt, selection, "size", "m"))?.id).toBe("red-m");
 });

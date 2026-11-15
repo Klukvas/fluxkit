@@ -73,6 +73,7 @@ describe("loadCatalogListing", () => {
       query: { page: 2, brand: "demo-brand" },
     });
     expect(data.listProducts).toHaveBeenCalledWith("uk", {
+      groupBy: "listing",
       limit: 24,
       offset: 24,
       category: "tops",
@@ -90,7 +91,7 @@ describe("loadCatalogListing", () => {
   it("sends neither category nor brand on the plain catalog, and asks for no categories", async () => {
     const data = fakeData();
     await loadCatalogListing(data, "en", { query: { page: 1, brand: null } });
-    expect(data.calls.listProducts).toEqual([["en", { limit: 24, offset: 0 }]]);
+    expect(data.calls.listProducts).toEqual([["en", { groupBy: "listing", limit: 24, offset: 0 }]]);
     expect(data.calls.listCategories).toHaveLength(0);
   });
 
