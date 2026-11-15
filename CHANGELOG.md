@@ -8,6 +8,9 @@
 One line per user-visible or schema change.
 
 ## Unreleased
+- Storefront: the home hero demo picture becomes a niche-neutral shopping bag, swinging tag and parcel illustration in the Playful palette.
+- Storefront: hero headings use a heavy display role, with a larger 4xl h1 step and wrapping layout.
+- Theme and UI: cards and outlined controls gain 2px theme-aware ink outlines; text fields keep the input-border role, now ink in light mode; shared admin cards, secondary buttons, fields and badges follow.
 - API: optional `RATE_LIMIT_STORE=redis` shares fixed request/service windows and admin login across instances with private HMAC keys; Redis outages use local windows, code-only throttled errors and additive `GET /health` `rateLimitStore` status. Default memory behavior and limits unchanged (ADR 0055).
 - Admin type-option assignments can split listing cards by one option, with value-image guidance and a field-level conflict; fresh seeds activate the separate flavour demo and fixture clothing colours without overwriting saved flags (ADR 0052, step 4).
 - Store/search (additive, minor; ADR 0052 step 2): opt-in listing-group SQL/search pages, group offers and localized listing identity; v4 search documents rebuild automatically with an inherited-build guard, unique build generations, conservative restart after an interrupted swap and listing readiness fallback; product mode remains the default.

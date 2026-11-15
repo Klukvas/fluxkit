@@ -48,7 +48,7 @@ for (const width of [1280, 1024]) {
   });
 }
 
-test("a card rises on hover (shadow and border tokens) and shows a stock badge only for exceptions", async ({
+test("a card keeps its ink outline and rises on hover (shadow token) and shows a stock badge only for exceptions", async ({
   page,
 }) => {
   await page.goto("/en/catalog");
@@ -57,14 +57,20 @@ test("a card rises on hover (shadow and border tokens) and shows a stock badge o
   const style = () =>
     card.evaluate((element) => {
       const computed = getComputedStyle(element);
-      return { shadow: computed.boxShadow, border: computed.borderTopColor };
+      return {
+        shadow: computed.boxShadow,
+        border: computed.borderTopColor,
+        borderWidth: computed.borderTopWidth,
+      };
     });
   await page.mouse.move(0, 0);
   const resting = await style();
   expect(resting.shadow).toBe("none");
+  expect(resting.borderWidth).toBe("2px");
+  expect(resting.border).toBe(await page.evaluate(() => getComputedStyle(document.body).color));
   await card.hover();
   await expect.poll(async () => (await style()).shadow).not.toBe("none");
-  expect((await style()).border).not.toBe(resting.border);
+  expect((await style()).border).toBe(resting.border);
 
   // Every card says its availability; only the exceptions are drawn. Earlier scenarios change stock in the shared database,
   // so each card is judged by what it says, not by its seed stock.

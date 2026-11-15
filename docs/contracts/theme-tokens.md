@@ -11,8 +11,8 @@ Source of truth: `packages/theme/src/tokens.css` (the template's values). A clie
 |---|---|---|
 | `--fk-color-background` / `-foreground` | `bg-background` / `text-foreground` | page background and text |
 | `--fk-color-muted` / `-muted-foreground` | `bg-muted` / `text-muted-foreground` | secondary surfaces and text |
-| `--fk-color-border` | `border-border` | decorative borders and dividers (cards, badges, buttons); NOT for the line that identifies a control |
-| `--fk-color-border-input` | `border-border-input` | the border of inputs, textareas, selects and checkboxes (WCAG 1.4.11, at least 3:1; added after the storefront step 10 review) |
+| `--fk-color-border` | `border-border` | hairline dividers, inline panels, menus, dialogs, toasts, tables, tabs and side navigation; cards and outlined controls use `border-2 border-foreground` (ink in light, cream in dark), neutral badges too; status and accent borders keep their colours |
+| `--fk-color-border-input` | `border-border-input` | the identifying border of inputs, textareas, selects, search and lookup fields, and quantity number fields: `border-2 border-border-input`; native checkboxes keep their existing width (WCAG 1.4.11, at least 3:1). Light ink `#2b1a12`, dark/system `#b58b68` |
 | `--fk-color-primary` / `-primary-foreground` | `bg-primary` / `text-primary-foreground` | primary actions |
 | `--fk-color-accent` / `-accent-foreground` | `bg-accent`, `border-accent` / `text-accent-foreground` | a second brand colour: the `accent` tone of a home banner card (`BannerCard`), otherwise **reserved for client code**. Light: ochre `#b17b15` (the concept's butter darkened for contrast), dark: butter `#ffd166`, both with ink text ("Playful defaults" below). Added 2026-11-08 |
 | `--fk-color-danger` | `text-danger`, `bg-danger`, `border-danger` | destructive and error states |
@@ -28,11 +28,11 @@ Source of truth: `packages/theme/src/tokens.css` (the template's values). A clie
 | `--fk-radius-overlay` | `rounded-overlay` | free-floating surfaces over the page: `Dialog`, the add-to-cart toast. Default `1.5rem`. Added 2026-11-09 |
 | `--fk-radius-media` | `rounded-media` | product and banner pictures, gallery thumbnails, `ProductImage`, `StoreImage`, `Skeleton` (it stands in for loading content). Default `1rem`. Added 2026-11-09 |
 | `--fk-font-sans` / `-mono` | `font-sans` / `font-mono` | font stacks |
-| `--fk-font-display` | `font-display` | the heading face of the `pageTitle` and `sectionTitle` roles and the text logo (`.fk-logo`); default = the `--fk-font-sans` stack (a test asserts the equality). May be `var(--font-...)` from `apps/storefront/src/config/fonts.ts` (section "Fonts"). Added 2026-11-08 |
+| `--fk-font-display` | `font-display` | the heading face of the `displayTitle`, `pageTitle` and `sectionTitle` roles and the text logo (`.fk-logo`); default = the `--fk-font-sans` stack (a test asserts the equality). May be `var(--font-...)` from `apps/storefront/src/config/fonts.ts` (section "Fonts"). Added 2026-11-08 |
 | `--fk-shadow-card` | `shadow-card` | card elevation (resting) |
 | `--fk-shadow-raised` | `shadow-raised` | a raised surface: the hovered product card (added 2026-11-03, design batch A) |
 | `--fk-shadow-overlay` | `shadow-overlay` | surfaces over the page: menus, toasts, bars (added 2026-11-03) |
-| `--fk-font-size-{xs,sm,base,lg,xl,2xl,3xl,4xl}` / `--fk-line-height-{same steps}` | `text-xs` ... `text-4xl` (size and line height) | the type scale (added 2026-11-03; values = Tailwind's defaults, so nothing moved) |
+| `--fk-font-size-{xs,sm,base,lg,xl,2xl,3xl,4xl}` / `--fk-line-height-{same steps}` | `text-xs` ... `text-4xl` (size and line height) | the type scale (added 2026-11-03); Tailwind defaults except 4xl = `3.5rem` / `3.75rem`, the display step of the Hero h1 (home hero and category banner) |
 | `--fk-space-unit` | every spacing utility (`p-4` = 4 units, `gap-2`, `m-6`, `size-11`, ...) | the spacing unit, 0.25rem (added 2026-11-03) |
 
 ## Playful defaults (2026-11-14)
@@ -43,7 +43,7 @@ Source of truth: `packages/theme/src/tokens.css` (the template's values). A clie
 |---|---|---|
 | background / foreground | `#fff3e3` / `#2b1a12` | `#1f130d` / `#fff3e3` |
 | muted / muted-foreground | `#fae9d3` / `#75543e` | `#352217` / `#d2b397` |
-| border / border-input | `#d9b997` / `#957052` | `#65432e` / `#b58b68` |
+| border / border-input | `#d9b997` / `#2b1a12` | `#65432e` / `#b58b68` |
 | primary / primary-foreground | `#db3b18` / `#ffffff` | `#ff7959` / `#2b1a12` |
 | accent / accent-foreground | `#b17b15` / `#2b1a12` | `#ffd166` / `#2b1a12` |
 | danger / danger-foreground | `#b83224` / `#ffffff` | `#ff9380` / `#2b1a12` |
@@ -51,7 +51,7 @@ Source of truth: `packages/theme/src/tokens.css` (the template's values). A clie
 | ring | `#db3b18` | `#ff7959` |
 | scrim | `#2b1a1280` | `#09050380` |
 
-- Radius roles: control/card/overlay `1.5rem`, panel/media `1rem`; scale sm/md/lg `0.375rem` / `0.75rem` / `1.5rem`. Small marks retain the sm step. Type scale and spacing unit stay unchanged.
+- Radius roles: control/card/overlay `1.5rem`, panel/media `1rem`; scale sm/md/lg `0.375rem` / `0.75rem` / `1.5rem`. Small marks retain the sm step. The 4xl display step is `3.5rem` / `3.75rem`; other type steps and the spacing unit stay unchanged.
 - Shadows: card `3px 3px 0 0`, raised `5px 5px 0 0`, overlay `6px 6px 0 0`, all in ink `#2b1a12` (light) or near-black brown `#090503` (dark); no blur.
 
 Design kit rules (review D-19, plan `docs/plans/2026-11-03-storefront-design-a.md`; enforced by `packages/theme/src/design-guard.spec.ts`): font sizes only
@@ -92,7 +92,8 @@ so a dark theme only sets values. Controls have no colour transition: it would a
 
 | Role | Classes today | Used for |
 |---|---|---|
-| `pageTitle` | `font-display text-3xl font-bold text-foreground` | a page's `h1` (the hero adds `md:text-4xl`) |
+| `displayTitle` | `font-display text-3xl font-black tracking-tight text-foreground` | the hero banner heading at either level; h1 adds `md:text-4xl`, line height comes from the scale tokens (no leading class) |
+| `pageTitle` | `font-display text-3xl font-bold text-foreground` | a page's `h1` |
 | `pageTitleCompact` | `text-2xl font-bold text-foreground` | the `h1` of the error and not-found views; the order page adds `sm:text-3xl` |
 | `sectionTitle` | `font-display text-xl font-semibold text-foreground` | a section `h2`, a form section's `legend`, the `Disclosure` heading |
 | `subsectionTitle` | `text-lg font-semibold text-foreground` | smaller `h2`/`h3`, the `EmptyState` heading, the result count, the filter sheet title |
@@ -102,7 +103,7 @@ so a dark theme only sets values. Controls have no colour transition: it would a
 | `navGroupTitle` | `text-sm font-semibold text-muted-foreground` | the heading over a `SideNav` link group (added after review m1 of PR 242) |
 | `meta` | `text-sm text-muted-foreground` | hints and meta lines |
 
-- `font-display` is on `pageTitle` and `sectionTitle` only: a decorative face in small titles hurts legibility. A fork that wants it on more
+- `font-display` is on `displayTitle`, `pageTitle` and `sectionTitle` only: a decorative face in small titles hurts legibility. A fork that wants it on more
   roles edits `textStyles`, nothing else.
 - Guard (`packages/theme/src/design-guard.spec.ts`, "heading roles"): every `<h1>` to `<h6>`, dynamic `<Heading>` and `<legend>` with a
   `className` in `packages/ui` and `apps/storefront` uses a `textStyles` role written inline (a call site adds layout, focus or visibility
@@ -157,7 +158,7 @@ a token in the light block of `tokens.css` (since 2026-11-08 non-colour tokens l
   for that view and uses the cached face on the next page.
 - Coverage: Cyrillic including Ґ Є І Ї (and ґ є і ї), the apostrophe U+2019, ₴ and the Latin set; test with the shop's real copy in `uk`
   and `en`.
-- Weights: load the ones `textStyles` uses (600 and 700 for headings, plus 500 for `cardTitle` if the body face is replaced) or one
+- Weights: load the ones `textStyles` uses (900 for the hero, 600 and 700 for other headings, plus 500 for `cardTitle` if the body face is replaced) or one
   variable font; a missing weight is synthesised (fake bold).
 - No preload (`preload: false`) while the first-HTML budget is open (plan 2026-11-08, L1): a preload `<link>` in `<head>` counts toward it.
 - `@font-face` only in global CSS: `next/font` emits it into the root layout's stylesheet. Never declare a face (or a stylesheet that
@@ -313,7 +314,7 @@ classes, with the same pixels), and Tailwind's own `accent-*` utilities, which s
 
 The scrim is checked separately on the same EFFECTIVE values (including overrides) in light, dark, both system device states and the admin: composite `--fk-color-scrim` over `background` and `foreground` with browser-style sRGB alpha blending before computing luminance. Neither surface may become lighter, and the lighter surface must retain 15–35% of its original luminance. Scrim is an overlay, not a text/background contrast pair.
 
-The test also reads the class strings of `packages/ui` and `apps/storefront` and fails when a component uses a text, border, outline or ring token on a background that is neither in this table nor declared decorative in the test (`border` on `background` and on `muted`: outlines of cards, badges, buttons and dividers, whose content is identified by its text).
+The test also reads the class strings of `packages/ui` and `apps/storefront` and fails when a component uses a text, border, outline or ring token on a background that is neither in this table nor declared decorative in the test (`border` on `background` and on `muted`: hairlines of panels, menus, overlays and dividers, whose content is identified by its text).
 
 Design batch B (2026-11-03) added no colour token and no new pair either: the hero and the category tiles are `foreground` and
 `muted-foreground` on `muted`, the theme switch `primary-foreground` on `primary` (pressed) and `foreground` on `background`/`muted`. The storefront
@@ -321,7 +322,7 @@ e2e (`e2e/tests/design-b.e2e.ts`) also measures the computed colours of every vi
 cart and checkout pages in dark (4.5:1 text, 3:1 field border).
 
 Design batch A (2026-11-03) added no colour token and no new pair: the discount badge is `danger-foreground` on `danger`, the current funnel step
-`primary-foreground` on `primary`, the hovered card border `border-input` on `background`, the trust bar `foreground` and `muted-foreground` on
+`primary-foreground` on `primary`, the card outline `foreground` on `background`, the trust bar `foreground` and `muted-foreground` on
 `background`; all are in the table above and the class scan confirms it.
 
 Status colors (`danger`, `success`, `warning`) are documented and tested for text on `background` and on `muted` (4.5:1 in both themes). The light `danger` was darkened from `#dc2626` to `#b91c1c` (4.41:1 on `muted` before). The `Alert` uses the status colors for borders only.

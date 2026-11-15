@@ -19,7 +19,7 @@
   --fk-color-muted: #fae9d3;
   --fk-color-muted-foreground: #75543e;
   --fk-color-border: #d9b997;
-  --fk-color-border-input: #957052;
+  --fk-color-border-input: #2b1a12;
   --fk-color-primary: #db3b18;
   --fk-color-primary-foreground: #ffffff;
   /*
@@ -54,12 +54,12 @@
   --fk-font-sans: var(--font-template-sans, ui-sans-serif), system-ui, sans-serif;
   --fk-font-mono: ui-monospace, monospace;
   /*
-   * Body and headings (`pageTitle`, `sectionTitle`) default to the template's Rubik (`lib/template-fonts.ts` in the storefront). The
+   * Body and headings (`displayTitle`, `pageTitle`, `sectionTitle`) default to the template's Rubik (`lib/template-fonts.ts` in the storefront). The
    * fallback inside var() keeps the declaration valid where that variable does not exist (the admin, mail). A fork's own face comes
    * from `config/fonts.ts`, named in its overrides file: `var(--font-...)`.
    */
   --fk-font-display: var(--font-template-sans, ui-sans-serif), system-ui, sans-serif;
-  /* Type scale (font size and line height per step). Values equal Tailwind's defaults, so the mapping moved nothing. */
+  /* Type scale (font size and line height per step). Values equal Tailwind's defaults except 4xl, the display step of the Hero h1 (home hero and category banner). */
   --fk-font-size-xs: 0.75rem;
   --fk-line-height-xs: 1rem;
   --fk-font-size-sm: 0.875rem;
@@ -74,8 +74,8 @@
   --fk-line-height-2xl: 2rem;
   --fk-font-size-3xl: 1.875rem;
   --fk-line-height-3xl: 2.25rem;
-  --fk-font-size-4xl: 2.25rem;
-  --fk-line-height-4xl: 2.5rem;
+  --fk-font-size-4xl: 3.5rem;
+  --fk-line-height-4xl: 3.75rem;
   /* Fast: hover/press feedback; base: toasts, popovers and number roll; slow: drawers and page reveals. */
   --fk-motion-duration-fast: 150ms;
   --fk-motion-duration-base: 250ms;

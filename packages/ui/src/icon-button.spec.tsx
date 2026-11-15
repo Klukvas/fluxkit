@@ -39,7 +39,7 @@ describe("IconButton", () => {
       name: "delete",
     });
     expect(first(markup, "button").attributes.class).toBe(
-      "inline-flex items-center justify-center rounded-control font-medium disabled:opacity-50 size-12 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring border border-danger bg-background text-danger enabled:hover:bg-muted w-full",
+      "inline-flex items-center justify-center rounded-control font-medium disabled:opacity-50 size-12 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring border-2 border-danger bg-background text-danger enabled:hover:bg-muted w-full",
     );
     expect(IconButton(props).props.ref).toBe(ref);
   });
