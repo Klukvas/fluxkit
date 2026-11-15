@@ -29,13 +29,14 @@ The API (`apps/api`) reads facts from the database, calls these functions inside
 
 - `src/catalog/variants.ts` - `computeOptionSignature` (sorted `code=value` pairs joined with `;`; internal), `generateVariants` (cartesian product, skips existing combinations, enforces limits), invariant checks (`checkExactlyOneDefault`, `checkOptionCoverage`, `checkUniqueSignatures`, `checkSignatureConsistency`, `checkVariantInvariants`).
 - `src/catalog/variant-rules.ts` - `canDeleteVariant` (draft only, not the last, not the default, no stock history: `has_stock_history`, ADR 0013, and no order line: `has_order_lines`, ADR 0020), `canRebuildVariants` (refuses an option change that rebuilds all variants while any variant has stock history, ADR 0014, or an order line, ADR 0020), `canCreateVariantManually` (draft only).
+- `src/catalog/listing.ts` and `listing.spec.ts` - opaque listing keys and partitioning sellable variants by the type-local split option, with option-coverage validation and safe maps; no price aggregation or IO.
 - `src/catalog/sellable.ts` - `isVariantSellable({productStatus, variantIsActive, hasShopPrice})`: the one rule for "can be bought" that the store listing and `ReservationsService.reserve` both follow. Pure; must not know about SQL.
 - `src/catalog/product-option-change.ts` - `planProductOptionChange`: what a change of a product's options and chosen values does (works on ids, returns a plan; the service applies it in one transaction).
 
 ## Categories
 
-- `src/catalog/category-tree.ts` - `depthOf`, `subtreeHeight`, `wouldCreateCycle`, `validateMove`, `validateNewNode`, `validateTree`: depth 5, no cycles, existence of parent or node. Pure; takes the whole tree as input.
-- `src/catalog/category-assignments.ts` - `normalizeCategoryAssignments` (exactly one primary when a product has categories), `promotePrimaryAfterRemoval`.
+- `src/catalog/category-tree.ts` - `depthOf`, `subtreeHeight`, `wouldCreateCycle`, `validateMove`, `validateNewNode`, `validateTree`: depth 5, no cycles, existence of parent or node. Pure; takes the whole tree as input. The API does not import `validateTree` (it checks single moves and inserts); it is exported and tested in core only (no caller in the apps or seeds, 2026-11-14).
+- `src/catalog/category-assignments.ts` - `normalizeCategoryAssignments` (exactly one primary when a product has categories), `promotePrimaryAfterRemoval`. The API does not import `promotePrimaryAfterRemoval`: `PUT /admin/products/{id}/categories` replaces the whole list and normalizes it (no caller in the apps or seeds, 2026-11-14).
 
 ## Lifecycle, rules and type changes
 

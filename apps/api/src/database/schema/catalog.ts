@@ -224,6 +224,7 @@ export const productTypeOption = pgTable(
   {
     productTypeId: uuid("product_type_id").notNull(),
     optionId: uuid("option_id").notNull(),
+    splitsListing: boolean("splits_listing").notNull().default(false),
     position: position(),
     createdAt: createdAt(),
   },
@@ -240,6 +241,9 @@ export const productTypeOption = pgTable(
       foreignColumns: [option.id],
     }).onDelete("restrict"),
     index("product_type_option_option_id_idx").on(t.optionId),
+    uniqueIndex("product_type_one_split_option_idx")
+      .on(t.productTypeId)
+      .where(sql`${t.splitsListing} = true`),
   ],
 );
 
