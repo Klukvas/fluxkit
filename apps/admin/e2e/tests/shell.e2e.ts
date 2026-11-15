@@ -309,3 +309,102 @@ test("failed sign-out shows an alert outside the disclosure; pending sign-out se
   await expect(alert).toBeVisible();
   expect(requests).toBe(1);
 });
+
+const navigationScrollBox = (page: Page) => page.locator("[data-nav-scroll-box]");
+const navigationScrollHint = (page: Page) =>
+  page.locator("#admin-navigation-desktop [data-nav-scroll-hint]");
+const adminUsers = (page: Page) =>
+  sections(page).getByRole("link", { name: "Admin users", exact: true });
+
+async function usersInsideScrollBox(page: Page): Promise<boolean> {
+  return adminUsers(page).evaluate((link) => {
+    const box = link.closest("[data-nav-scroll-box]");
+    if (!(box instanceof HTMLElement)) throw new Error("Missing navigation scroll box");
+    const item = link.getBoundingClientRect();
+    const rect = box.getBoundingClientRect();
+    const top = rect.top + box.clientTop;
+    const left = rect.left + box.clientLeft;
+    return (
+      item.top >= top - 1 &&
+      item.bottom <= top + box.clientHeight + 1 &&
+      item.left >= left - 1 &&
+      item.right <= left + box.clientWidth + 1
+    );
+  });
+}
+
+async function expectUsersFullyVisible(page: Page): Promise<void> {
+  await expect(adminUsers(page)).toBeInViewport({ ratio: 1 });
+  await expect.poll(() => usersInsideScrollBox(page)).toBe(true);
+}
+
+test("1440x900: every Settings item is visible without scrolling, expanded and collapsed", async ({
+  page,
+  signIn,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await signIn("owner");
+  for (const mode of ["expanded", "collapsed"] as const) {
+    if (mode === "collapsed") {
+      await collapse(page).click();
+      await expect(expand(page)).toBeVisible();
+    }
+    await expectUsersFullyVisible(page);
+    await expect.poll(() => navigationScrollBox(page).evaluate((box) => box.scrollTop)).toBe(0);
+    await expect(navigationScrollHint(page)).toHaveAttribute("data-nav-scroll-hint", "none");
+  }
+});
+
+for (const viewport of [
+  { width: 1366, height: 768 },
+  { width: 1280, height: 720 },
+]) {
+  test(`${viewport.width}x${viewport.height}: hidden items are announced by the hint and reachable`, async ({
+    page,
+    signIn,
+  }) => {
+    await page.setViewportSize(viewport);
+    await signIn("owner");
+    for (const mode of ["expanded", "collapsed"] as const) {
+      if (mode === "collapsed") {
+        await collapse(page).click();
+        await expect(expand(page)).toBeVisible();
+        await navigationScrollBox(page).evaluate((box) => {
+          box.scrollTop = 0;
+        });
+      }
+      await expect(navigationScrollHint(page)).toHaveAttribute("data-nav-scroll-hint", "below");
+      await expect.poll(() => usersInsideScrollBox(page)).toBe(false);
+      const box = await navigationScrollBox(page).boundingBox();
+      if (!box) throw new Error("Missing navigation scroll box geometry");
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await page.mouse.wheel(0, 2000);
+      await expectUsersFullyVisible(page);
+      await expect(navigationScrollHint(page)).toHaveAttribute(
+        "data-nav-scroll-hint",
+        /^(above|none)$/,
+      );
+    }
+  });
+}
+
+test("direct navigation reveals the current item", async ({ page, signIn }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await signIn("owner");
+  await page.goto(`${SPA}/users`);
+  await expect(adminUsers(page)).toHaveAttribute("aria-current", "page");
+  await expectUsersFullyVisible(page);
+});
+
+test("widening from mobile reveals the current desktop item", async ({ page, signIn }) => {
+  // The sign-in fixture waits for the desktop account button, so narrow the page only afterwards.
+  await signIn("owner");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`${SPA}/users`);
+  await expect(
+    page.getByRole("heading", { name: "Admin users", exact: true, level: 1 }),
+  ).toBeVisible();
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await expect(adminUsers(page)).toHaveAttribute("aria-current", "page");
+  await expectUsersFullyVisible(page);
+});
