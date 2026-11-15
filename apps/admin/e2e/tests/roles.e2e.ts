@@ -16,6 +16,12 @@ test("the viewer browses the catalog read-only and is not allowed in orders", as
   guard,
 }) => {
   await signIn("viewer");
+  await expect(page.getByRole("heading", { level: 1, name: "Start", exact: true })).toBeVisible();
+  const subtitle = page.getByRole("main").locator("div.max-w-prose");
+  await expect(subtitle).toHaveText(
+    "Your work area: counters, quick actions and setup steps you have access to.",
+  );
+  await expect(subtitle).not.toContainText(/orders|customers/i);
   const workspace = page.getByRole("region", { name: "Overview", exact: true });
   await expect(workspace.getByRole("link")).toHaveCount(2);
   await expect(workspace.getByRole("link", { name: /Draft products/ })).toBeVisible();

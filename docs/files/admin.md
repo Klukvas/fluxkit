@@ -224,5 +224,6 @@ Run, headers and conventions: `apps/admin/README.md`. Plan: `docs/plans/2026-10-
 - `src/areas/home/workspace-view.tsx` - counter links with local states and sibling retries, consistently outlined secondary quick-action links and no-access Help link.
 - `src/areas/home/workspace-model.spec.ts` - permission selection, exact queries/targets and uk/en number formatting.
 - `src/areas/home/workspace-view.spec.tsx` - static markup states, names, retry semantics, omitted groups and workspace/checklist order.
+- `src/areas/home/home-page.spec.tsx` - the neutral Start subtitle (no area the user may not open) in both languages, also with an empty workspace.
 - `src/messages/{uk,en}/home.json` - lazy workspace labels and state/action text in both UI languages.
 - `e2e/tests/home.e2e.ts` - response-derived counter totals, navigation, isolated failure/retry and phone overflow/checklist checks; requires real services.
