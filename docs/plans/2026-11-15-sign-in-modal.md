@@ -1,6 +1,6 @@
 # Sign-in modal — presentation plan
 
-- Status: implemented. Branch: `feature/sign-in-modal`; local verification below, real-service Chromium and independent QA pending.
+- Status: implemented (branch `feature/sign-in-modal`). Final state: independent QA round 4 approve with fixes (docs, fixed); the orchestrator's real-service Chromium run of 11 e2e files 262 passed, 0 failed, and the blog file with `E2E_FEATURES=blog` passed. The fix-round notes below are history: the close rule of round 2 and later is what the code does.
 - Scope: storefront presentation and navigation wiring; authentication remains unchanged.
 - Decision: [round 4, item 10](2026-11-13-storefront-ui-round-4.md) keeps `/{locale}/account/login` canonical and adds a native-dialog intercepting route.
 - Existing evidence: [storefront README](../../apps/storefront/README.md), [ADR 0048](../adr/0048-first-html-budget-and-loading-boundaries.md), the route tree, forms, guards and requested browser specs; installed Next 16.4.3 docs `apps/storefront/node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/{parallel-routes,intercepting-routes}.md`.
