@@ -11,6 +11,7 @@ import { uuidSchema } from "../../common/openapi-formats.js";
 const textParam = z.string().max(2_000);
 
 export const storeSearchQuerySchema = z.strictObject({
+  groupBy: z.enum(["product", "listing"]).optional(),
   q: textParam.optional().meta({
     description: `The text the shopper typed, at most ${String(SEARCH_LIMITS.maxQueryLength)} characters and no control characters; at most ${String(SEARCH_LIMITS.maxQueryWords)} words are used. Missing or empty browses with facets (sort newest).`,
   }),
@@ -60,7 +61,7 @@ const facetValueSchema = z.object({
   }),
   count: z.number().int().min(0).nullable().meta({
     description:
-      "Products with this value among the results (other values of the same facet ignored); null for variant-level facets, which list values without counts (ADR 0034 decision 4).",
+      "Products (listing groups in listing mode) with this value among the results (other values of the same facet ignored); null for variant-level facets, which list values without counts (ADR 0034 decision 4).",
   }),
   selected: z.boolean(),
 });
@@ -91,7 +92,7 @@ export const storeSearchMatchSchema = z.object({
     .number()
     .int()
     .min(1)
-    .meta({ description: "How many sellable variants of the product match." }),
+    .meta({ description: "How many sellable variants of the product/group match." }),
   price: z
     .object({
       from: z.number().int().min(0),
@@ -116,7 +117,7 @@ export type StoreSearchMatch = z.output<typeof storeSearchMatchSchema>;
 export const storeSearchItemSchema = storeProductListItemSchema.extend({
   match: storeSearchMatchSchema.nullable().optional().meta({
     description:
-      "Present only when the request selects at variant level (`inStock`, `price`, an option, or a variant-level attribute): the sellable variants that fit the facets and the price (not the words), from current data. `null` when none fits any more (the index is behind; the product is queued for sync). Absent otherwise: then every variant matches and `price` and `availability` describe them.",
+      "Present only when the request selects at variant level (`inStock`, `price`, an option, or a variant-level attribute): the group-local sellable variants that fit the facets and the price (not the words), from current data. `null` when none fits any more (the index is behind; the product is queued for sync). Absent otherwise: then every variant matches and `price` and `availability` describe them.",
   }),
 });
 
@@ -126,7 +127,7 @@ export const storeSearchResponseSchema = z.object({
   items: z.array(storeSearchItemSchema),
   total: z.number().int().min(0).meta({
     description:
-      "Products the engine found (at most 10 000 can be paged). The page may hold fewer items than `limit` when a product stopped being for sale after it was indexed.",
+      "Products or listing groups (according to groupBy) the engine found (at most 10 000 can be paged). The page may hold fewer items than `limit` when a product stopped being for sale after it was indexed.",
   }),
   page: z.number().int().min(1),
   pageCount: z.number().int().min(0),

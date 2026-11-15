@@ -1,13 +1,18 @@
 import { nextSearchSyncAttemptAt } from "@fluxkit/core";
-import { and, eq, inArray, sql, type SQL } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import type { DbExecutor } from "../../common/transaction.js";
 import { searchIndexState } from "../../database/schema/index.js";
 
 export type IndexStateRow = typeof searchIndexState.$inferSelect;
 
-/** What a finished build installs as the live index of one locale. */
-export interface SwappedLocale {
+export interface SwapBuild {
   readonly locale: string;
+  readonly buildIndexUid: string;
+  readonly buildRebuildKey: string;
+}
+
+/** What a finished build installs as the live index of one locale. */
+export interface SwappedLocale extends SwapBuild {
   readonly liveIndexUid: string;
   readonly settingsHash: string;
   readonly documentVersion: number;
@@ -60,6 +65,7 @@ export class SearchIndexStateRepository {
     db: DbExecutor,
     locale: string,
     buildIndexUid: string,
+    buildRebuildKey: string,
     answered: string | null,
     now: Date,
   ): Promise<void> {
@@ -67,6 +73,7 @@ export class SearchIndexStateRepository {
       .update(searchIndexState)
       .set({
         buildIndexUid,
+        buildRebuildKey,
         buildStartedAt: now,
         buildCursor: null,
         buildDocumentsCount: 0,
@@ -98,6 +105,7 @@ export class SearchIndexStateRepository {
       .update(searchIndexState)
       .set({
         buildIndexUid: null,
+        buildRebuildKey: null,
         buildStartedAt: null,
         buildCursor: null,
         buildDocumentsCount: 0,
@@ -124,14 +132,71 @@ export class SearchIndexStateRepository {
   }
 
   /**
+   * Claim the expected builds before submitting the engine swap. Null keys fence competing runs and make crash
+   * recovery discard uncertain builds. Lock/check the whole batch so a lost claim leaves every locale unchanged.
+   */
+  async markSwapPending(db: DbExecutor, builds: readonly SwapBuild[], now: Date): Promise<boolean> {
+    if (builds.length === 0) return false;
+    return db.transaction(async (tx) => {
+      const rows = await tx
+        .select()
+        .from(searchIndexState)
+        .where(
+          inArray(
+            searchIndexState.locale,
+            builds.map((build) => build.locale),
+          ),
+        )
+        .orderBy(asc(searchIndexState.locale))
+        .for("update");
+      if (
+        builds.some(
+          (build) =>
+            !rows.some(
+              (row) =>
+                row.locale === build.locale &&
+                row.buildIndexUid === build.buildIndexUid &&
+                row.buildRebuildKey === build.buildRebuildKey,
+            ),
+        )
+      )
+        return false;
+      const claimed = await tx
+        .update(searchIndexState)
+        .set({ buildRebuildKey: null, updatedAt: now })
+        .where(
+          or(
+            ...builds.map((build) =>
+              and(
+                eq(searchIndexState.locale, build.locale),
+                eq(searchIndexState.buildIndexUid, build.buildIndexUid),
+                eq(searchIndexState.buildRebuildKey, build.buildRebuildKey),
+              ),
+            ),
+          ),
+        )
+        .returning({ locale: searchIndexState.locale });
+      return claimed.length === builds.length;
+    });
+  }
+
+  /**
    * After the one atomic swap: the build is the live index of every locale. The swap answers no rebuild request: the
    * requests this build absorbed were cleared when it started or started over; one still set arrived during its last run
    * and is built at the next run.
    */
-  async completeSwap(db: DbExecutor, swapped: readonly SwappedLocale[], now: Date): Promise<void> {
-    await db.transaction(async (tx) => {
-      for (const entry of swapped) {
-        await tx
+  async completeSwap(
+    db: DbExecutor,
+    swapped: readonly SwappedLocale[],
+    now: Date,
+  ): Promise<string[]> {
+    return db.transaction(async (tx) => {
+      const completed: string[] = [];
+      // Match the claim's lock order when a competing run reaches these rows during completion.
+      for (const entry of [...swapped].sort((left, right) =>
+        left.locale.localeCompare(right.locale),
+      )) {
+        const rows = await tx
           .update(searchIndexState)
           .set({
             liveIndexUid: entry.liveIndexUid,
@@ -141,6 +206,7 @@ export class SearchIndexStateRepository {
             documentsCount: entry.documentsCount,
             builtAt: now,
             buildIndexUid: null,
+            buildRebuildKey: null,
             buildStartedAt: null,
             buildCursor: null,
             buildDocumentsCount: 0,
@@ -150,8 +216,17 @@ export class SearchIndexStateRepository {
             nextAttemptAt: null,
             updatedAt: now,
           })
-          .where(eq(searchIndexState.locale, entry.locale));
+          .where(
+            and(
+              eq(searchIndexState.locale, entry.locale),
+              eq(searchIndexState.buildIndexUid, entry.buildIndexUid),
+              isNull(searchIndexState.buildRebuildKey),
+            ),
+          )
+          .returning({ locale: searchIndexState.locale });
+        completed.push(...rows.map((row) => row.locale));
       }
+      return completed;
     });
   }
 

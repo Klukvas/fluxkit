@@ -79,6 +79,7 @@ export const KNOWN_REASON_CODES = [
   "option_in_use_by_products",
   "option_value_in_use",
   "option_not_allowed",
+  "split_option_already_set",
   "option_pair_incomplete",
   "options_frozen",
   "too_many_options",

@@ -1152,6 +1152,17 @@
               "type": "string",
               "maxLength": 200
             }
+          },
+          {
+            "name": "groupBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["product", "listing"],
+              "default": "product"
+            },
+            "description": "Product-wide summaries by default; listing counts and pages the current split groups."
           }
         ],
         "responses": {
@@ -1167,6 +1178,30 @@
                       "items": {
                         "type": "object",
                         "properties": {
+                          "listingKey": {
+                            "type": "string",
+                            "description": "Opaque summary identity; product id in product mode, current group identity in listing mode. Product ids may repeat only in listing mode."
+                          },
+                          "listingOption": {
+                            "nullable": true,
+                            "type": "object",
+                            "properties": {
+                              "optionCode": {
+                                "type": "string"
+                              },
+                              "valueCode": {
+                                "type": "string"
+                              },
+                              "optionName": {
+                                "type": "string"
+                              },
+                              "valueName": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["optionCode", "valueCode", "optionName", "valueName"],
+                            "additionalProperties": false
+                          },
                           "id": {
                             "type": "string",
                             "format": "uuid"
@@ -1240,12 +1275,12 @@
                           },
                           "defaultVariantId": {
                             "nullable": true,
-                            "description": "The id of the product's only sellable variant (active and priced in the shop currency), so a list can add it to the cart without opening the product; null when the product has several sellable variants (the shopper chooses on the product page). Set whatever the variant's availability: an out-of-stock variant still has its id here.",
+                            "description": "The id of the product/group's only sellable variant (active and priced in the shop currency), so a list can add it to the cart without opening the product; null when the product/group has several sellable variants (the shopper chooses on the product page). Set whatever the variant's availability: an out-of-stock variant still has its id here.",
                             "type": "string",
                             "format": "uuid"
                           },
                           "match": {
-                            "description": "Present only when the request selects at variant level (`inStock`, `price`, an option, or a variant-level attribute): the sellable variants that fit the facets and the price (not the words), from current data. `null` when none fits any more (the index is behind; the product is queued for sync). Absent otherwise: then every variant matches and `price` and `availability` describe them.",
+                            "description": "Present only when the request selects at variant level (`inStock`, `price`, an option, or a variant-level attribute): the group-local sellable variants that fit the facets and the price (not the words), from current data. `null` when none fits any more (the index is behind; the product is queued for sync). Absent otherwise: then every variant matches and `price` and `availability` describe them.",
                             "nullable": true,
                             "type": "object",
                             "properties": {
@@ -1258,7 +1293,7 @@
                                 "type": "integer",
                                 "minimum": 1,
                                 "maximum": 9007199254740991,
-                                "description": "How many sellable variants of the product match."
+                                "description": "How many sellable variants of the product/group match."
                               },
                               "price": {
                                 "type": "object",
@@ -1316,6 +1351,8 @@
                           }
                         },
                         "required": [
+                          "listingKey",
+                          "listingOption",
                           "id",
                           "slug",
                           "title",
@@ -1333,7 +1370,7 @@
                       "type": "integer",
                       "minimum": 0,
                       "maximum": 9007199254740991,
-                      "description": "Products the engine found (at most 10 000 can be paged). The page may hold fewer items than `limit` when a product stopped being for sale after it was indexed."
+                      "description": "Products or listing groups (according to groupBy) the engine found (at most 10 000 can be paged). The page may hold fewer items than `limit` when a product stopped being for sale after it was indexed."
                     },
                     "page": {
                       "type": "integer",
@@ -1410,7 +1447,7 @@
                                 },
                                 "count": {
                                   "nullable": true,
-                                  "description": "Products with this value among the results (other values of the same facet ignored); null for variant-level facets, which list values without counts (ADR 0034 decision 4).",
+                                  "description": "Products (listing groups in listing mode) with this value among the results (other values of the same facet ignored); null for variant-level facets, which list values without counts (ADR 0034 decision 4).",
                                   "type": "integer",
                                   "minimum": 0,
                                   "maximum": 9007199254740991
@@ -31436,6 +31473,17 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "groupBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["product", "listing"],
+              "default": "product"
+            },
+            "description": "Product-wide summaries by default; listing counts and pages the current split groups."
           }
         ],
         "responses": {
@@ -31451,6 +31499,30 @@
                       "items": {
                         "type": "object",
                         "properties": {
+                          "listingKey": {
+                            "type": "string",
+                            "description": "Opaque summary identity; product id in product mode, current group identity in listing mode. Product ids may repeat only in listing mode."
+                          },
+                          "listingOption": {
+                            "nullable": true,
+                            "type": "object",
+                            "properties": {
+                              "optionCode": {
+                                "type": "string"
+                              },
+                              "valueCode": {
+                                "type": "string"
+                              },
+                              "optionName": {
+                                "type": "string"
+                              },
+                              "valueName": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["optionCode", "valueCode", "optionName", "valueName"],
+                            "additionalProperties": false
+                          },
                           "id": {
                             "type": "string",
                             "format": "uuid"
@@ -31524,12 +31596,14 @@
                           },
                           "defaultVariantId": {
                             "nullable": true,
-                            "description": "The id of the product's only sellable variant (active and priced in the shop currency), so a list can add it to the cart without opening the product; null when the product has several sellable variants (the shopper chooses on the product page). Set whatever the variant's availability: an out-of-stock variant still has its id here.",
+                            "description": "The id of the product/group's only sellable variant (active and priced in the shop currency), so a list can add it to the cart without opening the product; null when the product/group has several sellable variants (the shopper chooses on the product page). Set whatever the variant's availability: an out-of-stock variant still has its id here.",
                             "type": "string",
                             "format": "uuid"
                           }
                         },
                         "required": [
+                          "listingKey",
+                          "listingOption",
                           "id",
                           "slug",
                           "title",
@@ -37540,6 +37614,9 @@
                           "optionCode": {
                             "type": "string"
                           },
+                          "splitsListing": {
+                            "type": "boolean"
+                          },
                           "position": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -37555,6 +37632,7 @@
                           "productTypeId",
                           "optionId",
                           "optionCode",
+                          "splitsListing",
                           "position",
                           "createdAt"
                         ],
@@ -38223,7 +38301,7 @@
     },
     "/admin/product-types/{id}/options/{optionId}": {
       "put": {
-        "description": "Answers 201 when the assignment is new and 200 when it replaced an existing one.",
+        "description": "Answers 201 when new and 200 when updated. Omitted splitsListing defaults to false on creation and is preserved on update. Only one option per type may split listings; another returns 409 split_option_already_set.",
         "operationId": "ProductTypesController_putOption",
         "parameters": [
           {
@@ -38264,6 +38342,9 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "splitsListing": {
+                    "type": "boolean"
+                  },
                   "position": {
                     "type": "integer",
                     "minimum": 0,
@@ -38294,6 +38375,9 @@
                     "optionCode": {
                       "type": "string"
                     },
+                    "splitsListing": {
+                      "type": "boolean"
+                    },
                     "position": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -38305,7 +38389,14 @@
                       "description": "ISO 8601, UTC."
                     }
                   },
-                  "required": ["productTypeId", "optionId", "optionCode", "position", "createdAt"],
+                  "required": [
+                    "productTypeId",
+                    "optionId",
+                    "optionCode",
+                    "splitsListing",
+                    "position",
+                    "createdAt"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -38329,6 +38420,9 @@
                     "optionCode": {
                       "type": "string"
                     },
+                    "splitsListing": {
+                      "type": "boolean"
+                    },
                     "position": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -38340,7 +38434,14 @@
                       "description": "ISO 8601, UTC."
                     }
                   },
-                  "required": ["productTypeId", "optionId", "optionCode", "position", "createdAt"],
+                  "required": [
+                    "productTypeId",
+                    "optionId",
+                    "optionCode",
+                    "splitsListing",
+                    "position",
+                    "createdAt"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -38386,6 +38487,16 @@
               }
             }
           },
+          "409": {
+            "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Internal server error. Details are only in the server log.",
             "content": {
@@ -38397,7 +38508,7 @@
             }
           }
         },
-        "summary": "Allow an option on a product type, or change its position",
+        "summary": "Allow an option on a product type, or change its position or listing split",
         "tags": ["admin-product-types"],
         "x-fluxkit-permission": "catalog.write"
       },

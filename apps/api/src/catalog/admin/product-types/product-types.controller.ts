@@ -139,15 +139,16 @@ export class ProductTypesController {
 
   @Put(":id/options/:optionId")
   @ApiOperation({
-    summary: "Allow an option on a product type, or change its position",
-    description: "Answers 201 when the assignment is new and 200 when it replaced an existing one.",
+    summary: "Allow an option on a product type, or change its position or listing split",
+    description:
+      "Answers 201 when new and 200 when updated. Omitted splitsListing defaults to false on creation and is preserved on update. Only one option per type may split listings; another returns 409 split_option_already_set.",
   })
   @ApiParam(ID_PARAM)
   @ApiParam(OPTION_ID_PARAM)
   @ApiZodBody(putProductTypeOptionSchema)
   @ApiZodResponse(200, productTypeOptionResponseSchema, "The replaced assignment.")
   @ApiZodResponse(201, productTypeOptionResponseSchema, "The new assignment.")
-  @ApiProblemResponses(400, 404)
+  @ApiProblemResponses(400, 404, 409)
   async putOption(
     @Param("id", uuidParam("id")) id: string,
     @Param("optionId", uuidParam("optionId")) optionId: string,

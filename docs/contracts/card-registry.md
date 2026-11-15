@@ -41,3 +41,7 @@ never part of a cache key, a canonical URL, hreflang or the sitemap. The switch 
 (`components/view-toggle.tsx`, messages `catalog.view.label`, `catalog.view.grid`, `catalog.view.list`).
 
 Not contract: the markup and classes of the built-in cards and of the switch, the position of the switch, default values.
+
+## API listing capability (ADR 0052 step 2)
+
+The store list/search APIs now accept opt-in `groupBy=listing` and return `listingKey` plus nullable localized `listingOption`. Their group offer and group-local `match` rules are in [the API contract](api.md#listing-summaries-adr-0052-additive-minor). The supplied storefront/card model still uses product mode; this step changes no card registry or renderer contract. Custom API consumers that opt in must key sibling cards by opaque `listingKey`, retaining product ids for product identity and variant ids for cart operations.

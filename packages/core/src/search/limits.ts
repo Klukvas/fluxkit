@@ -6,7 +6,7 @@ import { CATALOG_LIMITS } from "../catalog/limits.js";
  */
 // 2: `publishedAt` in milliseconds (search finish review F2); 3: the filter field of every public attribute, filterable
 // or not, so `isFilterable` is a settings change (finding F2 of the measurements at scale).
-export const SEARCH_DOCUMENT_VERSION = 3;
+export const SEARCH_DOCUMENT_VERSION = 4;
 
 /** Search limits, ADR 0034. Enforced by these rules and by the API at the boundary. */
 export const SEARCH_LIMITS = Object.freeze({

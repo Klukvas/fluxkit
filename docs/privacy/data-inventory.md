@@ -100,7 +100,7 @@ Purposes and legal bases are proposals taken from the plan. TODO(fluxkit): legal
 | `product_option_value` | all 5 columns | none | D24 | not_applicable | not_applicable | |
 | `product_type` | all 7 columns | none | D24 | not_applicable | not_applicable | |
 | `product_type_attribute` | all 6 columns | none | D24 | not_applicable | not_applicable | |
-| `product_type_option` | all 4 columns | none | D24 | not_applicable | not_applicable | |
+| `product_type_option` | all 5 columns | none | D24 | not_applicable | not_applicable | |
 | `reservation` | `id`, `variant_id`, `location_id`, `quantity`, `status`, `expires_at`, `created_at`, `updated_at` | none | D21 | not_applicable | not_applicable |  |
 | `reservation` | `reference` | pseudonymous (Q) | D21 | excluded | keep | May hold an order number; expires with the reservation. |
 | `sales_order` | `email`, `phone`, `first_name`, `last_name` | personal (P) | D6 | included | anonymise |  |
@@ -114,7 +114,7 @@ Purposes and legal bases are proposals taken from the plan. TODO(fluxkit): legal
 | `sales_order` | `cancellation_reason` | free text (F) | D10 | included | anonymise |  |
 | `sales_order` | `contact_erased_at` | pseudonymous (Q) | D6 | included | anonymise | Set by the anonymisation itself (core ORDER_ANONYMISATION_PLAN, set_erased_at): it marks the contact as erased. |
 | `sales_order` | `payment_reference` | free text (F) | D10 | included | keep | Bank or provider reference needed for accounting; the admin UI says not to type names here. |
-| `search_index_state` | all 17 columns | none | D24 | not_applicable | not_applicable | |
+| `search_index_state` | all 18 columns | none | D24 | not_applicable | not_applicable | |
 | `search_sync_queue` | all 8 columns | none | D24 | not_applicable | not_applicable | |
 | `search_synonym_group` | `id`, `locale`, `terms`, `created_at`, `updated_at` | none | D24 | not_applicable | not_applicable |  |
 | `search_synonym_group` | `created_by_admin_id` | staff (S) | D24 | excluded | set_null | Admin actor id; admin ids are not exported. |
