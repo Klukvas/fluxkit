@@ -1,5 +1,18 @@
 import { Injectable } from "@nestjs/common";
-import { and, asc, desc, eq, gt, inArray, isNotNull, like, lte, or, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gt,
+  inArray,
+  isNotNull,
+  like,
+  lte,
+  or,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 import type { DbExecutor, Transaction } from "../../common/transaction.js";
 import {
   domainEvent,
@@ -62,6 +75,18 @@ export interface PaymentListCursor {
 export interface PaymentListRow {
   readonly payment: PaymentRow;
   readonly orderNumber: string;
+}
+
+interface AdminPaymentFilter {
+  readonly needsAttention: boolean | undefined;
+}
+
+/** Static predicates let PostgreSQL prove eligibility for the open-attention partial index. */
+function adminPaymentWhere(filter: AdminPaymentFilter): SQL | undefined {
+  if (filter.needsAttention === undefined) return undefined;
+  return filter.needsAttention
+    ? sql`${payment.needsAttention}`
+    : sql`not ${payment.needsAttention}`;
 }
 
 /** What the basket needs of one order line (snapshot, ADR 0011). */
@@ -262,7 +287,7 @@ export class PaymentsRepository {
    */
   async listPage(
     db: DbExecutor,
-    filter: { readonly needsAttention: boolean | undefined },
+    filter: AdminPaymentFilter,
     after: PaymentListCursor | undefined,
     limit: number,
   ): Promise<PaymentListRow[]> {
@@ -272,9 +297,7 @@ export class PaymentsRepository {
       .innerJoin(salesOrder, eq(salesOrder.id, payment.orderId))
       .where(
         and(
-          filter.needsAttention === undefined
-            ? undefined
-            : eq(payment.needsAttention, filter.needsAttention),
+          adminPaymentWhere(filter),
           after === undefined
             ? undefined
             : sql`(${payment.createdAt}, ${payment.id}) < (${after.createdAt.toISOString()}::timestamptz, ${after.id}::uuid)`,
@@ -283,6 +306,18 @@ export class PaymentsRepository {
       .orderBy(desc(payment.createdAt), desc(payment.id))
       .limit(limit);
     return rows;
+  }
+
+  /** Full filtered total, independent of the page cursor and limit. */
+  async countForAdmin(db: DbExecutor, filter: AdminPaymentFilter): Promise<number> {
+    const [row] = await db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(payment)
+      .where(adminPaymentWhere(filter));
+    if (row === undefined) {
+      throw new Error("Counting payment attempts returned no row");
+    }
+    return row.total;
   }
 
   async insertRefund(tx: Transaction, values: NewRefundRow): Promise<RefundRow> {
