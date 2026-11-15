@@ -19,6 +19,36 @@ async function box(locator: Locator): Promise<{ x: number; y: number; width: num
   return value;
 }
 
+interface TabStop {
+  name: string;
+  x: number;
+  y: number;
+}
+
+/** The header's Tab stops from the top of the page, in order, with their place on screen (a closed header). */
+async function headerTabStops(page: Page): Promise<TabStop[]> {
+  const stops: TabStop[] = [];
+  for (let step = 0; step < 30; step += 1) {
+    await page.keyboard.press("Tab");
+    const stop = await page.evaluate(() => {
+      const element = document.activeElement;
+      if (!(element instanceof HTMLElement) || element.closest("header") === null) return null;
+      const label =
+        element.getAttribute("aria-label") ??
+        (element instanceof HTMLInputElement ? element.labels?.[0]?.textContent : null) ??
+        element.textContent;
+      const rect = element.getBoundingClientRect();
+      return { name: (label ?? "").replace(/\s+/g, " ").trim(), x: rect.x, y: rect.y };
+    });
+    if (stop === null) {
+      if (stops.length > 0) return stops;
+      continue;
+    }
+    stops.push(stop);
+  }
+  throw new Error(`the focus never left the header: ${stops.map((stop) => stop.name).join(" > ")}`);
+}
+
 async function setTheme(page: Page, value: string): Promise<void> {
   await page.context().addCookies([{ name: "fluxkit_theme", value, url: E2E_ORIGIN }]);
 }
@@ -69,6 +99,32 @@ test.describe("desktop", () => {
     await nav.getByRole("link", { name: "Tops", exact: true }).click();
     await expect(page).toHaveURL(/\/en\/c\/demo-clothing-tops$/);
     await expect(picker).toHaveAttribute("aria-expanded", "false");
+  });
+
+  test("the header reads logo, Categories, search, controls: the Tab order is the order on screen (owner's decision 2026-11-15)", async ({
+    page,
+  }) => {
+    await page.goto("/en");
+    await waitForHydration(page);
+    const banner = page.getByRole("banner");
+    await expect(banner.getByRole("button", { name: "Menu", exact: true })).toBeHidden();
+    const stops = await headerTabStops(page);
+    const names = stops.map((stop) => stop.name);
+    expect(names.indexOf("Categories")).toBe(1);
+    expect(names.slice(2, 4)).toEqual(["Search products", "Search"]);
+    expect(names).not.toContain("Menu");
+    // One row, left to right, in Tab order.
+    for (const [index, stop] of stops.entries()) {
+      if (index === 0) continue;
+      expect(stop.x, `${stop.name} after ${names[index - 1] ?? ""}`).toBeGreaterThan(
+        stops[index - 1]?.x ?? 0,
+      );
+    }
+    // One "Main navigation" at this width, and only while the picker is open.
+    const nav = banner.getByRole("navigation", { name: "Main navigation" });
+    await expect(nav).toHaveCount(0);
+    await banner.getByRole("button", { name: "Categories", exact: true }).click();
+    await expect(nav).toHaveCount(1);
   });
 
   test("the theme control: Tab and Enter open it, a choice applies in place, Escape closes it and returns the focus", async ({
@@ -150,6 +206,29 @@ test.describe("desktop", () => {
 
 test.describe("phone", () => {
   test.use({ viewport: PHONE });
+
+  test("the header reads Menu, logo, then the icons: the Tab order is the order on screen, no Categories button", async ({
+    page,
+  }) => {
+    await page.goto("/en");
+    await waitForHydration(page);
+    const banner = page.getByRole("banner");
+    await expect(banner.getByRole("button", { name: "Categories", exact: true })).toBeHidden();
+    const stops = await headerTabStops(page);
+    const names = stops.map((stop) => stop.name);
+    expect(names[0]).toBe("Menu");
+    expect(names).not.toContain("Categories");
+    for (const [index, stop] of stops.entries()) {
+      if (index === 0) continue;
+      expect(stop.x, `${stop.name} after ${names[index - 1] ?? ""}`).toBeGreaterThan(
+        stops[index - 1]?.x ?? 0,
+      );
+    }
+    const nav = banner.getByRole("navigation", { name: "Main navigation" });
+    await expect(nav).toHaveCount(0);
+    await banner.getByRole("button", { name: "Menu", exact: true }).click();
+    await expect(nav).toHaveCount(1);
+  });
 
   test("the menu keeps the flat list, carries the theme switch, and the footer has two columns", async ({
     page,

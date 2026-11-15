@@ -41,8 +41,10 @@ with a CHANGELOG line and the fork note. D would add a field whose only purpose 
 - `picker`: `menu` renders the phone menu (`xl:hidden`, top-level categories, links, the phone theme switch), `navigation` renders the
   "Categories" disclosure (`max-xl:hidden`, categories with children in columns, links; no theme switch, the `theme` control shows at that
   width). `row` is unchanged.
-- The desktop panel's side follows the `navigation` block's place (opens towards the end when the block is in the first half of the row,
-  towards the start otherwise); its bounds checked at 1280 px for the accepted orders.
+- The desktop panel's side follows the `navigation` block's place. As built: it opens towards the start when a shown search box precedes
+  the picker (the box grows from `lg`, so the picker then sits at the end of the row), otherwise towards the end (`pickerPanelAlign`);
+  the "first half of the row" rule above would have opened it the wrong way for `logo, search, navigation, controls` with search off.
+  Bounds checked in a browser at 1280 px for the default order only (the e2e suite builds one config).
 - Cost: the top-level category links and the configured links are in the markup twice (one copy always `display: none`, as in `row`);
   the header stays under the 8 000-byte cap of `shell.spec.tsx` (measured in the PR).
 - Tests: the `header-footer-defaults` snapshots, `header-layout.spec.ts`, an e2e of the header's Tab order at 1280 and 390 px (closed
@@ -52,4 +54,17 @@ with a CHANGELOG line and the fork note. D would add a field whose only purpose 
 
 ## Owner decision
 
-Pending (asked 2026-11-15 through the orchestrator). Until then nothing is implemented; the header stays as it is (A).
+**C, approved by the owner on 2026-11-15** (through the orchestrator; answer to "C (recommended), D or A?": go with the
+recommendation). This approves the change of the `navigation.display` row in `docs/contracts/header-footer.md` without a new field.
+
+As built (branch `fix/header-categories-position`):
+
+- `layout/header-layout.ts`: in `picker` mode `menu` gives the `row` menu (top-level categories and links, flat, theme switch below
+  `sm`) and `navigation` gives the `picker` view (no `withTheme`); `pickerPanelAlign`.
+- `components/site-header.tsx`: `PickerBlock` is `max-xl:hidden`, its summary the "Categories" text and chevron only.
+- Header markup 7 707 bytes in `shell.spec.tsx`'s worst case (cap 8 000; 6 969 before).
+- Docs: contract row, `config/header.ts` comment, `docs/customization.md`, `CHANGELOG.md`, the update section of
+  `docs/migrations/2026-11-13-storefront-header-footer-round-4.md` (how to keep "Categories" before the logo), `docs/files/storefront.md`,
+  `docs/HANDOFF.md`.
+- Tests: `header-layout.spec.ts`, `header-footer-config.spec.tsx`, `shell.spec.tsx`, the frozen `header-footer-defaults` snapshots, and
+  `e2e/tests/header-footer-round-4.e2e.ts` (Tab order equals the order on screen at 1280 and 390 px, one "Main navigation" per width).

@@ -36,10 +36,11 @@ export type HeaderBlockName = "menu" | "logo" | "navigation" | "search" | "contr
 export type HeaderControlName = "language" | "theme" | "cart" | "account";
 
 /**
- * How the navigation shows from `xl`: `row`, the links inline in the header row (scrolling sideways when they do not fit);
- * `picker`, ONE disclosure that is the menu button below `xl` and a "Categories" button from `xl`, whose panel lists the
- * top-level categories with their children in columns, then the links. In `picker` mode the `navigation` block renders
- * nothing (the `menu` block's disclosure is the picker), so the category list is in the page once.
+ * How the `navigation` block shows from `xl`: `row`, the links inline in the header row (scrolling sideways when they do not
+ * fit); `picker`, a "Categories" button whose panel lists the top-level categories with their children in columns, then the
+ * links. Below `xl` both use the `menu` block (the menu button with the flat list). Each block shows at its own place in
+ * `blocks`, so the order on screen, the reading order and the Tab order agree at every width (owner's decision 2026-11-15,
+ * `docs/plans/2026-11-15-header-categories-position.md`).
  */
 export type HeaderNavigationDisplay = "row" | "picker";
 
@@ -83,8 +84,9 @@ export interface HeaderCategoryLink extends HeaderLink {
 export type PanelAlign = "start" | "end";
 
 /**
- * `withTheme` on `menu` and `picker`: the panel also holds the theme switch below `sm`, where the `theme` control is hidden;
- * `themeInMenu` on `controls` says the same from the control's side.
+ * `withTheme` on `menu`: the panel also holds the theme switch below `sm`, where the `theme` control is hidden; `themeInMenu`
+ * on `controls` says the same from the control's side. `picker` is the `navigation` block in `picker` mode (from `xl` only, so
+ * the `theme` control shows next to it and its panel needs no switch).
  */
 export type HeaderBlockView =
   | { kind: "menu"; links: readonly HeaderLink[]; align: PanelAlign; withTheme: boolean }
@@ -93,7 +95,6 @@ export type HeaderBlockView =
       categories: readonly HeaderCategoryLink[];
       links: readonly HeaderLink[];
       align: PanelAlign;
-      withTheme: boolean;
     }
   | { kind: "logo" }
   | { kind: "navigation"; links: readonly HeaderLink[] }
@@ -114,6 +115,23 @@ export type HeaderBlockView =
  */
 export function menuPanelAlign(config: HeaderConfig): PanelAlign {
   return config.blocks.indexOf("menu") < config.blocks.indexOf("logo") ? "start" : "end";
+}
+
+/**
+ * Where the `picker` panel (`xl:w-3xl`) opens. From `xl` the search box grows (`lg:flex-1`) and `controls` sits at the end
+ * (`ms-auto`), so a picker after a shown search box is at the end of the row and opens towards the start (`end`); anywhere
+ * else it packs at the start of the row and opens towards the end (`start`). Measured at 1280 px for the supported orders
+ * (`e2e/tests/header-footer-round-4.e2e.ts`).
+ */
+export function pickerPanelAlign(
+  blocks: readonly HeaderBlockName[],
+  searchShown: boolean,
+): PanelAlign {
+  return searchShown &&
+    blocks.indexOf("search") !== -1 &&
+    blocks.indexOf("search") < blocks.indexOf("navigation")
+    ? "end"
+    : "start";
 }
 
 /** Whether the menu's place is one of the two measured shapes (see `menuPanelAlign`); true without a menu. */
@@ -149,8 +167,7 @@ function pickerCategory(locale: Locale, category: NavigationCategory): HeaderCat
 
 /**
  * The header's blocks as `SiteHeader` renders them, in config order. Left out: `search` when the shop has no search, `menu`
- * and `navigation` when there is no link at all (no empty landmark), `navigation` in `picker` mode (the menu's disclosure is
- * the picker), the `theme` control while `showThemeSwitch` (`showToggle` of `config/theme.ts`) is false, and `controls` when
+ * and `navigation` when there is no link at all (no empty landmark), the `theme` control while `showThemeSwitch` (`showToggle` of `config/theme.ts`) is false, and `controls` when
  * nothing is left in it. `categories` is `null` when the API could not be read: the configured links still show.
  * `featureLinks` are the header links of the enabled feature slices (`features/registry.ts`, `docs/contracts/header-footer.md`):
  * appended after `navigation.links` wherever those show, a path the config already links left out; none, and the view is
@@ -196,21 +213,20 @@ export function headerView(
   for (const name of config.blocks) {
     switch (name) {
       case "menu":
-        if (!hasMenu) break;
+        if (hasMenu) blocks.push({ kind: "menu", links, align, withTheme: themeInMenu });
+        break;
+      case "navigation":
+        if (links.length === 0) break;
         blocks.push(
           isPicker
             ? {
                 kind: "picker",
                 categories: shownCategories.map((category) => pickerCategory(locale, category)),
                 links: configuredLinks,
-                align,
-                withTheme: themeInMenu,
+                align: pickerPanelAlign(config.blocks, input.searchEnabled),
               }
-            : { kind: "menu", links, align, withTheme: themeInMenu },
+            : { kind: "navigation", links },
         );
-        break;
-      case "navigation":
-        if (links.length > 0 && !isPicker) blocks.push({ kind: "navigation", links });
         break;
       case "logo":
         blocks.push({ kind: "logo" });

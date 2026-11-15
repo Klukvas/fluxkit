@@ -72,15 +72,16 @@ describe("SiteShell landmarks and accessibility", () => {
 
   it("labels every navigation landmark", () => {
     const navs = html.match(/<nav[^>]*>/g) ?? [];
-    // main (ONCE: the "Categories" picker is the menu below `xl` too, round 4), locale switcher, the footer's two link groups
-    // (the `columns` layout: each a navigation named by its visible heading)
-    expect(navs).toHaveLength(4);
+    // main TWICE (the phone menu below `xl`, the "Categories" picker from `xl`; one of them is `display: none` at every width,
+    // 2026-11-15), locale switcher, the footer's two link groups (the `columns` layout: each a navigation named by its
+    // visible heading)
+    expect(navs).toHaveLength(5);
     for (const nav of navs) expect(nav).toMatch(/aria-label="§[^"]+"|aria-labelledby="[^"]+"/);
     const mains = navs.filter((nav) => nav.includes('aria-label="§nav.main.label"'));
-    expect(mains).toHaveLength(1);
-    // The picker's summary is named by its content: "Menu" below `xl` (visually hidden), "Categories" from `xl`.
+    expect(mains).toHaveLength(2);
+    // The menu button is named "Menu" (below `xl`), the picker's summary by its text "Categories" (from `xl`), after the logo.
     expect(html).toMatch(
-      /<details class="group relative shrink-0"><summary role="button" aria-expanded="false" class="fk-header-button">.*?§nav\.menu.*?§nav\.categories/,
+      /<details class="group relative shrink-0 xl:hidden"><summary role="button" aria-expanded="false" aria-label="§nav\.menu".*?class="fk-logo".*?<details class="group relative shrink-0 max-xl:hidden"><summary role="button" aria-expanded="false" class="fk-header-button"><span>§nav\.categories<\/span>/,
     );
     expect(html).toContain('aria-label="§locale.switcher.label"');
     for (const nav of navs.filter((tag) => tag.includes("aria-labelledby"))) {
@@ -162,7 +163,7 @@ describe("header and footer size (a loose sanity cap, ADR 0048)", () => {
       </SiteShell>,
     );
     const header = html.slice(html.indexOf("<header"), html.indexOf("</header>"));
-    expect(new TextEncoder().encode(header).length).toBeLessThan(8000); // 3 427 bytes on 2026-11-05 (six categories, no search box); 6 969 on 2026-11-13 (round 4: the picker with four children each, the theme control and its phone copy)
+    expect(new TextEncoder().encode(header).length).toBeLessThan(8000); // 3 427 bytes on 2026-11-05 (six categories, no search box); 6 969 on 2026-11-13 (round 4: the picker with four children each, the theme control and its phone copy); 7 707 on 2026-11-15 (the picker after the logo, the phone menu its own copy)
   });
 
   it("keeps the footer under 4 000 bytes", () => {

@@ -319,15 +319,24 @@ describe("SiteHeader: the picker display and the theme control (round 4)", () =>
     },
   };
 
-  it("renders the category list once, in one disclosure named by its visible text, with the children nested", () => {
+  it("renders the phone menu in the menu's place and the picker, named by its visible text, after the logo (owner's decision 2026-11-15)", () => {
     const html = header(picker, true, tree);
-    expect(html.match(/§cat-shoes/g)).toHaveLength(1);
+    // The top-level links twice (the phone menu and the picker; one of them is `display: none` at every width, as in the
+    // `row` display), the children once (only the picker shows them), one landmark per copy.
+    expect(html.match(/§cat-shoes/g)).toHaveLength(2);
     expect(html.match(/§cat-boots/g)).toHaveLength(1);
-    expect(html.match(/<nav aria-label="§nav\.main\.label"/g)).toHaveLength(1);
+    expect(html.match(/<nav aria-label="§nav\.main\.label"/g)).toHaveLength(2);
     expect(html).not.toContain(markers.navigation);
-    // No aria-label on the summary: "Menu" (visually hidden, below `xl`) or "Categories" (from `xl`) names it.
+    const menu = html.indexOf('aria-label="§nav.menu"');
+    const logo = html.indexOf(markers.logo);
+    const categories = html.indexOf("§nav.categories");
+    expect(menu).toBeGreaterThan(-1);
+    expect(menu).toBeLessThan(logo);
+    expect(logo).toBeLessThan(categories);
+    expect(categories).toBeLessThan(html.indexOf("fk-header-end"));
+    // No aria-label on the picker's summary: its text names it; the whole disclosure is hidden below `xl`.
     expect(html).toMatch(
-      /<details class="group relative shrink-0"><summary role="button" aria-expanded="false" class="fk-header-button">.*?<span class="sr-only xl:hidden">§nav\.menu<\/span><span class="max-xl:hidden">§nav\.categories<\/span>/,
+      /<details class="group relative shrink-0 max-xl:hidden"><summary role="button" aria-expanded="false" class="fk-header-button"><span>§nav\.categories<\/span>/,
     );
     expect(html).toContain(
       '<ul class="fk-picker"><li><a class="fk-menu-item" href="/en/c/shoes">§cat-shoes</a><ul><li><a class="fk-menu-item" href="/en/c/boots">§cat-boots</a></li>',
