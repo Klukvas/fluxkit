@@ -10,6 +10,8 @@ export interface CustomerPrincipal {
   customerId: string;
   email: string;
   sessionId: string;
+  /** Present for database sessions; custom authenticators cannot rotate a session without its hash. */
+  tokenHash?: string;
 }
 
 /**

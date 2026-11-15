@@ -1,3 +1,4 @@
+import { unauthorized } from "../../common/problem.js";
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { evaluateSession, sessionExpiry, shouldTouchSession } from "@fluxkit/core";
 import { CLOCK, type Clock } from "../../auth/clock.js";
@@ -18,6 +19,7 @@ export interface CreatedCustomerSession {
 }
 
 export interface ResolvedCustomerSession {
+  tokenHash: string;
   sessionId: string;
   customer: { id: string; email: string };
 }
@@ -95,9 +97,27 @@ export class CustomerSessionService {
       await this.sessions.touch(found.sessionId, now);
     }
     return {
+      tokenHash: hashSessionToken(rawToken),
       sessionId: found.sessionId,
       customer: { id: found.customer.id, email: found.customer.email },
     };
+  }
+
+  /** Rotation preserves the absolute expiry and commits with the caller's password change. */
+  async rotate(
+    sessionId: string,
+    oldTokenHash: string,
+    executor: DbExecutor,
+  ): Promise<{ token: string; expiresAt: Date }> {
+    const token = generateSessionToken();
+    const rotated = await this.sessions.rotateToken(
+      sessionId,
+      oldTokenHash,
+      hashSessionToken(token),
+      executor,
+    );
+    if (rotated === undefined) throw unauthorized();
+    return { token, expiresAt: rotated.expiresAt };
   }
 
   /** True when a session was deleted. */
