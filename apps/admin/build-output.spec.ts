@@ -40,8 +40,11 @@ const dist = join(import.meta.dirname, "dist");
  * Admin shell redesign PR 1 (icons, collapsed sidebar, top-layer tooltips and account disclosure): 447 298 raw, 133 774
  * gzip before and 456 996 raw, 136 998 gzip after (Node 22, entry plus static imports, gzip level 9; 3 chunks); both caps
  * are exceeded, so raw moves to 461 600 and gzip to 138 400 (about measured size plus 1 %, orchestrator decision).
+ * Admin sidebar overflow (PR 325: compact navigation, scroll hint and reveal; already trimmed to fit) plus the
+ * payments-to-review counter (PR 314): 461 176 raw, 138 412 gzip (Node 22, gzip level 9; 3 chunks), 12 bytes over the
+ * gzip cap; raw moves to 465 800 and gzip to 139 800 (again about measured size plus 1 %, owner's decision 2026-11-15).
  */
-const INITIAL_JS_BUDGET = { raw: 461_600, gzip: 138_400 };
+const INITIAL_JS_BUDGET = { raw: 465_800, gzip: 139_800 };
 
 /** Every lazily loaded area module of the route table. */
 const AREA_MODULES = [
