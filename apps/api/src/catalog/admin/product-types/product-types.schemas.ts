@@ -56,6 +56,7 @@ export const putProductTypeAttributeSchema = z.strictObject({
 
 /** `PUT /admin/product-types/:id/options/:optionId`: creates the assignment or replaces it. */
 export const putProductTypeOptionSchema = z.strictObject({
+  splitsListing: z.boolean().optional(),
   position: positionSchema.optional(),
 });
 
@@ -83,6 +84,7 @@ export const productTypeOptionResponseSchema = z.object({
   productTypeId: uuidSchema,
   optionId: uuidSchema,
   optionCode: z.string(),
+  splitsListing: z.boolean(),
   position: z.number().int(),
   createdAt: timestampSchema,
 });

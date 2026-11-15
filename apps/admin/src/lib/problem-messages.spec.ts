@@ -66,6 +66,7 @@ const NOT_ERROR_CODES = new Set([
   "order_item_reservation",
   "order_status_change",
   "out_of_stock",
+  "option_changed",
   "pg_advisory_xact_lock",
   "placed_at",
   "quantity_capped",
