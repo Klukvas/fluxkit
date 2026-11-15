@@ -186,3 +186,10 @@
   page, else home. Keep only the latest `{origin, opener}` for focus; no entries, traversal flags or navigation kinds. Preserve
   opener Tab order, and schedule both opener and heading focus after dialog teardown. The header link on canonical login stays plain.
 - Docs and contracts as planned: no change in `docs/contracts/`; README, `docs/files/storefront.md`, `e2e/README.md`, CHANGELOG, HANDOFF.
+
+## Fix round 5 (2026-11-15)
+
+- Approved scope: the two failures from the real round-4 Chromium run (260 passed, 2 failed). Reuse the existing field-error/legacy-fragment scenarios; no auth, form, API, contract, dependency or header change. No next task, commit, push, deploy or external write.
+- The field-error locator matches an href ending in `#login-email`, so rewriting it to an absolute same-document URL does not invalidate the subsequent click.
+- A mounted `popstate` listener resets `closing`, including hash-only traversals that leave pathname/search unchanged; cleanup removes the same listener. The existing route-commit reset remains. The existing legacy-fragment e2e scenario is the behavioral regression seam; no shallow source assertion is added.
+- Node 22 verification: storefront typecheck passes; storefront tests pass (2,553 default / 2,454 brand fork / 2,458 home fork, 13 existing skips). Root lint, format and format:check pass; all requested commands run with `fnm exec --using=22` and exit 0. `git diff --check` passes. No build/e2e in this developer round; browser rerun and fresh independent QA remain with the orchestrator.

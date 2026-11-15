@@ -666,7 +666,7 @@ height, altKey }`, `href`, optional `tone`; pictures in `public/home/` (their ow
 
 ## Sign-in modal (2026-11-15)
 
-Inside the dialog, field-error summary links focus and scroll to their field without adding a fragment history entry; reduced-motion preference uses instant scrolling. Full-page summary links retain native behaviour. Dialog links and same-document fragments never replace the recorded opener. If a dismissal traversal leaves the dialog mounted, the next route commit releases its close guard so dismissal can be retried.
+Inside the dialog, field-error summary links focus and scroll to their field without adding a fragment history entry; reduced-motion preference uses instant scrolling. Full-page summary links retain native behaviour. Dialog links and same-document fragments never replace the recorded opener. If a dismissal traversal leaves the dialog mounted, `popstate` (including hash-only traversal) or the next route commit releases its close guard so dismissal can be retried. The `popstate` listener is removed on unmount.
 
 `/{locale}/account/login` stays the canonical full page. Client navigation to it uses the locale-level `@modal` parallel slot and `(.)account/login` interception, reusing `LoginForm` inside a native `<dialog>`. The existing session provider, validation, native POST and safe destination builders are unchanged. No feature flag, new dependency or public contract is added.
 

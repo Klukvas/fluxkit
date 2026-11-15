@@ -121,6 +121,14 @@ export function SignInModal({ children }: { children: ReactNode }) {
     closing.current = false;
   }, [pathname, searchParams]);
   useEffect(() => {
+    // Hash-only traversals do not change pathname or search params.
+    const resetClosing = () => {
+      closing.current = false;
+    };
+    window.addEventListener("popstate", resetClosing);
+    return () => window.removeEventListener("popstate", resetClosing);
+  }, []);
+  useEffect(() => {
     const dialog = dialogRef.current;
     if (dialog === null) return;
     mounted.current = true;

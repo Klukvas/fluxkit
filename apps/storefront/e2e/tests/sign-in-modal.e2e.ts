@@ -206,7 +206,7 @@ for (const dismissal of ["Close", "Back"] as const) {
     const loginUrl = page.url();
     const historyLength = await page.evaluate(() => window.history.length);
     await dialog.getByRole("button", { name: "Sign in", exact: true }).click();
-    const emailLink = dialog.locator('a[href="#login-email"]');
+    const emailLink = dialog.locator('a[href$="#login-email"]');
     await expect(emailLink).toBeVisible();
     if (dismissal === "Back") {
       // Exercise an absolute same-document URL as well as the form's normal fragment-only href.
