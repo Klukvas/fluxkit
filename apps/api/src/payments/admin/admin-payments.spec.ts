@@ -3,6 +3,7 @@ import { PERMISSIONS, permissionsOf, type AdminPermission } from "@fluxkit/core"
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { AdminPrincipal } from "../../auth/admin-authenticator.js";
 import { testPrincipal } from "../../test/allow-all-admin-authenticator.js";
+import { countStatements } from "../../test/admin-orders-world.js";
 import { startApp, type RunningApp } from "../../test/app.js";
 import { deepKeys } from "../../test/cart-helpers.js";
 import { http, type HttpResult } from "../../test/http.js";
@@ -660,6 +661,65 @@ describe("payments: admin routes (real Postgres)", () => {
       return made;
     }
 
+    it("counts the whole true, false or unfiltered set independently of limit and every cursor, without writes or provider calls", async () => {
+      const baseline = await world.pool.query<{ attention: number; other: number }>(
+        "select count(*) filter (where needs_attention)::int as attention, count(*) filter (where not needs_attention)::int as other from payment",
+      );
+      const before = baseline.rows[0];
+      if (before === undefined) throw new Error("Missing fixture baseline");
+      await mismatch();
+      await mismatch();
+      await attempt(world.app);
+      await attempt(world.app);
+      const snapshot = () =>
+        world.pool.query<{ state: string }>(
+          "select json_build_array((select json_agg(p order by id) from payment p), (select json_agg(r order by id) from payment_refund r), (select json_agg(e order by id) from payment_event e))::text as state",
+        );
+      const stored = await snapshot();
+      const calls = { ...world.provider().calls };
+      const refunds = [...world.provider().refundCalls];
+      for (const [filter, total] of [
+        ["needsAttention=true&", before.attention + 2],
+        ["needsAttention=false&", before.other + 2],
+        ["", before.attention + before.other + 4],
+      ] as const) {
+        const get = async (query: string) => {
+          const answer = await http<AdminPaymentPage>(
+            world.orders.owner.baseUrl,
+            "GET",
+            `/admin/payments?${filter}${query}`,
+          );
+          expect(answer.status).toBe(200);
+          expect(answer.body.total).toBe(total);
+          return answer.body;
+        };
+        // One page, one COUNT, and the two existing batched view reads, regardless of rows.
+        expect(
+          await countStatements(async () => {
+            await get("limit=1");
+          }),
+        ).toBe(4);
+        const first = await get("limit=1");
+        if (first.nextCursor === null) throw new Error("Expected another page");
+        await get("limit=100");
+        await get(`limit=1&cursor=${encodeURIComponent(first.nextCursor)}`);
+        const beyond = Buffer.from(
+          JSON.stringify({
+            t: "1970-01-01T00:00:00.000Z",
+            i: "00000000-0000-0000-0000-000000000000",
+          }),
+        ).toString("base64url");
+        expect(await get(`limit=1&cursor=${beyond}`)).toMatchObject({
+          items: [],
+          total,
+          nextCursor: null,
+        });
+      }
+      expect((await snapshot()).rows).toEqual(stored.rows);
+      expect(world.provider().calls).toEqual(calls);
+      expect(world.provider().refundCalls).toEqual(refunds);
+    });
+
     it("lists open items newest first with keyset paging, and clearing one journals the admin and keeps the code", async () => {
       const first = await mismatch();
       // Attempts are stamped with the (fake) clock: a later one is newer.
@@ -719,6 +779,8 @@ describe("payments: admin routes (real Postgres)", () => {
         "/admin/payments?needsAttention=true&limit=100",
       );
       expect(open.body.items.map((item) => item.payment.id)).not.toContain(second.paymentId);
+      expect(page2.body.total).toBe(page1.body.total);
+      expect(open.body.total).toBe(page1.body.total - 1);
     });
 
     it("pages through attempts of the same instant by id: a cursor inside the tie loses and repeats nothing", async () => {
@@ -741,6 +803,25 @@ describe("payments: admin routes (real Postgres)", () => {
       }
       expect(new Set(seen).size).toBe(seen.length);
       expect(seen.filter((id) => tied.includes(id))).toEqual([...tied].sort().reverse());
+    });
+
+    it("returns a genuine zero when no open attention items remain", async () => {
+      const open = await world.pool.query<{ id: string }>(
+        "select id from payment where needs_attention",
+      );
+      for (const { id } of open.rows) {
+        expect(
+          (await http(world.orders.owner.baseUrl, "POST", `/admin/payments/${id}/attention/clear`))
+            .status,
+        ).toBe(200);
+      }
+      const answer = await http<AdminPaymentPage>(
+        world.orders.owner.baseUrl,
+        "GET",
+        "/admin/payments?needsAttention=true&limit=1",
+      );
+      expect(answer.status).toBe(200);
+      expect(answer.body).toEqual({ items: [], total: 0, limit: 1, nextCursor: null });
     });
 
     it("refuses a misspelt filter, a damaged cursor and an unknown payment", async () => {
@@ -915,6 +996,21 @@ describe("payments: the refund and attention routes need payments.refund itself 
 
   afterAll(async () => {
     await running.app.close();
+  });
+
+  it("orders.read alone allows the filtered total; no permission refuses the read", async () => {
+    permissions = ["orders.read"];
+    const allowed = await http<AdminPaymentPage>(
+      running.baseUrl,
+      "GET",
+      "/admin/payments?needsAttention=true&limit=1",
+    );
+    expect(allowed.status).toBe(200);
+    expect(allowed.body.total).toEqual(expect.any(Number));
+    permissions = [];
+    expect(
+      (await http(running.baseUrl, "GET", "/admin/payments?needsAttention=true&limit=1")).status,
+    ).toBe(403);
   });
 
   it("every other permission (orders.write included) is 403; payments.refund alone gets past the guard", async () => {

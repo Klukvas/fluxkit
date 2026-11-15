@@ -116,7 +116,7 @@ export class AdminPaymentsController {
   @ApiOperation({
     summary: "List payment attempts, newest first",
     description:
-      "`needsAttention=true` lists the open attention items (late or duplicate successes, refunds that failed or are unknown, amount mismatches, unknown provider statuses, reads that gave up); `false` the others; missing means all. Keyset paging: pass `nextCursor` as `cursor`.",
+      "`needsAttention=true` lists the open attention items (late or duplicate successes, refunds that failed or are unknown, amount mismatches, unknown provider statuses, reads that gave up); `false` the others; missing means all. Keyset paging: pass `nextCursor` as `cursor`. `total` counts all matching attempts, independent of cursor and limit. Page and count are separate reads and may briefly disagree during concurrent changes.",
   })
   @ApiQuery({
     name: "needsAttention",
