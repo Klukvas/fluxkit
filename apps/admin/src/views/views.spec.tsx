@@ -1,4 +1,4 @@
-import { HomeIcon } from "@fluxkit/ui";
+import { Button, HomeIcon } from "@fluxkit/ui";
 import { Children, isValidElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -108,7 +108,14 @@ describe("ResourceFallback", () => {
 });
 
 describe("language switch while a switch runs (step 13 review, L3)", () => {
+  /** The class list of a button tag, so the switch can be compared with the real secondary Button. */
+  function classesOf(tag: string): string[] {
+    return (/\sclass="([^"]*)"/.exec(tag)?.[1] ?? "").split(/\s+/).filter(Boolean);
+  }
+
   it("uses secondary buttons and a token-based selected look in either language", () => {
+    const secondary = classesOf(renderToStaticMarkup(<Button variant="secondary">x</Button>));
+    expect(secondary.length).toBeGreaterThan(0);
     for (const locale of ["uk", "en"] as const) {
       const html = renderToStaticMarkup(
         <LanguageSwitchView t={t} locale={locale} onChange={noop} />,
@@ -117,11 +124,10 @@ describe("language switch while a switch runs (step 13 review, L3)", () => {
       expect(toggles).toHaveLength(2);
       for (const [index, button] of toggles.entries()) {
         expect(button).not.toContain("bg-primary");
-        expect(button).toContain("border border-border bg-background text-foreground");
+        expect(classesOf(button)).toEqual(expect.arrayContaining(secondary));
         expect(button).toContain(`aria-pressed="${["uk", "en"][index] === locale}"`);
         expect(button).toContain("aria-pressed:bg-muted");
         expect(button).toContain("aria-pressed:font-semibold");
-        expect(button).toContain("aria-pressed:border-foreground");
         expect(button).toContain("min-h-11");
       }
     }

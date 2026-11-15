@@ -34,7 +34,7 @@ export function LanguageSwitchView({
             onClick={() => {
               if (!busy) onChange(option);
             }}
-            className="min-h-11 px-3 py-1 text-sm aria-pressed:bg-muted aria-pressed:font-semibold aria-pressed:border-foreground aria-disabled:opacity-50"
+            className="min-h-11 px-3 py-1 text-sm aria-pressed:bg-muted aria-pressed:font-semibold aria-disabled:opacity-50"
           >
             {t(`language.${option}`)}
           </Button>
