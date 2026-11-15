@@ -12,6 +12,7 @@
 One line per user-visible or schema change.
 
 ## Unreleased
+- Production example: `api` waits for a healthy `redis` before it starts (with `RATE_LIMIT_STORE=redis` the API refuses to start while Redis does not answer, so a release that recreated Redis could fail its start and roll back). No API, schema or variable change.
 - Fixed: scheduler stops starting jobs once its lock connection is lost.
 - Production example: a `redis` service (password `REDIS_PASSWORD`, required; no persistence, internal only), PR 1 of the multi-instance plan; the API does not use it yet. Existing hosts add `REDIS_PASSWORD` to `production.env` before deploying (`docs/deployment.md`).
 - Storefront header (owner's decision 2026-11-15, plan `docs/plans/2026-11-15-header-categories-position.md`; storefront only, no API, schema, token, variable or dependency change; the `navigation.display` row of `docs/contracts/header-footer.md` changes, no field added): in the `picker` display the "Categories" button now shows at the `navigation` block's place from `xl` (the default header reads logo, "Categories", search, controls; before it, "Categories", logo), and the `menu` block is the phone menu below `xl`, as in `row`. Visual, reading and Tab order now agree at every width. A fork that wants "Categories" before the logo lists `navigation` before `menu` (`docs/migrations/2026-11-13-storefront-header-footer-round-4.md`). `HeaderBlockView` `picker` loses `withTheme` (internal).
