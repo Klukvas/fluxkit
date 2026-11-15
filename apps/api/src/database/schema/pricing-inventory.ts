@@ -23,11 +23,12 @@ import { variant } from "./catalog.js";
  * `_fkey` / `_pkey` suffixes. The `stock_movement` append-only trigger and the `main` location row live in the
  * hand-written part of `0003_pricing_inventory.sql` (drizzle-kit does not model triggers or data).
  *
- * The limits mirror packages/core: MAX_AMOUNT (pricing/limits), MAX_ON_HAND (inventory/limits), MAX_QUANTITY.
+ * The limits mirror packages/core: MAX_AMOUNT (pricing/limits), MAX_ON_HAND and MAX_RESERVED (inventory/limits), MAX_QUANTITY.
  */
 
 const MAX_AMOUNT = 1_000_000_000_000;
 const MAX_ON_HAND = 1_000_000_000;
+const MAX_RESERVED = MAX_ON_HAND;
 const MAX_QUANTITY = 1_000_000;
 const CODE_PATTERN = "^[a-z][a-z0-9_]{0,63}$";
 const CURRENCY_PATTERN = "^[A-Z]{3}$";
@@ -119,7 +120,10 @@ export const inventoryLevel = pgTable(
       "inventory_level_on_hand_check",
       sql`${t.onHand} >= 0 AND ${t.onHand} <= ${sql.raw(`${MAX_ON_HAND}`)}`,
     ),
-    check("inventory_level_reserved_check", sql`${t.reserved} >= 0`),
+    check(
+      "inventory_level_reserved_check",
+      sql`${t.reserved} >= 0 AND ${t.reserved} <= ${sql.raw(`${MAX_RESERVED}`)}`,
+    ),
     index("inventory_level_location_id_idx").on(t.locationId),
   ],
 );

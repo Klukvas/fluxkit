@@ -30,7 +30,7 @@
 | A `docs/catalog-review-drift` | 6b, 6c, 6d in `docs/`; a new ADR reconciling ADR 0006 with the code for 6e, 6f, 6g (old ADRs are not edited); stale R11 lines in HANDOFF | no |
 | B `test/catalog-surviving-mutations` | tests for 7a (manual variant create and generation with long slugs), 7d, 7e; each shown to fail with the mutation | no |
 | C `fix/store-required-text` | owner decision: a product (or category, brand) without a usable required text is left out of the storefront answer and an error is logged with its id only (no `""`, no `500`); plus `app.disable("x-powered-by")` in the API | no (store behaviour; documented in `docs/api/catalog.md`) |
-| E `feature/reserved-upper-bound` | migration `0014`: `inventory_level_reserved_check` becomes `reserved >= 0 AND reserved <= 1000000000`, with `.down.sql` (restores `reserved >= 0`, deletes its journal row); refuses with a clear error if a row already exceeds the bound; test up, down, up, down on a `_test` database; CHANGELOG | yes, approved |
+| E `feature/reserved-upper-bound` | migration `0015`: `inventory_level_reserved_check` becomes `reserved >= 0 AND reserved <= 1000000000`, with `.down.sql` (restores `reserved >= 0`, deletes its journal row); refuses with a clear error if a row already exceeds the bound; test up, down, up, down on a `_test` database; CHANGELOG | yes, approved |
 | D C5 lock | deferred by the owner | - |
 
 C and the X-Powered-By change could be split; they are kept in one PR only if the reviewer agrees they are one concern ("store answers never carry masked data or framework banners"); otherwise two PRs.
