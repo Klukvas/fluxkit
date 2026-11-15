@@ -112,9 +112,11 @@ file, or ask upstream for an extension point (`AGENTS.md` section 17).
   reorder or leave out the blocks of the one header row (menu button, logo, navigation, search box, controls), reorder or leave out the
   controls at the end (language, theme, cart, account), set how many top-level categories show (0 to 12) and which links follow them
   (message key plus storefront path; a new text goes into `apps/storefront/src/messages-extra/uk.json` and `apps/storefront/src/messages-extra/en.json` under `custom.`),
-  and choose how the navigation shows from `xl` (`navigation.display`): `picker` (the template's default since round 4) makes the menu
-  button a "Categories" button from `xl` whose panel lists each category with up to 8 children in columns, then the links (the category
-  list is in the page once); `row` (also when left out) keeps the inline row that scrolls sideways. The `theme` control is the Light / Dark /
+  and choose how the navigation shows from `xl` (`navigation.display`): `picker` (the template's default since round 4) shows the
+  navigation block as a "Categories" button from `xl`, at its place in the row (after the logo by default), whose panel lists each
+  category with up to 8 children in columns, then the links; `row` (also when left out) keeps the inline row that scrolls sideways.
+  Below `xl` both use the menu button. To put "Categories" before the logo on a desktop, list `navigation` before `menu`:
+  `["navigation", "menu", "logo", "search", "controls"]`. The `theme` control is the Light / Dark /
   System menu (only while `showToggle` is true); below `sm` it moves into the menu's panel so a phone's row keeps room for the logo.
   Supported orders: the logo is required, `controls` (when listed) is the last block, menu and navigation go together, and the menu is
   either the first block shown on a phone (before the logo; the default) or the last one (after the logo, with no controls group: "logo

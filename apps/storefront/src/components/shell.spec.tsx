@@ -72,15 +72,16 @@ describe("SiteShell landmarks and accessibility", () => {
 
   it("labels every navigation landmark", () => {
     const navs = html.match(/<nav[^>]*>/g) ?? [];
-    // main (ONCE: the "Categories" picker is the menu below `xl` too, round 4), locale switcher, the footer's two link groups
-    // (the `columns` layout: each a navigation named by its visible heading)
-    expect(navs).toHaveLength(4);
+    // main TWICE (the phone menu below `xl`, the "Categories" picker from `xl`; one of them is `display: none` at every width,
+    // 2026-11-15), locale switcher, the footer's two link groups (the `columns` layout: each a navigation named by its
+    // visible heading)
+    expect(navs).toHaveLength(5);
     for (const nav of navs) expect(nav).toMatch(/aria-label="§[^"]+"|aria-labelledby="[^"]+"/);
     const mains = navs.filter((nav) => nav.includes('aria-label="§nav.main.label"'));
-    expect(mains).toHaveLength(1);
-    // The picker's summary is named by its content: "Menu" below `xl` (visually hidden), "Categories" from `xl`.
+    expect(mains).toHaveLength(2);
+    // The menu button is named "Menu" (below `xl`), the picker's summary by its text "Categories" (from `xl`), after the logo.
     expect(html).toMatch(
-      /<details class="group relative shrink-0"><summary role="button" aria-expanded="false" class="fk-header-button">.*?§nav\.menu.*?§nav\.categories/,
+      /<details class="group relative shrink-0 xl:hidden"><summary role="button" aria-expanded="false" aria-label="§nav\.menu".*?class="fk-logo".*?<details class="group relative shrink-0 max-xl:hidden xl:static"><summary role="button" aria-expanded="false" class="fk-header-button"><span>§nav\.categories<\/span>/,
     );
     expect(html).toContain('aria-label="§locale.switcher.label"');
     for (const nav of navs.filter((tag) => tag.includes("aria-labelledby"))) {
@@ -138,7 +139,7 @@ describe("header and footer size (a loose sanity cap, ADR 0048)", () => {
   // the header and footer cannot hide them. The real guards are the e2e tests `pre-hydration-forms` (uk and en) and
   // `first-html` (the raw HTML: the form is not in a hidden segment and no loading view precedes it). These caps only catch
   // a runaway header or footer (every page carries them); a client fork may raise them with a reason.
-  it("keeps the header under 8 000 bytes", () => {
+  it("keeps the header under 9 000 bytes", () => {
     // Four children each (the demo seed has up to four): the `picker` display shows them (round 4).
     const longNames = Array.from({ length: headerConfig.navigation.categoryLimit }, (_, index) => ({
       slug: `category-${String(index)}`,
@@ -162,7 +163,11 @@ describe("header and footer size (a loose sanity cap, ADR 0048)", () => {
       </SiteShell>,
     );
     const header = html.slice(html.indexOf("<header"), html.indexOf("</header>"));
-    expect(new TextEncoder().encode(header).length).toBeLessThan(8000); // 3 427 bytes on 2026-11-05 (six categories, no search box); 6 969 on 2026-11-13 (round 4: the picker with four children each, the theme control and its phone copy)
+    // 3 427 bytes on 2026-11-05 (six categories, no search box); 6 969 on 2026-11-13 (round 4: the picker with four children
+    // each, the theme control and its phone copy); 2026-11-15, the picker after the logo (the phone menu is its own copy of the
+    // top-level links again, as in the `row` display): 7 707 here, 8 008 in the brand-fork run, so the cap went from 8 000 to
+    // 9 000 (plan 2026-11-15-header-categories-position.md; the e2e `first-html` and `pre-hydration-forms` are the real guards).
+    expect(new TextEncoder().encode(header).length).toBeLessThan(9000);
   });
 
   it("keeps the footer under 4 000 bytes", () => {

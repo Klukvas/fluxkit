@@ -9,10 +9,12 @@
  * unknown block name).
  *
  * Controls: `language`, `theme` (the Light / Dark / System menu; only while `showToggle` of `config/theme.ts` is true; below
- * `sm` it moves into the menu's panel when the header has a menu), `cart`, `account`. `navigation.display`: `row` (also when
- * left out) shows the links inline from `xl`, a row that scrolls sideways; `picker` makes the menu button a "Categories"
- * button from `xl` whose panel shows each category with its children in columns, then the links (the `navigation` block then
- * renders nothing, it stays listed next to `menu`).
+ * `sm` it moves into the menu's panel when the header has a menu), `cart`, `account`. `navigation.display`: how the
+ * `navigation` block shows from `xl`, at its place in `blocks`: `row` (also when left out), the links inline, a row that
+ * scrolls sideways; `picker`, a "Categories" button whose panel shows each category with its children in columns, then the
+ * links. Below `xl` both use the `menu` block. Since 2026-11-15 the default reads logo, "Categories", search, controls from
+ * `xl` (before, the picker took the menu's place); "Categories" before the logo is
+ * `blocks: ["navigation", "menu", "logo", "search", "controls"]`.
  *
  * Supported orders (anything else fails the check, also at render): `logo` is required; `controls`, when listed, is the LAST
  * block; `menu` and `navigation` go together; `menu` is either the first block shown on a phone (before `logo`, with only
