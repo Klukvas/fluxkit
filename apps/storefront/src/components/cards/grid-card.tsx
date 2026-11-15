@@ -54,7 +54,7 @@ export function GridCard({ card, headingLevel: Heading, eager, locale, t }: Card
       </Badge>
     ) : null;
   return (
-    <article className="group relative flex h-full flex-col gap-2 rounded-card border border-border bg-background p-3 transition-shadow hover:border-border-input hover:shadow-raised focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring motion-reduce:transition-none">
+    <article className="group relative flex h-full flex-col gap-2 rounded-card border-2 border-foreground bg-background p-3 transition-shadow hover:shadow-raised focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring motion-reduce:transition-none">
       {badges === null ? (
         imageBlock
       ) : (

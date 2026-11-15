@@ -66,7 +66,7 @@ export interface StickyBuyBarProps {
 }
 
 const stepButton =
-  "inline-flex size-11 items-center justify-center rounded-control border border-border bg-background text-foreground disabled:opacity-50";
+  "inline-flex size-11 items-center justify-center rounded-control border-2 border-foreground bg-background text-foreground disabled:opacity-50";
 
 /**
  * The product page's buy bar on phones (review D-02): fixed to the bottom below `md`, shown only while the inline "Add to

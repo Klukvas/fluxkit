@@ -298,7 +298,7 @@ export function FiltersButton({ label }: { label: string }) {
         event.preventDefault();
         setSheetOpen(true);
       }}
-      className={`inline-flex min-h-11 items-center gap-2 rounded-control border border-border-input bg-background px-4 font-medium text-foreground lg:hidden ${focusRing}`}
+      className={`inline-flex min-h-11 items-center gap-2 rounded-control border-2 border-foreground bg-background px-4 font-medium text-foreground lg:hidden ${focusRing}`}
     >
       {label}
     </a>

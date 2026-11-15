@@ -5,6 +5,9 @@
 One line per user-visible or schema change.
 
 ## Unreleased
+- Storefront: the home hero demo picture becomes a niche-neutral shopping bag, swinging tag and parcel illustration in the Playful palette.
+- Storefront: hero headings use a heavy display role, with a larger 4xl h1 step and wrapping layout.
+- Theme and UI: cards and outlined controls gain 2px theme-aware ink outlines; text fields keep the input-border role, now ink in light mode; shared admin cards, secondary buttons, fields and badges follow.
 - Admin: Start becomes a permission-aware workspace with five independent counters, quick navigation actions and the existing setup checklist below.
 - Docs: `docs/deployment.md` gains "Proxy hops" (the `TRUST_PROXY` value and `STOREFRONT_FORWARD_CLIENT_ADDRESS` for the nginx and Caddy edges, a CDN in front, development) and "Checking per-address limits" (a two-network check); `.env.example` no longer gives "1 for a single Next.js server" as an example (the `next dev` rewrite passes a browser-sent `X-Forwarded-For` through, ADR 0026, so that value would let a client choose its rate-limit key). No code or configuration change.
 - API: the plain catalog reads `GET /store/config`, `/store/categories`, `/store/products`, `/store/products/{slug}` and `/store/banners` share one rate limit window, `catalogRead`, of 300 reads a minute per client address, and answer `429 too_many_requests` with `Retry-After` over it (additive: a new error response, documented in `docs/api/openapi.json`). With `TRUST_PROXY` above 0 a read that reached the API without a forwarded hop (the storefront's own server reads) is not counted; with `TRUST_PROXY=0` every read counts. No new dependency, configuration variable or schema change; plan `docs/plans/2026-11-14-catalog-rate-limits.md`.
