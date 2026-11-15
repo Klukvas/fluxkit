@@ -6,7 +6,7 @@ import enHome from "../../messages/en/home.json";
 import ukHome from "../../messages/uk/home.json";
 import { renderInRouter } from "../../test-helpers";
 import { HomeView } from "./home-page";
-import { COUNTERS, QUICK_ACTIONS } from "./workspace-model";
+import { COUNTERS, QUICK_ACTIONS, formatTotal } from "./workspace-model";
 import { CounterView, WorkspaceView } from "./workspace-view";
 
 const noop = () => undefined;
@@ -15,6 +15,7 @@ const states: ResourceView<{ total: number }>[] = [
   { status: "loading", reload: noop },
   { status: "ready", data: { total: 0 }, reload: noop },
   { status: "error", failure: { kind: "network" }, reload: noop },
+  { status: "ready", data: { total: 2 }, reload: noop },
   { status: "forbidden", reload: noop },
   { status: "ready", data: { total: 1200 }, reload: noop },
 ];
@@ -49,13 +50,15 @@ describe("workspace view", () => {
     expect(html).toContain(t("home.counter.forbidden"));
     expect(html).toContain(t("home.counter.unavailable"));
     expect(html).toContain(t("errors.network"));
-    expect(html).toContain('aria-label="Try again: Customers"');
+    expect(html).toContain('aria-label="Try again: Payments to review"');
     expect(html.match(/<button /g)).toHaveLength(1);
     for (const link of html.matchAll(/<a\b[^>]*>(.*?)<\/a>/g))
       expect(link[1]).not.toContain("<button");
     expect(html).not.toContain('role="alert"');
     expect(html).not.toContain('role="status"');
     expect(html).not.toContain("bg-primary");
+    expect(html).toContain("lg:grid-cols-3");
+    expect(html).not.toContain("xl:grid-cols-5");
     expect(html.match(/aria-hidden="true" class="inline-flex size-5/g)).toHaveLength(3);
     expect(html.indexOf("checklist-slot")).toBeGreaterThan(html.indexOf("Quick actions"));
     expect(html).toContain('href="/admin-ui/products/new"');
@@ -72,6 +75,51 @@ describe("workspace view", () => {
       expect(html).not.toContain(">0<");
     }
   });
+
+  it.each(["en", "uk"] as const)(
+    "keeps every payment counter state local and formats exact totals in %s",
+    (locale) => {
+      const translator = createTranslator(
+        messagesWith(locale, { home: locale === "en" ? enHome : ukHome }),
+        locale,
+      );
+      const counter = COUNTERS[2];
+      const label = translator("home.counter.paymentsAttention");
+      for (const status of ["loading", "error", "forbidden", "ready"] as const) {
+        for (const total of [0, 12345]) {
+          const state: ResourceView<{ total: number }> =
+            status === "ready"
+              ? { status, data: { total }, reload: noop }
+              : status === "error"
+                ? { status, failure: { kind: "network" }, reload: noop }
+                : { status, reload: noop };
+          const html = renderInRouter(
+            <CounterView
+              t={translator}
+              counter={counter}
+              state={state}
+              total={formatTotal(total, locale)}
+              onRetry={noop}
+            />,
+          );
+          expect(html).toContain('href="/admin-ui/payments"');
+          expect(html).toContain(label);
+          expect(html.includes("<button")).toBe(status === "error");
+          if (status === "ready") {
+            expect(html).toContain(formatTotal(total, locale));
+            expect(html).toContain("tabular-nums");
+          } else {
+            expect(html).not.toContain(">0<");
+            expect(html).toContain(
+              translator(`home.counter.${status === "error" ? "unavailable" : status}`),
+            );
+          }
+          if (status === "error")
+            expect(html).toContain(translator("home.counter.retry", { label }));
+        }
+      }
+    },
+  );
 
   it("omits empty sections, keeps Help/noAccess and the checklist without workspace access", () => {
     const empty = renderInRouter(
@@ -99,7 +147,7 @@ describe("workspace view", () => {
     const html = renderInRouter(
       <CounterView
         t={uk}
-        counter={COUNTERS[2]}
+        counter={COUNTERS[3]}
         state={{ status: "ready", data: { total: 0 }, reload: noop }}
         total="0"
         onRetry={noop}

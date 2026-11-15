@@ -185,6 +185,9 @@ export class AdminPaymentsService {
       after,
       query.limit + 1,
     );
+    const total = await this.payments.countForAdmin(this.database, {
+      needsAttention: query.needsAttention,
+    });
     const page = rows.slice(0, query.limit);
     const views = await this.viewsOf(page.map((entry) => entry.payment));
     const last = page.at(-1);
@@ -196,6 +199,7 @@ export class AdminPaymentsService {
         }
         return { orderId: entry.payment.orderId, orderNumber: entry.orderNumber, payment };
       }),
+      total,
       limit: query.limit,
       nextCursor:
         rows.length > query.limit && last !== undefined

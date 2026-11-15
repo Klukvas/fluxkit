@@ -17,6 +17,12 @@ export const COUNTERS = [
     target: `${PATHS.orders}?status=paid`,
   },
   {
+    id: "paymentsAttention",
+    operation: "listPayments",
+    query: { needsAttention: true, limit: 1 },
+    target: PATHS.payments,
+  },
+  {
     id: "customers",
     operation: "listCustomers",
     query: { limit: 1, offset: 0 },
@@ -56,13 +62,15 @@ export function selectWorkspace(permissions: readonly string[] | null) {
 
 /** Keep the matching query with its typed client method; no list pages or their modules are imported. */
 export async function readCounter(
-  client: Pick<AdminClient, "listOrders" | "listCustomers" | "listProducts">,
+  client: Pick<AdminClient, "listOrders" | "listPayments" | "listCustomers" | "listProducts">,
   counter: WorkspaceCounter,
   signal: AbortSignal,
 ): Promise<AdminResult<{ total: number }>> {
   switch (counter.operation) {
     case "listOrders":
       return client.listOrders({ ...counter.query, signal });
+    case "listPayments":
+      return client.listPayments({ ...counter.query, signal });
     case "listCustomers":
       return client.listCustomers({ ...counter.query, signal });
     case "listProducts":

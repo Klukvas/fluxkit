@@ -18,6 +18,10 @@ export const adminPaymentListItemSchema = z.object({
 
 export const adminPaymentPageSchema = z.object({
   items: z.array(adminPaymentListItemSchema),
+  total: z.number().int().nonnegative().meta({
+    description:
+      "Payment attempts matching the filter, independent of cursor and limit. Read separately from the page; concurrent changes may briefly make them disagree.",
+  }),
   limit: z.number().int(),
   nextCursor: z.string().nullable().meta({
     description: "Pass as `cursor` for the next page; null on the last page. Opaque.",

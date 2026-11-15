@@ -2,6 +2,7 @@
   "home.counters.title": "Огляд",
   "home.counter.awaitingPayment": "Замовлення в очікуванні оплати",
   "home.counter.paid": "Оплачені замовлення в очікуванні виконання",
+  "home.counter.paymentsAttention": "Платежі на перевірку",
   "home.counter.customers": "Покупці",
   "home.counter.draftProducts": "Чернетки товарів",
   "home.counter.activeProducts": "Активні товари",

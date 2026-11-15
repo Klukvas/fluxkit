@@ -481,6 +481,8 @@ export interface AdminPaymentList {
 
 export interface AdminPaymentPage {
   items: { orderId: string; orderNumber: string; payment: AdminPayment }[];
+  /** Full filtered count, independent of cursor and limit; read separately from the page. */
+  total: number;
   limit: number;
   /** Pass as `cursor` for the next page; null on the last page. */
   nextCursor: string | null;

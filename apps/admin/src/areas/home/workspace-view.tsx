@@ -100,7 +100,7 @@ export function WorkspaceView({
           <h2 id="home-counters-title" className="text-lg font-semibold text-foreground">
             {t("home.counters.title")}
           </h2>
-          <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+          <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {counters}
           </div>
         </section>
