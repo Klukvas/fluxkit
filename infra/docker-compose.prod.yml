@@ -78,7 +78,7 @@ services:
       timeout: 3s
       retries: 20
 
-  # Shared state of the API instances (rate-limit windows and the mail pacer, multi-instance plan; not read by the API yet).
+  # Shared state of the API instances (rate-limit windows and the mail pacer, multi-instance plan; read by the API with RATE_LIMIT_STORE=redis).
   # Counters only: nothing to persist or back up (no RDB, no AOF), keys carry a TTL and `volatile-ttl` evicts the closest to
   # expiry. Unmodified image under the approved AGPLv3 exception (docs/dependencies.md). Reachable only on the Compose network:
   # never publish its port or route it through the edge. Runs as the image's redis user (999) so no capability is needed.
@@ -140,6 +140,9 @@ services:
       migrate: { condition: service_completed_successfully }
       # Also with search off: a broken engine stops the boot instead of failing later (docs/deployment.md).
       meilisearch: { condition: service_healthy }
+      # With RATE_LIMIT_STORE=redis the API refuses to start while Redis does not answer (ADR 0055), so a release that
+      # recreates Redis must not start the API before it is healthy.
+      redis: { condition: service_healthy }
 
   storefront:
     <<: *hardening
