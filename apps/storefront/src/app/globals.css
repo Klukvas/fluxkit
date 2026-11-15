@@ -96,7 +96,7 @@
    * the form was outlined without a script (e2e `pre-hydration-forms`, uk).
    */
   .fk-header-row {
-    @apply flex flex-wrap items-center gap-x-2 gap-y-2 py-2 lg:flex-nowrap lg:gap-x-4;
+    @apply flex flex-wrap items-center gap-x-2 gap-y-2 py-2 lg:flex-nowrap lg:gap-x-4 xl:relative;
   }
   /*
    * A category list longer than the row scrolls sideways (council decision 1, docs/plans/2026-11-11-ui-council-decisions.md):
@@ -214,30 +214,29 @@
     @apply mt-1 border-t border-border pt-1 sm:hidden;
   }
   /*
-   * The `picker` display of the header navigation (round 4, `PickerBlock` in `site-header.tsx`): below `xl` the menu's flat list
-   * (the children hidden), from `xl` a wide panel with the categories in columns, each with its children, and the configured
-   * links in a row below. No class on the nested lists and links beyond `.fk-menu-item` (bytes, see above).
+   * The `picker` display of the header navigation (round 4, `PickerBlock` in `site-header.tsx`; shown from `xl` only since
+   * 2026-11-15, below it the `menu` block is the navigation): a wide panel with the categories in columns, each with its
+   * children, and the configured links in a row below. From `xl` the picker's `<details>` is static and `.fk-header-row` is the
+   * panel's containing block, so the panel sits at the row's start or end edge and never past the screen, however wide a fork's
+   * logo is. No class on the nested lists and links beyond `.fk-menu-item` (bytes, see above).
    */
   .fk-picker-panel {
-    @apply xl:w-3xl xl:p-3;
+    @apply w-3xl p-3;
   }
   .fk-picker {
-    @apply flex flex-col xl:block xl:columns-3 xl:gap-4;
+    @apply columns-3 gap-4;
   }
   .fk-picker > li {
-    @apply break-inside-avoid xl:mb-2;
+    @apply mb-2 break-inside-avoid;
   }
   .fk-picker > li > a {
-    @apply xl:font-semibold;
-  }
-  .fk-picker ul {
-    @apply max-xl:hidden;
+    @apply font-semibold;
   }
   .fk-picker ul a {
     @apply text-sm text-muted-foreground hover:text-foreground;
   }
   .fk-picker-links {
-    @apply flex flex-col xl:mt-1 xl:flex-row xl:flex-wrap xl:border-t xl:border-border xl:pt-2;
+    @apply mt-1 flex flex-row flex-wrap border-t border-border pt-2;
   }
   .fk-header-slot {
     @apply inline-flex min-h-11 min-w-11 items-center justify-center;

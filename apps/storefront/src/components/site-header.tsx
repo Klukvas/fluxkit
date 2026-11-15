@@ -97,38 +97,33 @@ function MenuBlock({
 }
 
 /**
- * The `picker` display (round 4): ONE disclosure for every width, so the category list is in the page once. Below `xl` it is
- * the menu button with the flat list of top-level categories and links, as in the `row` display; from `xl` the summary reads
- * "Categories" with a chevron and the panel shows each category with its children, in columns, then the links. The summary is
- * named by its content (no `aria-label`), so the name is "Menu" while the icon shows and "Categories" while the text does.
- * Plain links in lists, no menu roles; Escape and an outside click close it (`HeaderDisclosure`).
+ * The `navigation` block in the `picker` display (round 4; at its own place in the row since 2026-11-15): from `xl` only, a
+ * "Categories" summary with a chevron whose panel shows each category with its children, in columns, then the links. Below
+ * `xl` the `menu` block is the navigation, as in the `row` display; the hidden copy is `display: none` as a whole, so one
+ * "Main navigation" is exposed at every width. The summary is named by its text (no `aria-label`). Plain links in lists, no
+ * menu roles; Escape and an outside click close it (`HeaderDisclosure`).
  */
 function PickerBlock({
   categories,
   links,
   align,
-  withTheme,
-  context,
+  t,
 }: {
   categories: readonly HeaderCategoryLink[];
   links: readonly HeaderLink[];
   align: PanelAlign;
-  withTheme: boolean;
-  context: HeaderContext;
+  t: Translator;
 }) {
-  const { t } = context;
   return (
     <HeaderDisclosure
       summary={
         <>
-          <MenuIcon className="xl:hidden" />
-          <span className="sr-only xl:hidden">{t("nav.menu")}</span>
-          <span className="max-xl:hidden">{t("nav.categories")}</span>
-          <ChevronDownIcon className="fk-chevron max-xl:hidden" />
+          <span>{t("nav.categories")}</span>
+          <ChevronDownIcon className="fk-chevron" />
         </>
       }
       align={align}
-      className="shrink-0"
+      className="shrink-0 max-xl:hidden xl:static"
       panelClassName="fk-picker-panel"
     >
       <nav aria-label={t("nav.main.label")}>
@@ -154,7 +149,6 @@ function PickerBlock({
           </ul>
         ) : null}
       </nav>
-      {withTheme ? <MenuTheme context={context} /> : null}
     </HeaderDisclosure>
   );
 }
@@ -234,8 +228,7 @@ function block(view: HeaderBlockView, context: HeaderContext): ReactNode {
           categories={view.categories}
           links={view.links}
           align={view.align}
-          withTheme={view.withTheme}
-          context={context}
+          t={t}
         />
       );
     case "logo":
@@ -267,13 +260,12 @@ function block(view: HeaderBlockView, context: HeaderContext): ReactNode {
 
 /**
  * Server-rendered header, ONE row of controls in every language (owner request 2026-11-02). Its blocks and their order come
- * from `config/header.ts` through `headerView` (`layout/header-layout.ts`, plan L3); the defaults: the menu button (below `xl`;
- * the same button is the "Categories" picker from `xl` (`PickerBlock`, round 4)), the logo (`brand-logo.tsx`, `config/brand.ts`), the
- * search box (in the row from `lg`; below it a search icon that opens a full-width second row, `HeaderSearchToggle`), then
+ * from `config/header.ts` through `headerView` (`layout/header-layout.ts`, plan L3); the defaults: the menu button (below `xl`),
+ * the logo (`brand-logo.tsx`, `config/brand.ts`), the "Categories" picker (from `xl`, `PickerBlock`), the search box (in the row from `lg`; below it a search icon that opens a full-width second row, `HeaderSearchToggle`), then
  * the language, theme, cart and account icons. Below `lg` the header is sticky (`.fk-site-header`: the cart count stays in view
  * while scrolling; `scroll-padding-top` keeps anchors and focused fields out from under it). In the `row` display the main
- * navigation exists twice in the markup (inline from `xl` and inside the menu); one of them is always `display: none`, so
- * assistive technology meets one; the `picker` display has it once. `categories` is `null` when the API could not be read
+ * navigation exists twice in the markup (inline from `xl`, or the picker, and inside the menu); one of them is always
+ * `display: none`, so assistive technology meets one. `categories` is `null` when the API could not be read
  * (the page still renders, without the category links; the failure is logged where it happened). The cart, account,
  * language, theme and search parts are client islands; `searchEnabled` false means NO search box (and no results page). The
  * `header.top` slot's components (`config/slots.tsx`, `docs/contracts/slots.md`) render above the row, inside the header.
