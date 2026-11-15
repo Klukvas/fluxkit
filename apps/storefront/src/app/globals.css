@@ -324,6 +324,18 @@
   .fk-theme-option {
     @apply inline-flex min-h-11 cursor-pointer items-center rounded-control border-2 border-foreground bg-background px-3 text-sm text-foreground not-aria-pressed:hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring aria-pressed:border-primary aria-pressed:bg-primary aria-pressed:font-semibold aria-pressed:text-primary-foreground;
   }
+  /* The sign-in card scrolls independently of its inert background. */
+  html.fk-sign-in-open,
+  html.fk-sign-in-open body {
+    overflow: hidden;
+  }
+  .fk-sign-in-modal {
+    inline-size: calc(100% - var(--fk-space-unit) * 8);
+    max-block-size: calc(100dvh - var(--fk-space-unit) * 8);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
   /* The icon components (`components/icons.tsx`) carry no presentation attributes: fewer bytes in every page's header. */
   .fk-icon {
     @apply fill-none stroke-current stroke-2;
