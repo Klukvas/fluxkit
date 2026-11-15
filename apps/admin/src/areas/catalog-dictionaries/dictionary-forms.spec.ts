@@ -249,13 +249,22 @@ describe("assignments", () => {
       level: "product",
       isRequired: false,
     });
-    expect(optionAssignmentBody({ optionId: "o1", position: "" })).toEqual({});
-    expect(optionAssignmentBody({ optionId: "o1", position: "2" })).toEqual({ position: 2 });
-    expect(validateOptionAssignment({ optionId: "", position: "" }, "add")["optionId"]?.key).toBe(
-      "dict.error.pickerRequired",
-    );
+    expect(optionAssignmentBody({ optionId: "o1", position: "", splitsListing: false })).toEqual({
+      splitsListing: false,
+    });
+    expect(optionAssignmentBody({ optionId: "o1", position: "2", splitsListing: true })).toEqual({
+      position: 2,
+      splitsListing: true,
+    });
     expect(
-      validateOptionAssignment({ optionId: "o", position: "-1" }, "add")["position"]?.key,
+      validateOptionAssignment({ optionId: "", position: "", splitsListing: false }, "add")[
+        "optionId"
+      ]?.key,
+    ).toBe("dict.error.pickerRequired");
+    expect(
+      validateOptionAssignment({ optionId: "o", position: "-1", splitsListing: false }, "add")[
+        "position"
+      ]?.key,
     ).toBe("dict.error.positionInvalid");
   });
 });

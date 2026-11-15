@@ -60,6 +60,42 @@ function syrup(
 
 export const coffeeFoodProducts: readonly SeedProduct[] = [
   coffeeProduct({
+    slug: "demo-flavoured-syrup",
+    sku: "DEMO-SYRUP",
+    title: t("Сироп для напоїв", "Syrup for drinks"),
+    description: t(
+      "Ванільний або карамельний сироп у двох об’ємах.",
+      "Vanilla or caramel syrup in two bottle sizes.",
+    ),
+    type: "demo_flavoured_syrup",
+    brand: "siropia",
+    categories: SYRUPS,
+    attributes: { shelf_life_days: 540 },
+    options: [
+      ["demo_flavour", ["vanilla", "caramel"]],
+      ["volume", ["250ml", "1l"]],
+    ],
+    variants: {
+      "vanilla/250ml": v(12900, 24),
+      "vanilla/1l": v(34900, 18),
+      "caramel/250ml": v(13900, 20),
+      "caramel/1l": v(36900, 16),
+    },
+    image: "syrup-coconut",
+    extraImages: [
+      {
+        file: "syrup-vanilla",
+        alt: t("Ванільний сироп", "Vanilla syrup"),
+        optionValue: { optionCode: "demo_flavour", valueCode: "vanilla" },
+      },
+      {
+        file: "syrup-caramel",
+        alt: t("Карамельний сироп", "Caramel syrup"),
+        optionValue: { optionCode: "demo_flavour", valueCode: "caramel" },
+      },
+    ],
+  }),
+  coffeeProduct({
     slug: "barista-milk-3-2",
     sku: "MLK-32",
     title: t("Молоко для бариста 3,2 %, 1 л", "Barista milk 3.2%, 1 l"),

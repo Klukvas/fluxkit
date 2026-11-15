@@ -61,15 +61,21 @@ test("a product with several variants links from its card to the product page to
   // A plain link: it works before (and without) the page's scripts, so no wait for hydration.
   await page.goto("/uk/c/demo-clothing-shirts");
   const choose = products(page, "Товари").getByRole("link", {
-    name: "Обрати варіант Демо лляна сорочка",
+    name: "Обрати варіант Демо лляна сорочка — Білий",
   });
   await expect(choose).toBeVisible();
   expect((await choose.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
   const href = await choose.getAttribute("href");
-  expect(href).toBe("/uk/p/demo-linen-shirt");
+  expect(href).toBe("/uk/p/demo-linen-shirt?opt.color=white");
   await choose.click();
-  await expect(page).toHaveURL(/\/uk\/p\/demo-linen-shirt$/);
+  await expect(page).toHaveURL(
+    (url) =>
+      url.pathname === "/uk/p/demo-linen-shirt" && url.searchParams.get("opt.color") === "white",
+  );
   await expect(page.getByRole("heading", { level: 1, name: "Демо лляна сорочка" })).toBeVisible();
+  await expect(
+    page.getByRole("group", { name: "Колір", exact: true }).getByRole("radio", { name: "Білий" }),
+  ).toBeChecked();
 });
 
 test("without a script the add control is a working link to the product page, never a dead disabled button", async ({
