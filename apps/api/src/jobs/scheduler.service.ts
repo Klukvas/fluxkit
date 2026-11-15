@@ -39,7 +39,7 @@ export type TickOutcome =
   | { status: "lock_held" }
   /** The previous tick of this process is still running: nothing ran. */
   | { status: "overlap" }
-  /** The lock could not be taken (database unreachable): logged, nothing ran. */
+  /** The lock could not be taken or was lost during the pass: logged, no further jobs started. */
   | { status: "failed" }
   | { status: "stopped" };
 
@@ -157,8 +157,8 @@ export class SchedulerService implements OnApplicationBootstrap, BeforeApplicati
    * by `pnpm jobs:run-once`. Throws if the lock connection fails; job errors are in the reports.
    */
   async runOnce(): Promise<TickOutcome> {
-    const locked = await withSchedulerLock(this.databaseUrl, () =>
-      this.runner.runAll(this.clock.now()),
+    const locked = await withSchedulerLock(this.databaseUrl, (lock) =>
+      this.runner.runAll(this.clock.now(), { signal: lock.signal }),
     );
     return locked.acquired ? { status: "ran", reports: locked.value } : { status: "lock_held" };
   }

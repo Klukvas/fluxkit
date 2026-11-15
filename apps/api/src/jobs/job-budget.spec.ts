@@ -17,4 +17,13 @@ describe("JobBudget", () => {
   it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])("refuses the budget %s", (ms) => {
     expect(() => new JobBudget(ms)).toThrow(RangeError);
   });
+
+  it("is exhausted as soon as its signal is aborted, even with time remaining", () => {
+    const controller = new AbortController();
+    const budget = new JobBudget(500, () => 1_000, controller.signal);
+    expect(budget.exhausted()).toBe(false);
+    controller.abort();
+    expect(budget.exhausted()).toBe(true);
+    expect(new JobBudget(500, () => 1_000, controller.signal).exhausted()).toBe(true);
+  });
 });

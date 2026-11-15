@@ -16,7 +16,7 @@ Malformed values fail startup (and `pnpm jobs:run-once`) with `Invalid environme
 The timer calls `SchedulerService.tick()` every `SCHEDULER_INTERVAL_SECONDS`:
 1. Takes the session advisory lock `7426003` with `pg_try_advisory_lock` on a dedicated connection (application name `fluxkit-scheduler-lock`; it only takes and gives back the lock, the jobs run on the application pool). Lock held elsewhere: the tick does nothing (`lock_held`). The previous tick of this process still running: nothing (`overlap`). Skipped ticks are logged, see Skipped ticks below.
 2. Runs the jobs below in this order with `now = clock.now()` (one value for the whole tick), each with its own time budget (see Bounded jobs). A failing job is logged (class and cause code only, never the message) and does not stop the next; nothing a tick does can crash the process.
-3. Unlocks and ends the connection. A crashed process or a lost connection releases the lock with the session.
+3. Unlocks and ends the connection. A crashed process or a lost connection releases the lock with the session. Connection loss (`error` or `end`) aborts the pass: no further jobs or units of work start, a unit already in progress finishes, and the tick logs `SchedulerLockLostError` and reports `failed`. A loss noticed before the first job starts runs no job. A loss during the unlock, after every job has finished, is logged and the tick still reports `ran` (nothing started after it).
 
 Shutdown clears the timer and waits for a running tick before the database pool closes.
 
@@ -152,7 +152,7 @@ For each due event, oldest first (ADR 0025):
 | Exit | Meaning |
 |---|---|
 | `0` | every job ran; stdout has one line per job, for example `expire-orders: scanned=2 expired=2 deferred=0 notDue=0 failures=0 truncated=false` |
-| `1` | a job failed (its line says `FAILED` and the full error is on stderr, connection string removed), or the configuration is malformed, `DATABASE_URL` is missing, an argument was given, or the database is unreachable |
+| `1` | a job failed (its line says `FAILED` and the full error is on stderr, connection string removed), or the configuration is malformed, `DATABASE_URL` is missing, an argument was given, or the database is unreachable or the lock connection is lost (a friendly message without a stack) |
 | `2` | the lock is held by a running scheduler or another command: nothing was run; stderr says so. A tick takes seconds; run it again, or leave it, the scheduler is doing this work |
 
 Use it for a system cron when `SCHEDULER_ENABLED=false`, and to run the jobs by hand. Feature handlers of enabled features (`FEATURES_ENABLED`) are discovered, so their events are delivered by the command too.

@@ -66,13 +66,16 @@ export async function runReindexCommand(
     const locale = app.get<LocaleConfig>(LOCALE_CONFIG);
     const indexer = app.get(SearchIndexer);
     await new SearchIndexStateRepository().requestRebuild(database, locale.locales, new Date());
-    const locked = await withSchedulerLock(config.databaseUrl, async () => {
+    const locked = await withSchedulerLock(config.databaseUrl, async ({ signal }) => {
       let documents = 0;
       let swapped = 0;
       let synced = 0;
       const failures: string[] = [];
-      for (let run = 0; run < MAX_RUNS && swapped === 0; run++) {
-        const result = await indexer.rebuild(new Date(), new JobBudget(DEFAULT_JOB_BUDGET_MS));
+      for (let run = 0; run < MAX_RUNS && swapped === 0 && !signal.aborted; run++) {
+        const result = await indexer.rebuild(
+          new Date(),
+          new JobBudget(DEFAULT_JOB_BUDGET_MS, undefined, signal),
+        );
         documents += result.documents;
         swapped += result.swapped;
         failures.push(...result.failures.map((failure) => failure.code));
@@ -83,8 +86,11 @@ export async function runReindexCommand(
           break;
         }
       }
-      for (let run = 0; run < MAX_RUNS; run++) {
-        const result = await indexer.sync(new Date(), new JobBudget(DEFAULT_JOB_BUDGET_MS));
+      for (let run = 0; run < MAX_RUNS && !signal.aborted; run++) {
+        const result = await indexer.sync(
+          new Date(),
+          new JobBudget(DEFAULT_JOB_BUDGET_MS, undefined, signal),
+        );
         synced += result.synced;
         failures.push(...result.failures.map((failure) => failure.code));
         if (result.failures.length > 0 || (!result.truncated && result.scanned === 0)) {

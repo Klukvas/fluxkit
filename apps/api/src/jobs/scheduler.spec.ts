@@ -20,7 +20,11 @@ import { PlacedOrders } from "../test/order-fixtures.js";
 import { eventsOf, orderRow } from "../test/order-http.js";
 import { OrderMaker } from "../test/order-maker.js";
 import { JobsRunner, type JobReport } from "./jobs-runner.js";
-import { SCHEDULER_LOCK_APPLICATION_NAME, SCHEDULER_LOCK_KEY } from "./scheduler-lock.js";
+import {
+  SchedulerLockLostError,
+  SCHEDULER_LOCK_APPLICATION_NAME,
+  SCHEDULER_LOCK_KEY,
+} from "./scheduler-lock.js";
 import { SchedulerService } from "./scheduler.service.js";
 
 const START = new Date("2025-10-01T08:00:00.000Z");
@@ -214,10 +218,101 @@ describe("the scheduler: advisory lock, ticks, shutdown (real Postgres)", () => 
       expect(await lockIsFree()).toBe(true);
       expect(await schedulerOf(second).tick()).toMatchObject({ status: "ran" });
 
-      // The first tick ends without taking the process down, whatever it reports.
+      // The first tick fails without taking the process down.
       release.open();
-      await expect(running).resolves.toBeDefined();
+      await expect(running).resolves.toEqual({ status: "failed" });
     });
+
+    it("starts no job when the connection is lost in the same read as the reply that grants the lock", async () => {
+      const errors = vi.spyOn(Logger.prototype, "error").mockImplementation(() => undefined);
+      const runner = vi.spyOn(runnerOf(first), "runAll").mockResolvedValue([]);
+      const query = pg.Client.prototype.query;
+      // The fatal error is emitted after the grant arrives and before the caller resumes, as pg does when both are in one buffer.
+      vi.spyOn(pg.Client.prototype, "query").mockImplementation(async function (
+        this: pg.Client,
+        ...args: Parameters<typeof query>
+      ) {
+        const result: unknown = await Reflect.apply(query, this, args);
+        if (String(args[0]).includes("pg_try_advisory_lock")) {
+          this.emit("error", Object.assign(new Error("terminated"), { code: "57P01" }));
+        }
+        return result;
+      } as typeof query);
+      expect(await schedulerOf(first).tick()).toEqual({ status: "failed" });
+      vi.mocked(pg.Client.prototype.query).mockRestore();
+      expect(runner).not.toHaveBeenCalled();
+      expect(errors.mock.calls.map((call) => String(call[0])).join("\n")).toContain(
+        "Scheduler tick failed: SchedulerLockLostError",
+      );
+      expect(await lockIsFree()).toBe(true);
+    });
+
+    it("keeps the result of a pass whose connection is lost only during the unlock, after every job finished", async () => {
+      const errors = vi.spyOn(Logger.prototype, "error").mockImplementation(() => undefined);
+      vi.spyOn(runnerOf(first), "runAll").mockResolvedValue([]);
+      const query = pg.Client.prototype.query;
+      vi.spyOn(pg.Client.prototype, "query").mockImplementation(async function (
+        this: pg.Client,
+        ...args: Parameters<typeof query>
+      ) {
+        if (String(args[0]).includes("pg_advisory_unlock")) {
+          this.emit("error", Object.assign(new Error("terminated"), { code: "57P01" }));
+        }
+        return (await Reflect.apply(query, this, args)) as unknown;
+      } as typeof query);
+      expect(await schedulerOf(first).tick()).toEqual({ status: "ran", reports: [] });
+      vi.mocked(pg.Client.prototype.query).mockRestore();
+      expect(errors.mock.calls.map((call) => String(call[0])).join("\n")).toContain(
+        "SchedulerLockLostError: scheduler lock connection lost code=57P01",
+      );
+      expect(await lockIsFree()).toBe(true);
+    });
+
+    it.each([false, true])(
+      "aborts a pass when its lock connection is lost (work throws: %s)",
+      async (workThrows) => {
+        const errors = vi.spyOn(Logger.prototype, "error").mockImplementation(() => undefined);
+        const entered = gate();
+        const release = gate();
+        const workError = new Error("secret connection details");
+        let signal: AbortSignal | undefined;
+        vi.spyOn(runnerOf(first), "runAll").mockImplementation(async (_now, options) => {
+          signal = options?.signal;
+          entered.open();
+          await release.promise;
+          if (workThrows) throw workError;
+          return [];
+        });
+        const running = schedulerOf(first).tick();
+        try {
+          await entered.promise;
+          const killed = await pool.query<{ terminated: boolean }>(
+            "select pg_terminate_backend(pid) as terminated from pg_stat_activity where application_name = $1",
+            [SCHEDULER_LOCK_APPLICATION_NAME],
+          );
+          expect(killed.rows.map((row) => row.terminated)).toEqual([true]);
+          for (let waited = 0; waited < 100 && !signal?.aborted; waited += 1) {
+            await sleep(20);
+          }
+          expect(signal?.aborted).toBe(true);
+          expect(signal?.reason).toBeInstanceOf(SchedulerLockLostError);
+          // pg emits error and end for the same loss: one loud lock-loss log before work settles.
+          expect(errors.mock.calls).toHaveLength(1);
+        } finally {
+          release.open();
+          await running;
+        }
+        expect(await running).toEqual({ status: "failed" });
+        expect(signal?.reason).toMatchObject(
+          workThrows ? { cause: workError } : { name: "SchedulerLockLostError" },
+        );
+        const logged = errors.mock.calls.map((call) => String(call[0])).join("\n");
+        expect(logged).toContain("SchedulerLockLostError: scheduler lock connection lost");
+        expect(logged).toContain("Scheduler tick failed: SchedulerLockLostError");
+        expect(logged).not.toContain("secret connection details");
+        expect(await lockIsFree()).toBe(true);
+      },
+    );
   });
 
   describe("ticks", () => {
@@ -303,7 +398,9 @@ describe("the scheduler: advisory lock, ticks, shutdown (real Postgres)", () => 
       const runner = vi.spyOn(runnerOf(first), "runAll").mockResolvedValue([]);
       clock.set(new Date("2025-10-02T03:04:05.678Z"));
       await schedulerOf(first).tick();
-      expect(runner).toHaveBeenCalledWith(new Date("2025-10-02T03:04:05.678Z"));
+      expect(runner).toHaveBeenCalledWith(new Date("2025-10-02T03:04:05.678Z"), {
+        signal: expect.any(AbortSignal),
+      });
       clock.set(START);
     });
 
