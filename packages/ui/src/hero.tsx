@@ -54,10 +54,14 @@ export function Hero({
         className,
       )}
     >
-      <div className="flex flex-col items-start gap-3">
+      <div className="flex min-w-0 flex-col items-start gap-3">
         <Heading
           id={headingId}
-          className={cn(textStyles.pageTitle, headingLevel === "h1" ? "md:text-4xl" : null)}
+          className={cn(
+            textStyles.displayTitle,
+            "w-full break-words",
+            headingLevel === "h1" ? "md:text-4xl" : null,
+          )}
         >
           {title}
         </Heading>

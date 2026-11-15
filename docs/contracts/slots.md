@@ -100,3 +100,7 @@ runs the whole unit suite twice more with every slot filled: `apps/storefront/vi
 the fork's brand, header and footer) and `apps/storefront/vitest.home-fork.config.ts` (with a reshaped home page). Deleting
 `config/slots.upstream.spec.ts` keeps `src/customization-doc.spec.ts` green (it lists the fork-deletable files). A fork tests its own slot
 components in its own specs.
+
+Listing cards (ADR 0052): card slots run once per `listingKey`, with the ready-to-render suffixed `card.title` and preselected
+`card.href`. Multiple models can share `card.id` (the product). Use `listingKey` for card state/DOM identity and `id` for
+product-wide actions; do not collapse sibling cards. The fork-owned slot registry and custom card registry are unchanged.

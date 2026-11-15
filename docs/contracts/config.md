@@ -6,7 +6,8 @@ Status: draft (first version, introduced in plan step 5). Covered by SemVer (AGE
 | Variable | Required | Default | Meaning |
 |---|---|---|---|
 | `DATABASE_URL` | yes | - | Postgres connection string |
-| `REDIS_URL` | no | - | Redis connection string (queues, cache) |
+| `REDIS_URL` | when `RATE_LIMIT_STORE=redis` | - | Redis connection string; the API refuses startup if the selected Redis store is unreachable. No client is created for memory windows |
+| `RATE_LIMIT_STORE` | no | `memory` | Exactly `memory` or `redis`. Shared fixed windows include admin/customer login, all named request limits and per-email/customer service limits. Redis errors at runtime fall back to per-process windows for that request, log only `rate_limit_store_unavailable` at most once a minute, and expose `rateLimitStore: "degraded"` on `GET /health`; successful Redis hits restore `redis`. Keys are `fluxkit:{prefix}:rl:{limitName}:{HMAC-SHA256(key)}`: prefix is the URL-encoded database name from `DATABASE_URL`, key is normalized (IPv6 /64), HMAC secret is HKDF-SHA256 of `ORDER_TOKEN_SECRET` with empty salt and info `rate-limit`. Values are counts; TTL is the fixed window, never extended by rejection. Rotating the secret or changing the database name starts fresh counters; switching to `memory` and back to `redis` within a window resumes the counts still in Redis; Redis remains private |
 | `PORT` | no | 3000 | HTTP port |
 | `FEATURES_ENABLED` | no | empty | Comma-separated optional feature names (lowercase letters, digits and dashes, starting with a letter, at most 32 characters, so the feature's migrations table fits Postgres's 63-byte identifiers, ADR 0049); trimmed, lowercased and de-duplicated; unset means none. A feature package's manifest name follows the same rule |
 | `FEATURES_DIR` | no | `<repo>/packages/features` | Where feature packages are discovered |

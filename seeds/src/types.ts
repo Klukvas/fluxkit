@@ -52,6 +52,8 @@ export interface SeedProductType {
   attributes: readonly SeedProductTypeAttribute[];
   /** Option codes, in display order. Empty for a type whose products have a single default variant. */
   optionCodes: readonly string[];
+  /** One of optionCodes; set only when creating the type, never overwrites saved flags. */
+  splitListingOptionCode?: string;
 }
 
 export interface SeedBrand {

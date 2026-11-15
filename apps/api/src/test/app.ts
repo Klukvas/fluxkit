@@ -50,6 +50,9 @@ export interface StartAppOptions {
   adminPrincipal?: { role: AdminRole };
   /** Other numbers for the named rate limits (default: the production ones). */
   rateLimits?: RateLimitOverrides;
+  rateLimitStore?: "memory" | "redis";
+  redisUrl?: string;
+  rateLimitKeyPrefix?: string;
   /** A controlled clock for session expiry (use with `"production-default"`). */
   clock?: Clock;
   /** Shipping provider modules mounted as if enabled, for example `testShippingProviders()` (no package under packages/providers is read). */
@@ -127,6 +130,8 @@ export async function startApp(options: StartAppOptions = {}): Promise<RunningAp
   const app = await createApp(
     {
       databaseUrl: requireEnv("DATABASE_URL"),
+      rateLimitStore: options.rateLimitStore,
+      redisUrl: options.redisUrl,
       enabledFeatures: options.enabledFeatures ?? [],
       featuresDir: options.featuresDir,
       adminCookieSecure: options.adminCookieSecure,
@@ -164,6 +169,7 @@ export async function startApp(options: StartAppOptions = {}): Promise<RunningAp
     {
       adminAuthenticator: authenticator === "production-default" ? undefined : authenticator,
       rateLimits: options.rateLimits,
+      rateLimitKeyPrefix: options.rateLimitKeyPrefix,
       clock: options.clock,
       scrypt: TEST_SCRYPT_PARAMS,
       extraFeatures: options.extraFeatures,

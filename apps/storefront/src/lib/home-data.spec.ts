@@ -103,7 +103,7 @@ describe("loadHomeSection", () => {
   it("reads the newest products with the section's limit and the shop's currency digits", async () => {
     const { data, calls } = fakeData();
     const result = await loadHomeSection(data, "en", newest);
-    expect(calls.listProducts).toEqual([["en", { limit: 8 }]]);
+    expect(calls.listProducts).toEqual([["en", { groupBy: "listing", limit: 8 }]]);
     expect(result).toEqual({
       kind: "productRow",
       products: [summary("a"), summary("b")],
@@ -120,8 +120,8 @@ describe("loadHomeSection", () => {
       source: { sort: "newest", brand: "acme" },
     });
     expect(calls.listProducts).toEqual([
-      ["uk", { limit: 8, category: "tools" }],
-      ["uk", { limit: 4, brand: "acme" }],
+      ["uk", { groupBy: "listing", limit: 8, category: "tools" }],
+      ["uk", { groupBy: "listing", limit: 4, brand: "acme" }],
     ]);
   });
 });
@@ -264,5 +264,22 @@ describe("loadHomeSectionResult", () => {
       },
     });
     await expect(loadHomeSectionResult(data, "uk", categories, vi.fn())).rejects.toBe(bug);
+  });
+});
+
+it("keeps sibling listing cards with the same product id in home rows", async () => {
+  const groups = ["red", "blue"].map((value) =>
+    summary("shirt", { listingKey: `id-shirt:color:${value}` }),
+  );
+  const { data } = fakeData({
+    listProducts: async (_locale, query) => {
+      expect(query?.groupBy).toBe("listing");
+      return ok({ items: groups, total: 2, limit: 8, offset: 0 });
+    },
+  });
+  expect(await loadHomeSection(data, "en", newest)).toEqual({
+    kind: "productRow",
+    products: groups,
+    exponent: 2,
   });
 });

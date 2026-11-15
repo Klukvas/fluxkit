@@ -7,6 +7,14 @@ import type { SeedProductType } from "../types.js";
  */
 export const coffeeProductTypes: readonly SeedProductType[] = [
   {
+    code: "demo_flavoured_syrup",
+    name: { uk: "Сироп зі смаками", en: "Flavoured syrup" },
+    requiresShipping: true,
+    optionCodes: ["demo_flavour", "volume"],
+    splitListingOptionCode: "demo_flavour",
+    attributes: [{ attributeCode: "shelf_life_days", level: "product" }],
+  },
+  {
     code: "disposable_ware",
     name: { uk: "Одноразовий посуд", en: "Disposable ware" },
     requiresShipping: true,

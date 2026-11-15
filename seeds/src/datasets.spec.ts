@@ -27,6 +27,16 @@ describe("seed datasets", () => {
     expect(seedDatasets.test).toBe(testCatalogSeed);
   });
 
+  it("only splits on an option assigned to the type in either dataset", () => {
+    for (const seed of Object.values(seedDatasets)) {
+      for (const type of seed.productTypes) {
+        if (type.splitListingOptionCode !== undefined) {
+          expect(type.optionCodes, type.code).toContain(type.splitListingOptionCode);
+        }
+      }
+    }
+  });
+
   it("share nothing but the demo shipping methods, so both can be seeded into one database", () => {
     const fixture = new Set(keys(testCatalogSeed));
     expect(keys(coffeeCatalogSeed).filter((key) => fixture.has(key))).toEqual([]);

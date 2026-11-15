@@ -27,7 +27,7 @@
     "page": "*",
     "selector": "header.banner",
     "property": "screenshot",
-    "reason": "plan 2026-11-11-ui-council-decisions, decision 1: the header category list fades at its end edge while it can scroll (mask-image, not a recorded property) and snaps to items; the header is masked"
+    "reason": "plan 2026-11-15-header-categories-position (owner's choice C): from xl the header reads logo, Categories, search, controls instead of Categories, logo; the header is masked at 1280 (computed styles identical; the 390 frames are unchanged)"
   },
   {
     "page": "*",
@@ -2170,5 +2170,882 @@
     "selector": "home.hero",
     "property": "screenshot",
     "reason": "plan 2026-11-14-playful-default-design WS-D: opted-in hero adds static accent blob, circular sticker and marker underline on desktop and mobile; original layout and heading typography remain guarded by computed styles and undecorated frozen bytes."
+  },
+  {
+    "page": "catalog",
+    "theme": "light",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): 2px ink outlines on cards and controls (the header search field and the footer theme options on every page; cards grow by 2px, so full frames shift) and the display hero heading; the changed selectors' computed styles are recorded and declared"
+  },
+  {
+    "page": "catalog",
+    "theme": "dark",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): 2px ink outlines on cards and controls (the header search field and the footer theme options on every page; cards grow by 2px, so full frames shift) and the display hero heading; the changed selectors' computed styles are recorded and declared"
+  },
+  {
+    "page": "en-catalog",
+    "theme": "light",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): 2px ink outlines on cards and controls (the header search field and the footer theme options on every page; cards grow by 2px, so full frames shift) and the display hero heading; the changed selectors' computed styles are recorded and declared"
+  },
+  {
+    "page": "en-catalog",
+    "theme": "dark",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): 2px ink outlines on cards and controls (the header search field and the footer theme options on every page; cards grow by 2px, so full frames shift) and the display hero heading; the changed selectors' computed styles are recorded and declared"
+  },
+  {
+    "page": "en-home",
+    "theme": "light",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "fix/home-about-demo-copy (HANDOFF, storefront UI round 4 open item): the home \"About the shop\" demo text (home.about.body, uk and en) describes the coffee demo; only that paragraph changes and its line count may change the page height, so the full page is masked; the home markup is pinned by home-sections-frozen and computed styles stay identical"
+  },
+  {
+    "page": "en-home",
+    "theme": "dark",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "fix/home-about-demo-copy (HANDOFF, storefront UI round 4 open item): the home \"About the shop\" demo text (home.about.body, uk and en) describes the coffee demo; only that paragraph changes and its line count may change the page height, so the full page is masked; the home markup is pinned by home-sections-frozen and computed styles stay identical"
+  },
+  {
+    "page": "home",
+    "theme": "light",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "fix/home-about-demo-copy (HANDOFF, storefront UI round 4 open item): the home \"About the shop\" demo text (home.about.body, uk and en) describes the coffee demo; only that paragraph changes and its line count may change the page height, so the full page is masked; the home markup is pinned by home-sections-frozen and computed styles stay identical"
+  },
+  {
+    "page": "home",
+    "theme": "dark",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "fix/home-about-demo-copy (HANDOFF, storefront UI round 4 open item): the home \"About the shop\" demo text (home.about.body, uk and en) describes the coffee demo; only that paragraph changes and its line count may change the page height, so the full page is masked; the home markup is pinned by home-sections-frozen and computed styles stay identical"
+  },
+  {
+    "page": "home",
+    "theme": "system",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "fix/home-about-demo-copy (HANDOFF, storefront UI round 4 open item): the home \"About the shop\" demo text (home.about.body, uk and en) describes the coffee demo; only that paragraph changes and its line count may change the page height, so the full page is masked; the home markup is pinned by home-sections-frozen and computed styles stay identical"
+  },
+  {
+    "page": "search",
+    "theme": "light",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): 2px ink outlines on cards and controls (the header search field and the footer theme options on every page; cards grow by 2px, so full frames shift) and the display hero heading; the changed selectors' computed styles are recorded and declared"
+  },
+  {
+    "page": "search",
+    "theme": "dark",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): 2px ink outlines on cards and controls (the header search field and the footer theme options on every page; cards grow by 2px, so full frames shift) and the display hero heading; the changed selectors' computed styles are recorded and declared"
+  },
+  {
+    "page": "cart",
+    "selector": "button.secondary",
+    "property": "border-bottom-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "*",
+    "selector": "button.secondary",
+    "property": "border-bottom-width",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "cart",
+    "selector": "button.secondary",
+    "property": "border-left-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "*",
+    "selector": "button.secondary",
+    "property": "border-left-width",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "cart",
+    "selector": "button.secondary",
+    "property": "border-right-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "*",
+    "selector": "button.secondary",
+    "property": "border-right-width",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "cart",
+    "selector": "button.secondary",
+    "property": "border-top-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "*",
+    "selector": "button.secondary",
+    "property": "border-top-width",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "catalog",
+    "selector": "card.article",
+    "property": "border-bottom-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "catalog-390",
+    "selector": "card.article",
+    "property": "border-bottom-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "home",
+    "selector": "card.article",
+    "property": "border-bottom-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "home-390",
+    "selector": "card.article",
+    "property": "border-bottom-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "*",
+    "selector": "card.article",
+    "property": "border-bottom-width",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "catalog",
+    "selector": "card.article",
+    "property": "border-left-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "catalog-390",
+    "selector": "card.article",
+    "property": "border-left-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "home",
+    "selector": "card.article",
+    "property": "border-left-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "home-390",
+    "selector": "card.article",
+    "property": "border-left-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "*",
+    "selector": "card.article",
+    "property": "border-left-width",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "catalog",
+    "selector": "card.article",
+    "property": "border-right-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "catalog-390",
+    "selector": "card.article",
+    "property": "border-right-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "home",
+    "selector": "card.article",
+    "property": "border-right-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "home-390",
+    "selector": "card.article",
+    "property": "border-right-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "*",
+    "selector": "card.article",
+    "property": "border-right-width",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "catalog",
+    "selector": "card.article",
+    "property": "border-top-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "catalog-390",
+    "selector": "card.article",
+    "property": "border-top-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "home",
+    "selector": "card.article",
+    "property": "border-top-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "home-390",
+    "selector": "card.article",
+    "property": "border-top-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "*",
+    "selector": "card.article",
+    "property": "border-top-width",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "*",
+    "selector": "card.badge",
+    "property": "border-bottom-width",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "*",
+    "selector": "card.badge",
+    "property": "border-left-width",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "*",
+    "selector": "card.badge",
+    "property": "border-right-width",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "*",
+    "selector": "card.badge",
+    "property": "border-top-width",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "checkout",
+    "selector": "form.select",
+    "property": "border-bottom-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "*",
+    "selector": "form.select",
+    "property": "border-bottom-width",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "checkout",
+    "selector": "form.select",
+    "property": "border-left-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "*",
+    "selector": "form.select",
+    "property": "border-left-width",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "checkout",
+    "selector": "form.select",
+    "property": "border-right-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "*",
+    "selector": "form.select",
+    "property": "border-right-width",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "checkout",
+    "selector": "form.select",
+    "property": "border-top-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "*",
+    "selector": "form.select",
+    "property": "border-top-width",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "catalog",
+    "selector": "form.textbox",
+    "property": "border-bottom-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "checkout",
+    "selector": "form.textbox",
+    "property": "border-bottom-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "login",
+    "selector": "form.textbox",
+    "property": "border-bottom-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "register",
+    "selector": "form.textbox",
+    "property": "border-bottom-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "*",
+    "selector": "form.textbox",
+    "property": "border-bottom-width",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "catalog",
+    "selector": "form.textbox",
+    "property": "border-left-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "checkout",
+    "selector": "form.textbox",
+    "property": "border-left-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "login",
+    "selector": "form.textbox",
+    "property": "border-left-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "register",
+    "selector": "form.textbox",
+    "property": "border-left-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "*",
+    "selector": "form.textbox",
+    "property": "border-left-width",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "catalog",
+    "selector": "form.textbox",
+    "property": "border-right-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "checkout",
+    "selector": "form.textbox",
+    "property": "border-right-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "login",
+    "selector": "form.textbox",
+    "property": "border-right-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "register",
+    "selector": "form.textbox",
+    "property": "border-right-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "*",
+    "selector": "form.textbox",
+    "property": "border-right-width",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "catalog",
+    "selector": "form.textbox",
+    "property": "border-top-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "checkout",
+    "selector": "form.textbox",
+    "property": "border-top-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "login",
+    "selector": "form.textbox",
+    "property": "border-top-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "register",
+    "selector": "form.textbox",
+    "property": "border-top-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "*",
+    "selector": "form.textbox",
+    "property": "border-top-width",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "cart",
+    "selector": "header.search-input",
+    "property": "border-bottom-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "catalog",
+    "selector": "header.search-input",
+    "property": "border-bottom-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "checkout",
+    "selector": "header.search-input",
+    "property": "border-bottom-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "home",
+    "selector": "header.search-input",
+    "property": "border-bottom-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "legal-privacy",
+    "selector": "header.search-input",
+    "property": "border-bottom-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "login",
+    "selector": "header.search-input",
+    "property": "border-bottom-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "product",
+    "selector": "header.search-input",
+    "property": "border-bottom-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "register",
+    "selector": "header.search-input",
+    "property": "border-bottom-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "*",
+    "selector": "header.search-input",
+    "property": "border-bottom-width",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "cart",
+    "selector": "header.search-input",
+    "property": "border-left-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "catalog",
+    "selector": "header.search-input",
+    "property": "border-left-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "checkout",
+    "selector": "header.search-input",
+    "property": "border-left-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "home",
+    "selector": "header.search-input",
+    "property": "border-left-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "legal-privacy",
+    "selector": "header.search-input",
+    "property": "border-left-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "login",
+    "selector": "header.search-input",
+    "property": "border-left-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "product",
+    "selector": "header.search-input",
+    "property": "border-left-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "register",
+    "selector": "header.search-input",
+    "property": "border-left-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "*",
+    "selector": "header.search-input",
+    "property": "border-left-width",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "cart",
+    "selector": "header.search-input",
+    "property": "border-right-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "catalog",
+    "selector": "header.search-input",
+    "property": "border-right-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "checkout",
+    "selector": "header.search-input",
+    "property": "border-right-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "home",
+    "selector": "header.search-input",
+    "property": "border-right-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "legal-privacy",
+    "selector": "header.search-input",
+    "property": "border-right-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "login",
+    "selector": "header.search-input",
+    "property": "border-right-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "product",
+    "selector": "header.search-input",
+    "property": "border-right-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "register",
+    "selector": "header.search-input",
+    "property": "border-right-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "*",
+    "selector": "header.search-input",
+    "property": "border-right-width",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "cart",
+    "selector": "header.search-input",
+    "property": "border-top-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "catalog",
+    "selector": "header.search-input",
+    "property": "border-top-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "checkout",
+    "selector": "header.search-input",
+    "property": "border-top-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "home",
+    "selector": "header.search-input",
+    "property": "border-top-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "legal-privacy",
+    "selector": "header.search-input",
+    "property": "border-top-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "login",
+    "selector": "header.search-input",
+    "property": "border-top-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "product",
+    "selector": "header.search-input",
+    "property": "border-top-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "register",
+    "selector": "header.search-input",
+    "property": "border-top-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "*",
+    "selector": "header.search-input",
+    "property": "border-top-width",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "cart",
+    "selector": "main.button",
+    "property": "border-bottom-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "home",
+    "selector": "main.button",
+    "property": "border-bottom-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "*",
+    "selector": "main.button",
+    "property": "border-bottom-width",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "cart",
+    "selector": "main.button",
+    "property": "border-left-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "home",
+    "selector": "main.button",
+    "property": "border-left-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "*",
+    "selector": "main.button",
+    "property": "border-left-width",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "cart",
+    "selector": "main.button",
+    "property": "border-right-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "home",
+    "selector": "main.button",
+    "property": "border-right-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "*",
+    "selector": "main.button",
+    "property": "border-right-width",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "cart",
+    "selector": "main.button",
+    "property": "border-top-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "home",
+    "selector": "main.button",
+    "property": "border-top-color",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "*",
+    "selector": "main.button",
+    "property": "border-top-width",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "*",
+    "selector": "main.h1",
+    "property": "font-size",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): the hero heading takes the displayTitle role (Rubik 900, tight tracking) and the retuned 4xl step (3.5rem / 3.75rem)"
+  },
+  {
+    "page": "*",
+    "selector": "main.h1",
+    "property": "font-weight",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): the hero heading takes the displayTitle role (Rubik 900, tight tracking) and the retuned 4xl step (3.5rem / 3.75rem)"
+  },
+  {
+    "page": "*",
+    "selector": "main.h1",
+    "property": "letter-spacing",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): the hero heading takes the displayTitle role (Rubik 900, tight tracking) and the retuned 4xl step (3.5rem / 3.75rem)"
+  },
+  {
+    "page": "*",
+    "selector": "main.h1",
+    "property": "line-height",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): the hero heading takes the displayTitle role (Rubik 900, tight tracking) and the retuned 4xl step (3.5rem / 3.75rem)"
+  },
+  {
+    "page": "*",
+    "selector": "product.badge",
+    "property": "border-bottom-width",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "*",
+    "selector": "product.badge",
+    "property": "border-left-width",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "*",
+    "selector": "product.badge",
+    "property": "border-right-width",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "*",
+    "selector": "product.badge",
+    "property": "border-top-width",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): cards and outlined controls get 2px foreground outlines (ink in light, cream in dark); text fields keep border-input, now 2px and ink in light"
+  },
+  {
+    "page": "cart",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): 2px ink outlines on cards and controls (the header search field and the footer theme options on every page; cards grow by 2px, so full frames shift) and the display hero heading; the changed selectors' computed styles are recorded and declared"
+  },
+  {
+    "page": "checkout",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): 2px ink outlines on cards and controls (the header search field and the footer theme options on every page; cards grow by 2px, so full frames shift) and the display hero heading; the changed selectors' computed styles are recorded and declared"
+  },
+  {
+    "page": "en-register",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): 2px ink outlines on cards and controls (the header search field and the footer theme options on every page; cards grow by 2px, so full frames shift) and the display hero heading; the changed selectors' computed styles are recorded and declared"
+  },
+  {
+    "page": "legal-privacy",
+    "theme": "dark",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): 2px ink outlines on cards and controls (the header search field and the footer theme options on every page; cards grow by 2px, so full frames shift) and the display hero heading; the changed selectors' computed styles are recorded and declared"
+  },
+  {
+    "page": "legal-privacy",
+    "theme": "light",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): 2px ink outlines on cards and controls (the header search field and the footer theme options on every page; cards grow by 2px, so full frames shift) and the display hero heading; the changed selectors' computed styles are recorded and declared"
+  },
+  {
+    "page": "login",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): 2px ink outlines on cards and controls (the header search field and the footer theme options on every page; cards grow by 2px, so full frames shift) and the display hero heading; the changed selectors' computed styles are recorded and declared"
+  },
+  {
+    "page": "not-found",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): 2px ink outlines on cards and controls (the header search field and the footer theme options on every page; cards grow by 2px, so full frames shift) and the display hero heading; the changed selectors' computed styles are recorded and declared"
+  },
+  {
+    "page": "product",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): 2px ink outlines on cards and controls (the header search field and the footer theme options on every page; cards grow by 2px, so full frames shift) and the display hero heading; the changed selectors' computed styles are recorded and declared"
+  },
+  {
+    "page": "register",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): 2px ink outlines on cards and controls (the header search field and the footer theme options on every page; cards grow by 2px, so full frames shift) and the display hero heading; the changed selectors' computed styles are recorded and declared"
+  },
+  {
+    "page": "home",
+    "theme": "light",
+    "selector": "header.banner",
+    "property": "screenshot",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): element shot left out: the element changes size or outline (2px ink outlines; display hero heading and new demo picture); its computed styles are still recorded"
+  },
+  {
+    "page": "home",
+    "theme": "dark",
+    "selector": "header.banner",
+    "property": "screenshot",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): element shot left out: the element changes size or outline (2px ink outlines; display hero heading and new demo picture); its computed styles are still recorded"
+  },
+  {
+    "page": "home",
+    "theme": "light",
+    "selector": "footer.contentinfo",
+    "property": "screenshot",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): element shot left out: the element changes size or outline (2px ink outlines; display hero heading and new demo picture); its computed styles are still recorded"
+  },
+  {
+    "page": "home",
+    "theme": "dark",
+    "selector": "footer.contentinfo",
+    "property": "screenshot",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): element shot left out: the element changes size or outline (2px ink outlines; display hero heading and new demo picture); its computed styles are still recorded"
+  },
+  {
+    "page": "home",
+    "theme": "light",
+    "selector": "card.article",
+    "property": "screenshot",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): element shot left out: the element changes size or outline (2px ink outlines; display hero heading and new demo picture); its computed styles are still recorded"
+  },
+  {
+    "page": "home",
+    "theme": "dark",
+    "selector": "card.article",
+    "property": "screenshot",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): element shot left out: the element changes size or outline (2px ink outlines; display hero heading and new demo picture); its computed styles are still recorded"
+  },
+  {
+    "page": "*",
+    "selector": "home.hero",
+    "property": "screenshot",
+    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): element shot left out (taken on home only): the hero heading takes the display role and the demo picture is new, so the hero changes size; its computed styles are still recorded"
   }
 ]

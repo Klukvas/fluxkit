@@ -57,7 +57,7 @@ export function ProductGrid<Item extends ProductSummary>({
           ...(offer === undefined ? {} : { offer }),
         });
         return (
-          <li key={card.id}>
+          <li key={card.listingKey}>
             <Card
               card={card}
               headingLevel={headingLevel}

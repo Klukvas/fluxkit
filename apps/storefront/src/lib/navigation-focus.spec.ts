@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createNavigationFocus, type FocusableDocument } from "./navigation-focus";
 
 interface FakeElement {
@@ -88,4 +88,15 @@ describe("createNavigationFocus", () => {
     for (const path of ["/a", "/b", "/c", "/a"]) focus.onPathname(path);
     expect(heading.focused).toHaveLength(3);
   });
+});
+
+it("consumes a skipped modal pathname without focusing the inert background", () => {
+  const document = { querySelector: vi.fn(() => null) };
+  const navigation = createNavigationFocus(() => document);
+  navigation.onPathname("/en/catalog");
+  navigation.onPathname("/en/account/login", true);
+  navigation.onPathname("/en/catalog", true);
+  expect(document.querySelector).not.toHaveBeenCalled();
+  navigation.onPathname("/en/cart");
+  expect(document.querySelector).toHaveBeenCalled();
 });

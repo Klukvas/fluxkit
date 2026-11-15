@@ -2839,7 +2839,25 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": "Service and database are reachable."
+            "description": "Service and database are reachable. Rate limit store may be degraded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["status", "rateLimitStore"],
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": ["ok"]
+                    },
+                    "rateLimitStore": {
+                      "type": "string",
+                      "enum": ["memory", "redis", "degraded"]
+                    }
+                  }
+                }
+              }
+            }
           },
           "503": {
             "description": "Database is not reachable."
@@ -26991,7 +27009,7 @@
     },
     "/admin/payments": {
       "get": {
-        "description": "`needsAttention=true` lists the open attention items (late or duplicate successes, refunds that failed or are unknown, amount mismatches, unknown provider statuses, reads that gave up); `false` the others; missing means all. Keyset paging: pass `nextCursor` as `cursor`.",
+        "description": "`needsAttention=true` lists the open attention items (late or duplicate successes, refunds that failed or are unknown, amount mismatches, unknown provider statuses, reads that gave up); `false` the others; missing means all. Keyset paging: pass `nextCursor` as `cursor`. `total` counts all matching attempts, independent of cursor and limit. Page and count are separate reads and may briefly disagree during concurrent changes.",
         "operationId": "AdminPaymentsController_list",
         "parameters": [
           {
@@ -27432,6 +27450,12 @@
                         "additionalProperties": false
                       }
                     },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991,
+                      "description": "Payment attempts matching the filter, independent of cursor and limit. Read separately from the page; concurrent changes may briefly make them disagree."
+                    },
                     "limit": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -27443,7 +27467,7 @@
                       "type": "string"
                     }
                   },
-                  "required": ["items", "limit", "nextCursor"],
+                  "required": ["items", "total", "limit", "nextCursor"],
                   "additionalProperties": false
                 }
               }
