@@ -28,6 +28,7 @@ import { featureRouteGate, shownFeatures, useEnabledFeatures } from "./enabled-f
 import { FeatureRouteFallback, fallbackTitleKey } from "./feature-route-view";
 import { LanguageSwitch } from "./language-switch";
 import { isCurrentPath, visibleNavigation } from "./navigation";
+import { NavigationScrollHint, useRevealCurrentItem, useScrollEdges } from "./navigation-scroll";
 import { mayOpenRoute } from "./route-gate";
 import { useSidebarCollapsed } from "./use-sidebar-collapsed";
 import { UserMenu } from "./user-menu";
@@ -98,13 +99,22 @@ function ShellNavigation({
   navigation,
   helpNavigation = [],
   collapsed = false,
-}: Pick<ShellFrameProps, "t" | "navigation" | "helpNavigation" | "collapsed">) {
+  desktop = false,
+  pathname,
+}: Pick<ShellFrameProps, "t" | "navigation" | "helpNavigation" | "collapsed"> & {
+  desktop?: boolean;
+  pathname?: string;
+}) {
+  const scrollBox = useRef<HTMLDivElement>(null);
+  const edges = useScrollEdges(scrollBox);
+  useRevealCurrentItem(scrollBox, pathname);
   const renderNav = (groups: SideNavGroup[], label: string) => (
     <SideNav
       label={label}
       groups={groups}
       collapsed={collapsed}
       currentTone="muted"
+      density={desktop ? "compact" : "comfortable"}
       renderLink={({ href, children, ...link }) => (
         <Link to={href} {...link}>
           {children}
@@ -114,10 +124,13 @@ function ShellNavigation({
   );
   return (
     <>
-      <div className="min-h-0 flex-1 overflow-y-auto p-1">
+      <div ref={desktop ? scrollBox : undefined} className="min-h-0 flex-1 overflow-y-auto p-1">
         {renderNav(navigation, t("shell.navLabel"))}
       </div>
-      <div className="shrink-0 pt-4">{renderNav(helpNavigation, t("page.help.title"))}</div>
+      {desktop ? <NavigationScrollHint edges={edges} collapsed={collapsed} t={t} /> : null}
+      <div className={cn("shrink-0", desktop ? "pt-2" : "pt-4")}>
+        {renderNav(helpNavigation, t("page.help.title"))}
+      </div>
     </>
   );
 }
@@ -134,7 +147,7 @@ function CollapseControl({
   return (
     <Button
       variant="secondary"
-      className="mt-2 w-full shrink-0 gap-3 px-3"
+      className="mt-2 w-full shrink-0 gap-3 px-3 text-sm pointer-coarse:min-h-11"
       aria-expanded={!collapsed}
       aria-controls={DESKTOP_NAVIGATION_PANEL_ID}
       onClick={onToggle}
@@ -212,6 +225,7 @@ export function ShellFrame({
 }: ShellFrameProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
+  const { pathname } = useLocation();
   useEffect(() => {
     setMenuOpen(false);
   }, [navigationKey]);
@@ -235,7 +249,7 @@ export function ShellFrame({
           collapsed ? "w-20" : "w-64",
         )}
       >
-        <ShellNavigation {...navProps} collapsed={collapsed} />
+        <ShellNavigation {...navProps} collapsed={collapsed} desktop pathname={pathname} />
         <CollapseControl t={t} collapsed={collapsed} onToggle={onToggleCollapsed} />
       </aside>
       <aside

@@ -1,6 +1,8 @@
 {
   "shell.skipLink": "Перейти до вмісту",
   "shell.navLabel": "Розділи адмінки",
+  "shell.navMoreBelow": "Ще нижче",
+  "shell.navMoreAbove": "Ще вище",
   "shell.userLabel": "Ваш обліковий запис",
   "shell.signedInAs": "Ви увійшли як {email}",
   "shell.account": "Мій обліковий запис",
