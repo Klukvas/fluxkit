@@ -4,7 +4,7 @@ DO $$
 BEGIN
   LOCK TABLE "inventory_level" IN ACCESS EXCLUSIVE MODE;
   IF EXISTS (SELECT 1 FROM "inventory_level" WHERE "reserved" > 1000000000) THEN
-    RAISE EXCEPTION 'Cannot apply 0014_inventory_reserved_upper_bound: inventory_level.reserved exceeds 1000000000; reconcile inventory before retrying.';
+    RAISE EXCEPTION 'Cannot apply 0015_inventory_reserved_upper_bound: inventory_level.reserved exceeds 1000000000; reconcile inventory before retrying.';
   END IF;
 END;
 $$;

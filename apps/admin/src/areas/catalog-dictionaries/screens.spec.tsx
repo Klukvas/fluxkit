@@ -601,6 +601,7 @@ const optionAssignment: AdminProductTypeOptionAssignment = {
   productTypeId: "t1",
   optionId: "o1",
   optionCode: "color",
+  splitsListing: false,
   position: 1,
   createdAt: "2026-01-01T00:00:00Z",
 };

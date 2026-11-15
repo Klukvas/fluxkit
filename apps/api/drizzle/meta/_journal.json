@@ -103,8 +103,15 @@
     {
       "idx": 14,
       "version": "7",
-      "when": 1794690724166,
-      "tag": "0014_inventory_reserved_upper_bound",
+      "when": 1794699341331,
+      "tag": "0014_split_listing",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1794703483735,
+      "tag": "0015_inventory_reserved_upper_bound",
       "breakpoints": true
     }
   ]

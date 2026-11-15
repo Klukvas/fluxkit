@@ -1,5 +1,5 @@
 {
-  "id": "6fa5a586-2a86-4eb8-940e-86b79e672c51",
+  "id": "a91ed8a0-c4b7-4e10-b669-c811491bdd32",
   "prevId": "3e40db9b-ddb8-4e02-930e-9d2eb55a488b",
   "version": "7",
   "dialect": "postgresql",
@@ -1471,6 +1471,13 @@
           "primaryKey": false,
           "notNull": true
         },
+        "splits_listing": {
+          "name": "splits_listing",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
         "position": {
           "name": "position",
           "type": "integer",
@@ -1498,6 +1505,22 @@
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "product_type_one_split_option_idx": {
+          "name": "product_type_one_split_option_idx",
+          "columns": [
+            {
+              "expression": "product_type_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"product_type_option\".\"splits_listing\" = true",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -2125,7 +2148,7 @@
         },
         "inventory_level_reserved_check": {
           "name": "inventory_level_reserved_check",
-          "value": "\"inventory_level\".\"reserved\" >= 0 AND \"inventory_level\".\"reserved\" <= 1000000000"
+          "value": "\"inventory_level\".\"reserved\" >= 0"
         }
       },
       "isRLSEnabled": false
@@ -6908,6 +6931,12 @@
         },
         "build_index_uid": {
           "name": "build_index_uid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "build_rebuild_key": {
+          "name": "build_rebuild_key",
           "type": "text",
           "primaryKey": false,
           "notNull": false
