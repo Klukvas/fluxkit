@@ -2204,35 +2204,35 @@
     "theme": "light",
     "selector": "page.body",
     "property": "screenshot",
-    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): 2px ink outlines on cards and controls (the header search field and the footer theme options on every page; cards grow by 2px, so full frames shift) and the display hero heading; the changed selectors' computed styles are recorded and declared"
+    "reason": "fix/home-about-demo-copy (HANDOFF, storefront UI round 4 open item): the home \"About the shop\" demo text (home.about.body, uk and en) describes the coffee demo; only that paragraph changes and its line count may change the page height, so the full page is masked; the home markup is pinned by home-sections-frozen and computed styles stay identical"
   },
   {
     "page": "en-home",
     "theme": "dark",
     "selector": "page.body",
     "property": "screenshot",
-    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): 2px ink outlines on cards and controls (the header search field and the footer theme options on every page; cards grow by 2px, so full frames shift) and the display hero heading; the changed selectors' computed styles are recorded and declared"
+    "reason": "fix/home-about-demo-copy (HANDOFF, storefront UI round 4 open item): the home \"About the shop\" demo text (home.about.body, uk and en) describes the coffee demo; only that paragraph changes and its line count may change the page height, so the full page is masked; the home markup is pinned by home-sections-frozen and computed styles stay identical"
   },
   {
     "page": "home",
     "theme": "light",
     "selector": "page.body",
     "property": "screenshot",
-    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): 2px ink outlines on cards and controls (the header search field and the footer theme options on every page; cards grow by 2px, so full frames shift) and the display hero heading; the changed selectors' computed styles are recorded and declared"
+    "reason": "fix/home-about-demo-copy (HANDOFF, storefront UI round 4 open item): the home \"About the shop\" demo text (home.about.body, uk and en) describes the coffee demo; only that paragraph changes and its line count may change the page height, so the full page is masked; the home markup is pinned by home-sections-frozen and computed styles stay identical"
   },
   {
     "page": "home",
     "theme": "dark",
     "selector": "page.body",
     "property": "screenshot",
-    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): 2px ink outlines on cards and controls (the header search field and the footer theme options on every page; cards grow by 2px, so full frames shift) and the display hero heading; the changed selectors' computed styles are recorded and declared"
+    "reason": "fix/home-about-demo-copy (HANDOFF, storefront UI round 4 open item): the home \"About the shop\" demo text (home.about.body, uk and en) describes the coffee demo; only that paragraph changes and its line count may change the page height, so the full page is masked; the home markup is pinned by home-sections-frozen and computed styles stay identical"
   },
   {
     "page": "home",
     "theme": "system",
     "selector": "page.body",
     "property": "screenshot",
-    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): 2px ink outlines on cards and controls (the header search field and the footer theme options on every page; cards grow by 2px, so full frames shift) and the display hero heading; the changed selectors' computed styles are recorded and declared"
+    "reason": "fix/home-about-demo-copy (HANDOFF, storefront UI round 4 open item): the home \"About the shop\" demo text (home.about.body, uk and en) describes the coffee demo; only that paragraph changes and its line count may change the page height, so the full page is masked; the home markup is pinned by home-sections-frozen and computed styles stay identical"
   },
   {
     "page": "search",
