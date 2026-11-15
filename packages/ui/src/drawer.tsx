@@ -60,7 +60,7 @@ export function Drawer({
         type="button"
         aria-label={closeLabel}
         tabIndex={-1}
-        className="fk-drawer-backdrop absolute inset-0 bg-foreground/50"
+        className="fk-drawer-backdrop absolute inset-0 bg-scrim"
         onClick={onClose}
       />
       <section className="fk-drawer-panel relative ms-auto flex h-full w-full max-w-md flex-col border-s border-border bg-background shadow-overlay">

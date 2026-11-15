@@ -5,7 +5,7 @@ Core module, no feature flag (ADR 0046, plan `docs/plans/2026-11-05-admin-home-b
 
 | Endpoint | Auth | Purpose | Request | Response | Errors | Flag |
 |---|---|---|---|---|---|---|
-| `GET /store/banners` | public | The banners live now: active and inside their window, at most 3, by `position` then `id` | query `locale` (optional, a configured locale; missing = `DEFAULT_LOCALE`); unknown parameters are `400` | `200 {items: [{id, layout, title, text, href, tone, image: {url, width, height, alt}}]}` | 400 (`invalid_value` at `locale`) | - |
+| `GET /store/banners` | public | The banners live now: active and inside their window, at most 3, by `position` then `id` | query `locale` (optional, a configured locale; missing = `DEFAULT_LOCALE`); unknown parameters are `400` | `200 {items: [{id, layout, title, text, href, tone, image: {url, width, height, alt}}]}` | 400 (`invalid_value` at `locale`), 429 (`catalogRead`, shared with the catalog reads, `docs/api/catalog.md` Store) | - |
 | `GET /admin/banners` | admin `catalog.read` | Every banner (at most 50), by `position` then `id` | none | `200 {items: [banner]}` | - | - |
 | `POST /admin/banners` | admin `catalog.write` | Create a banner, appended at the end | body below (`imageUploadId` and `link` required) | `201` banner, `Location` | 400 (see below), 409 `rule_violation` `too_many_banners` | - |
 | `PUT /admin/banners/order` | admin `catalog.write` | Reorder: positions become 0..n-1 in the given order | `{ids: uuid[]}`, exactly the current banners, each once | `200 {items: [banner]}` | 400 (`order_mismatch` at `ids`) | - |
@@ -48,7 +48,7 @@ Core module, no feature flag (ADR 0046, plan `docs/plans/2026-11-05-admin-home-b
 ## Notes
 
 - Caching: `GET /store/banners` sends no `Cache-Control` and no cookie, like `GET /store/categories`; the storefront caches it 60 s, so a
-  start or end time takes effect up to 60 s late. No rate limit (same gap as the other catalog store routes).
+  start or end time takes effect up to 60 s late. Rate limited with the other catalog store routes (`catalogRead`, 300 a minute per client address; the storefront's own server reads are not counted, `docs/api/catalog.md` Store).
 - Known gap: banner writes record no audit event (owner decision 2026-11-05, like catalog and brand edits, `docs/api/audit.md`) and emit no
   domain event.
 - The texts are public marketing copy: do not type personal data into them (privacy inventory row D24).

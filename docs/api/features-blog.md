@@ -67,5 +67,5 @@ writes, `Cache-Control: no-store`. Store routes set no cookie and no `Cache-Cont
 - Request size: `/admin/blog/posts` takes JSON bodies up to the API's admin content limit (content locales x 40 000 UTF-16 units x
   6 bytes + 256 KiB, about 0.7 MB with two locales; `docs/contracts/api.md`, "Default deny for `/admin`"), so one save carries a
   full-length body in every locale in any script. Larger answers `413`.
-- Rate limits: none on the store blog routes yet, the same known launch blocker as the other plain catalog store routes (`docs/HANDOFF.md`);
+- Rate limits: none on the store blog routes yet (a feature package cannot use the API's `catalogRead` window today; follow-up in `docs/plans/2026-11-14-catalog-rate-limits.md`);
   `GET /store/blog/sitemap` is the heaviest (up to 5 001 rows and a locale check per row, no body parse).

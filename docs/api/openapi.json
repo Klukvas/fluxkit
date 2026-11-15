@@ -6699,6 +6699,16 @@
               }
             }
           },
+          "429": {
+            "description": "Too many requests: try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Internal server error. Details are only in the server log.",
             "content": {
@@ -31230,6 +31240,16 @@
               }
             }
           },
+          "429": {
+            "description": "Too many requests: try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Internal server error. Details are only in the server log.",
             "content": {
@@ -31315,6 +31335,16 @@
           },
           "400": {
             "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: try again after the number of seconds in the Retry-After header.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -31520,6 +31550,16 @@
           },
           "400": {
             "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: try again after the number of seconds in the Retry-After header.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -31996,6 +32036,16 @@
           },
           "404": {
             "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: try again after the number of seconds in the Retry-After header.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -37473,6 +37523,9 @@
                           "optionCode": {
                             "type": "string"
                           },
+                          "splitsListing": {
+                            "type": "boolean"
+                          },
                           "position": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -37488,6 +37541,7 @@
                           "productTypeId",
                           "optionId",
                           "optionCode",
+                          "splitsListing",
                           "position",
                           "createdAt"
                         ],
@@ -38156,7 +38210,7 @@
     },
     "/admin/product-types/{id}/options/{optionId}": {
       "put": {
-        "description": "Answers 201 when the assignment is new and 200 when it replaced an existing one.",
+        "description": "Answers 201 when new and 200 when updated. Omitted splitsListing defaults to false on creation and is preserved on update. Only one option per type may split listings; another returns 409 split_option_already_set.",
         "operationId": "ProductTypesController_putOption",
         "parameters": [
           {
@@ -38197,6 +38251,9 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "splitsListing": {
+                    "type": "boolean"
+                  },
                   "position": {
                     "type": "integer",
                     "minimum": 0,
@@ -38227,6 +38284,9 @@
                     "optionCode": {
                       "type": "string"
                     },
+                    "splitsListing": {
+                      "type": "boolean"
+                    },
                     "position": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -38238,7 +38298,14 @@
                       "description": "ISO 8601, UTC."
                     }
                   },
-                  "required": ["productTypeId", "optionId", "optionCode", "position", "createdAt"],
+                  "required": [
+                    "productTypeId",
+                    "optionId",
+                    "optionCode",
+                    "splitsListing",
+                    "position",
+                    "createdAt"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -38262,6 +38329,9 @@
                     "optionCode": {
                       "type": "string"
                     },
+                    "splitsListing": {
+                      "type": "boolean"
+                    },
                     "position": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -38273,7 +38343,14 @@
                       "description": "ISO 8601, UTC."
                     }
                   },
-                  "required": ["productTypeId", "optionId", "optionCode", "position", "createdAt"],
+                  "required": [
+                    "productTypeId",
+                    "optionId",
+                    "optionCode",
+                    "splitsListing",
+                    "position",
+                    "createdAt"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -38319,6 +38396,16 @@
               }
             }
           },
+          "409": {
+            "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Internal server error. Details are only in the server log.",
             "content": {
@@ -38330,7 +38417,7 @@
             }
           }
         },
-        "summary": "Allow an option on a product type, or change its position",
+        "summary": "Allow an option on a product type, or change its position or listing split",
         "tags": ["admin-product-types"],
         "x-fluxkit-permission": "catalog.write"
       },
