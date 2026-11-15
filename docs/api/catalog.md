@@ -100,6 +100,11 @@ Options such as color or size. Products choose values of options; variants are g
 ## Product types
 
 A product type defines which attributes and options a product of that type may have.
+Option assignments in detail and PUT responses include `splitsListing`. At most one assignment per type may be true;
+setting another returns `409 rule_violation`, `rule: split_option_already_set`, `field: splitsListing`, including index races.
+Uncheck the old assignment before selecting another; no option is cleared automatically. Reads need `catalog.read`, writes
+`catalog.write`. Flag changes and removal of a true, unused assignment mark all products of the type transactionally for
+search (`option_changed`); position-only edits do not. Store list and search responses do not use this flag yet.
 
 | Endpoint | Auth | Purpose | Request | Response | Errors | Flag |
 |---|---|---|---|---|---|---|
@@ -110,7 +115,7 @@ A product type defines which attributes and options a product of that type may h
 | `DELETE /admin/product-types/{id}` | admin | Delete a product type that no product uses | path `id` | 204 (its assignments go with it) | 400, 404, 409 (`product_type_in_use`) | - |
 | `PUT /admin/product-types/{id}/attributes/{attributeId}` | admin | Assign an attribute to the type, or replace the assignment | body: `level` (`product` or `variant`, required), optional `isRequired`, `position` | 201 new assignment or 200 replaced one | 400, 404, 409 (`level_in_use`, other core reasons) | - |
 | `DELETE /admin/product-types/{id}/attributes/{attributeId}` | admin | Remove an attribute from the type | path `id`, `attributeId` | 204 | 400, 404, 409 (`attribute_assignment_in_use`) | - |
-| `PUT /admin/product-types/{id}/options/{optionId}` | admin | Allow an option on the type, or change its position | body: optional `position` | 201 new assignment or 200 replaced one | 400, 404 | - |
+| `PUT /admin/product-types/{id}/options/{optionId}` | admin | Allow an option on the type, or change its position/listing split | body: optional `position`, `splitsListing` (boolean; omitted on create: false; omitted on update: unchanged) | 201 new assignment or 200 replaced one, including `splitsListing` | 400, 404, 409 (`split_option_already_set`) | - |
 | `DELETE /admin/product-types/{id}/options/{optionId}` | admin | Remove an option from the type | path `id`, `optionId` | 204 | 400, 404, 409 (`option_in_use_by_products`) | - |
 
 ## Brands

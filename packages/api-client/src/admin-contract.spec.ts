@@ -980,6 +980,7 @@ const typeAttributeAssignment: Shape<AdminProductTypeAttributeAssignment> = {
 };
 const typeOptionAssignment: Shape<AdminProductTypeOptionAssignment> = {
   object: {
+    splitsListing: "boolean",
     productTypeId: "string",
     optionId: "string",
     optionCode: "string",
@@ -1435,7 +1436,7 @@ const body = {
     },
   } satisfies Shape<Admin.PutProductTypeAttributeBody>,
   putProductTypeOption: {
-    object: { position: { optional: "integer" } },
+    object: { position: { optional: "integer" }, splitsListing: { optional: "boolean" } },
   } satisfies Shape<Admin.PutProductTypeOptionBody>,
   putProductPrices: {
     object: {

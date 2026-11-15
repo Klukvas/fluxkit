@@ -1106,6 +1106,7 @@ export interface AdminProductTypeAttribute extends AdminProductTypeAttributeAssi
 }
 
 export interface AdminProductTypeOptionAssignment {
+  splitsListing: boolean;
   productTypeId: string;
   optionId: string;
   optionCode: string;
@@ -1139,6 +1140,8 @@ export interface PutProductTypeAttributeBody {
 }
 
 export interface PutProductTypeOptionBody {
+  /** Omitted: false on creation; preserves the stored flag on update. */
+  splitsListing?: boolean;
   position?: number;
 }
 
