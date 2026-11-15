@@ -37,6 +37,7 @@ describe("FreeShippingProgress", () => {
       expect(labelId).toBeDefined();
       expect(html).toContain(`aria-labelledby="${labelId}"`);
       expect(html).toContain("tabular-nums");
+      expect(html).toContain('class="fk-progress w-full rounded-control"');
       expect(html).not.toContain("style=");
     },
   );

@@ -63,8 +63,8 @@ export function Drawer({
         className="fk-drawer-backdrop absolute inset-0 bg-scrim"
         onClick={onClose}
       />
-      <section className="fk-drawer-panel relative ms-auto flex h-full w-full max-w-md flex-col border-s border-border bg-background shadow-overlay">
-        <header className="flex items-center justify-between gap-4 border-b border-border p-4">
+      <section className="fk-drawer-panel relative ms-auto flex h-full w-full max-w-md flex-col overflow-hidden rounded-overlay border-2 border-foreground bg-background shadow-overlay">
+        <header className="flex shrink-0 items-center justify-between gap-4 border-b border-border p-4">
           <h2 id={titleId} className={textStyles.dialogTitle}>
             {title}
           </h2>
@@ -89,7 +89,7 @@ export function Drawer({
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto p-4">{children}</div>
         {footer ? (
-          <footer className="fk-drawer-footer border-t border-border p-4">{footer}</footer>
+          <footer className="fk-drawer-footer shrink-0 border-t border-border p-4">{footer}</footer>
         ) : null}
       </section>
     </dialog>

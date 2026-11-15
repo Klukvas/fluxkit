@@ -26,6 +26,7 @@ import { allowedImageUrl } from "../lib/image-source";
 import { localizedHref } from "../lib/locale-path";
 import { formatMoney } from "../lib/money";
 import { CartDrawerQuantity, type DrawerQuantityProps } from "./cart-drawer-quantity";
+import { EmptyCartIllustration } from "./empty-cart-illustration";
 import { FreeShippingProgress } from "./free-shipping-progress";
 import { StoreImage } from "./store-image";
 import { focusRing, linkButton, secondaryLinkButton } from "./styles";
@@ -168,19 +169,7 @@ export function CartDrawerView({
       ) : null}
       {cart !== null && cart.lines.length === 0 ? (
         <div className="flex flex-col items-center gap-4 py-8 text-center">
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 96 96"
-            className="size-24 text-muted-foreground"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <path className="fill-muted" d="m20 30 8 40h42l8-40Z" />
-            <path d="M34 36V24a14 14 0 0 1 28 0v12M36 46v12m24-12v12" />
-            <circle cx="36" cy="80" r="4" />
-            <circle cx="62" cy="80" r="4" />
-          </svg>
+          <EmptyCartIllustration />
           <h3 className={textStyles.itemTitle}>{t("cart.empty.title")}</h3>
           <p>{t("cart.empty.description")}</p>
           <Link href={localizedHref(locale, "/catalog")} className={linkButton} onClick={onClose}>
