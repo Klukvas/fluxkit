@@ -434,6 +434,95 @@ describe("SearchIndexer (real Postgres, real Meilisearch)", () => {
   });
 
   describe("rebuild", () => {
+    it("discards an old-version partial build so hidden products leave totals and facets without a queue mark", async () => {
+      const hidden = await world.variant({ onHand: 1 });
+      const visible = await world.variant({ onHand: 1 });
+      const term = `upgrade${fx.runId.replaceAll("-", "")}`;
+      for (const productId of [hidden.productId, visible.productId]) {
+        expect(
+          (
+            await call("PATCH", `/admin/products/${productId}`, {
+              title: { uk: term, en: term },
+            })
+          ).status,
+        ).toBe(200);
+      }
+      expect((await indexer.rebuild(new Date(), UNLIMITED_BUDGET)).failures).toEqual([]);
+      await syncAll();
+      await pool.query("update search_index_state set rebuild_requested_at = now()");
+      const startedAt = new Date();
+      expect(await indexer.rebuild(startedAt, budgetOf(0))).toMatchObject({
+        started: 2,
+        truncated: true,
+      });
+      const builds = await pool.query<{
+        locale: string;
+        build_index_uid: string;
+        build_rebuild_key: string;
+      }>(
+        "select locale, build_index_uid, build_rebuild_key from search_index_state order by locale",
+      );
+      // Simulate the completed page of a v3 process, which still indexed this product's text.
+      for (const build of builds.rows) {
+        expect(build.build_rebuild_key).toBe(`${SEARCH_DOCUMENT_VERSION}:UAH:${build.locale}`);
+        const documents = [
+          ...(await documentsOf(build.locale, hidden.productId)),
+          ...(await documentsOf(build.locale, visible.productId)),
+        ];
+        expect(documents).toHaveLength(2);
+        const response = await fetch(`${meiliUrl()}/indexes/${build.build_index_uid}/documents`, {
+          method: "POST",
+          headers: { authorization: `Bearer ${search.key}`, "content-type": "application/json" },
+          body: JSON.stringify(documents),
+        });
+        expect(response.ok).toBe(true);
+        await waitForMasterTask(((await response.json()) as { taskUid: number }).taskUid);
+      }
+      await pool.query(
+        "update search_index_state set document_version = 3, build_rebuild_key = '3:UAH:' || locale, build_cursor = $1, build_documents_count = 2",
+        [[hidden.productId, visible.productId].sort().at(-1)],
+      );
+      await pool.query("update product set title = $2::jsonb where id = $1", [
+        hidden.productId,
+        JSON.stringify({ uk: " " }),
+      ]);
+      await pool.query("delete from search_sync_queue where product_id = $1", [hidden.productId]);
+      const finished = await indexer.rebuild(
+        new Date(startedAt.getTime() + 2_000),
+        UNLIMITED_BUDGET,
+      );
+      expect(finished).toMatchObject({ swapped: 2, failures: [] });
+      for (const locale of ["uk", "en"]) {
+        const response = await fetch(`${meiliUrl()}/indexes/${search.liveUid(locale)}/search`, {
+          method: "POST",
+          headers: { authorization: `Bearer ${search.key}`, "content-type": "application/json" },
+          body: JSON.stringify({
+            q: term,
+            page: 1,
+            hitsPerPage: 10,
+            facets: ["productId"],
+            distinct: "productId",
+          }),
+        });
+        expect(response.ok).toBe(true);
+        expect(await response.json()).toMatchObject({
+          totalHits: 1,
+          facetDistribution: { productId: { [visible.productId]: 1 } },
+        });
+        expect(await documentsOf(locale, hidden.productId)).toEqual([]);
+      }
+      expect(finished).toMatchObject({ started: 2, restarted: 0 });
+      expect(await listIndexUids(search.prefix)).toEqual([
+        search.liveUid("en"),
+        search.liveUid("uk"),
+      ]);
+      expect((await pool.query("select build_rebuild_key from search_index_state")).rows).toEqual([
+        { build_rebuild_key: null },
+        { build_rebuild_key: null },
+      ]);
+      expect(Object.keys(await queued())).not.toContain(hidden.productId);
+    });
+
     it("a change made while a build runs is not lost: sync waits, the build swaps, then sync applies it", async () => {
       const stocked = await world.variant({ onHand: 5 });
       await syncAll();

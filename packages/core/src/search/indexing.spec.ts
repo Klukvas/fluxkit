@@ -173,6 +173,7 @@ describe("decideIndexAction", () => {
     rebuildRequestedAt: null,
     buildIndexUid: null,
     buildStartedAt: null,
+    buildRebuildKey: null,
   };
 
   it("does nothing for a fresh live index", () => {
@@ -229,16 +230,50 @@ describe("decideIndexAction", () => {
     ).toEqual({ kind: "update_settings" });
   });
 
+  it("discards incompatible running builds, including inherited builds without a key", () => {
+    for (const buildRebuildKey of [
+      null,
+      searchRebuildKey(3, "UAH", "uk"),
+      searchRebuildKey(SEARCH_DOCUMENT_VERSION, "EUR", "uk"),
+    ]) {
+      expect(
+        decideIndexAction({
+          locale: "uk",
+          state: {
+            ...live,
+            buildIndexUid: "fluxkit_catalog_uk_old",
+            buildStartedAt: minutes(-10),
+            buildRebuildKey,
+          },
+          derived,
+          now: NOW,
+        }),
+      ).toEqual({ kind: "rebuild", cause: "stale_build" });
+    }
+  });
+
   it("continues a running build, and restarts one older than 24 hours", () => {
     const building = {
       ...live,
       rebuildRequestedAt: minutes(-10),
       buildIndexUid: "fluxkit_catalog_uk_20261029115000",
       buildStartedAt: minutes(-10),
+      buildRebuildKey: derived.rebuildKey,
     };
     expect(decideIndexAction({ locale: "uk", state: building, derived, now: NOW })).toEqual({
       kind: "continue_build",
     });
+    // The live index may still be old (or absent); compatibility belongs to the build itself.
+    for (const liveIndexUid of [null, live.liveIndexUid]) {
+      expect(
+        decideIndexAction({
+          locale: "uk",
+          state: { ...building, liveIndexUid, documentVersion: 3 },
+          derived,
+          now: NOW,
+        }),
+      ).toEqual({ kind: "continue_build" });
+    }
     expect(
       decideIndexAction({
         locale: "uk",

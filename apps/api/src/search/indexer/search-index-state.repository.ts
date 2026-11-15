@@ -60,6 +60,7 @@ export class SearchIndexStateRepository {
     db: DbExecutor,
     locale: string,
     buildIndexUid: string,
+    buildRebuildKey: string,
     answered: string | null,
     now: Date,
   ): Promise<void> {
@@ -67,6 +68,7 @@ export class SearchIndexStateRepository {
       .update(searchIndexState)
       .set({
         buildIndexUid,
+        buildRebuildKey,
         buildStartedAt: now,
         buildCursor: null,
         buildDocumentsCount: 0,
@@ -92,12 +94,13 @@ export class SearchIndexStateRepository {
       .where(eq(searchIndexState.locale, locale));
   }
 
-  /** Drops a build's bookkeeping (an expired build, or one whose index is gone). */
+  /** Drops an expired, incompatible or missing build's bookkeeping. */
   async dropBuild(db: DbExecutor, locale: string, now: Date): Promise<void> {
     await db
       .update(searchIndexState)
       .set({
         buildIndexUid: null,
+        buildRebuildKey: null,
         buildStartedAt: null,
         buildCursor: null,
         buildDocumentsCount: 0,
@@ -141,6 +144,7 @@ export class SearchIndexStateRepository {
             documentsCount: entry.documentsCount,
             builtAt: now,
             buildIndexUid: null,
+            buildRebuildKey: null,
             buildStartedAt: null,
             buildCursor: null,
             buildDocumentsCount: 0,

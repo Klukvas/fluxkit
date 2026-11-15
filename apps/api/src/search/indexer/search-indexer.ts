@@ -401,6 +401,7 @@ export class SearchIndexer {
                 rebuildRequestedAt: state.rebuildRequestedAt,
                 buildIndexUid: state.buildIndexUid,
                 buildStartedAt: state.buildStartedAt,
+                buildRebuildKey: state.buildRebuildKey,
               },
         derived,
         now,
@@ -464,7 +465,14 @@ export class SearchIndexer {
       await engine.updateSettings(uid, plan.derived.settings),
       this.taskTimeoutMs(),
     );
-    await this.states.startBuild(this.database, plan.locale, uid, requested, now);
+    await this.states.startBuild(
+      this.database,
+      plan.locale,
+      uid,
+      plan.derived.rebuildKey,
+      requested,
+      now,
+    );
   }
 
   private async addDocuments(

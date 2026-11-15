@@ -115,6 +115,7 @@ export interface IndexStateFacts {
   readonly rebuildRequestedAt: Date | null;
   readonly buildIndexUid: string | null;
   readonly buildStartedAt: Date | null;
+  readonly buildRebuildKey: string | null;
 }
 
 export type IndexAction =
@@ -123,11 +124,12 @@ export type IndexAction =
   | { readonly kind: "continue_build" }
   | {
       readonly kind: "rebuild";
-      readonly cause: "missing" | "stale_documents" | "requested" | "build_expired";
+      readonly cause: "missing" | "stale_documents" | "requested" | "build_expired" | "stale_build";
     };
 
 /**
- * What the indexer does for one locale. A running build is continued (or restarted after 24 hours); without one, a missing
+ * What the indexer does for one locale. Only a compatible running build is continued (or restarted after 24 hours);
+ * incompatible or inherited builds without a key are discarded. Without a build, a missing
  * live index, documents built for another version or currency, or an operator's request mean a full rebuild with a swap;
  * a changed settings hash alone is applied to the live index in place (the engine re-indexes in the background and
  * search keeps working).
@@ -140,6 +142,9 @@ export function decideIndexAction(input: {
 }): IndexAction {
   const { state, derived, now } = input;
   if (state !== null && state.buildIndexUid !== null) {
+    if (state.buildRebuildKey !== derived.rebuildKey) {
+      return { kind: "rebuild", cause: "stale_build" };
+    }
     const startedAt = state.buildStartedAt?.getTime() ?? 0;
     if (now.getTime() - startedAt > SEARCH_INDEXING.buildMaxAgeHours * 3_600_000) {
       return { kind: "rebuild", cause: "build_expired" };
