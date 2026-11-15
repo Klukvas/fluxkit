@@ -98,7 +98,7 @@ review by a different model than its author.
 
 A check of the live storefront against the concept found gaps; the owner asked to fix them all ("Чини все"). Two PRs, owned paths apart:
 
-- Hero picture, hero heading and ink outlines (this round's PR, branch `claude/polish-hero-borders-551d8a`):
+- Hero picture, hero heading and ink outlines (PR 317, branch `claude/polish-hero-borders-551d8a`):
   - `public/home/hero.svg` becomes flat, niche-neutral demo art in the concept's palette (shopping bag, tag, parcel; ink outlines), same size, still decorative (`altKey: null`).
   - The hero heading uses the additive `textStyles.displayTitle` role (Rubik 900, tight tracking); the top type step `4xl` is retuned to 3.5rem / 3.75rem (token values only, no new token; it is used only by the hero `h1`).
   - Cards and outlined controls get 2px `foreground` outlines (ink in light, cream in dark); text fields keep `border-input`, now 2px, with the light value set to ink. Dividers, panels, menus and dialogs stay hairline `border`.
