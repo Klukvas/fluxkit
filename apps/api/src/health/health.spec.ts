@@ -1,3 +1,4 @@
+import { RedisClient } from "../common/redis/redis-client.js";
 import net from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { startApp, type RunningApp } from "../test/app.js";
@@ -13,10 +14,14 @@ describe("GET /health", () => {
     await running.app.close();
   });
 
+  it("does not create a Redis provider in memory mode", () => {
+    expect(() => running.app.get(RedisClient)).toThrow();
+  });
+
   it("returns ok when Postgres is reachable", async () => {
     const response = await fetch(`${running.baseUrl}/health`);
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ status: "ok" });
+    expect(await response.json()).toEqual({ status: "ok", rateLimitStore: "memory" });
   });
 });
 

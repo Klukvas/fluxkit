@@ -7,6 +7,7 @@ import {
   type NestModule,
 } from "@nestjs/common";
 import { APP_GUARD } from "@nestjs/core";
+import { WINDOW_STORE, type WindowStore } from "../rate-limit/window-store.js";
 import { adminNoStoreMiddleware } from "./admin-no-store.middleware.js";
 import { ADMIN_AUTHENTICATOR, type AdminAuthenticator } from "./admin-authenticator.js";
 import { AdminGuard, AdminPathGuard } from "./admin.guard.js";
@@ -60,8 +61,8 @@ export class AuthModule implements NestModule {
         { provide: PasswordHasher, useFactory: () => new PasswordHasher(options.scrypt) },
         {
           provide: LoginThrottle,
-          useFactory: (clock: Clock) => new LoginThrottle(clock),
-          inject: [CLOCK],
+          useFactory: (clock: Clock, store: WindowStore) => new LoginThrottle(clock, {}, store),
+          inject: [CLOCK, WINDOW_STORE],
         },
         SessionRepository,
         SessionService,

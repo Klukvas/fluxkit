@@ -49,15 +49,15 @@ function build() {
 }
 
 describe("RateLimitGuard", () => {
-  it("lets the maximum through and answers 429 too_many_requests with Retry-After after that", () => {
+  it("lets the maximum through and answers 429 too_many_requests with Retry-After after that", async () => {
     const guard = build();
     const context = contextFor(ProbeController.prototype.limited, "10.0.0.1");
     for (let attempt = 0; attempt < 10; attempt += 1) {
-      expect(guard.canActivate(context)).toBe(true);
+      expect(await guard.canActivate(context)).toBe(true);
     }
     let thrown: unknown;
     try {
-      guard.canActivate(context);
+      await guard.canActivate(context);
     } catch (error) {
       thrown = error;
     }
@@ -68,28 +68,32 @@ describe("RateLimitGuard", () => {
     expect(problem.headers["Retry-After"]).toBe("600");
   });
 
-  it("counts per client address", () => {
+  it("counts per client address", async () => {
     const guard = build();
     for (let attempt = 0; attempt < 10; attempt += 1) {
-      guard.canActivate(contextFor(ProbeController.prototype.limited, "10.0.0.1"));
+      await guard.canActivate(contextFor(ProbeController.prototype.limited, "10.0.0.1"));
     }
-    expect(guard.canActivate(contextFor(ProbeController.prototype.limited, "10.0.0.2"))).toBe(true);
+    expect(await guard.canActivate(contextFor(ProbeController.prototype.limited, "10.0.0.2"))).toBe(
+      true,
+    );
   });
 
-  it("an address that is missing is counted under one shared key, not skipped", () => {
+  it("an address that is missing is counted under one shared key, not skipped", async () => {
     const guard = build();
     for (let attempt = 0; attempt < 10; attempt += 1) {
-      guard.canActivate(contextFor(ProbeController.prototype.limited, undefined));
+      await guard.canActivate(contextFor(ProbeController.prototype.limited, undefined));
     }
-    expect(() =>
+    await expect(
       guard.canActivate(contextFor(ProbeController.prototype.limited, undefined)),
-    ).toThrow(ProblemException);
+    ).rejects.toThrow(ProblemException);
   });
 
-  it("does nothing on a route without @RateLimit", () => {
+  it("does nothing on a route without @RateLimit", async () => {
     const guard = build();
     for (let attempt = 0; attempt < 500; attempt += 1) {
-      expect(guard.canActivate(contextFor(ProbeController.prototype.free, "10.0.0.1"))).toBe(true);
+      expect(await guard.canActivate(contextFor(ProbeController.prototype.free, "10.0.0.1"))).toBe(
+        true,
+      );
     }
   });
 });
@@ -113,9 +117,12 @@ describe("RateLimitGuard keyed by the admin user (mediaUpload, ADR 0028)", () =>
     } as unknown as ExecutionContext;
   }
 
-  function refusal(guard: RateLimitGuard, context: ExecutionContext): ProblemException {
+  async function refusal(
+    guard: RateLimitGuard,
+    context: ExecutionContext,
+  ): Promise<ProblemException> {
     try {
-      guard.canActivate(context);
+      await guard.canActivate(context);
     } catch (error) {
       if (error instanceof ProblemException) return error;
       throw error;
@@ -123,42 +130,43 @@ describe("RateLimitGuard keyed by the admin user (mediaUpload, ADR 0028)", () =>
     throw new Error("expected a 429");
   }
 
-  it("allows 60 uploads per admin in 10 minutes, then 429 with Retry-After 600", () => {
+  it("allows 60 uploads per admin in 10 minutes, then 429 with Retry-After 600", async () => {
     const guard = build();
     for (let attempt = 1; attempt <= 60; attempt += 1) {
-      expect(guard.canActivate(uploadContext("10.0.0.1", "admin-a")), `attempt ${attempt}`).toBe(
-        true,
-      );
+      expect(
+        await guard.canActivate(uploadContext("10.0.0.1", "admin-a")),
+        `attempt ${attempt}`,
+      ).toBe(true);
     }
-    const problem = refusal(guard, uploadContext("10.0.0.1", "admin-a"));
+    const problem = await refusal(guard, uploadContext("10.0.0.1", "admin-a"));
     expect(problem.getStatus()).toBe(429);
     expect(problem.code).toBe("too_many_requests");
     expect(problem.headers["Retry-After"]).toBe("600");
   });
 
-  it("counts per admin user, not per address: another admin on the same address goes on, the same admin from elsewhere does not", () => {
+  it("counts per admin user, not per address: another admin on the same address goes on, the same admin from elsewhere does not", async () => {
     const guard = build();
     for (let attempt = 0; attempt < 60; attempt += 1) {
-      guard.canActivate(uploadContext("10.0.0.1", "admin-a"));
+      await guard.canActivate(uploadContext("10.0.0.1", "admin-a"));
     }
-    expect(guard.canActivate(uploadContext("10.0.0.1", "admin-b"))).toBe(true);
-    expect(refusal(guard, uploadContext("10.9.9.9", "admin-a")).getStatus()).toBe(429);
+    expect(await guard.canActivate(uploadContext("10.0.0.1", "admin-b"))).toBe(true);
+    expect((await refusal(guard, uploadContext("10.9.9.9", "admin-a"))).getStatus()).toBe(429);
   });
 
-  it("does not share the window with the address limits of the same client", () => {
+  it("does not share the window with the address limits of the same client", async () => {
     const guard = build();
     for (let attempt = 0; attempt < 10; attempt += 1) {
-      guard.canActivate(contextFor(ProbeController.prototype.limited, "10.0.0.1"));
+      await guard.canActivate(contextFor(ProbeController.prototype.limited, "10.0.0.1"));
     }
-    expect(guard.canActivate(uploadContext("10.0.0.1", "admin-a"))).toBe(true);
+    expect(await guard.canActivate(uploadContext("10.0.0.1", "admin-a"))).toBe(true);
   });
 
-  it("fails loudly (a server error, not a pass) on a user-keyed route without a signed-in admin", () => {
+  it("fails loudly (a server error, not a pass) on a user-keyed route without a signed-in admin", async () => {
     const guard = build();
-    expect(() => guard.canActivate(uploadContext("10.0.0.1", undefined))).toThrow(
+    await expect(guard.canActivate(uploadContext("10.0.0.1", undefined))).rejects.toThrow(
       /signed-in admin/,
     );
-    expect(() => guard.canActivate(uploadContext("10.0.0.1", undefined))).not.toThrow(
+    await expect(guard.canActivate(uploadContext("10.0.0.1", undefined))).rejects.not.toThrow(
       ProblemException,
     );
   });
@@ -188,55 +196,55 @@ describe("RateLimitGuard counting only proxied requests (catalogRead)", () => {
   const throughEdge = (address: string) =>
     catalogContext({ ip: address, ips: [address], trustProxy: 1 });
 
-  it("allows 300 reads a minute per forwarded address, then 429 with Retry-After 60", () => {
+  it("allows 300 reads a minute per forwarded address, then 429 with Retry-After 60", async () => {
     const guard = build();
     for (let attempt = 1; attempt <= 300; attempt += 1) {
-      expect(guard.canActivate(throughEdge("203.0.113.1")), `attempt ${attempt}`).toBe(true);
+      expect(await guard.canActivate(throughEdge("203.0.113.1")), `attempt ${attempt}`).toBe(true);
     }
     let thrown: unknown;
     try {
-      guard.canActivate(throughEdge("203.0.113.1"));
+      await guard.canActivate(throughEdge("203.0.113.1"));
     } catch (error) {
       thrown = error;
     }
     expect(thrown).toBeInstanceOf(ProblemException);
     expect((thrown as ProblemException).headers["Retry-After"]).toBe("60");
-    expect(guard.canActivate(throughEdge("203.0.113.2"))).toBe(true);
+    expect(await guard.canActivate(throughEdge("203.0.113.2"))).toBe(true);
   });
 
-  it("does not count a request that bypassed the trusted proxies (the storefront's own server reads)", () => {
+  it("does not count a request that bypassed the trusted proxies (the storefront's own server reads)", async () => {
     const guard = build();
     const internal = catalogContext({ ip: "172.18.0.5", ips: [], trustProxy: 1 });
     for (let attempt = 0; attempt < 1_000; attempt += 1) {
-      expect(guard.canActivate(internal)).toBe(true);
+      expect(await guard.canActivate(internal)).toBe(true);
     }
   });
 
-  it("counts every request by its socket address when no proxy is trusted", () => {
+  it("counts every request by its socket address when no proxy is trusted", async () => {
     const guard = build();
     const direct = catalogContext({ ip: "127.0.0.1", ips: [], trustProxy: 0 });
     for (let attempt = 0; attempt < 300; attempt += 1) {
-      guard.canActivate(direct);
+      await guard.canActivate(direct);
     }
-    expect(() => guard.canActivate(direct)).toThrow(ProblemException);
+    await expect(guard.canActivate(direct)).rejects.toThrow(ProblemException);
   });
 
-  it("counts the request when trust proxy is not a hop count (an unknown setting fails closed)", () => {
+  it("counts the request when trust proxy is not a hop count (an unknown setting fails closed)", async () => {
     const guard = build();
     const unusual = catalogContext({ ip: "10.1.1.1", ips: [], trustProxy: "loopback" });
     for (let attempt = 0; attempt < 300; attempt += 1) {
-      guard.canActivate(unusual);
+      await guard.canActivate(unusual);
     }
-    expect(() => guard.canActivate(unusual)).toThrow(ProblemException);
+    await expect(guard.canActivate(unusual)).rejects.toThrow(ProblemException);
   });
 
-  it("does not share the window with the search window or another address limit", () => {
+  it("does not share the window with the search window or another address limit", async () => {
     const guard = build();
     for (let attempt = 0; attempt < 300; attempt += 1) {
-      guard.canActivate(throughEdge("203.0.113.9"));
+      await guard.canActivate(throughEdge("203.0.113.9"));
     }
-    expect(guard.canActivate(contextFor(ProbeController.prototype.limited, "203.0.113.9"))).toBe(
-      true,
-    );
+    expect(
+      await guard.canActivate(contextFor(ProbeController.prototype.limited, "203.0.113.9")),
+    ).toBe(true);
   });
 });

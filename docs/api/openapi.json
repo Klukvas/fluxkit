@@ -2839,7 +2839,25 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": "Service and database are reachable."
+            "description": "Service and database are reachable. Rate limit store may be degraded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["status", "rateLimitStore"],
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": ["ok"]
+                    },
+                    "rateLimitStore": {
+                      "type": "string",
+                      "enum": ["memory", "redis", "degraded"]
+                    }
+                  }
+                }
+              }
+            }
           },
           "503": {
             "description": "Database is not reachable."

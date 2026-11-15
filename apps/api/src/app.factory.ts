@@ -83,6 +83,8 @@ export type CreateAppEnv = Pick<AppEnv, "databaseUrl" | "enabledFeatures" | "fea
       | "orderGuestAccessDays"
       | "orderContactRetentionDays"
       | "orderTokenSecret"
+      | "rateLimitStore"
+      | "redisUrl"
       | "maxOpenOrders"
       | "trustProxy"
       | "schedulerEnabled"
@@ -104,6 +106,8 @@ export interface CreateAppOptions {
   adminAuthenticator?: AdminAuthenticator;
   /** Tests only: other numbers for the named rate limits. */
   rateLimits?: RateLimitOverrides;
+  /** Tests only: isolated Redis counter namespace. */
+  rateLimitKeyPrefix?: string;
   /** Tests only: a controlled clock for session expiry. */
   clock?: Clock;
   /** Tests only: cheap scrypt parameters. */
@@ -237,6 +241,13 @@ export async function createApp(
       search: env.search,
       searchTuning: options.searchTuning,
       rateLimits: options.rateLimits,
+      rateLimitStore: {
+        store: env.rateLimitStore ?? "memory",
+        ...(options.rateLimitKeyPrefix === undefined ? {} : { prefix: options.rateLimitKeyPrefix }),
+        redisUrl: env.redisUrl,
+        databaseUrl: env.databaseUrl,
+        secret: env.orderTokenSecret,
+      },
       shipmentCallTimeouts: options.shipmentCallTimeouts,
       adminAuthenticator: options.adminAuthenticator,
       clock: options.clock,
