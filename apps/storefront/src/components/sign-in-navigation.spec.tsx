@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   createSignInNavigation,
+  focusSignInDestination,
   isSignInModalActive,
   shouldRedirectAccountGuest,
   signInCloseAction,
@@ -63,5 +64,75 @@ describe("sign-in navigation decisions", () => {
     for (const status of ["signedIn", "loading", "error"]) {
       expect(shouldRedirectAccountGuest(status, false)).toBe(false);
     }
+  });
+});
+
+describe("post-dialog focus destination", () => {
+  function page() {
+    const heading = { hasAttribute: () => false, setAttribute: vi.fn(), focus: vi.fn() };
+    const main = { hasAttribute: () => true, setAttribute: vi.fn(), focus: vi.fn() };
+    return {
+      heading,
+      main,
+      doc: {
+        querySelector: (selector: "main h1" | "main") => (selector === "main h1" ? heading : main),
+      },
+    };
+  }
+
+  it.each([origin, "/en/account/forgot-password"])(
+    "returns to the connected opener at %s without changing its native Tab order",
+    (destination) => {
+      const navigation = createSignInNavigation();
+      // The header summary and forgot-page anchor need only their native focus method.
+      const opener = { isConnected: true, focus: vi.fn() };
+      navigation.recordOpener({ origin: destination, opener });
+      const { heading, main, doc } = page();
+      focusSignInDestination(destination, navigation, doc);
+      expect(opener.focus).toHaveBeenCalledExactlyOnceWith({ preventScroll: true });
+      expect(heading.focus).not.toHaveBeenCalled();
+      expect(main.focus).not.toHaveBeenCalled();
+      expect(heading.setAttribute).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(["/en", "/en/catalog", "/en/catalog?sort=price_desc", "/en/account/register"])(
+    "focuses the destination heading instead of an opener from another origin at %s",
+    (destination) => {
+      const navigation = createSignInNavigation();
+      const opener = { isConnected: true, focus: vi.fn() };
+      navigation.recordOpener({ origin, opener });
+      const { heading, main, doc } = page();
+      focusSignInDestination(destination, navigation, doc);
+      expect(opener.focus).not.toHaveBeenCalled();
+      expect(heading.focus).toHaveBeenCalledExactlyOnceWith({ preventScroll: true });
+      expect(heading.setAttribute).toHaveBeenCalledExactlyOnceWith("tabindex", "-1");
+      expect(main.focus).not.toHaveBeenCalled();
+    },
+  );
+
+  it("falls back to the heading when the matching opener was removed", () => {
+    const navigation = createSignInNavigation();
+    const opener = { isConnected: false, focus: vi.fn() };
+    navigation.recordOpener({ origin, opener });
+    const { heading, doc } = page();
+    focusSignInDestination(origin, navigation, doc);
+    expect(opener.focus).not.toHaveBeenCalled();
+    expect(heading.focus).toHaveBeenCalledExactlyOnceWith({ preventScroll: true });
+  });
+
+  it("focuses the gate destination heading without a recorded login-link opener", () => {
+    const { heading, doc } = page();
+    focusSignInDestination("/en", createSignInNavigation(), doc);
+    expect(heading.focus).toHaveBeenCalledExactlyOnceWith({ preventScroll: true });
+  });
+
+  it("falls back to main while the destination has no heading", () => {
+    const { main } = page();
+    const doc = {
+      querySelector: (selector: "main h1" | "main") => (selector === "main" ? main : null),
+    };
+    focusSignInDestination("/en", createSignInNavigation(), doc);
+    expect(main.focus).toHaveBeenCalledExactlyOnceWith({ preventScroll: true });
   });
 });

@@ -4,8 +4,10 @@ import { Button } from "@fluxkit/ui";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, type ReactNode, type Ref } from "react";
 import { localizedHref } from "../lib/locale-path";
-import { signInCloseAction } from "../lib/sign-in-navigation";
+import { focusSignInDestination, signInCloseAction } from "../lib/sign-in-navigation";
 import { useI18n } from "./i18n-provider";
+import { useAccount } from "./session-provider";
+import { useSignInNavigation } from "./sign-in-navigation";
 
 /** Rebind a replaced form heading without taking focus from a field, close button or error summary. */
 export function createSignInHeadingBinding(
@@ -64,6 +66,8 @@ export function SignInModalView({
 export function SignInModal({ children }: { children: ReactNode }) {
   const { locale, t } = useI18n();
   const router = useRouter();
+  const coordinator = useSignInNavigation()?.coordinator ?? null;
+  const { store } = useAccount();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const mounted = useRef(false);
   const closing = useRef(false);
@@ -73,6 +77,14 @@ export function SignInModal({ children }: { children: ReactNode }) {
     if (dialog === null) return;
     mounted.current = true;
     closing.current = false;
+    coordinator?.setPostSignInHeading(false);
+    let sessionStatus = store.getState().session.status;
+    let signedIn = false;
+    const stopSessionWatch = store.subscribe(() => {
+      const nextStatus = store.getState().session.status;
+      if (sessionStatus !== "signedIn" && nextStatus === "signedIn") signedIn = true;
+      sessionStatus = nextStatus;
+    });
     const bindHeading = createSignInHeadingBinding(
       () => dialog.querySelector("h1"),
       titleId,
@@ -91,11 +103,28 @@ export function SignInModal({ children }: { children: ReactNode }) {
     document.documentElement.classList.add("fk-sign-in-open");
     return () => {
       mounted.current = false;
+      stopSessionWatch();
       observer.disconnect();
       document.documentElement.classList.remove("fk-sign-in-open");
       if (dialog.open) dialog.close();
+      // Strict-mode effect replay closes and reopens a connected dialog, without a real unmount.
+      if (dialog.isConnected) return;
+      // A successful form navigation belongs to RouteFocus; all other exits belong to this dialog.
+      const focusAfterSignIn = signedIn && !closing.current;
+      coordinator?.setPostSignInHeading(focusAfterSignIn);
+      if (focusAfterSignIn && coordinator) return;
+      requestAnimationFrame(() => {
+        // Give a separately committed destination page one more frame before reading its URL and DOM.
+        requestAnimationFrame(() => {
+          focusSignInDestination(
+            window.location.pathname + window.location.search,
+            coordinator,
+            document,
+          );
+        });
+      });
     };
-  }, [titleId]);
+  }, [titleId, coordinator, store]);
   const dismiss = () => {
     if (!mounted.current || closing.current) return;
     closing.current = true;

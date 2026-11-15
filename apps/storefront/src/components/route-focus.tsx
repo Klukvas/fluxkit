@@ -14,18 +14,12 @@ export function RouteFocus() {
   useEffect(() => {
     const active = navigation?.active ?? false;
     const closed = wasModalActive.current && !active;
+    // Slot and pathname updates can arrive separately. Wait for the destination commit.
+    if (closed && pathname.endsWith("/account/login")) return;
     wasModalActive.current = active;
-    focus.current.onPathname(pathname, active || closed);
-    if (!closed) return;
-    // Native close() restores pre-dialog focus during teardown. Both return paths must run after it.
-    const frame = requestAnimationFrame(() => {
-      const opener = navigation?.coordinator.openerFor(
-        window.location.pathname + window.location.search,
-      );
-      if (opener) opener.focus({ preventScroll: true });
-      else focusPageHeading(document);
-    });
-    return () => cancelAnimationFrame(frame);
+    const signedIn = !active && (navigation?.coordinator.takePostSignInHeading() ?? false);
+    focus.current.onPathname(pathname, active || closed || signedIn);
+    if (signedIn) focusPageHeading(document);
   }, [pathname, navigation?.active, navigation?.coordinator]);
   return null;
 }
