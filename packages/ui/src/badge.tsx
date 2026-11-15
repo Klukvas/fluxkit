@@ -8,7 +8,7 @@ export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
 }
 
 const variantClasses: Record<BadgeVariant, string> = {
-  neutral: "border-border text-foreground",
+  neutral: "border-foreground text-foreground",
   success: "border-success text-success",
   warning: "border-warning text-warning",
   danger: "border-danger text-danger",
@@ -19,7 +19,7 @@ export function Badge({ variant = "neutral", className, ...props }: BadgeProps) 
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-sm border bg-background px-2 py-0.5 text-sm font-medium",
+        "inline-flex items-center rounded-sm border-2 bg-background px-2 py-0.5 text-sm font-medium",
         variantClasses[variant],
         className,
       )}

@@ -112,8 +112,8 @@ describe("CartDrawerView", () => {
     const secondaryClasses = String(viewCart[0]?.props.className).split(" ");
     expect(secondaryClasses).toEqual(
       expect.arrayContaining([
-        "border",
-        "border-border",
+        "border-2",
+        "border-foreground",
         "bg-background",
         "text-foreground",
         "hover:bg-muted",

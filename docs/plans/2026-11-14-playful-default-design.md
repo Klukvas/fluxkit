@@ -1,6 +1,6 @@
 # Playful default design (concept 03)
 
-Status: A (PR 285), B (PR 284, test only), C (PR 292) and D (PR 291) merged and deployed (2026-11-14). Follow-up in progress: free-shipping progress in the drawer (decision 7).
+Status: A (PR 285), B (PR 284, test only), C (PR 292) and D (PR 291) merged and deployed (2026-11-14); follow-ups merged: free-shipping progress (decision 7, PR 298) and the overlay scrim token (decision 9, PR 300). Polish round of 2026-11-15 below.
 
 ## Goal
 
@@ -93,3 +93,13 @@ review by a different model than its author.
   stack has no box, and `ActionButton` clips its labels only with `truncateLabels` (cards): any clipping box inside the product
   page's add button changed the anti-aliasing of the trust bar text after it (bisected with CSS overrides against main's screenshot).
 - Follow-ups: free-shipping progress (API red zone, see above); admin use of the motion kit.
+
+## Polish round (2026-11-15)
+
+A check of the live storefront against the concept found gaps; the owner asked to fix them all ("Чини все"). Two PRs, owned paths apart:
+
+- Hero picture, hero heading and ink outlines (PR 317, branch `claude/polish-hero-borders-551d8a`):
+  - `public/home/hero.svg` becomes flat, niche-neutral demo art in the concept's palette (shopping bag, tag, parcel; ink outlines), same size, still decorative (`altKey: null`).
+  - The hero heading uses the additive `textStyles.displayTitle` role (Rubik 900, tight tracking); the top type step `4xl` is retuned to 3.5rem / 3.75rem (token values only, no new token; it is used only by the hero `h1`).
+  - Cards and outlined controls get 2px `foreground` outlines (ink in light, cream in dark); text fields keep `border-input`, now 2px, with the light value set to ink. Dividers, panels, menus and dialogs stay hairline `border`.
+- Floating cart drawer, empty cart and product-card hover: a separate PR of the parallel session.

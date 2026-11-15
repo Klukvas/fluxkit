@@ -1,9 +1,28 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" width="640" height="480">
-  <!-- Fluxkit placeholder picture (neutral, no branding, no niche): a generic landscape pictogram in mid greys that read on the
-       light and the dark theme without glare. A picture loaded by <img> cannot use the theme tokens or currentColor, so the
-       greys are fixed. TODO(fluxkit): a client fork replaces it with its own picture of the same size (config/home.ts). -->
-  <rect width="640" height="480" rx="24" fill="#a7abb3"/>
-  <circle cx="470" cy="150" r="54" fill="#c7cad0"/>
-  <path d="M24 400l146-190 120 130 80-80 246 216v24H24z" fill="#8e939c"/>
-  <path d="M0 456V380l230-120 180 110 230-90v176a24 24 0 0 1-24 24H24A24 24 0 0 1 0 456z" fill="#7a7f88"/>
+  <!-- Placeholder demo art. Fixed hex colours because an <img> cannot read tokens.
+       TODO(fluxkit): a fork replaces it with its own picture of the same size (config/home.ts). -->
+  <rect width="640" height="480" rx="24" fill="#ffe2c2"/>
+  <g stroke="#2b1a12" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M101 375h437" fill="none"/>
+    <path d="M163 168l190-14 31 206-243 17z" fill="#2b1a12"/>
+    <path d="M150 155l190-14 31 206-243 17z" fill="#ff5a36"/>
+    <path d="M191 166l-3-42c-5-66 94-74 99-7l3 42" fill="none"/>
+    <path d="M169 198l-11 133 29-2" fill="none" stroke="#fff3e3"/>
+    <path d="M316 154c25 4 50 18 58 42" fill="none"/>
+    <g transform="rotate(22 378 219)">
+      <path d="M356 189l22-21 23 21v69h-45z" fill="#b17b15"/>
+      <circle cx="378" cy="190" r="5" fill="#fff3e3" stroke-width="6"/>
+      <path d="M368 226h21m-21 13h13" fill="none" stroke="#fff3e3" stroke-width="6"/>
+    </g>
+    <path d="M376 286l119-20 39 33v72l-119 18-39-33z" fill="#2b1a12"/>
+    <path d="M365 275l119-20 39 33v72l-119 18-39-33z" fill="#fae9d3"/>
+    <path d="M365 275l39 32 119-19m-119 19v71" fill="none"/>
+    <path d="M414 267l39 32 1 30 28-5v-30l-39-32z" fill="#b17b15"/>
+    <path d="M427 349l28-5" fill="none"/>
+    <path d="M98 126l9-25 10 25 25 10-25 9-10 26-9-26-26-9z" fill="#ffd166"/>
+    <path d="M493 178l7-19 7 19 19 7-19 8-7 19-7-19-19-8z" fill="#fff3e3"/>
+    <path d="M446 86v23m-11-12h23M99 275v18m-9-9h18" fill="none"/>
+    <path d="M381 113c63-9 119 12 154 48 23 23 30 53 16 74" fill="none" stroke-width="6" stroke-dasharray="2 17"/>
+    <path d="M535 230l14 12 16-9" fill="none" stroke-width="6"/>
+  </g>
 </svg>
