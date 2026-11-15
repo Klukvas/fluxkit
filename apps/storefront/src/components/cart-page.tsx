@@ -54,6 +54,7 @@ import {
 } from "../lib/quantity-autosave";
 import { useI18n } from "./i18n-provider";
 import { useCart } from "./session-provider";
+import { EmptyCartIllustration } from "./empty-cart-illustration";
 import { FreeShippingProgress } from "./free-shipping-progress";
 import { StoreImage } from "./store-image";
 import { focusRing, linkButton } from "./styles";
@@ -465,6 +466,7 @@ export function CartPageView({
 
       {cart !== null && cart.lines.length === 0 ? (
         <EmptyState
+          illustration={<EmptyCartIllustration />}
           title={t("cart.empty.title")}
           description={t("cart.empty.description")}
           action={
