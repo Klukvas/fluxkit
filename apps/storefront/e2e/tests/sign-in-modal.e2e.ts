@@ -12,7 +12,7 @@ async function openSignIn(page: Page, locale = "en") {
     .getByRole("link", { name: locale === "en" ? "Sign in" : "Увійти", exact: true })
     .click();
   const dialog = page.getByRole("dialog", {
-    name: locale === "en" ? "Sign in" : "Увійти",
+    name: locale === "en" ? "Sign in" : "Вхід",
     exact: true,
   });
   await expect(dialog).toBeVisible();
@@ -38,9 +38,13 @@ for (const width of [1280, 390]) {
     expect(await dialog.getByRole("heading", { level: 1 }).getAttribute("id")).toBe(labelledBy);
     for (const key of ["Tab", "Shift+Tab", "Tab", "Tab", "Tab", "Tab", "Tab", "Tab"]) {
       await page.keyboard.press(key);
-      expect(await dialog.evaluate((element) => element.contains(document.activeElement))).toBe(
-        true,
-      );
+      // Like the shared Dialog's keyboard regression: native Tab may visit browser controls
+      // (activeElement becomes body), but must never focus the inert background page.
+      const outside = await dialog.evaluate((element) => {
+        const active = document.activeElement;
+        return active !== null && active !== document.body && !element.contains(active);
+      });
+      expect(outside, "focus left the modal dialog for the page behind it").toBe(false);
     }
     expect(
       await page.locator("html").evaluate((element) => getComputedStyle(element).overflow),
@@ -149,7 +153,12 @@ test("failed sign-in keeps its error summary and focus inside the modal", async 
   await dialog.getByRole("button", { name: "Sign in", exact: true }).click();
   const message = dialog.getByText("The email or password is not correct.");
   await expect(message).toHaveCount(1);
-  await expect(dialog.locator('div[tabindex="-1"]').filter({ has: message })).toBeFocused();
+  // `has` is relative to each candidate: a dialog-scoped locator would seek a nested dialog.
+  const summary = dialog.locator('div[tabindex="-1"]').filter({
+    has: page.getByRole("alert").filter({ hasText: "The email or password is not correct." }),
+  });
+  await expect(summary).toHaveCount(1);
+  await expect(summary).toBeFocused();
   await expect(dialog.getByLabel("Password", { exact: true })).toHaveValue("");
   await expect(dialog.getByLabel("Email", { exact: true })).toHaveValue(email);
   await expect(dialog.locator('[aria-invalid="true"]')).toHaveCount(0);
@@ -231,7 +240,7 @@ test("checkout sign-in preserves its explicit return destination", async ({
 test("Forgot password clears the slot and its login link opens it again", async ({ page }) => {
   await page.goto("/en/catalog");
   const dialog = await openSignIn(page);
-  await dialog.getByRole("link", { name: "Forgot password?", exact: true }).click();
+  await dialog.getByRole("link", { name: "Forgot your password?", exact: true }).click();
   await expect(page).toHaveURL(/\/en\/account\/forgot-password$/);
   await expect(dialog).toHaveCount(0);
   await page.locator('main a[href="/en/account/login"]').click();

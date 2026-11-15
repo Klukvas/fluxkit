@@ -120,6 +120,15 @@
 - Default root build: 17/18 tasks succeed; storefront reaches compile then Turbopack fails because sandboxing forbids binding its PostCSS worker port (`Operation not permitted`). The default build must be repeated outside this sandbox. `pnpm --filter @fluxkit/storefront build --webpack` passes (compile, TypeScript, 47 static pages and traces).
 - No RTL/jsdom or no-JS header fallback, as ruled below. Behavioural scenarios use Chromium; they are not run here because the real services are unavailable. The orchestrator owns independent QA, browser/first-HTML/feature-matrix and visual acceptance; no commit, push, deploy or next task is performed.
 
+## Fix round 1 (2026-11-15)
+
+- Independent QA requested changes; the orchestrator's initial real-service Chromium run reports 249 passed and 8 failed. Build/e2e reruns and fresh review remain with the orchestrator for this fix round; the developer leaves the fixes uncommitted.
+- The coordinator reads `useSelectedLayoutSegments("modal")`: installed Next 16.4.3 returns `["(.)account", "login"]`, while its singular hook returns the last segment for a named slot. The pure helper also accepts Next's `null` result without a layout-router context (standalone static renders).
+- Next exposes no history-entry index. Traversal metadata is reused only for a single recorded entry at that URL; duplicate/unknown entries and traversals after the bounded record fills dismiss to home. The gate → Register → Sign in → Back twice regression fails before the fix (`back`, expected `home`) and passes after it.
+- Heading rebinding preserves existing focus inside the dialog, including the failure summary, while still focusing an initial or replacement heading after focus is lost. Pure callback regressions cover both paths.
+- Test corrections: Ukrainian dialog name `Вхід` (the heading), English forgot link `Forgot your password?`, an unscoped descendant locator inside the relative summary filter, and native Tab behaviour matching `apps/admin/e2e/tests/keyboard.e2e.ts` for the shared Dialog (browser controls allowed, background page controls forbidden). No check is disabled.
+- Node 22 verification: storefront `typecheck`, root `lint`, `format`, `format:check`, `check:boundaries` (2,901 modules, zero violations), storefront `test`: default 2,534 passed; brand fork 2,435 passed; home fork 2,439 passed and 13 existing template-only skips. The first full unit run exposed the null-context edge above; the corrected complete rerun passes. No build or e2e is run in this round, per the current request.
+
 ## Red zone
 
 - No server sign-in logic, session/cookie behaviour, API response or public-contract change is required or planned. Any discovered need will stop implementation and go to the owner, rather than be folded into this plan.

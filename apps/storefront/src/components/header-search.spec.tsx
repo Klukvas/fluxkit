@@ -13,7 +13,7 @@ const { uk } = messagesByLocale;
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
   usePathname: () => "/uk",
-  useSelectedLayoutSegment: () => null,
+  useSelectedLayoutSegments: () => [],
   useSearchParams: () => new URLSearchParams(),
 }));
 

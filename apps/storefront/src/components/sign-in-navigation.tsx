@@ -1,10 +1,10 @@
 "use client";
 
 import type { Locale } from "@fluxkit/ui";
-import { useSelectedLayoutSegment } from "next/navigation";
+import { useSelectedLayoutSegments } from "next/navigation";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { localizedHref } from "../lib/locale-path";
-import { createSignInNavigation } from "../lib/sign-in-navigation";
+import { createSignInNavigation, isSignInModalActive } from "../lib/sign-in-navigation";
 
 interface Navigation {
   active: boolean;
@@ -18,9 +18,9 @@ export function useSignInNavigation() {
 
 /** Observes normal anchors without changing their URL, click semantics or Next history state. */
 export function SignInNavigation({ locale, children }: { locale: Locale; children: ReactNode }) {
-  const segment = useSelectedLayoutSegment("modal");
+  const segments = useSelectedLayoutSegments("modal");
   const [coordinator] = useState(createSignInNavigation);
-  const active = segment === "(.)account";
+  const active = isSignInModalActive(segments);
   useEffect(() => {
     const onTraversal = () => coordinator.traversal();
     window.addEventListener("popstate", onTraversal);

@@ -123,7 +123,7 @@ test("a draft is a real 404; a published post renders with its metadata, JSON-LD
     await waitForHydration(page);
     await openAccountMenu(page, "Меню акаунта");
     await page.getByRole("banner").getByRole("link", { name: "Увійти", exact: true }).click();
-    const signIn = page.getByRole("dialog", { name: "Увійти", exact: true });
+    const signIn = page.getByRole("dialog", { name: "Вхід", exact: true });
     await expect(signIn).toBeVisible();
     await expect(
       main.getByRole("heading", { level: 1, name: "Догляд за льоном", includeHidden: true }),

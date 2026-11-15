@@ -7,6 +7,23 @@ import { localizedHref } from "../lib/locale-path";
 import { useI18n } from "./i18n-provider";
 import { useSignInNavigation } from "./sign-in-navigation";
 
+/** Rebind a replaced form heading without taking focus from a field, close button or error summary. */
+export function createSignInHeadingBinding(
+  readHeading: () => Pick<HTMLHeadingElement, "id" | "tabIndex" | "focus"> | null,
+  titleId: string,
+  hasContentFocus: () => boolean,
+) {
+  let previousHeading: ReturnType<typeof readHeading> = null;
+  return (initial = false) => {
+    const heading = readHeading();
+    if (heading === null || heading === previousHeading) return;
+    heading.id = titleId;
+    heading.tabIndex = -1;
+    previousHeading = heading;
+    if (initial || !hasContentFocus()) heading.focus({ preventScroll: true });
+  };
+}
+
 /** Static shell: the contained form supplies the only heading. Never server-render an open dialog. */
 export function SignInModalView({
   children,
@@ -57,15 +74,11 @@ export function SignInModal({ children }: { children: ReactNode }) {
     if (dialog === null) return;
     mounted.current = true;
     closing.current = false;
-    let previousHeading: HTMLHeadingElement | null = null;
-    const bindHeading = () => {
-      const heading = dialog.querySelector("h1");
-      if (heading === null || heading === previousHeading) return;
-      heading.id = titleId;
-      heading.tabIndex = -1;
-      previousHeading = heading;
-      heading.focus({ preventScroll: true });
-    };
+    const bindHeading = createSignInHeadingBinding(
+      () => dialog.querySelector("h1"),
+      titleId,
+      () => dialog.contains(document.activeElement),
+    );
     // Label before showModal; then focus the heading instead of opening a phone keyboard.
     const heading = dialog.querySelector("h1");
     if (heading) {
@@ -73,8 +86,8 @@ export function SignInModal({ children }: { children: ReactNode }) {
       heading.tabIndex = -1;
     }
     if (!dialog.open) dialog.showModal();
-    bindHeading();
-    const observer = new MutationObserver(bindHeading);
+    bindHeading(true);
+    const observer = new MutationObserver(() => bindHeading());
     observer.observe(dialog, { childList: true, subtree: true });
     document.documentElement.classList.add("fk-sign-in-open");
     return () => {

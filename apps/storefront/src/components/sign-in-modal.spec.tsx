@@ -3,7 +3,42 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { messagesByLocale } from "../messages";
 import { LoginFormView } from "./login-form";
-import { SignInModalView } from "./sign-in-modal";
+import { createSignInHeadingBinding, SignInModalView } from "./sign-in-modal";
+
+describe("modal heading binding", () => {
+  it("focuses initially, then preserves the error summary's focus even if the heading is replaced", () => {
+    const initial = { id: "", tabIndex: 0, focus: vi.fn() };
+    let heading = initial;
+    const bind = createSignInHeadingBinding(
+      () => heading,
+      "modal-title",
+      () => true,
+    );
+    bind(true);
+    expect(initial.focus).toHaveBeenCalledExactlyOnceWith({ preventScroll: true });
+    bind();
+    expect(initial.focus).toHaveBeenCalledTimes(1);
+    heading = { id: "", tabIndex: 0, focus: vi.fn() };
+    bind();
+    expect(heading.id).toBe("modal-title");
+    expect(heading.tabIndex).toBe(-1);
+    expect(heading.focus).not.toHaveBeenCalled();
+  });
+
+  it("focuses a replacement signed-in heading when the previous view lost focus", () => {
+    let heading = { id: "", tabIndex: 0, focus: vi.fn() };
+    const bind = createSignInHeadingBinding(
+      () => heading,
+      "modal-title",
+      () => false,
+    );
+    bind(true);
+    heading = { id: "", tabIndex: 0, focus: vi.fn() };
+    bind();
+    expect(heading.id).toBe("modal-title");
+    expect(heading.focus).toHaveBeenCalledExactlyOnceWith({ preventScroll: true });
+  });
+});
 
 it("renders a closed native dialog with a named close button and no extra heading", () => {
   for (const locale of ["uk", "en"] as const) {
