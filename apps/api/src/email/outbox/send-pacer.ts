@@ -1,19 +1,22 @@
-/**
- * Spaces the provider calls of one process (ADR 0031 decision 6: at most `sendsPerSecond`, under Resend's 10 requests
- * per second per team, R7): every call takes the next free slot, `1000 / sendsPerSecond` ms after the previous one, and
- * waits for it. Job 9 and the immediate attempts share one pacer, so together they never exceed the rate in one process
- * (several processes can, ADR 0031 open question 5). Reads the monotonic clock; a test passes its own clock and sleep.
- */
+import type { WindowStore } from "../../rate-limit/window-store.js";
+
+/** Redis TIME is rounded down to milliseconds; reserve that rounding error as well as allowed lateness. */
+const SLOT_TOLERANCE_MS = 5;
+
+/** One admission queue for job and immediate calls; never catch up missed slots (ADR 0031, 0055). */
 export class SendPacer {
   private readonly intervalMs: number;
   private nextSlotAt = Number.NEGATIVE_INFINITY;
   private waitingCount = 0;
+  private replyAllowanceMs = 0;
+  private admissions: Promise<void> = Promise.resolve();
 
   constructor(
     sendsPerSecond: number,
     private readonly clock: () => number = () => performance.now(),
     private readonly sleep: (ms: number) => Promise<void> = (ms) =>
       new Promise((resolve) => setTimeout(resolve, ms)),
+    private readonly store?: WindowStore,
   ) {
     if (!Number.isFinite(sendsPerSecond) || sendsPerSecond <= 0) {
       throw new RangeError("sendsPerSecond must be a positive number");
@@ -21,24 +24,74 @@ export class SendPacer {
     this.intervalMs = 1000 / sendsPerSecond;
   }
 
-  /** Calls waiting for their slot right now. */
   waiting(): number {
     return this.waitingCount;
   }
 
-  /** Takes the next slot and resolves when it comes. Slots are handed out in call order. */
-  async acquire(): Promise<void> {
-    const now = this.clock();
-    const slot = Math.max(now, this.nextSlotAt);
-    this.nextSlotAt = slot + this.intervalMs;
-    if (slot <= now) {
-      return;
-    }
+  async acquire(maxWaitMs = 110_000): Promise<boolean> {
+    return (await this.start(maxWaitMs, () => undefined)).started;
+  }
+
+  /**
+   * Serializes slot admission and synchronous provider invocation, never database I/O or provider completion.
+   * The wait budget includes queued admissions, Redis round trips and sleeps.
+   */
+  async start<T>(
+    maxWaitMs: number,
+    start: () => T,
+  ): Promise<{ started: false } | { started: true; value: T }> {
+    const until = this.clock() + Math.max(0, maxWaitMs);
     this.waitingCount += 1;
+    const admission = this.admissions.then(async () => {
+      for (;;) {
+        if (this.clock() >= until) return { started: false } as const;
+        const localWait = Math.max(0, this.nextSlotAt - this.clock());
+        if (this.clock() + localWait >= until) return { started: false } as const;
+        await this.waitUntil(this.clock() + localWait);
+        if (this.clock() >= until) return { started: false } as const;
+        const requestedAt = this.clock();
+        const replyAllowance = this.replyAllowanceMs;
+        const shared = await this.store?.reserveEmailSlot?.(
+          this.intervalMs + replyAllowance + SLOT_TOLERANCE_MS + 1,
+          until - requestedAt,
+        );
+        const receivedAt = this.clock();
+        const replyMs = Math.ceil(receivedAt - requestedAt);
+        const slot = receivedAt + (shared?.waitMs ?? 0);
+        // The server reserved between request and reply. Sleeping the returned wait from receipt never starts
+        // early. Pad this reservation's interval for reply uncertainty, separately from the 5 ms timer tolerance.
+        const latest = requestedAt + (shared?.waitMs ?? 0) + replyAllowance + SLOT_TOLERANCE_MS;
+        if (slot >= until) return { started: false } as const;
+        if (shared != null && slot > latest) {
+          // This reservation did not include enough reply padding. Leave it unused and reserve with the observed RTT.
+          this.replyAllowanceMs = replyMs;
+          continue;
+        }
+        await this.waitUntil(slot);
+        if (this.clock() >= until) return { started: false } as const;
+        if (shared != null && (this.clock() > latest || this.clock() > slot + SLOT_TOLERANCE_MS))
+          continue;
+        if (shared != null) this.replyAllowanceMs = replyMs;
+        this.nextSlotAt = this.clock() + this.intervalMs;
+        return { started: true, value: start() } as const;
+      }
+    });
+    this.admissions = admission.then(
+      () => undefined,
+      () => undefined,
+    );
     try {
-      await this.sleep(slot - now);
+      return await admission;
     } finally {
       this.waitingCount -= 1;
+    }
+  }
+
+  private async waitUntil(at: number): Promise<void> {
+    let remaining = at - this.clock();
+    while (remaining > 0) {
+      await this.sleep(Math.min(remaining, 2_147_483_647));
+      remaining = at - this.clock();
     }
   }
 }

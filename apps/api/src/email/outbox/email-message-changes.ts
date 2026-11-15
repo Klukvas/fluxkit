@@ -179,6 +179,37 @@ export class EmailMessageChanges {
     );
   }
 
+  /** Return an unattempted claim to the queue, without spending an attempt or overwriting a newer claim. */
+  defer(
+    claimed: ClaimedEmailMessage,
+    now: Date,
+    limits: JobLimits = DEFAULT_JOB_LIMITS,
+  ): Promise<{ kind: "deferred" | "lost" }> {
+    return withJobTransaction(
+      this.database,
+      async (tx) => {
+        const row = await this.outbox.lock(tx, claimed.id);
+        if (
+          row === undefined ||
+          row.status !== "sending" ||
+          row.attempts !== claimed.attempts ||
+          row.leaseUntil?.getTime() !== claimed.leaseUntil.getTime()
+        )
+          return { kind: "lost" };
+        assertTransition("sending", "pending", "system");
+        await this.outbox.update(tx, row.id, {
+          status: "pending",
+          attempts: row.attempts - 1,
+          leaseUntil: null,
+          nextAttemptAt: new Date(Math.min(now.getTime() + 1_000, row.deadlineAt.getTime())),
+          updatedAt: now,
+        });
+        return { kind: "deferred" };
+      },
+      limits,
+    );
+  }
+
   /**
    * `pending -> cancelled` by an admin (ADR 0031 decision 5). Locks the row and waits for a sender that holds it right now,
    * then decides on the status it finds: a claim that committed first left `sending` (refused), a cancel that committed
