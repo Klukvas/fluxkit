@@ -22,11 +22,6 @@ export function SignInNavigation({ locale, children }: { locale: Locale; childre
   const [coordinator] = useState(createSignInNavigation);
   const active = isSignInModalActive(segments);
   useEffect(() => {
-    const onTraversal = () => coordinator.traversal();
-    window.addEventListener("popstate", onTraversal);
-    return () => window.removeEventListener("popstate", onTraversal);
-  }, [coordinator]);
-  useEffect(() => {
     const observe = (event: MouseEvent) => {
       if (
         event.defaultPrevented ||
@@ -53,9 +48,7 @@ export function SignInNavigation({ locale, children }: { locale: Locale; childre
       const opener = anchor.closest("header")
         ? (anchor.closest("details")?.querySelector("summary") ?? anchor)
         : anchor;
-      coordinator.prepare({
-        kind: "push",
-        destination: url.pathname + url.search,
+      coordinator.recordOpener({
         origin: window.location.pathname + window.location.search,
         opener,
       });

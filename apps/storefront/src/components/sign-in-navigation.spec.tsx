@@ -3,10 +3,10 @@ import {
   createSignInNavigation,
   isSignInModalActive,
   shouldRedirectAccountGuest,
+  signInCloseAction,
 } from "../lib/sign-in-navigation";
 
-const destination = "/en/account/login";
-const origin = "/en/catalog";
+const origin = "/en/catalog?sort=price_asc";
 
 describe("sign-in navigation decisions", () => {
   it("recognizes the actual Next 16 modal segments, keeping the gate's original next", () => {
@@ -18,39 +18,43 @@ describe("sign-in navigation decisions", () => {
     }
   });
 
-  it("dismisses a known push with Back exactly once and restores its origin opener", () => {
+  it.each([
+    [true, "back"],
+    [false, "home"],
+    [undefined, "home"],
+  ] as const)("closes with %s browser canGoBack as %s", (canGoBack, action) => {
+    expect(signInCloseAction(canGoBack)).toBe(action);
+  });
+
+  it("restores the latest connected opener only at its exact origin, including search", () => {
     const navigation = createSignInNavigation();
     const opener = { isConnected: true, focus: vi.fn() };
-    navigation.route(false, origin);
-    navigation.prepare({ kind: "push", destination, origin, opener });
-    expect(navigation.route(true, destination).skipFocus).toBe(true);
-    expect(navigation.dismiss()).toBe("back");
-    expect(navigation.dismiss()).toBeNull();
-    expect(navigation.route(false, origin)).toEqual({
-      skipFocus: true,
-      restoreFocus: true,
-      opener,
-    });
-    navigation.traversal();
-    navigation.route(true, destination);
-    expect(navigation.dismiss()).toBe("back");
+    expect(navigation.openerFor(origin)).toBeNull();
+    navigation.recordOpener({ origin, opener });
+    expect(navigation.openerFor(origin)).toBe(opener);
+    expect(navigation.openerFor("/en/catalog")).toBeNull();
+    expect(navigation.openerFor("/en/catalog?sort=price_desc")).toBeNull();
+    expect(navigation.openerFor("/en/account")).toBeNull();
+    // Back/Forward needs no bookkeeping to retain the same focus destination.
+    expect(navigation.openerFor(origin)).toBe(opener);
   });
 
-  it.each(["replace", "unknown"] as const)("dismisses %s to home", (kind) => {
+  it("uses the latest activation instead of keeping history of previous openers", () => {
     const navigation = createSignInNavigation();
-    if (kind === "replace") navigation.prepare({ kind, destination, origin, opener: null });
-    navigation.route(true, destination);
-    expect(navigation.dismiss()).toBe("home");
-    expect(navigation.dismiss()).toBeNull();
+    const first = { isConnected: true, focus: vi.fn() };
+    const latest = { isConnected: true, focus: vi.fn() };
+    navigation.recordOpener({ origin, opener: first });
+    navigation.recordOpener({ origin: "/en/account/forgot-password", opener: latest });
+    expect(navigation.openerFor(origin)).toBeNull();
+    expect(navigation.openerFor("/en/account/forgot-password")).toBe(latest);
   });
 
-  it("does not reuse push metadata for a later unknown navigation or restore focus on success", () => {
+  it("does not restore an opener that has left the document", () => {
     const navigation = createSignInNavigation();
-    navigation.prepare({ kind: "push", destination, origin, opener: null });
-    navigation.route(true, destination);
-    expect(navigation.route(false, "/en/account").skipFocus).toBe(false);
-    navigation.route(true, destination);
-    expect(navigation.dismiss()).toBe("home");
+    const opener = { isConnected: true, focus: vi.fn() };
+    navigation.recordOpener({ origin, opener });
+    opener.isConnected = false;
+    expect(navigation.openerFor(origin)).toBeNull();
   });
 
   it("prevents gate re-entry while the modal is active", () => {
@@ -59,53 +63,5 @@ describe("sign-in navigation decisions", () => {
     for (const status of ["signedIn", "loading", "error"]) {
       expect(shouldRedirectAccountGuest(status, false)).toBe(false);
     }
-  });
-
-  it("closes to home after gate → Register → Sign in → Back twice", () => {
-    const navigation = createSignInNavigation();
-    const register = "/en/account/register?next=%2Fen%2Faccount%2Forders%3Fpage%3D3";
-    const login = "/en/account/login?next=%2Fen%2Faccount%2Forders%3Fpage%3D3";
-    navigation.prepare({
-      kind: "replace",
-      destination: login,
-      origin: "/en/account/orders?page=3",
-      opener: null,
-    });
-    navigation.route(true, login);
-    navigation.route(false, register);
-    navigation.prepare({ kind: "push", destination: login, origin: register, opener: null });
-    navigation.route(true, login);
-    expect(navigation.dismiss()).toBe("back");
-    navigation.traversal();
-    navigation.route(false, register);
-    navigation.traversal();
-    navigation.route(true, login);
-    expect(navigation.dismiss()).toBe("home");
-  });
-
-  it("does not identify an unknown entry by another push with the same URL", () => {
-    const navigation = createSignInNavigation();
-    navigation.route(true, destination);
-    navigation.route(false, origin);
-    navigation.prepare({ kind: "push", destination, origin, opener: null });
-    navigation.route(true, destination);
-    navigation.traversal();
-    navigation.route(false, origin);
-    navigation.traversal();
-    navigation.route(true, destination);
-    expect(navigation.dismiss()).toBe("home");
-  });
-
-  it("does not regain false certainty after its bounded traversal history fills up", () => {
-    const navigation = createSignInNavigation();
-    for (let index = 0; index < 21; index += 1) {
-      navigation.prepare({ kind: "push", destination, origin, opener: null });
-      navigation.route(true, destination);
-      expect(navigation.dismiss()).toBe("back");
-      navigation.route(false, origin);
-    }
-    navigation.traversal();
-    navigation.route(true, destination);
-    expect(navigation.dismiss()).toBe("home");
   });
 });

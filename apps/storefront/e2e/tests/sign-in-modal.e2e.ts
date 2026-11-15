@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import { expect, test, uniqueEmail } from "../support/fixtures.ts";
-import { openAccountMenu, waitForHydration } from "../support/flows.ts";
+import { chooseSort, openAccountMenu, waitForHydration } from "../support/flows.ts";
 
 const PASSWORD = "a long modal e2e password 123";
 
@@ -57,6 +57,14 @@ for (const width of [1280, 390]) {
     await expect(
       page.getByRole("banner").getByRole("button", { name: "Account menu" }),
     ).toBeFocused();
+    await page.keyboard.press("Shift+Tab");
+    await expect(
+      page.getByRole("banner").getByRole("button", { name: "Account menu" }),
+    ).not.toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(
+      page.getByRole("banner").getByRole("button", { name: "Account menu" }),
+    ).toBeFocused();
     expect(
       await page.locator("html").evaluate((element) => getComputedStyle(element).overflow),
     ).not.toBe("hidden");
@@ -73,6 +81,29 @@ for (const width of [1280, 390]) {
     await expect(dialog).toHaveCount(0);
   });
 }
+
+test("query-only Back before sign-in leaves dismissal correct after Forward reopening", async ({
+  page,
+}) => {
+  await page.goto("/en/catalog");
+  await waitForHydration(page);
+  await chooseSort(page, "Price: low to high");
+  await expect(page).toHaveURL(/\/en\/catalog\?sort=price_asc$/);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/en\/catalog$/);
+  const dialog = await openSignIn(page);
+  await page.keyboard.press("Escape");
+  await expect(page).toHaveURL(/\/en\/catalog$/);
+  await expect(dialog).toHaveCount(0);
+  await page.goForward();
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page).toHaveURL(/\/en\/catalog$/);
+  await expect(dialog).toHaveCount(0);
+  await expect(
+    page.getByRole("banner").getByRole("button", { name: "Account menu" }),
+  ).toBeFocused();
+});
 
 for (const path of ["/en", "/en/catalog", "/en/delivery-and-payment"]) {
   test(`opens over ${path} and Register clears the slot`, async ({ page }) => {

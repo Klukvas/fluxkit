@@ -4,8 +4,8 @@ import { Button } from "@fluxkit/ui";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, type ReactNode, type Ref } from "react";
 import { localizedHref } from "../lib/locale-path";
+import { signInCloseAction } from "../lib/sign-in-navigation";
 import { useI18n } from "./i18n-provider";
-import { useSignInNavigation } from "./sign-in-navigation";
 
 /** Rebind a replaced form heading without taking focus from a field, close button or error summary. */
 export function createSignInHeadingBinding(
@@ -64,7 +64,6 @@ export function SignInModalView({
 export function SignInModal({ children }: { children: ReactNode }) {
   const { locale, t } = useI18n();
   const router = useRouter();
-  const navigation = useSignInNavigation();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const mounted = useRef(false);
   const closing = useRef(false);
@@ -100,9 +99,10 @@ export function SignInModal({ children }: { children: ReactNode }) {
   const dismiss = () => {
     if (!mounted.current || closing.current) return;
     closing.current = true;
-    const action = navigation === null ? "home" : navigation.coordinator.dismiss();
+    const browser = window as typeof window & { navigation?: { canGoBack: boolean } };
+    const action = signInCloseAction(browser.navigation?.canGoBack);
     if (action === "back") router.back();
-    else if (action === "home") router.replace(localizedHref(locale, "/"));
+    else router.replace(localizedHref(locale, "/"));
   };
   return (
     <SignInModalView

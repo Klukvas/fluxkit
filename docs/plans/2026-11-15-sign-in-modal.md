@@ -26,9 +26,9 @@
 | `src/app/[locale]/layout.tsx` | Will accept `modal: ReactNode` and pass it to `SiteShell`; the slot will sit beside this layout, outside every route group. |
 | `src/components/site-shell.tsx` | Will accept an optional internal `modal` prop and render it beside `main`, under the existing i18n/session/cart providers and a small navigation coordinator. Will retain one header, main, footer and `SessionNotices`. |
 | `src/components/sign-in-modal.tsx` (new) | Will own the native dialog, heading association, close controls, focus and scroll cleanup; will render the existing form as children. |
-| `src/components/sign-in-navigation.tsx` (new) | Will coordinate slot activity, known push versus gate-replace entry, opener/origin and dismissal focus in memory. Will not store credentials, session state or new URL parameters. |
+| `src/components/sign-in-navigation.tsx` (new) | Will coordinate slot activity and the latest login-link opener/origin for focus return in memory. Will not store credentials, session state or new URL parameters. |
 | `src/components/account-link.tsx` | Will preserve the sign-in href, provide the account-summary focus target and a translated plain-anchor fallback in `noscript` for the current loading branch. |
-| `src/components/account-gate.tsx` | Will retain `router.replace(loginHref(...))`, mark this as a replacement entry, and suppress further redirects while the sign-in slot is active. Will capture the protected target before interception changes the visible pathname. |
+| `src/components/account-gate.tsx` | Will retain `router.replace(loginHref(...))`, suppress further redirects while the sign-in slot is active. Will capture the protected target before interception changes the visible pathname. |
 | `src/components/route-focus.tsx`, `src/lib/navigation-focus.ts` | Will coordinate modal entry/return with normal heading focus, consuming pathname changes without focusing the inert background. |
 | `src/app/globals.css`, `src/messages/{uk,en}/account.json` | Will supply scoped token-based dialog/scroll rules and a close label if an existing translated label is unsuitable. |
 
@@ -42,8 +42,8 @@
 ## Navigation rule
 
 - Recommendation: **every client navigation to login will show the modal**, including automatic replacement. There will be no header-only interception flag or alternate login URL.
-- The coordinator will observe ordinary same-tab login anchor activations before navigation, record their origin and opener, and classify them as pushes. It will not prevent the link's native/default behaviour. Modified clicks/new tabs will retain normal anchor semantics.
-- It will read the actual selected `modal` segment, not infer open state solely from the pathname (the same URL also serves the full page). Active entry metadata will clear on leaving, with a bounded in-memory traversal record retained for Back/Forward; unknown entries will use the safe close fallback below. It will not overwrite Next's history state.
+- The coordinator will observe ordinary same-tab login anchor activations before navigation, record only the latest origin and opener for focus return. It will not prevent the link's native/default behaviour. Modified clicks/new tabs will retain normal anchor semantics.
+- It will read the actual selected `modal` segments, not infer open state solely from the pathname (the same URL also serves the full page). No entry classification, traversal flags or history records will be kept; Next/browser history owns Back/Forward. It will not overwrite Next's history state.
 
 | Entry or exit | Planned behaviour |
 | --- | --- |
@@ -55,7 +55,7 @@
 | Header activation while already on the canonical login page | Will remain on the full-page form; the header link will use a plain anchor there, avoiding two login forms with identical field IDs. |
 | Typed URL, external link, new tab, reload | Will render the canonical full page, including a deep link with `?next=`; no dialog will open on hydration. |
 | JavaScript disabled | Will follow the header's plain-anchor fallback to the full page; the unchanged native POST will safely return it. |
-| Browser Back / Forward after a pushed modal | Will close / reopen through Next history; the coordinator will preserve the corresponding opener information for that traversal. Password persistence across unmount is not promised. |
+| Browser Back / Forward | Will close / reopen through Next history without entry/traversal bookkeeping. The latest login-link origin/opener remains available for focus return. Password persistence across unmount is not promised. |
 
 ## Success and dismissal
 
@@ -64,8 +64,8 @@
 - `store.login` already updates the shared account store and triggers cart refresh; the header and cart badge will update through the same provider. No forced reload, router refresh, new session fetch or cookie access will be added.
 - The existing success `router.replace` will navigate to a null modal route and unmount the dialog. The wrapper will not dismiss merely because session status becomes signed in: that could race the form's replacement or hide `AlreadySignedInView`.
 - Escape and a translated `type="button"` close control will dismiss. Backdrop clicks will do nothing, matching UI Dialog. Repeated cancel/close events will cause at most one navigation; stale cleanup close events will be ignored.
-- A known pushed entry will dismiss with `router.back()`, preserving the origin and Forward reopening. There will be no `router.push` on close, which would create a history loop.
-- A gate-replace or unknown entry will close with `router.replace(localizedHref(locale, "/"))`, not Back: its predecessor may be another site, and returning to the protected guest page would immediately reopen login. `next` is a post-login destination, not a safe dismissal destination.
+- At dismissal, `window.navigation?.canGoBack === true` will call `router.back()`; false or an unavailable Navigation API will call `router.replace(localizedHref(locale, "/"))`. This replaces the push/replace/unknown close matrix. `next` remains only a post-login destination.
+- A gate replacement therefore closes to the page before the protected page when that predecessor is on this site, else home. A direct protected visit without a same-origin predecessor closes to home. The replaced protected entry cannot be recovered.
 - Browser Back after gate replacement will retain normal browser-history behaviour; it cannot recover the replaced protected entry. Forward may restore login. Tests will distinguish this from the pushed-header case.
 
 ## Dialog, focus and responsive layout
@@ -73,8 +73,8 @@
 - `SignInModal` will use a storefront-local native `<dialog>` rather than change the public UI Dialog API or nest another title above the existing `h1`. It will follow the inspected Dialog/native-close lifecycle; no deep import of unexported UI helpers will be added.
 - Before `showModal()`, the wrapper will assign its instance-generated ID to its contained existing `h1` and set `aria-labelledby` to it. It will rebind after a session-status render replaces that heading with `AlreadySignedInView`; form markup/source will remain untouched.
 - Initial focus will go to that `h1` with `tabIndex=-1` (both form and signed-in view); this avoids opening the phone keyboard immediately. Tab will reach the fields and the close control; the native modal will make the background inert and trap focus.
-- The opener captured from the header login link will be its enclosing account `<summary>`, not the link hidden when `HeaderDisclosure` closes. Other pushed links will restore their connected opener when returning to their origin; a missing opener will fall back to that page's heading/main.
-- `RouteFocus` will skip background focus on entry and origin-return, but still record the pathname. On an origin-return the coordinator will restore focus after dialog teardown; on success/other destinations it will run normal page-heading focus. This will cover browser Back as well as the close button, without effect-order-dependent races.
+- The opener captured from the header login link will be its enclosing account `<summary>`, not the link hidden when `HeaderDisclosure` closes. Other login links will restore their connected opener only when the resulting pathname plus search equals the latest activation's origin; a missing opener will fall back to that page's heading/main. Opener focusability and Tab order will not be changed.
+- `RouteFocus` will skip background focus on entry and consume the pathname. Every post-close focus, whether a matching connected opener or the normal heading/main fallback, runs in an animation frame after dialog teardown: native `dialog.close()` restoration must finish first. This covers browser Back, successful navigation and the close controls.
 - The dialog will use a centred card at phone and desktop widths: existing `max-w-md`, spacing, `rounded-overlay`, border, background/foreground, shadow and scrim tokens. Scoped CSS will constrain width/height to the viewport minus token spacing, with internal vertical scrolling; no new tokens or raw design values will be introduced.
 - A scoped document rule while this sign-in dialog is open will lock background scrolling and release on close/unmount; existing scroll styles will not be overwritten. The card will remain usable at 320/360/390 px and with a short viewport/keyboard. No entrance animation is needed.
 - Already signed in: the unchanged `AlreadySignedInView` and its account link will appear; the dialog will remain labelled and closable. Its account link will clear the slot.
@@ -91,11 +91,11 @@
 
 | Layer / files | Required evidence |
 | --- | --- |
-| Vitest: new `src/components/sign-in-navigation.spec.tsx`, `src/components/sign-in-modal.spec.tsx`, `src/components/account-gate.spec.tsx`; existing `src/components/{account,shell}.spec.tsx`, `src/lib/navigation-focus.spec.ts` | Will cover push/replace/unknown close decisions, double close, stale native close, cleanup, heading rebinding, opener restoration, gate re-entry prevention, no-JS anchor and unchanged hrefs. RTL interaction coverage will require the tooling decision in Red zone. |
+| Vitest: new `src/components/sign-in-navigation.spec.tsx`, `src/components/sign-in-modal.spec.tsx`, `src/components/account-gate.spec.tsx`; existing `src/components/{account,shell}.spec.tsx`, `src/lib/navigation-focus.spec.ts` | Will cover Navigation API close decisions (true → Back, false/undefined → home), selected-slot segments, exact origin/opener matching, heading rebinding, gate re-entry prevention and unchanged hrefs. Chromium covers double-close/native events, teardown and keyboard focus. RTL interaction coverage will require the tooling decision in Red zone. |
 | Existing `route-structure.spec.ts`, `features/slice-rules.spec.ts`, `source-guards.spec.ts`, `safe-next.spec.ts`, form/shell specs | Will retain privacy, native-POST, safe destination, shell and feature-isolation checks; new slot checks will not weaken existing guards. |
 | New `e2e/tests/sign-in-modal.e2e.ts` | Will open from the header on home, product, catalog and a shop page; assert background preservation, labelled dialog, Escape/button close, summary focus, inert background, Tab/Shift+Tab containment, ignored backdrop, Back/Forward, successful login/header update, failed login and already-signed-in history reopening. |
 | Direct/progressive enhancement | Will assert `/uk/account/login` and `/en/account/login?next=...` are full pages, including reload of an open modal; will retain unsafe/repeated-next coverage, no-JS native POST and delayed scripts. Will test the no-JS header anchor separately. |
-| Navigation exits | Will test checkout return, register/forgot exits, login links from all email pages, gate replacement from `/account/orders?page=3`, no re-entry loop, gate close to home and a null slot after success/other navigation. |
+| Navigation exits | Will test checkout return, register/forgot exits, login links from all email pages, gate replacement from `/account/orders?page=3`, no re-entry loop, gate close to its same-origin predecessor or home and a null slot after success/other navigation. |
 | Mobile/a11y | Will use Chromium at 320/360/390 and desktop widths, both locales and light/dark: no horizontal overflow, reachable close/submit in a short viewport, body scroll locked/restored. Like `ui-polish` and `navigation-focus`, will assert roles, accessible names, ARIA references and actual focus/keyboard behaviour; no axe dependency is assumed. |
 | Features / 404 | Will extend `e2e/tests/blog.e2e.ts` to open/close from a published blog page; will retain `blog-off`/`not-found` assertions and feature-matrix on/off/deleted checks (deleted only in its disposable CI setup). |
 
@@ -129,6 +129,14 @@
 - Test corrections: Ukrainian dialog name `Вхід` (the heading), English forgot link `Forgot your password?`, an unscoped descendant locator inside the relative summary filter, and native Tab behaviour matching `apps/admin/e2e/tests/keyboard.e2e.ts` for the shared Dialog (browser controls allowed, background page controls forbidden). No check is disabled.
 - Node 22 verification: storefront `typecheck`, root `lint`, `format`, `format:check`, `check:boundaries` (2,901 modules, zero violations), storefront `test`: default 2,534 passed; brand fork 2,435 passed; home fork 2,439 passed and 13 existing template-only skips. The first full unit run exposed the null-context edge above; the corrected complete rerun passes. No build or e2e is run in this round, per the current request.
 
+## Fix round 2 (2026-11-15)
+
+- The orchestrator replaces history classification with a live Navigation API `canGoBack` decision. The dialog retains its per-instance repeated-close/stale-native-event guard. No change to auth, forms, session, API, cookies, contracts, header markup, fork-owned values or dependencies.
+- The click observer retains only the latest login-link origin/opener; Back/Forward needs no coordinator updates. AccountGate retains its modal-active guard and original `next`, without preparing a replacement entry.
+- RouteFocus defers every post-close focus until an animation frame after native-dialog teardown. Connected matching openers retain native focusability; only fallback heading/main receives `tabindex=-1` through the existing navigation-focus helper.
+- Unit regressions cover close decisions, selected segments and exact origin/search/connection matching. Chromium scenarios retain product/header and forgot-page return, add summary Shift+Tab/Tab reachability and query-only Back → open → close → Forward → close. The gate's direct-visit test has no same-origin predecessor and expects home plus heading focus; a separate same-origin predecessor test expects Back to that page.
+- Node 22 local checks pass: storefront typecheck; root lint, format + format:check; check:boundaries (2,902 modules, zero violations); storefront test: default 2,533 passed, brand fork 2,434 passed, home fork 2,438 passed with 13 existing template-only skips. `git diff --check` passes. No build or e2e in this round, per the current request; the orchestrator owns those runs and fresh independent QA.
+
 ## Red zone
 
 - No server sign-in logic, session/cookie behaviour, API response or public-contract change is required or planned. Any discovered need will stop implementation and go to the owner, rather than be folded into this plan.
@@ -140,7 +148,7 @@
 | Risk / question | Recommendation |
 | --- | --- |
 | More navigation coordination than a local open boolean | Will keep one internal coordinator with no persistence or global auth state; routing remains the source of truth. |
-| Gate replacement loses the originating history entry | Will use the explicit home dismissal rule and prove it with a prior external/history entry; will not change the gate to push. |
+| Gate replacement loses the protected history entry | Will use the browser's live `canGoBack` decision: same-origin predecessor before the protected page, else home; will not change the gate to push. |
 | Should header login stay on the shopper's page? | Will retain the existing account destination for this presentation-only change; explicit `next` already supports contextual returns. |
 | Native dialog helper duplication / heading replacement | Will keep the wrapper local and small, test native close semantics and label resolution, and leave the shared UI API untouched. |
 | Background form IDs or focus collisions | Will avoid interception from the canonical login page, scope browser locators to the dialog and test register/reset backgrounds and `AlreadySignedInView`. |
@@ -157,6 +165,8 @@
   Vitest); behaviour (focus, Escape, history) is covered by Playwright in Chromium.
 - After a successful sign-in the destination stays as the form decides today (`safeNextPath`: `/{locale}/account` without `next`).
   Keeping the shopper on the page they came from is a follow-up, not this change.
-- Keep the coordinator small: a pushed entry closes with `router.back()`, anything else (the account gate's replace, an unknown
-  entry) with `router.replace` to the home page; the header link on the canonical login page navigates without interception.
+- Fix round 2 supersedes the original push/replace close rule: read `window.navigation?.canGoBack` at dismissal; true uses
+  `router.back()`, false/undefined replaces with locale home. Gate replacements go to the same-origin page before the protected
+  page, else home. Keep only the latest `{origin, opener}` for focus; no entries, traversal flags or navigation kinds. Preserve
+  opener Tab order, and schedule both opener and heading focus after dialog teardown. The header link on canonical login stays plain.
 - Docs and contracts as planned: no change in `docs/contracts/`; README, `docs/files/storefront.md`, `e2e/README.md`, CHANGELOG, HANDOFF.

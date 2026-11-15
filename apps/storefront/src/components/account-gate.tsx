@@ -105,19 +105,9 @@ export function AccountGate({
 
   useEffect(() => {
     if (shouldRedirectAccountGuest(state.session.status, navigation?.active ?? false)) {
-      const destination = loginHref(
-        locale,
-        currentPath(protectedPath.current, window.location.search),
-      );
-      navigation?.coordinator.prepare({
-        kind: "replace",
-        destination,
-        origin: currentPath(protectedPath.current, window.location.search),
-        opener: null,
-      });
       router.replace(loginHref(locale, currentPath(protectedPath.current, window.location.search)));
     }
-  }, [state.session.status, router, locale, pathname, navigation?.active, navigation?.coordinator]);
+  }, [state.session.status, router, locale, pathname, navigation?.active]);
 
   return (
     <AccountGateView
