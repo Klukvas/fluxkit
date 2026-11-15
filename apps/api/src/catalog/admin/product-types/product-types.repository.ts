@@ -39,6 +39,7 @@ export interface OptionAssignmentRow {
   productTypeId: string;
   optionId: string;
   optionCode: string;
+  splitsListing: boolean;
   position: number;
   createdAt: Date;
 }
@@ -63,6 +64,7 @@ const optionAssignmentColumns = {
   productTypeId: productTypeOption.productTypeId,
   optionId: productTypeOption.optionId,
   optionCode: option.code,
+  splitsListing: productTypeOption.splitsListing,
   position: productTypeOption.position,
   createdAt: productTypeOption.createdAt,
 };
@@ -272,20 +274,20 @@ export class ProductTypesRepository {
     db: DbExecutor,
     productTypeId: string,
     optionId: string,
-    position: number,
+    values: { position: number; splitsListing: boolean },
   ): Promise<void> {
-    await db.insert(productTypeOption).values({ productTypeId, optionId, position });
+    await db.insert(productTypeOption).values({ productTypeId, optionId, ...values });
   }
 
   async updateOptionAssignment(
     db: DbExecutor,
     productTypeId: string,
     optionId: string,
-    position: number,
+    values: { position: number; splitsListing: boolean },
   ): Promise<void> {
     await db
       .update(productTypeOption)
-      .set({ position })
+      .set(values)
       .where(
         and(
           eq(productTypeOption.productTypeId, productTypeId),
