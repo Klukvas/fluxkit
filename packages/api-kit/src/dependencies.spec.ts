@@ -55,7 +55,7 @@ describe("the API kit's dependencies", () => {
       "reflect-metadata": api.dependencies["reflect-metadata"],
       rxjs: api.dependencies.rxjs,
     });
-    expect(manifest.dependencies?.["@nestjs/common"]).toBe("12.2.0");
+    expect(manifest.dependencies?.["@nestjs/common"]).toBe("12.4.2");
     expect(manifest.peerDependencies).toBeUndefined();
   });
 });

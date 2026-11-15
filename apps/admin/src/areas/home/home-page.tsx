@@ -11,21 +11,39 @@ const HomeChecklist = lazy(() =>
   import("../help").then((module) => ({ default: module.HomeChecklist })),
 );
 
-export function HomeView({ t, checklist }: { t: Translator; checklist?: ReactNode }) {
+const HomeWorkspace = lazy(() =>
+  import("./home-workspace").then((module) => ({ default: module.HomeWorkspace })),
+);
+
+export function HomeView({
+  t,
+  workspace,
+  checklist,
+}: {
+  t: Translator;
+  workspace?: ReactNode;
+  checklist?: ReactNode;
+}) {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title={t("page.home.title")} description={t("page.home.welcome")} />
+      {workspace}
       {checklist}
     </div>
   );
 }
 
-/** The start page after sign-in: the getting-started checklist (until hidden); the navigation leads on. */
+/** Daily workspace and the independently loaded getting-started checklist. */
 export function HomePage() {
   const { t } = useI18n();
   return (
     <HomeView
       t={t}
+      workspace={
+        <Suspense fallback={<LoadingView t={t} />}>
+          <HomeWorkspace />
+        </Suspense>
+      }
       checklist={
         <Suspense fallback={<LoadingView t={t} />}>
           <HomeChecklist />

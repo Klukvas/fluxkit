@@ -69,6 +69,7 @@ export const LAZY_FILES = [
   "search",
   "help",
   "banners",
+  "home",
 ] as const;
 /** A lazy file of the app's own areas. */
 export type CoreLazyFile = (typeof LAZY_FILES)[number];
@@ -135,6 +136,10 @@ export const LAZY_FILE_LOADERS: Record<CoreLazyFile, Record<Locale, FileLoader>>
   help: {
     uk: () => import("./uk/help.json").then((module) => module.default),
     en: () => import("./en/help.json").then((module) => module.default),
+  },
+  home: {
+    uk: () => import("./uk/home.json").then((module) => module.default),
+    en: () => import("./en/home.json").then((module) => module.default),
   },
   banners: {
     uk: () => import("./uk/banners.json").then((module) => module.default),
