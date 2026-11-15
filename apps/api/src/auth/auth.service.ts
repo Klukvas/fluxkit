@@ -64,7 +64,7 @@ export class AuthService {
    * Every failure ends in the same `401` and does exactly one scrypt verification (a dummy one when there is no
    * hash to check or the account may not sign in), so neither the body nor the response time tells which case it was.
    */
-  async login(body: LoginBody, clientId: string): Promise<LoginResult> {
+  async login(body: LoginBody, clientId: string, previousToken?: string): Promise<LoginResult> {
     const decision = this.throttle.attempt(clientId);
     if (!decision.allowed) {
       // Before any lookup or hashing: a throttled client learns nothing about accounts and costs us no scrypt.
@@ -92,6 +92,7 @@ export class AuthService {
       ? await this.hasher.hash(body.password)
       : undefined;
     const { user: signedIn, session } = await this.completeLogin(user, upgradedHash, now);
+    if (previousToken !== undefined) await this.sessions.revoke(previousToken);
     this.logger.log(`Admin login succeeded for user ${signedIn.id}`);
     return {
       user: toAuthUser(signedIn),
@@ -114,7 +115,12 @@ export class AuthService {
    * The caller proves the current password (one scrypt; a wrong one counts toward the lockout like a failed login,
    * and a locked account cannot be used to guess passwords here either), then every OTHER session of the user ends.
    */
-  async changePassword(principal: AdminPrincipal, body: ChangePasswordBody): Promise<void> {
+  async changePassword(
+    principal: AdminPrincipal,
+    body: ChangePasswordBody,
+  ): Promise<{ token: string; maxAgeSeconds: number }> {
+    if (principal.tokenHash === undefined) throw unauthorized();
+    const tokenHash = principal.tokenHash;
     const now = this.clock.now();
     const user = await this.users.findById(principal.userId);
     if (user === undefined || !user.isActive) {
@@ -139,7 +145,7 @@ export class AuthService {
       throw validationFailed(errors);
     }
     const newHash = await this.hasher.hash(body.newPassword);
-    await withTransaction(this.db, async (transaction) => {
+    return withTransaction(this.db, async (transaction) => {
       const locked = await this.users.findByIdForUpdate(user.id, transaction);
       // Re-checked under the row lock: failures or another password change may have landed during the scrypt work.
       if (
@@ -156,6 +162,14 @@ export class AuthService {
         transaction,
       );
       await this.sessions.revokeAllForUser(user.id, principal.sessionId, transaction);
+      const rotated = await this.sessions.rotate(principal.sessionId, tokenHash, transaction);
+      return {
+        token: rotated.token,
+        maxAgeSeconds: Math.max(
+          1,
+          Math.floor((rotated.expiresAt.getTime() - this.clock.now().getTime()) / 1000),
+        ),
+      };
     });
   }
 

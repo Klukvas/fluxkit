@@ -132,3 +132,37 @@ test("signing in merges the guest cart into the account cart and shows the merge
   );
   await expect(notice).toHaveCount(0);
 });
+
+test("password rotation keeps the customer signed in after reload", async ({
+  page,
+  otherShopper,
+}, testInfo) => {
+  const email = uniqueEmail(testInfo, "rotation");
+  await otherShopper.register(email, PASSWORD);
+  await page.goto("/en/account/login");
+  await waitForHydration(page);
+  await page.getByLabel("Email", { exact: true }).fill(email);
+  await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page).toHaveURL(/\/en\/account$/);
+  const before = (await page.context().cookies()).find(
+    (cookie) => cookie.name === "fluxkit_customer_session",
+  );
+  expect(before).toBeDefined();
+  await page.goto("/en/account/profile");
+  await waitForHydration(page);
+  await page.getByLabel("Current password", { exact: true }).fill(PASSWORD);
+  await page.getByLabel("New password", { exact: true }).fill("replacement customer password 456");
+  await page.getByRole("button", { name: "Change password", exact: true }).click();
+  await expect(
+    page.getByText("Password changed. Your other devices were signed out."),
+  ).toBeVisible();
+  const after = (await page.context().cookies()).find(
+    (cookie) => cookie.name === "fluxkit_customer_session",
+  );
+  expect(after?.value).toBeDefined();
+  expect(after?.value).not.toBe(before?.value);
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Your details", exact: true })).toBeVisible();
+  expect((await page.request.get("/store/account/me")).status()).toBe(200);
+});
