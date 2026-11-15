@@ -8,6 +8,7 @@
 One line per user-visible or schema change.
 
 ## Unreleased
+- Admin: the desktop sidebar keeps every item reachable at laptop heights (compact `SideNav` density, additive prop; a "More below/above" hint at the scroll edges; the current item scrolls into view in the panel); all Start quick actions share the outlined style; the current language is shown without the accent colour; the Start subtitle no longer names areas the user cannot open.
 - API: optional `RATE_LIMIT_STORE=redis` shares fixed request/service windows and admin login across instances with private HMAC keys; Redis outages use local windows, code-only throttled errors and additive `GET /health` `rateLimitStore` status. Default memory behavior and limits unchanged (ADR 0055).
 - Admin type-option assignments can split listing cards by one option, with value-image guidance and a field-level conflict; fresh seeds activate the separate flavour demo and fixture clothing colours without overwriting saved flags (ADR 0052, step 4).
 - Store/search (additive, minor; ADR 0052 step 2): opt-in listing-group SQL/search pages, group offers and localized listing identity; v4 search documents rebuild automatically with an inherited-build guard, unique build generations, conservative restart after an interrupted swap and listing readiness fallback; product mode remains the default.
