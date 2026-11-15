@@ -20,7 +20,8 @@
   - `src/responses.ts` - response shapes and the "own locale text" rule. `src/inventory.ts` - `personalDataInventory` (every column `none`).
   - `src/*.spec.ts` - rules (TDD), inventory, declared permissions, migration up/down/up/down, admin and store routes over HTTP on a
     scratch Postgres database. `src/test/` - TEST ONLY helpers: scratch database, a `MEDIA_PORT` stand-in, the test app with a problem
-    filter stand-in; excluded from the build.
+    filter stand-in; excluded from the build. The scratch database is dropped only after every pooled connection has closed
+    (`closePool`, pinned by `src/test/database.spec.ts`).
 
 # packages/api-kit
 

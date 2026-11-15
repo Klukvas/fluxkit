@@ -214,6 +214,11 @@ export const coffeeAttributes: readonly SeedAttribute[] = [
 
 export const coffeeOptions: readonly SeedOption[] = [
   {
+    code: "demo_flavour",
+    name: { uk: "Смак", en: "Flavour" },
+    values: [value("vanilla", "Ваніль", "Vanilla"), value("caramel", "Карамель", "Caramel")],
+  },
+  {
     code: "volume",
     name: { uk: "Об'єм", en: "Volume" },
     values: [

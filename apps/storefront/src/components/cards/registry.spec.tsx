@@ -50,6 +50,7 @@ const hosts = ["cdn.example.com"];
  * registry's `grid` card must render exactly this markup for every input (plan 2026-11-08-design-changeability.md, L2: "no
  * change at defaults"). A deliberate change of the grid card updates this copy in the same PR, with its reason.
  * Changed 2026-11-13 (owner design, add to cart from a card): the purchase action at the bottom, after the price block.
+ * Changed 2026-11-15 (Playful motion): tilt class and a rounded clipping frame around the hopping image.
  */
 const PRODUCT_OFFER: CardOffer = { kind: "product" };
 function LegacyProductCard({
@@ -93,15 +94,19 @@ function LegacyProductCard({
   const badgeShown = availability !== null && shown !== "in_stock";
   const purchasable = shown !== null && canAddToCart(shown);
   return (
-    <article className="group relative flex h-full flex-col gap-2 rounded-card border border-border bg-background p-3 transition-shadow hover:border-border-input hover:shadow-raised focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring motion-reduce:transition-none">
-      <StoreImage
-        src={allowedImageUrl(product.image?.url, imageHosts)}
-        alt={product.image?.alt ?? product.title}
-        width={480}
-        height={480}
-        sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
-        eager={eager}
-      />
+    <article className="group relative flex h-full flex-col gap-2 rounded-card border-2 border-foreground bg-background p-3 fk-card-tilt hover:shadow-raised focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring motion-reduce:transition-none">
+      <div className="overflow-hidden rounded-media">
+        <div className="fk-card-hop">
+          <StoreImage
+            src={allowedImageUrl(product.image?.url, imageHosts)}
+            alt={product.image?.alt ?? product.title}
+            width={480}
+            height={480}
+            sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
+            eager={eager}
+          />
+        </div>
+      </div>
       {product.brand === null ? null : brandPath === null ? (
         <p className="text-sm text-muted-foreground">{product.brand.name}</p>
       ) : (
@@ -134,7 +139,7 @@ function LegacyProductCard({
         {!purchasable ? null : product.defaultVariantId === null ? (
           <Link
             href={href}
-            className={`relative z-10 inline-flex min-h-11 w-full items-center justify-center rounded-control border border-border bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-muted ${focusRing}`}
+            className={`relative z-10 inline-flex min-h-11 w-full items-center justify-center rounded-control border-2 border-foreground bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-muted ${focusRing}`}
           >
             <CardActionLabel
               short={t("product.card.chooseShort")}
@@ -324,6 +329,18 @@ describe("card registry: the default grid card", () => {
   it.each(CASES)("renders exactly today's product card markup ($name)", (entry) => {
     expect(render("grid", entry)).toBe(legacy(entry));
   });
+  it.each(["in stock, brand link", "out of stock, no brand, allowed image, price range"])(
+    "clips only the hopping image or placeholder (%s)",
+    (name) => {
+      const html = render("grid", caseNamed(name));
+      expect(html).toMatch(/<div class="overflow-hidden rounded-media"><div class="fk-card-hop">/);
+      const article = html.match(/<article class="([^"]+)"/)?.[1]?.split(" ");
+      expect(article).toContain("fk-card-tilt");
+      expect(article).toContain("focus-within:outline-ring");
+      expect(article).not.toContain("transition-shadow");
+      expect(article).not.toContain("overflow-hidden");
+    },
+  );
 
   it("lays the grid out in today's columns and loads the first row eagerly", () => {
     const products = Array.from({ length: 6 }, (_, i) => summary(`p${i}`, { title: `§p${i}` }));

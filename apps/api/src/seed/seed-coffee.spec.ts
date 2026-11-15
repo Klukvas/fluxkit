@@ -1,3 +1,7 @@
+import {
+  expectSeedSplitOptions,
+  expectSeedSplitFlagsPreserved,
+} from "../test/seed-listing-checks.js";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -136,6 +140,42 @@ describe("coffee demo seed (real app, real Postgres)", () => {
     expect(machine.body.media).toHaveLength(2);
   });
 
+  it("lists the new flavour demo as two group-local offers with linked value pictures", async () => {
+    const detail = await http<StoreProductDetail>(
+      running.baseUrl,
+      "GET",
+      "/store/products/demo-flavoured-syrup?locale=en",
+    );
+    expect(detail.status).toBe(200);
+    expect(detail.body.variants).toHaveLength(4);
+    const listing = await http<Page<StoreProductListItem>>(
+      running.baseUrl,
+      "GET",
+      "/store/products?brand=siropia&locale=en&groupBy=listing&limit=100",
+    );
+    expect(listing.status).toBe(200);
+    const cards = listing.body.items.filter((item) => item.id === detail.body.id);
+    expect(cards).toHaveLength(2);
+    expect(new Set(cards.map((card) => card.listingKey)).size).toBe(2);
+    const flavour = detail.body.options.find((option) => option.code === "demo_flavour");
+    expect(flavour).toBeDefined();
+    for (const [code, from, to] of [
+      ["vanilla", 12900, 34900],
+      ["caramel", 13900, 36900],
+    ] as const) {
+      const card = cards.find((card) => card.listingOption?.valueCode === code);
+      expect(card?.price).toEqual({ from, to, currency: "UAH" });
+      expect(card?.defaultVariantId).toBeNull();
+      const valueId = flavour?.values.find((value) => value.code === code)?.id;
+      expect(valueId).toBeDefined();
+      expect(card?.image).toEqual(
+        detail.body.media
+          .filter((image) => image.optionValueId === valueId)
+          .map(({ url, alt }) => ({ url, alt }))[0],
+      );
+    }
+  });
+
   it("shows the stock states: a sold-out product, a low-stock one, a backorder one", async () => {
     const detail = async (slug: string): Promise<StoreProductDetail> =>
       (await http<StoreProductDetail>(running.baseUrl, "GET", `/store/products/${slug}?locale=uk`))
@@ -149,6 +189,10 @@ describe("coffee demo seed (real app, real Postgres)", () => {
   it(
     "is idempotent: a second run creates nothing and writes no row",
     async () => {
+      await expectSeedSplitOptions(pool, coffeeCatalogSeed);
+      await expectSeedSplitFlagsPreserved(pool, coffeeCatalogSeed, () =>
+        runSeedCommand(["--dataset", "coffee"], env),
+      );
       const before = await tableCounts();
       const second = await runSeedCommand(["--dataset", "coffee"], env);
       expect(second.created.products).toBe(0);

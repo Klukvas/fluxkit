@@ -91,7 +91,7 @@ test("the seeded banners sit between the hero and the categories: two cards and 
     const main = page.getByRole("main");
     await expect(main.getByRole("link", { name: "Demo Screwdriver" }).first()).toBeVisible();
     await expect(main.getByRole("link", { name: "Demo E-book" }).first()).toBeVisible();
-    await expect(main.getByRole("link", { name: "Demo T-shirt" })).toHaveCount(0);
+    await expect(main.getByRole("link", { name: /^Demo T-shirt — / })).toHaveCount(0);
   }
 });
 

@@ -2,6 +2,7 @@
   "home.counters.title": "Overview",
   "home.counter.awaitingPayment": "Orders awaiting payment",
   "home.counter.paid": "Paid orders awaiting fulfilment",
+  "home.counter.paymentsAttention": "Payments to review",
   "home.counter.customers": "Customers",
   "home.counter.draftProducts": "Draft products",
   "home.counter.activeProducts": "Active products",

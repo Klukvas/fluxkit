@@ -1,4 +1,5 @@
 {
+  "account.modal.close": "Close",
   "account.title": "My account",
   "account.loading": "Loading your account",
   "account.field.email": "Email",

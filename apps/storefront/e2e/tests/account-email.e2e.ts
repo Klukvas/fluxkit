@@ -81,16 +81,16 @@ test("forgot password, reset link, new password, sign in: the old password stops
   await expect(page.getByRole("heading", { level: 1, name: "Password changed" })).toBeFocused();
   await expect(page.getByRole("button", { name: /^Account:/ })).toHaveCount(0);
   await page.getByRole("link", { name: "Go to sign in" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
-  await waitForHydration(page);
+  const signIn = page.getByRole("dialog", { name: "Sign in", exact: true });
+  await expect(signIn).toBeVisible();
 
   // The old password no longer works; the new one does.
-  await page.getByLabel("Email", { exact: true }).fill(email);
-  await page.getByLabel("Password", { exact: true }).fill(OLD_PASSWORD);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page.getByText("The email or password is not correct.")).toBeVisible();
-  await page.getByLabel("Password", { exact: true }).fill(NEW_PASSWORD);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await signIn.getByLabel("Email", { exact: true }).fill(email);
+  await signIn.getByLabel("Password", { exact: true }).fill(OLD_PASSWORD);
+  await signIn.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(signIn.getByText("The email or password is not correct.")).toBeVisible();
+  await signIn.getByLabel("Password", { exact: true }).fill(NEW_PASSWORD);
+  await signIn.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page).toHaveURL(/\/en\/account$/);
   await expect(page.getByRole("button", { name: "Account: Api" })).toBeVisible();
 

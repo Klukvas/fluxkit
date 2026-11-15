@@ -4,6 +4,7 @@ import { textStyles } from "./styles";
 
 export interface EmptyStateProps {
   title: ReactNode;
+  illustration?: ReactNode;
   description?: ReactNode;
   action?: ReactNode;
   headingAs?: "h2" | "h3";
@@ -12,6 +13,7 @@ export interface EmptyStateProps {
 
 export function EmptyState({
   title,
+  illustration,
   description,
   action,
   headingAs: Heading = "h2",
@@ -19,6 +21,7 @@ export function EmptyState({
 }: EmptyStateProps) {
   return (
     <div className={cn("flex flex-col items-center gap-2 p-8 text-center", className)}>
+      {illustration}
       <Heading className={textStyles.subsectionTitle}>{title}</Heading>
       {description ? <p className="text-muted-foreground">{description}</p> : null}
       {action ? <div className="mt-2">{action}</div> : null}
