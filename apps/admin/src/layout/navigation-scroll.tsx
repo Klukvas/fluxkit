@@ -55,13 +55,22 @@ export function revealDelta(
 export function useRevealCurrentItem(ref: RefObject<HTMLDivElement | null>, pathname?: string) {
   useEffect(() => {
     const box = ref.current;
-    const current = box?.querySelector('a[aria-current="page"]');
-    if (!box || !current || box.clientHeight === 0) return;
-    const top = box.getBoundingClientRect().top + box.clientTop;
-    box.scrollTop += revealDelta(current.getBoundingClientRect(), {
-      top,
-      bottom: top + box.clientHeight,
-    });
+    if (!box) return;
+    const reveal = () => {
+      const current = box.querySelector('a[aria-current="page"]');
+      if (!current || box.clientHeight === 0) return;
+      const top = box.getBoundingClientRect().top + box.clientTop;
+      box.scrollTop += revealDelta(current.getBoundingClientRect(), {
+        top,
+        bottom: top + box.clientHeight,
+      });
+    };
+    reveal();
+    const observer = new ResizeObserver(reveal);
+    observer.observe(box);
+    // Feature links can grow the nav without resizing its scroll box.
+    if (box.firstElementChild) observer.observe(box.firstElementChild);
+    return () => observer.disconnect();
   }, [ref, pathname]);
 }
 

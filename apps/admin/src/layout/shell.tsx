@@ -124,7 +124,11 @@ function ShellNavigation({
   );
   return (
     <>
-      <div ref={desktop ? scrollBox : undefined} className="min-h-0 flex-1 overflow-y-auto p-1">
+      <div
+        ref={desktop ? scrollBox : undefined}
+        data-nav-scroll-box={desktop ? "" : undefined}
+        className="min-h-0 flex-1 overflow-y-auto p-1"
+      >
         {renderNav(navigation, t("shell.navLabel"))}
       </div>
       {desktop ? <NavigationScrollHint edges={edges} collapsed={collapsed} t={t} /> : null}

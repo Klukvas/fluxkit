@@ -21,7 +21,7 @@ describe("home subtitle", () => {
       const html = renderInRouter(
         <HomeView t={t} workspace={<WorkspaceView t={t} counters={[]} actions={[]} />} />,
       );
-      expect(html).toContain(`<div class="max-w-prose text-muted-foreground">${subtitle}</div>`);
+      expect(html).toContain(subtitle);
       expect(t("page.home.welcome")).toBe(subtitle);
       expect(t("page.home.welcome")).not.toMatch(/orders|customers/i);
       expect(html).toContain(t("home.noAccess"));
