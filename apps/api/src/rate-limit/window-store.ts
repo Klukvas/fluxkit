@@ -11,9 +11,16 @@ import {
 
 export const WINDOW_STORE = Symbol("WINDOW_STORE");
 export type WindowStoreStatus = "memory" | "redis" | "degraded";
+export interface EmailPacingSlot {
+  readonly waitMs: number;
+  readonly slotAt: number;
+}
+
 export interface WindowStore {
   readonly status: WindowStoreStatus;
   hit(name: string, key: string, limit: WindowLimit): Promise<ThrottleDecision>;
+  /** Redis only; null means use the process-local pacer for this call. */
+  reserveEmailSlot?(intervalMs: number, maxWaitMs?: number): Promise<EmailPacingSlot | null>;
 }
 
 /** Retains the original fixed windows, /64 normalization, and oldest-client eviction. */
@@ -41,6 +48,19 @@ const HIT_SCRIPT = `
 local count = redis.call('INCR', KEYS[1])
 if count == 1 then redis.call('PEXPIRE', KEYS[1], ARGV[1], 'NX') end
 return {count, redis.call('PTTL', KEYS[1])}
+`;
+
+// Retain every reservation until its slot has passed, including a queued backlog.
+const EMAIL_SLOT_SCRIPT = `
+local time = redis.call('TIME')
+local now = tonumber(time[1]) * 1000 + math.floor(tonumber(time[2]) / 1000)
+local interval = math.ceil(tonumber(ARGV[1]))
+local slot = math.max(now, tonumber(redis.call('GET', KEYS[1])) or now)
+-- A refused slot must not extend the backlog on every outbox retry.
+if slot - now >= tonumber(ARGV[2]) then return {slot - now, slot} end
+local next = slot + interval
+redis.call('SET', KEYS[1], string.format('%.0f', next), 'PX', math.max(1000, next - now))
+return {slot - now, slot}
 `;
 
 export class RedisWindowStore implements WindowStore {
@@ -85,13 +105,46 @@ export class RedisWindowStore implements WindowStore {
         ? { allowed: true }
         : { allowed: false, retryAfterSeconds: Math.max(1, Math.ceil(result[1] / 1000)) };
     } catch {
-      this.degraded = true;
-      const now = Date.now();
-      if (now - this.lastErrorMs >= 60_000) {
-        this.lastErrorMs = now;
-        this.logger.error("rate_limit_store_unavailable");
-      }
+      this.reportUnavailable();
       return this.fallback.hit(name, key, limit);
+    }
+  }
+
+  async reserveEmailSlot(intervalMs: number, maxWaitMs = 110_000): Promise<EmailPacingSlot | null> {
+    try {
+      const result: unknown = await this.client.eval(
+        EMAIL_SLOT_SCRIPT,
+        1,
+        `fluxkit:${this.prefix}:email-pacer`,
+        intervalMs,
+        Math.max(0, maxWaitMs),
+      );
+      if (
+        !Array.isArray(result) ||
+        result.length !== 2 ||
+        typeof result[0] !== "number" ||
+        typeof result[1] !== "number" ||
+        !Number.isSafeInteger(result[0]) ||
+        !Number.isSafeInteger(result[1]) ||
+        result[0] < 0 ||
+        result[1] < 0
+      ) {
+        throw new Error("email_pacer_invalid_answer");
+      }
+      this.degraded = false;
+      return { waitMs: result[0], slotAt: result[1] };
+    } catch {
+      this.reportUnavailable();
+      return null;
+    }
+  }
+
+  private reportUnavailable(): void {
+    this.degraded = true;
+    const now = Date.now();
+    if (now - this.lastErrorMs >= 60_000) {
+      this.lastErrorMs = now;
+      this.logger.error("rate_limit_store_unavailable");
     }
   }
 }

@@ -1,7 +1,7 @@
 import type { OnModuleInit, OnApplicationShutdown } from "@nestjs/common";
 import { Redis } from "ioredis";
 
-/** One connection per API process, created only for shared windows. Never buffers requests during reconnect. */
+/** One connection per API process, created only for shared windows and email pacing. Never buffers requests during reconnect. */
 export class RedisClient implements OnModuleInit, OnApplicationShutdown {
   readonly client: Redis;
 

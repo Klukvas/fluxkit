@@ -7,11 +7,12 @@ import { EmailOutboxRepository } from "./email-outbox.repository.js";
 import { EmailOutbox } from "./email-outbox.service.js";
 import { DatabaseGuestOrderAccess } from "./guest-order-access.js";
 import { EMAIL_SEND_PACER, EmailSender } from "./email-sender.js";
+import { WINDOW_STORE, type WindowStore } from "../../rate-limit/window-store.js";
 import { SendPacer } from "./send-pacer.js";
 
 /**
  * The mail outbox (ADR 0031 decisions 5 to 8): enqueue (`EmailOutbox`), the one writer (`EmailMessageChanges`), the
- * sender with its per-process pacing (`EmailSender`) and the templates. Core, no flag: with `EMAIL_PROVIDER=none` the
+ * sender with its selected pacing (`EmailSender`) and the templates. Core, no flag: with `EMAIL_PROVIDER=none` the
  * enqueue writes nothing and the sender claims nothing. Global, so the jobs and (later) the auth flows, event handlers
  * and admin routes use it without importing it. Needs the globals of the database, `AuthModule` (clock),
  * `CommonModule` (locales) and `EmailRegistryModule` (the provider).
@@ -36,7 +37,9 @@ export class EmailOutboxModule {
         { provide: EMAIL_DELIVERY_CONFIG, useValue: config },
         {
           provide: EMAIL_SEND_PACER,
-          useFactory: () => new SendPacer(config.tuning.sendsPerSecond),
+          inject: [{ token: WINDOW_STORE, optional: true }],
+          useFactory: (store?: WindowStore) =>
+            new SendPacer(config.tuning.sendsPerSecond, undefined, undefined, store),
         },
         { provide: GUEST_ORDER_ACCESS, useClass: DatabaseGuestOrderAccess },
         { provide: EMAIL_LINK_SOURCE, useClass: StorefrontEmailLinks },

@@ -1,5 +1,6 @@
 # Changelog
 
+- Email pacing: `RATE_LIMIT_STORE=redis` shares provider slots across instances using Redis TIME and expiring timestamp-only keys; runtime failures use per-process pacing with the existing throttled store error and degraded readiness (ADR 0055, multi-instance PR 3). All modes bound admission by the lease/deadline, defer without spending an attempt, guarantee ownership through the lease without admission database reads, and preserve local start spacing through delayed timers and Redis fallback/recovery. Stale shared slots are reacquired within the remaining budget; reservation spacing accounts for observed Redis reply latency separately from timer lateness.
 - Admin shell: add a remembered collapsible desktop icon sidebar, daily-work navigation and pinned Help, plus a compact account disclosure; mobile keeps the expanded Menu panel. The daily group keeps id `sales`, feature entries append with `ExtensionIcon`, and unused sales/catalog heading messages remain valid fork overrides. Rebased entry: 447 298 / 133 774 → 456 996 / 136 998 raw/gzip bytes (3 chunks, Node 22, gzip level 9); caps 461 600 / 138 400.
 
 One line per user-visible or schema change.
