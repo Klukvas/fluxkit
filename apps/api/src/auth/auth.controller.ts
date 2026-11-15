@@ -19,7 +19,12 @@ import {
 import { AuthService } from "./auth.service.js";
 import { CurrentAdmin } from "./current-admin.js";
 import { AuthenticatedAdminRoute, PublicAdminRoute } from "./route-access.js";
-import { clearSessionCookie, setSessionCookie } from "./session-cookie.js";
+import {
+  SESSION_COOKIE_RESPONSE_HEADER,
+  clearSessionCookie,
+  readSessionCookie,
+  setSessionCookie,
+} from "./session-cookie.js";
 import { SessionService } from "./session.service.js";
 
 /** Thin HTTP layer of the admin sign-in flow: validate, call the service, set or clear the cookie. No rules here. */
@@ -34,7 +39,11 @@ export class AuthController {
   @Post("login")
   @PublicAdminRoute()
   @HttpCode(200)
-  @ApiOperation({ summary: "Sign in with email and password; sets the session cookie" })
+  @ApiOperation({
+    summary: "Sign in with email and password; sets the session cookie",
+    description:
+      "On success, revokes the session cookie the request carried. A failed login leaves it unchanged.",
+  })
   @ApiZodBody(loginSchema)
   @ApiZodResponse(
     200,
@@ -48,7 +57,11 @@ export class AuthController {
     @Res({ passthrough: true }) response: Response,
   ): Promise<LoginResponse> {
     // `request.ip` is the socket address unless Express `trust proxy` is set (see LoginThrottle).
-    const result = await this.auth.login(body, request.ip ?? "unknown");
+    const result = await this.auth.login(
+      body,
+      request.ip ?? "unknown",
+      readSessionCookie(request.headers.cookie),
+    );
     setSessionCookie(response, result.token, {
       secure: this.config.cookieSecure,
       maxAgeSeconds: result.maxAgeSeconds,
@@ -82,12 +95,26 @@ export class AuthController {
   @HttpCode(204)
   @ApiOperation({ summary: "Change the own password; all other sessions end" })
   @ApiZodBody(changePasswordSchema)
-  @ApiNoContentResponse({ description: "Password changed; the current session stays signed in." })
+  @ApiNoContentResponse({
+    description:
+      "Password changed; the current token is replaced. Store the new Set-Cookie; the old token no longer works.",
+    headers: {
+      [SESSION_COOKIE_RESPONSE_HEADER]: {
+        description: "Rotated session cookie with the remaining absolute lifetime.",
+        schema: { type: "string" },
+      },
+    },
+  })
   @ApiProblemResponses(400)
   async changePassword(
     @CurrentAdmin() admin: AdminPrincipal,
     @Body(new ZodValidationPipe(changePasswordSchema)) body: ChangePasswordBody,
+    @Res({ passthrough: true }) response: Response,
   ): Promise<void> {
-    await this.auth.changePassword(admin, body);
+    const result = await this.auth.changePassword(admin, body);
+    setSessionCookie(response, result.token, {
+      secure: this.config.cookieSecure,
+      maxAgeSeconds: result.maxAgeSeconds,
+    });
   }
 }

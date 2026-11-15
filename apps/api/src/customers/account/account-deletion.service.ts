@@ -50,7 +50,7 @@ export class AccountDeletionService {
   ) {}
 
   async deleteAccount(customerId: string, password: string): Promise<void> {
-    const limit = this.limiter.attempt("accountDelete", `customer:${customerId}`);
+    const limit = await this.limiter.attempt("accountDelete", `customer:${customerId}`);
     if (!limit.allowed) {
       throw tooManyRequests("Too many attempts. Try again later.", limit.retryAfterSeconds);
     }

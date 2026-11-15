@@ -172,7 +172,7 @@ describe("POST /admin/auth/login", () => {
           .status,
       ).toBe(401);
 
-      // Logging in while holding a valid session also issues a different one and keeps the old one working.
+      // Logging in while holding a valid session also issues a different one and revokes the old one.
       const reuse = await http<Record<string, unknown>>(
         running.baseUrl,
         "POST",
@@ -180,7 +180,7 @@ describe("POST /admin/auth/login", () => {
         { body: { email: user.email, password: PASSWORD }, headers: { cookie: first ?? "" } },
       );
       expect(sessionCookieOf(reuse)).not.toBe(first);
-      expect(await sessionCount(user.id)).toBe(4);
+      expect(await sessionCount(user.id)).toBe(3);
     });
 
     it("updates last_login_at and resets the lockout counters", async () => {

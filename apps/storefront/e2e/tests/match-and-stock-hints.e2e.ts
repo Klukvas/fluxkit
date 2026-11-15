@@ -25,15 +25,23 @@ test.describe("filtered cards from the matched variants", () => {
     page,
   }) => {
     await page.goto("/en/catalog?f=opt.color%3Ared&f=opt.size%3Al");
-    const tShirt = card(page, "Demo T-shirt");
+    const tShirt = card(page, "Demo T-shirt — Red");
     await expect(tShirt.getByText(/UAH\s629\.00/)).toBeVisible();
     await expect(tShirt.getByText(/from/)).toHaveCount(0);
     await expect(tShirt.getByText("Out of stock", { exact: true })).toBeVisible();
     await expect(tShirt.getByText("Price and stock depend on the option")).toHaveCount(0);
-    const link = tShirt.getByRole("link", { name: "Demo T-shirt", exact: true });
+    const link = tShirt.getByRole("link", { name: "Demo T-shirt — Red", exact: true });
     await expect(link).toHaveAttribute("href", "/en/p/demo-t-shirt?opt.color=red&opt.size=l");
     await link.click();
-    await expect(page).toHaveURL(/\/en\/p\/demo-t-shirt\?opt\.color=red&opt\.size=l$/);
+    await expect(page).toHaveURL(
+      (url) =>
+        url.pathname === "/en/p/demo-t-shirt" &&
+        url.searchParams.get("opt.color") === "red" &&
+        url.searchParams.get("opt.size") === "l",
+    );
+    await expect(
+      page.getByRole("group", { name: "Color", exact: true }).getByRole("radio", { name: "Red" }),
+    ).toBeChecked();
     await expect(
       page.getByRole("group", { name: "Size", exact: true }).getByRole("radio", { name: "L" }),
     ).toBeChecked();
@@ -44,15 +52,14 @@ test.describe("filtered cards from the matched variants", () => {
     page,
   }) => {
     await page.goto("/en/catalog?f=opt.color%3Ared");
-    const tShirt = card(page, "Demo T-shirt");
+    const tShirt = card(page, "Demo T-shirt — Red");
     await expect(tShirt.getByText("3 matching options")).toBeVisible();
     await expect(tShirt.getByText(/UAH\s629\.00/)).toBeVisible();
     await expect(tShirt.getByText("In stock", { exact: true })).toBeVisible();
     // The best available, then the cheapest, then the first in the product's order: red S (18 in stock).
-    await expect(tShirt.getByRole("link", { name: "Demo T-shirt", exact: true })).toHaveAttribute(
-      "href",
-      "/en/p/demo-t-shirt?opt.color=red&opt.size=s",
-    );
+    await expect(
+      tShirt.getByRole("link", { name: "Demo T-shirt — Red", exact: true }),
+    ).toHaveAttribute("href", "/en/p/demo-t-shirt?opt.color=red&opt.size=s");
   });
 
   test("the availability filter both ways: low stock is never 'In stock' (PR 213 review M1), out of stock says so", async ({
@@ -60,30 +67,29 @@ test.describe("filtered cards from the matched variants", () => {
   }) => {
     // Hoodie black XL has 5 (the low-stock threshold): the product is in stock, the matched variant is not.
     await page.goto("/en/catalog?f=inStock%3Atrue&f=opt.color%3Ablack&f=opt.size%3Axl");
-    const hoodie = card(page, "Demo Hoodie");
+    const hoodie = card(page, "Demo Hoodie — Black");
     await expect(hoodie.getByText("Only a few left", { exact: true })).toBeVisible();
     await expect(hoodie.getByText("In stock", { exact: true })).toHaveCount(0);
     await expect(hoodie.getByText(/UAH\s1,349\.00/)).toBeVisible();
 
     await page.goto("/en/catalog?f=inStock%3Afalse");
-    const tShirt = card(page, "Demo T-shirt");
+    const tShirt = card(page, "Demo T-shirt — Red");
     await expect(tShirt.getByText("Out of stock", { exact: true })).toBeVisible();
-    await expect(tShirt.getByRole("link", { name: "Demo T-shirt", exact: true })).toHaveAttribute(
-      "href",
-      "/en/p/demo-t-shirt?opt.color=red&opt.size=l",
-    );
+    await expect(
+      tShirt.getByRole("link", { name: "Demo T-shirt — Red", exact: true }),
+    ).toHaveAttribute("href", "/en/p/demo-t-shirt?opt.color=red&opt.size=l");
   });
 
   test("a price range: the matched variants' price, not the product's lowest; Ukrainian format", async ({
     page,
   }) => {
     await page.goto("/en/catalog?price=60000..70000");
-    const tShirt = card(page, "Demo T-shirt");
+    const tShirt = card(page, "Demo T-shirt — Red");
     await expect(tShirt.getByText(/UAH\s629\.00/)).toBeVisible();
     await expect(tShirt.getByText(/599\.00/)).toHaveCount(0);
 
     await page.goto("/uk/catalog?f=opt.color%3Ared&f=opt.size%3Al");
-    const uk = card(page, "Демо футболка");
+    const uk = card(page, "Демо футболка — Червоний");
     await expect(uk.getByText(/629,00\s₴/)).toBeVisible();
     await expect(uk.getByText("Немає в наявності", { exact: true })).toBeVisible();
   });

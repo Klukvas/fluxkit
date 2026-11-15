@@ -17,9 +17,9 @@ export interface ButtonProps extends ComponentPropsWithRef<"button"> {
 export const buttonVariantClasses: Record<ButtonVariant, string> = {
   primary: "bg-primary text-primary-foreground enabled:hover:bg-primary/90",
   ghost: "bg-background text-foreground enabled:hover:bg-muted",
-  secondary: "border border-border bg-background text-foreground enabled:hover:bg-muted",
+  secondary: "border-2 border-foreground bg-background text-foreground enabled:hover:bg-muted",
   /** Outlined, not filled: the label says what it does; `danger` text on `muted` is a tested pair. */
-  danger: "border border-danger bg-background text-danger enabled:hover:bg-muted",
+  danger: "border-2 border-danger bg-background text-danger enabled:hover:bg-muted",
 };
 
 const sizeClasses: Record<ButtonSize, string> = {

@@ -4,6 +4,7 @@ import type { AttributeInputType } from "../catalog/types.js";
 export const SEARCH_FIELDS = Object.freeze({
   id: "id",
   productId: "productId",
+  listingKey: "listingKey",
   productSlug: "productSlug",
   title: "title",
   brandName: "brandName",
@@ -48,6 +49,7 @@ export const SUGGEST_FIELDS: readonly string[] = [
 export const FIXED_FILTERABLE_FIELDS: readonly string[] = [
   SEARCH_FIELDS.id,
   SEARCH_FIELDS.productId,
+  SEARCH_FIELDS.listingKey,
   SEARCH_FIELDS.brand,
   SEARCH_FIELDS.categories,
   SEARCH_FIELDS.inStock,
@@ -58,6 +60,7 @@ export const FIXED_FILTERABLE_FIELDS: readonly string[] = [
 export const DISPLAYED_FIELDS: readonly string[] = [
   SEARCH_FIELDS.id,
   SEARCH_FIELDS.productId,
+  SEARCH_FIELDS.listingKey,
   SEARCH_FIELDS.productSlug,
   SEARCH_FIELDS.title,
 ];
@@ -67,6 +70,7 @@ export const SORTABLE_FIELDS: readonly string[] = [
   SEARCH_FIELDS.price,
   SEARCH_FIELDS.publishedAt,
   SEARCH_FIELDS.productId,
+  SEARCH_FIELDS.listingKey,
 ];
 
 export type OptionFieldName = `opt_${string}`;

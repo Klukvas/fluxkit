@@ -42,7 +42,7 @@ export function ListCard({ card, headingLevel: Heading, eager, locale, t }: Card
       <VisuallyHidden>{availability.text}</VisuallyHidden>
     );
   return (
-    <article className="group relative flex gap-4 rounded-card border border-border bg-background p-3 transition-shadow hover:border-border-input hover:shadow-raised focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring motion-reduce:transition-none">
+    <article className="group relative flex gap-4 rounded-card border-2 border-foreground bg-background p-3 transition-shadow hover:shadow-raised focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring motion-reduce:transition-none">
       <div className="w-24 shrink-0 sm:w-40">
         <StoreImage
           src={card.image.src}

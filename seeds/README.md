@@ -21,11 +21,11 @@ can be seeded into one database.
 | Kind | Content |
 |---|---|
 | Attributes (20) | `src/coffee/dictionaries.ts`: e.g. `ware_material`, `cup_wall`, `ware_color`, `milk_base`, `roast_level`, `coffee_origin`, `processing`, `syrup_flavour`, `machine_kind`, `burr_type` (select, filterable), `fat_content` (number, %, 1 decimal), `arabica_share`, `group_count`, `power_w`, `voltage_v`, `capacity_ml`, `shelf_life_days` (numbers), `storage_notes` (localized text), `digital_format`, and `supplier_code` (**internal**, never public) |
-| Options (8) | `volume` (110 ml to 1 l), `pack_size` (1 to 1000 pcs), `net_weight` (100 g to 5 kg), `grind`, `diameter` (straws, lids, tampers), `cup_slots`, `glove_size`, `card_value` |
-| ProductType presets (10) | `src/coffee/presets.ts`: `disposable_ware`, `coffee`, `dairy`, `ice`, `grocery`, `syrup_sauce`, `equipment`, `cleaning`, `consumables`, `digital_goods` (`requiresShipping` false). No type names a guide page (`optionGuidePage`), so no product links the size guide. A product picks a subset of its type's options (ADR 0006); simple products keep one default variant |
+| Options (9) | `volume` (110 ml to 1 l), `pack_size` (1 to 1000 pcs), `net_weight` (100 g to 5 kg), `grind`, `diameter` (straws, lids, tampers), `cup_slots`, `glove_size`, `card_value`, `demo_flavour` (vanilla/caramel) |
+| ProductType presets (11) | `src/coffee/presets.ts`: `disposable_ware`, `coffee`, `dairy`, `ice`, `grocery`, `syrup_sauce`, `equipment`, `cleaning`, `consumables`, `digital_goods` (`requiresShipping` false), `demo_flavoured_syrup` (splits cards by `demo_flavour`, volume stays inside). No type names a guide page (`optionGuidePage`), so no product links the size guide. A product picks a subset of its type's options (ADR 0006); simple products keep one default variant |
 | Brands (11) | Invented names (`Cuplia`, `Milkora`, `Greenfold`, `Icetta`, `Roast Harbor`, `Leafline`, `Siropia`, `Crema Works`, `Tampwise`, `Cleanbrew`, `Brew School`); no real company or trademark |
 | Categories (35) | 11 roots with children, one third level (Coffee > Coffee beans > Espresso blends / Single origin) |
-| Products (90, all published) | Cups and lids 16, straws, stirrers and sugar 7, packaging and consumables 6, milk and cream 9, ice 3, coffee 11, tea and cocoa 5, syrups and sauces 9, equipment 16, cleaning and filters 6, gift card and guide 2; 208 variants. `src/coffee/products-*.ts` through the builder `src/coffee/product-builder.ts` |
+| Products (91, all published) | Cups and lids 16, straws, stirrers and sugar 7, packaging and consumables 6, milk and cream 9, ice 3, coffee 11, tea and cocoa 5, syrups and sauces 10, equipment 16, cleaning and filters 6, gift card and guide 2; 212 variants; the added `demo-flavoured-syrup` has four unequal prices and linked vanilla/caramel images reused from existing assets. `src/coffee/products-*.ts` through the builder `src/coffee/product-builder.ts` |
 | SKUs | Explicit and systematic: a stem per product plus the value codes (`CUP-DW-KR-350ML-25`), set through the variant admin service |
 | Prices | UAH-like amounts in minor units; 5 variants with a compare-at price |
 | Stock | 19 low-stock variants (1 to 5), 7 sold out (two whole products: `grinder-blade`, `descaler-liquid`), one backorder (`espresso-machine-1-group`), the 4 digital variants untracked |
@@ -46,7 +46,7 @@ The tables below describe the fixture (`src/test-fixture/`), unchanged since it 
 |---|---|
 | Attributes (8) | `material` (select, filterable), `care_notes` (localized text), `supplier_reference` (**internal**, never public), `head_type` (select, filterable), `length` (number, mm), `weight` (number, g), `file_format` (select), `license_type` (select) |
 | Options (2) | `color` (black, white, red, blue), `size` (s, m, l, xl) |
-| ProductType presets (3) | `clothing` (options color + size; material required; guide page `size-guide`, so the storefront links its size guide next to the pickers; a database seeded before 2026-11-13 keeps its type WITHOUT a guide page, because the runner never overwrites an existing type: set it in the admin), `hand_tool` (no options; head type required; `requiresShipping` true), `digital_product` (no options; `requiresShipping` false; file format required) |
+| ProductType presets (3) | `clothing` (options color + size; splits cards by color, sizes stay inside; material required; guide page `size-guide`, so the storefront links its size guide next to the pickers; a database seeded before 2026-11-13 keeps its type WITHOUT a guide page, because the runner never overwrites an existing type: set it in the admin), `hand_tool` (no options; head type required; `requiresShipping` true), `digital_product` (no options; `requiresShipping` false; file format required) |
 | Brand (1) | `demo-brand` ("Demo Brand") |
 | Categories (9) | 3 roots (`demo-clothing`, `demo-tools`, `demo-digital-goods`), 2 children each |
 | Products (8, all published) | 3 clothing (variants: 9, 8 and 4), 3 hand tools and 2 digital products (one default variant each); 26 variants in total |
@@ -103,12 +103,19 @@ It prints how many entities were created and how many already existed. Any error
 - With `MEDIA_STORAGE_DRIVER=none` no demo banner is created (`images not uploaded: ... home banners not created`); the storefront then shows no banners.
 - Seeding creates no users, no customers, no carts, no orders and no shipments (no personal or fake order data in the template). The first admin owner comes from `pnpm admin:create` (README, Admin sign-in); a cart, a customer and an order come from the curl run in the README, Checkout walkthrough.
 
+## Activate split listing cards (ADR 0052)
+
+- In the admin, open Catalog setup → Product types → the type → change an allowed option, then tick **Separate listing cards per value**. Only one option per type may be checked; clear the old one before choosing another. This affects every product of the type. Link each value's pictures in the product's **Media** tab. Search updates asynchronously (jobs 13/14); caches may briefly show the previous cards.
+- Existing databases keep all saved assignment flags, including a choice to turn splitting off. To add the new coffee demo type/product, run the idempotent `pnpm seed`; it creates `demo_flavoured_syrup` with `demo_flavour` flagged only when that type does not exist. Existing types are never repaired or overwritten. Activate any existing type manually in the admin.
+- Fresh `pnpm seed:test` databases split clothing by `color` using the existing products and images: seven clothing cards, three products. `pnpm seed:test` also preserves flags on existing types. Product-mode API lists remain one item per product.
+- Presets may name one `splitListingOptionCode`, which must occur in their `optionCodes`. Omitting it creates all assignments with splitting off. The runner passes true only on the named assignment during type creation.
+
 ## Add or change a preset
 
 The demo shop lives in `src/coffee/` (change it freely, keeping `coffee-seed.spec.ts` green); the test fixture in `src/test-fixture/` changes only together with the tests that assert it.
 
 1. Add attributes or options to `dictionaries.ts` of the dataset (codes are immutable and match `^[a-z][a-z0-9_]{0,63}$`; value codes may start with a digit).
-2. Add the ProductType to `presets.ts`: which attributes (product or variant level, required or not) and which options it allows. Niche-specific fields live here as data, never in the product schema.
+2. Add the ProductType to `presets.ts`: which attributes (product or variant level, required or not) and which options it allows and, optionally, one `splitListingOptionCode` from that list. Niche-specific fields live here as data, never in the product schema.
 3. Add demo products (`products-*.ts` through `coffeeProduct()` in the coffee demo, `products.ts` in the fixture) and categories or brands to `taxonomy.ts`; give every text a `uk` and an `en` value, and one `variants` entry (option values, price, stock) for every variant the options generate.
 4. `pnpm --filter @fluxkit/seeds test` checks codes, slugs, texts and references; the integration tests `apps/api/src/seed/seed-coffee.spec.ts` (coffee) and `seed.spec.ts` (fixture) seed a real database and reads the result through the store API.
 

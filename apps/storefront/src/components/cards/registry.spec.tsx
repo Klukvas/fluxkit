@@ -94,7 +94,7 @@ function LegacyProductCard({
   const badgeShown = availability !== null && shown !== "in_stock";
   const purchasable = shown !== null && canAddToCart(shown);
   return (
-    <article className="group relative flex h-full flex-col gap-2 rounded-card border border-border bg-background p-3 fk-card-tilt hover:border-border-input hover:shadow-raised focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring motion-reduce:transition-none">
+    <article className="group relative flex h-full flex-col gap-2 rounded-card border-2 border-foreground bg-background p-3 fk-card-tilt hover:shadow-raised focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring motion-reduce:transition-none">
       <div className="overflow-hidden rounded-media">
         <div className="fk-card-hop">
           <StoreImage
@@ -139,7 +139,7 @@ function LegacyProductCard({
         {!purchasable ? null : product.defaultVariantId === null ? (
           <Link
             href={href}
-            className={`relative z-10 inline-flex min-h-11 w-full items-center justify-center rounded-control border border-border bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-muted ${focusRing}`}
+            className={`relative z-10 inline-flex min-h-11 w-full items-center justify-center rounded-control border-2 border-foreground bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-muted ${focusRing}`}
           >
             <CardActionLabel
               short={t("product.card.chooseShort")}

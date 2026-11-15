@@ -433,7 +433,14 @@ const storeConfig: Shape<StoreConfig> = {
 const priceRange = { object: { from: "integer", to: "integer", currency: "string" } } as const;
 const brand = { nullable: { object: { slug: "string", name: "string" } } } as const;
 
-const productList: Shape<ProductList> = {
+// Current servers require these additive fields; the public client also accepts pre-upgrade summaries.
+type CurrentListingPage<
+  T extends { items: readonly { listingKey?: string; listingOption?: unknown }[] },
+> = Omit<T, "items"> & {
+  items: (T["items"][number] &
+    Required<Pick<T["items"][number], "listingKey" | "listingOption">>)[];
+};
+const productList: Shape<CurrentListingPage<ProductList>> = {
   object: {
     items: {
       array: {
@@ -447,6 +454,17 @@ const productList: Shape<ProductList> = {
           price: priceRange,
           availability,
           defaultVariantId: { nullable: "string" },
+          listingKey: "string",
+          listingOption: {
+            nullable: {
+              object: {
+                optionCode: "string",
+                valueCode: "string",
+                optionName: "string",
+                valueName: "string",
+              },
+            },
+          },
         },
       },
     },
@@ -456,7 +474,7 @@ const productList: Shape<ProductList> = {
   },
 };
 
-const searchResult: Shape<SearchResult> = {
+const searchResult: Shape<CurrentListingPage<SearchResult>> = {
   object: {
     items: {
       array: {
@@ -786,7 +804,13 @@ type DataOf<N extends OperationName> = Extract<
   { ok: true }
 >["data"];
 
-const RESPONSE_SHAPES: { [N in OperationName]: Shape<DataOf<N>> } = {
+type CurrentResponse<N extends OperationName> =
+  DataOf<N> extends {
+    items: readonly { listingKey?: string; listingOption?: unknown }[];
+  }
+    ? CurrentListingPage<DataOf<N>>
+    : DataOf<N>;
+const RESPONSE_SHAPES: { [N in OperationName]: Shape<CurrentResponse<N>> } = {
   register: authResult,
   login: authResult,
   logout: "none",

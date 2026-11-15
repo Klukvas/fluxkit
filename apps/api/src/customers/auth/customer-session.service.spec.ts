@@ -103,6 +103,7 @@ describe("CustomerSessionService (real Postgres)", () => {
     const { token, sessionId } = await service.create(shopper.id);
     expect(await service.resolve(token)).toEqual({
       sessionId,
+      tokenHash: sha256(token),
       customer: { id: shopper.id, email: shopper.email },
     });
   });

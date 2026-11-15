@@ -5,9 +5,10 @@ import { COMPUTED_PROPERTIES } from "./snapshot.ts";
 /**
  * Declared exceptions of ONE pull request (`.visual/exceptions.json`; plan section 3 principle 2): differences the PR
  * means to make. `scripts/visual-compare.sh` honours only the entries this PR ADDED: an entry already in the merge-base's
- * file belongs to an earlier PR and is ignored (`ownExceptions`, compared by page, theme, selector and property; a changed
- * reason does not revive it), so an exception never outlives the PR that declared it. Old entries may stay in the file or
- * be removed by any PR; they declare nothing.
+ * file (same page, theme, selector, property AND reason) belongs to an earlier PR and is ignored (`ownExceptions`), so an
+ * exception never outlives the PR that declared it. To declare a difference an earlier PR already declared for the same
+ * page, theme, selector and property, a PR replaces that entry with its own reason (a duplicate key is still an error):
+ * the replacement is in the PR's diff like any new entry. Old entries may stay in the file or be removed by any PR.
  *
  * The file is a JSON array of entries:
  *   { "page": "<page id>" | "*", "theme"?: "light" | "dark" | "system", "selector": "<selector name>",
@@ -40,13 +41,21 @@ function exceptionKey(entry: VisualException): string {
   return [entry.page, entry.theme ?? "", entry.selector, entry.property].join("|");
 }
 
+/**
+ * One PR's declaration: the key plus the reason. Every entry with this page, theme, selector and property becomes
+ * unusable once merged; without the reason here, the next PR that changes the same frame could never declare it.
+ */
+function declarationKey(entry: VisualException): string {
+  return [exceptionKey(entry), entry.reason].join("|");
+}
+
 /** The entries of `current` that are not in `inherited` (the merge-base's file): the only ones a PR may use. */
 export function ownExceptions(
   current: readonly VisualException[],
   inherited: readonly VisualException[],
 ): VisualException[] {
-  const old = new Set(inherited.map(exceptionKey));
-  return current.filter((entry) => !old.has(exceptionKey(entry)));
+  const old = new Set(inherited.map(declarationKey));
+  return current.filter((entry) => !old.has(declarationKey(entry)));
 }
 
 export function parseExceptions(value: unknown, source = "exceptions"): VisualException[] {

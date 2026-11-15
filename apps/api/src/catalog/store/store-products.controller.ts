@@ -28,6 +28,13 @@ export class StoreProductsController {
     summary:
       "List active products, newest first (published_at desc, id desc); filter by category (with descendants) and brand",
   })
+  @ApiQuery({
+    name: "groupBy",
+    required: false,
+    schema: { type: "string", enum: ["product", "listing"], default: "product" },
+    description:
+      "Product-wide summaries by default; listing counts and pages the current split groups.",
+  })
   @ApiQuery({ name: "locale", required: false, schema: { type: "string" } })
   @ApiQuery({
     name: "limit",

@@ -26,8 +26,14 @@ import { SessionService } from "./session.service.js";
 class WhoAmIProbeController {
   @Get()
   @RequirePermission("catalog.read")
-  whoAmI(@CurrentAdmin() admin: AdminPrincipal): AdminPrincipal {
-    return admin;
+  whoAmI(@CurrentAdmin() admin: AdminPrincipal): Omit<AdminPrincipal, "tokenHash"> {
+    return {
+      userId: admin.userId,
+      email: admin.email,
+      role: admin.role,
+      permissions: admin.permissions,
+      sessionId: admin.sessionId,
+    };
   }
 }
 
@@ -113,6 +119,7 @@ describe("admin sessions end to end (real SessionAdminAuthenticator, real Postgr
     });
     expect(result.body.sessionId).toMatch(/^[0-9a-f-]{36}$/);
     expect(JSON.stringify(result.body)).not.toContain("passwordHash");
+    expect(JSON.stringify(result.body)).not.toContain("tokenHash");
   });
 
   it("does not authenticate without a cookie, with a garbage cookie or with an unknown token", async () => {

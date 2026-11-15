@@ -561,7 +561,10 @@ export class CatalogSeeder {
       await this.productTypes.putOption(
         created.id,
         this.lookup(this.optionIds, optionCode, "option"),
-        parse(putProductTypeOptionSchema, { position }),
+        parse(putProductTypeOptionSchema, {
+          position,
+          ...(optionCode === definition.splitListingOptionCode ? { splitsListing: true } : {}),
+        }),
       );
     }
     this.productTypeIds.set(definition.code, created.id);

@@ -43,7 +43,7 @@ export interface BannerCardProps {
 
 const TONES: Record<BannerCardTone, { card: string; text: string | null }> = {
   surface: {
-    card: "border-border bg-background text-foreground hover:border-border-input",
+    card: "border-foreground bg-background text-foreground",
     text: "text-muted-foreground",
   },
   // The tone NAME is stored by the API (`banner.tone`); its colour is the accent token pair, which equals primary by default.
@@ -75,7 +75,7 @@ export function BannerCard({
   if (layout === "image") {
     return renderLink({
       className: cn(
-        "group block overflow-hidden rounded-card border border-border transition-shadow hover:border-border-input hover:shadow-raised motion-reduce:transition-none",
+        "group block overflow-hidden rounded-card border-2 border-foreground transition-shadow hover:shadow-raised motion-reduce:transition-none",
         focusRing,
       ),
       children: <span className={FRAME}>{picture}</span>,
@@ -88,7 +88,7 @@ export function BannerCard({
   const hasText = text !== null && text !== undefined && text !== "";
   return renderLink({
     className: cn(
-      "group flex h-full flex-col overflow-hidden rounded-card border transition-shadow hover:shadow-raised motion-reduce:transition-none",
+      "group flex h-full flex-col overflow-hidden rounded-card border-2 transition-shadow hover:shadow-raised motion-reduce:transition-none",
       colours.card,
       focusRing,
     ),

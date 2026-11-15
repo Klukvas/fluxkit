@@ -132,7 +132,7 @@ describe("ProductCard (review D-07, D-15)", () => {
   it("has a hover elevation, a clamped title, the brand as a meta line and the price at the bottom", () => {
     const html = card("in_stock");
     const article = /<article class="([^"]*)"/.exec(html)?.[1]?.split(" ") ?? [];
-    for (const name of ["hover:shadow-raised", "hover:border-border-input", "h-full"]) {
+    for (const name of ["hover:shadow-raised", "border-2", "border-foreground", "h-full"]) {
       expect(article).toContain(name);
     }
     expect(html).toMatch(/<h2 class="[^"]*line-clamp-2/);

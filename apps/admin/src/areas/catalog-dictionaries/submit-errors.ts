@@ -7,7 +7,8 @@ import type { FormIssues } from "./form-rules";
 /**
  * A problem answer on a form's fields and summary. `400 validation_failed` puts each `errors[].path` on the field of that
  * name (`name.uk`, `validation.min_length`); a `409 conflict` that names one column (`field`: `code`, `slug`) goes on that
- * field; everything else is explained in the summary through the problem map (the API's English `detail` is never shown).
+ * field, as does the one-split-option rule on `splitsListing`; everything else is explained in the summary through the
+ * problem map (the API's English `detail` is never shown).
  */
 export function formErrorsFromProblem(
   problem: ProblemDetails,
@@ -15,7 +16,10 @@ export function formErrorsFromProblem(
   formFields: readonly string[],
 ): FormErrors<string> {
   if (
-    problem.code === "conflict" &&
+    (problem.code === "conflict" ||
+      (status === 409 &&
+        problem.code === "rule_violation" &&
+        problem.rule === "split_option_already_set")) &&
     problem.field !== undefined &&
     formFields.includes(problem.field)
   ) {

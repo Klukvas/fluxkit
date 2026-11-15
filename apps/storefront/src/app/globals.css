@@ -286,7 +286,7 @@
   }
   /* The sort's summary (`sort-menu.tsx`): looks like the field it replaced (44 px, the input border), no native marker. */
   .fk-sort-summary {
-    @apply flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-control border border-border-input bg-background px-3 py-2 text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring;
+    @apply flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-control border-2 border-foreground bg-background px-3 py-2 text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring;
   }
   .fk-sort-summary::-webkit-details-marker {
     display: none;
@@ -323,7 +323,7 @@
    * The pressed state follows `aria-pressed`, so it cannot drift from what assistive technology hears.
    */
   .fk-theme-option {
-    @apply inline-flex min-h-11 cursor-pointer items-center rounded-control border border-border bg-background px-3 text-sm text-foreground not-aria-pressed:hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring aria-pressed:border-primary aria-pressed:bg-primary aria-pressed:font-semibold aria-pressed:text-primary-foreground;
+    @apply inline-flex min-h-11 cursor-pointer items-center rounded-control border-2 border-foreground bg-background px-3 text-sm text-foreground not-aria-pressed:hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring aria-pressed:border-primary aria-pressed:bg-primary aria-pressed:font-semibold aria-pressed:text-primary-foreground;
   }
   /* The icon components (`components/icons.tsx`) carry no presentation attributes: fewer bytes in every page's header. */
   .fk-icon {

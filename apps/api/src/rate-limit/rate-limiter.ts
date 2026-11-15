@@ -1,6 +1,7 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Optional } from "@nestjs/common";
 import { CLOCK, type Clock } from "../auth/clock.js";
 import { IpWindowLimiter, type ThrottleDecision, type WindowLimit } from "./ip-window-limiter.js";
+import { WINDOW_STORE, MemoryWindowStore, type WindowStore } from "./window-store.js";
 
 /**
  * The named per-address limits of the store (ADR 0016, plan "Config" and "Security"). The numbers are internal
@@ -120,31 +121,29 @@ export const RATE_LIMIT_KEY = "fluxkit:rate-limit";
 export const RATE_LIMIT_OVERRIDES = Symbol("RATE_LIMIT_OVERRIDES");
 
 /**
- * Several named in-memory windows, one `IpWindowLimiter` per name, so exhausting one limit (checkout) never affects
- * another (login) for the same address. Single process only (see `IpWindowLimiter`).
+ * Named fixed windows in the selected store; different names never share counts.
  */
 @Injectable()
 export class RateLimiter {
-  private readonly limiters = new Map<RateLimitName, IpWindowLimiter>();
+  private readonly store: WindowStore;
+  private readonly limits = new Map<RateLimitName, WindowLimit>();
 
   constructor(
     @Inject(CLOCK) clock: Clock,
     @Inject(RATE_LIMIT_OVERRIDES) overrides: RateLimitOverrides = {},
+    @Optional() @Inject(WINDOW_STORE) store?: WindowStore,
   ) {
+    this.store = store ?? new MemoryWindowStore(clock);
     for (const name of RATE_LIMIT_NAMES) {
-      this.limiters.set(name, new IpWindowLimiter(clock, overrides[name] ?? RATE_LIMITS[name]));
+      const limit = overrides[name] ?? RATE_LIMITS[name];
+      new IpWindowLimiter(clock, limit); // Validate overrides at startup, including memory bounds.
+      this.limits.set(name, limit);
     }
   }
 
-  /**
-   * Counts one attempt of a client against the named limit. `client` is an address, or `admin-user:<id>` for a limit whose
-   * subject is the admin user (text that is not an IP address is counted as is).
-   */
-  attempt(name: RateLimitName, client: string): ThrottleDecision {
-    const limiter = this.limiters.get(name);
-    if (limiter === undefined) {
-      throw new Error(`Unknown rate limit "${String(name)}"`);
-    }
-    return limiter.attempt(client);
+  async attempt(name: RateLimitName, client: string): Promise<ThrottleDecision> {
+    const limit = this.limits.get(name);
+    if (limit === undefined) throw new Error(`Unknown rate limit "${String(name)}"`);
+    return this.store.hit(name, client, limit);
   }
 }

@@ -113,6 +113,7 @@ export async function loadCatalogListing(
 
   const [productsOutcome, configOutcome] = await Promise.all([
     data.listProducts(locale, {
+      groupBy: "listing",
       limit: CATALOG_PAGE_SIZE,
       offset: offsetForPage(query.page, CATALOG_PAGE_SIZE),
       ...(options.categorySlug === undefined ? {} : { category: options.categorySlug }),

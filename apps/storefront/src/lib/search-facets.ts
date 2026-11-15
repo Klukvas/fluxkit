@@ -153,7 +153,7 @@ export function describeFormFailure(reason: string): FormFailureText {
 
 /**
  * What a product card shows for one search item (plan 2026-11-03; review SQ-03 of 2026-11-02). Filters operate on variants
- * and group results by product (AGENTS.md 2.3), and the API names the variants of an item that fit the variant-level
+ * and group results by listing (AGENTS.md 2.3), and the API names the variants of an item that fit the variant-level
  * selection in `item.match` (`docs/api/search.md`, PR 214):
  * - `product`: no `match` (no variant-level selection, or a SQL fallback item): the product's own price, availability
  *   and link, as on the catalog.

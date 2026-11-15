@@ -360,10 +360,14 @@ function OptionAssignmentDialog({
   const edit = target.mode === "edit";
   const [values, setValues] = useState<OptionAssignmentValues>(
     target.mode === "edit"
-      ? { optionId: target.row.optionId, position: String(target.row.position) }
-      : { optionId: "", position: "" },
+      ? {
+          optionId: target.row.optionId,
+          position: String(target.row.position),
+          splitsListing: target.row.splitsListing,
+        }
+      : { optionId: "", position: "", splitsListing: false },
   );
-  const form = useFormSubmit(["optionId", "position"]);
+  const form = useFormSubmit(["optionId", "position", "splitsListing"]);
   const issues = form.state.fieldErrors;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -436,6 +440,28 @@ function OptionAssignmentDialog({
           }
         />
       )}
+      <div className="flex flex-col gap-1">
+        <Checkbox
+          id={`${formId}-splitsListing`}
+          name="splitsListing"
+          label={t("dict.assignment.option.splitsListing")}
+          checked={values.splitsListing}
+          disabled={form.state.busy}
+          aria-describedby={`${formId}-splitHint${issues["splitsListing"] === undefined ? "" : ` ${formId}-splitError`}`}
+          aria-invalid={issues["splitsListing"] === undefined ? undefined : true}
+          onChange={(event) =>
+            setValues((current) => ({ ...current, splitsListing: event.target.checked }))
+          }
+        />
+        <p id={`${formId}-splitHint`} className="text-sm text-muted-foreground">
+          {t("dict.assignment.option.splitHint")}
+        </p>
+        {issues["splitsListing"] === undefined ? null : (
+          <p id={`${formId}-splitError`} className="text-sm text-danger">
+            {describe(t, issues["splitsListing"])}
+          </p>
+        )}
+      </div>
       <TextField
         t={t}
         id={`${formId}-position`}
@@ -517,6 +543,16 @@ export function OptionAssignmentsSection({
                   <small className="text-muted-foreground">{row.optionCode}</small>
                 )}
               </span>
+            ),
+          },
+          {
+            id: "splitsListing",
+            header: t("dict.assignment.option.splitsListing"),
+            cell: (row) => (
+              <StatusBadge
+                tone={row.splitsListing ? "success" : "neutral"}
+                label={t(row.splitsListing ? "dict.form.yes" : "dict.form.no")}
+              />
             ),
           },
           {
