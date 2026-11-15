@@ -221,7 +221,7 @@ Run, headers and conventions: `apps/admin/README.md`. Plan: `docs/plans/2026-10-
 - `src/areas/home/home-page.tsx` - eager heading and independent lazy workspace/checklist slots; no header action.
 - `src/areas/home/workspace-model.ts` - permission-selected counter/action definitions, bounded typed reads and locale number formatting; no writes or screen imports.
 - `src/areas/home/home-workspace.tsx` - lazy home messages, per-user workspace and independent useResource loader per permitted counter.
-- `src/areas/home/workspace-view.tsx` - counter links with local states and sibling retries, quiet navigation actions and no-access Help link.
+- `src/areas/home/workspace-view.tsx` - counter links with local states and sibling retries, consistently outlined secondary quick-action links and no-access Help link.
 - `src/areas/home/workspace-model.spec.ts` - permission selection, exact queries/targets and uk/en number formatting.
 - `src/areas/home/workspace-view.spec.tsx` - static markup states, names, retry semantics, omitted groups and workspace/checklist order.
 - `src/messages/{uk,en}/home.json` - lazy workspace labels and state/action text in both UI languages.
