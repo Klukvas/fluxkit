@@ -27,7 +27,7 @@
     "page": "*",
     "selector": "header.banner",
     "property": "screenshot",
-    "reason": "plan 2026-11-11-ui-council-decisions, decision 1: the header category list fades at its end edge while it can scroll (mask-image, not a recorded property) and snaps to items; the header is masked"
+    "reason": "plan 2026-11-15-header-categories-position (owner's choice C): from xl the header reads logo, Categories, search, controls instead of Categories, logo; the header is masked at 1280 (computed styles identical; the 390 frames are unchanged)"
   },
   {
     "page": "*",

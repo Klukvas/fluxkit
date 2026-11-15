@@ -10,6 +10,7 @@ import {
   headerHasThemeControl,
   headerView,
   menuPanelAlign,
+  pickerPanelAlign,
   type HeaderConfig,
 } from "./header-layout";
 
@@ -278,10 +279,27 @@ describe("headerView: the picker display (round 4)", () => {
   ];
   const input = { locale: "uk", t, searchEnabled: true, showThemeSwitch: true } as const;
 
-  it("renders ONE disclosure in the menu's place with the categories and their children, then the links, and no inline row", () => {
+  it("keeps the phone menu in the menu's place and puts the picker in the navigation's place (owner's decision 2026-11-15)", () => {
     const view = headerView(picker, { ...input, categories: tree });
-    expect(view.map((block) => block.kind)).toEqual(["picker", "logo", "search", "controls"]);
-    const block = view[0];
+    expect(view.map((block) => block.kind)).toEqual([
+      "menu",
+      "logo",
+      "picker",
+      "search",
+      "controls",
+    ]);
+    // Below `xl` the menu is the `row` display's menu: the top-level categories, then the links, flat.
+    expect(view[0]).toEqual({
+      kind: "menu",
+      links: [
+        { key: "c:shoes", href: "/uk/c/shoes", label: "Shoes" },
+        { key: "c:hats", href: "/uk/c/hats", label: "Hats" },
+        { key: "/catalog", href: "/uk/catalog", label: "§nav.catalog" },
+      ],
+      align: "start",
+      withTheme: false,
+    });
+    const block = view[2];
     if (block?.kind !== "picker") throw new Error("no picker");
     // `categoryLimit` 2 of `base`: the third top-level category is left out.
     expect(block.categories.map((category) => category.key)).toEqual(["c:shoes", "c:hats"]);
@@ -293,12 +311,44 @@ describe("headerView: the picker display (round 4)", () => {
     });
     expect(block.categories[1]?.children).toEqual([]);
     expect(block.links).toEqual([{ key: "/catalog", href: "/uk/catalog", label: "§nav.catalog" }]);
-    expect(block).toMatchObject({ align: "start", withTheme: false });
+    expect(block.align).toBe("start");
+    expect(block).not.toHaveProperty("withTheme");
+  });
+
+  it("gives the phone menu the theme switch, never the picker (the theme control shows from `sm`)", () => {
+    const view = headerView(
+      { ...picker, controls: ["language", "theme", "cart", "account"] },
+      { ...input, categories: tree },
+    );
+    expect(view[0]).toMatchObject({ kind: "menu", withTheme: true });
+    expect(view[2]).not.toHaveProperty("withTheme");
+    expect(view.at(-1)).toMatchObject({ kind: "controls", themeInMenu: true });
+  });
+
+  it("opens the picker's panel towards the start only after a shown search box (it then sits at the end of the row)", () => {
+    expect(pickerPanelAlign(["menu", "logo", "navigation", "search", "controls"], true)).toBe(
+      "start",
+    );
+    expect(pickerPanelAlign(["menu", "logo", "search", "navigation", "controls"], true)).toBe(
+      "end",
+    );
+    expect(pickerPanelAlign(["menu", "logo", "search", "navigation", "controls"], false)).toBe(
+      "start",
+    );
+    expect(pickerPanelAlign(["navigation", "menu", "logo", "search", "controls"], true)).toBe(
+      "start",
+    );
+    expect(pickerPanelAlign(["logo", "search", "menu", "navigation"], true)).toBe("end");
+    const view = headerView(
+      { ...picker, blocks: ["menu", "logo", "search", "navigation", "controls"] },
+      { ...input, categories: tree },
+    );
+    expect(view[3]).toMatchObject({ kind: "picker", align: "end" });
   });
 
   it("keeps the configured links when the categories could not be read, and leaves the picker out with no link at all", () => {
     const degraded = headerView(picker, { ...input, categories: null });
-    expect(degraded[0]).toMatchObject({ kind: "picker", categories: [] });
+    expect(degraded[2]).toMatchObject({ kind: "picker", categories: [] });
     const nothing = headerView(
       { ...picker, navigation: { display: "picker", categoryLimit: 0, links: [] } },
       { ...input, categories: tree },
@@ -398,7 +448,7 @@ describe("headerView: links of the enabled feature slices (plan 2026-11-13-blog.
 
   it("appends them after the configured links in the picker's panel", () => {
     const blocks = view({ ...base, navigation: { ...base.navigation, display: "picker" } });
-    expect(blocks[0]).toMatchObject({
+    expect(blocks[2]).toMatchObject({
       kind: "picker",
       links: [
         { key: "/catalog", href: "/uk/catalog", label: "§nav.catalog" },
