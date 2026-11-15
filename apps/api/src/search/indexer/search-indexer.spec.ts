@@ -25,6 +25,7 @@ import {
   indexSettings,
   listIndexUids,
   meiliUrl,
+  SCOPED_KEY_ACTIONS,
   waitForMasterTask,
 } from "../../test/search-engine.js";
 import { budgetOf, SearchWorld, UNLIMITED_BUDGET } from "../../test/search-world.js";
@@ -675,6 +676,44 @@ describe("SearchIndexer (real Postgres, real Meilisearch)", () => {
         { failed_attempts: 0, last_error_code: null },
         { failed_attempts: 0, last_error_code: null },
       ]);
+    });
+
+    /** Fails one engine step of a rebuild with a key lacking `missing`, then rebuilds healthily after the backoff. */
+    async function rebuildAfterFailedStep(missing: string): Promise<void> {
+      const product = await world.variant({ onHand: 2 });
+      await syncAll();
+      await pool.query("update search_index_state set rebuild_requested_at = now()");
+      const weakKey = await createScopedKey(
+        search.prefix,
+        SCOPED_KEY_ACTIONS.filter((action) => action !== missing),
+      );
+      const now = new Date();
+      try {
+        const failed = await search
+          .indexer(database, { key: weakKey.key })
+          .rebuild(now, UNLIMITED_BUDGET);
+        expect(failed.failures).toEqual([{ code: "engine_unauthorized", locales: ["uk", "en"] }]);
+      } finally {
+        await deleteKey(weakKey.uid);
+      }
+      const later = await indexer.rebuild(new Date(now.getTime() + 61_000), UNLIMITED_BUDGET);
+      expect(later).toMatchObject({ swapped: 2, failures: [] });
+      expect(await listIndexUids(search.prefix)).toEqual([
+        search.liveUid("en"),
+        search.liveUid("uk"),
+      ]);
+      for (const locale of ["uk", "en"]) {
+        expect(await documentsOf(locale, product.productId)).toHaveLength(1);
+      }
+    }
+
+    it("a build that fails right after creating its index leaves no orphan index behind", async () => {
+      // The index is created, its settings are refused: the next run continues in it instead of leaking it.
+      await rebuildAfterFailedStep("settings.update");
+    });
+
+    it("a swap whose old index can not be deleted deletes it at the next run instead of leaking it", async () => {
+      await rebuildAfterFailedStep("indexes.delete");
     });
 
     it("a key without the needed actions is reported as engine_unauthorized", async () => {

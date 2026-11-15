@@ -464,7 +464,12 @@ export class SearchIndexer {
     }
   }
 
-  /** Creates the build index with the derived settings and records it; answers the request this run read, if any. */
+  /**
+   * Records the build, then creates its index with the derived settings; answers the request this run read, if any. The
+   * uid is recorded BEFORE the index exists, so a run that fails or dies after creating it never leaves an index nobody
+   * knows: the next run continues in it, or deletes it when the build is stale (an index the engine never created is
+   * found missing and the locale starts again). Without that order every such failure left one more index for ever.
+   */
   private async startBuild(plan: LocalePlan, requested: string | null, now: Date): Promise<void> {
     const engine = this.requireEngine();
     if (!this.config.enabled) {
@@ -477,11 +482,6 @@ export class SearchIndexer {
       now,
       randomBytes(16).toString("hex"),
     );
-    await engine.waitForTask(await engine.createIndex(uid), this.taskTimeoutMs());
-    await engine.waitForTask(
-      await engine.updateSettings(uid, plan.derived.settings),
-      this.taskTimeoutMs(),
-    );
     await this.states.startBuild(
       this.database,
       plan.locale,
@@ -489,6 +489,12 @@ export class SearchIndexer {
       plan.derived.rebuildKey,
       requested,
       now,
+    );
+    await engine.waitForTask(await engine.createIndex(uid), this.taskTimeoutMs());
+    // A run that stops before this line leaves the index without settings: `swapIn` applies them before every swap.
+    await engine.waitForTask(
+      await engine.updateSettings(uid, plan.derived.settings),
+      this.taskTimeoutMs(),
     );
   }
 
@@ -582,18 +588,20 @@ export class SearchIndexer {
         });
       }
     }
+    // After the verified swap the build uid names the OLD live index (or nothing after a rename), which nothing reads any
+    // more: delete it BEFORE the completion clears the uid from the state. A failed delete keeps the uid recorded with
+    // the uncertain-swap mark, so the next run deletes it again; deleting after the completion lost it for ever.
+    for (const pair of pairs) {
+      if (!pair.rename) {
+        await this.deleteOwnedIndex(pair.indexes[1]);
+      }
+    }
     const completed = await this.states.completeSwap(this.database, swapped, now);
-    // After a swap the build uid names the OLD live index (or nothing after a rename): delete it.
-    for (const [index, entry] of swapped.entries()) {
+    for (const entry of swapped) {
       if (!completed.includes(entry.locale)) {
         this.logger.warn(
           `Search swap completion skipped for locale ${entry.locale}: swap_completion_lost`,
         );
-        continue;
-      }
-      const pair = pairs[index];
-      if (pair !== undefined && !pair.rename) {
-        await this.deleteOwnedIndex(pair.indexes[1]);
       }
     }
     return completed.length;
