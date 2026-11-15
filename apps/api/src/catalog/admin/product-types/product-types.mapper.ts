@@ -45,6 +45,7 @@ export function toOptionAssignmentResponse(row: OptionAssignmentRow): ProductTyp
     productTypeId: row.productTypeId,
     optionId: row.optionId,
     optionCode: row.optionCode,
+    splitsListing: row.splitsListing,
     position: row.position,
     createdAt: row.createdAt.toISOString(),
   };

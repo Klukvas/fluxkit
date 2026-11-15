@@ -10,8 +10,8 @@ import {
 } from "@fluxkit/core";
 import { LOCALE_CONFIG, type LocaleConfig } from "../../../common/locale.js";
 import { toPage, type Page, type PaginationQuery } from "../../../common/pagination.js";
-import { translatePostgresError } from "../../../common/postgres-errors.js";
-import { notFound, validationFailed } from "../../../common/problem.js";
+import { isUniqueViolation, translatePostgresError } from "../../../common/postgres-errors.js";
+import { notFound, ProblemException, validationFailed } from "../../../common/problem.js";
 import { withTransaction } from "../../../common/transaction.js";
 import { SEARCH_PORT, type SearchPort } from "../../../common/search-port.js";
 import { DRIZZLE, type Database } from "../../../database/database.module.js";
@@ -216,7 +216,7 @@ export class ProductTypesService {
     });
   }
 
-  /** Creates the assignment or replaces its position. */
+  /** Creates the assignment or updates its position and optional listing flag. */
   async putOption(
     productTypeId: string,
     optionId: string,
@@ -231,14 +231,36 @@ export class ProductTypesService {
         throw notFound("Option");
       }
       const existing = await this.productTypes.findOptionAssignment(tx, productTypeId, optionId);
-      if (existing === undefined) {
-        await this.productTypes.insertOptionAssignment(tx, productTypeId, optionId, position);
-      } else {
-        await this.productTypes.updateOptionAssignment(tx, productTypeId, optionId, position);
+      const splitsListing = body.splitsListing ?? existing?.splitsListing ?? false;
+      if (splitsListing) {
+        const assignments = await this.productTypes.listOptionAssignments(tx, productTypeId);
+        if (assignments.some((entry) => entry.optionId !== optionId && entry.splitsListing)) {
+          throw splitOptionAlreadySet();
+        }
+      }
+      try {
+        const values = { position, splitsListing };
+        if (existing === undefined) {
+          await this.productTypes.insertOptionAssignment(tx, productTypeId, optionId, values);
+        } else {
+          await this.productTypes.updateOptionAssignment(tx, productTypeId, optionId, values);
+        }
+      } catch (error) {
+        if (isUniqueViolation(error, "product_type_one_split_option_idx")) {
+          throw splitOptionAlreadySet();
+        }
+        throw error;
       }
       const saved = required(
         await this.productTypes.findOptionAssignment(tx, productTypeId, optionId),
       );
+      if (splitsListing !== (existing?.splitsListing ?? false)) {
+        await this.search.productsChangedWhere(
+          tx,
+          sql`select id from product where product_type_id = ${productTypeId}`,
+          "option_changed",
+        );
+      }
       return { assignment: toOptionAssignmentResponse(saved), created: existing === undefined };
     });
   }
@@ -248,9 +270,8 @@ export class ProductTypesService {
       if ((await this.productTypes.findByIdForUpdate(tx, productTypeId)) === undefined) {
         throw notFound("Product type");
       }
-      if (
-        (await this.productTypes.findOptionAssignment(tx, productTypeId, optionId)) === undefined
-      ) {
+      const assignment = await this.productTypes.findOptionAssignment(tx, productTypeId, optionId);
+      if (assignment === undefined) {
         throw notFound("Option assignment");
       }
       assertAllowed(
@@ -264,6 +285,13 @@ export class ProductTypesService {
         "Products of this type still use the option.",
       );
       await this.productTypes.deleteOptionAssignment(tx, productTypeId, optionId);
+      if (assignment.splitsListing) {
+        await this.search.productsChangedWhere(
+          tx,
+          sql`select id from product where product_type_id = ${productTypeId}`,
+          "option_changed",
+        );
+      }
     });
   }
 
@@ -277,4 +305,12 @@ export class ProductTypesService {
       throw validationFailed(errors);
     }
   }
+}
+
+function splitOptionAlreadySet(): ProblemException {
+  return new ProblemException({
+    code: "rule_violation",
+    detail: "Another option already splits listings for this product type.",
+    extensions: { rule: "split_option_already_set", field: "splitsListing" },
+  });
 }
