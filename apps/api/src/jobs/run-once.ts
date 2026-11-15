@@ -1,4 +1,5 @@
 import { describeMigrateError } from "../database/migrate-command.js";
+import { SchedulerLockLostError } from "./scheduler-lock.js";
 import {
   RunOnceUsageError,
   describeFailedJobs,
@@ -23,7 +24,7 @@ runJobsOnceCommand(process.argv.slice(2), process.env)
   })
   .catch((error: unknown) => {
     const text =
-      error instanceof RunOnceUsageError
+      error instanceof RunOnceUsageError || error instanceof SchedulerLockLostError
         ? error.message
         : describeMigrateError(error, [process.env["DATABASE_URL"] ?? ""]);
     console.error(`Could not run the jobs.\n${text}`);

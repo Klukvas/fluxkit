@@ -102,8 +102,12 @@ export class JobsRunner {
    * own time budget (`budgetMs`, default `DEFAULT_JOB_BUDGET_MS`) and stops starting new work when it is used up, so no
    * job can hold the tick, and with it the lock, for hours; what is left waits for the next tick. One failing job never
    * stops the next and never throws out of here: its error is logged and returned.
+   * An aborted signal stops starting jobs and exhausts the running job's budget between units of work.
    */
-  async runAll(now: Date, options: { budgetMs?: number } = {}): Promise<JobReport[]> {
+  async runAll(
+    now: Date,
+    options: { budgetMs?: number; signal?: AbortSignal } = {},
+  ): Promise<JobReport[]> {
     const { database, repository } = this;
     const budgetMs = options.budgetMs ?? DEFAULT_JOB_BUDGET_MS;
     const reports: JobReport[] = [];
@@ -111,8 +115,11 @@ export class JobsRunner {
       name: JobName,
       job: (budget: JobBudget) => Promise<object>,
     ): Promise<void> => {
+      if (options.signal?.aborted) {
+        return;
+      }
       try {
-        const result = await job(new JobBudget(budgetMs));
+        const result = await job(new JobBudget(budgetMs, undefined, options.signal));
         reports.push({ name, ok: true, result });
         this.logResult(name, result);
       } catch (error) {
