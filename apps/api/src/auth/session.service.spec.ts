@@ -94,6 +94,7 @@ describe("SessionService (real Postgres)", () => {
     const resolved = await service.resolve(token);
     expect(resolved).toEqual({
       sessionId,
+      tokenHash: sha256(token),
       user: { id: user.id, email: user.email, role: "manager" },
     });
   });

@@ -28,6 +28,7 @@ export class SessionAdminAuthenticator implements AdminAuthenticator {
       role: resolved.user.role,
       permissions: permissionsOf(resolved.user.role),
       sessionId: resolved.sessionId,
+      tokenHash: resolved.tokenHash,
     };
   }
 }

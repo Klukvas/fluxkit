@@ -1,3 +1,4 @@
+import { SESSION_COOKIE_RESPONSE_HEADER } from "../../auth/session-cookie.js";
 import { Body, Get, HttpCode, Inject, Patch, Post, Req, Res } from "@nestjs/common";
 import { ApiNoContentResponse, ApiOperation } from "@nestjs/swagger";
 import type { Request, Response } from "express";
@@ -147,13 +148,27 @@ export class AccountController {
   @HttpCode(204)
   @ApiOperation({ summary: "Change the own password; all other sessions end" })
   @ApiZodBody(changePasswordSchema)
-  @ApiNoContentResponse({ description: "Password changed; the current session stays signed in." })
+  @ApiNoContentResponse({
+    description:
+      "Password changed; the current token is replaced. Store the new Set-Cookie; the old token no longer works.",
+    headers: {
+      [SESSION_COOKIE_RESPONSE_HEADER]: {
+        description: "Rotated session cookie with the remaining absolute lifetime.",
+        schema: { type: "string" },
+      },
+    },
+  })
   @ApiProblemResponses(400, 401)
   async changePassword(
     @CurrentCustomer() customer: CustomerPrincipal,
     @Body(new ZodValidationPipe(changePasswordSchema)) body: ChangePasswordBody,
+    @Res({ passthrough: true }) response: Response,
   ): Promise<void> {
-    await this.account.changePassword(customer, body);
+    const result = await this.account.changePassword(customer, body);
+    setCustomerSessionCookie(response, result.token, {
+      secure: this.config.cookieSecure,
+      maxAgeSeconds: result.maxAgeSeconds,
+    });
   }
 
   /** Sets the session cookie and, when the request carried a guest cart cookie, clears it: that cart was merged. */
