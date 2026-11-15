@@ -265,6 +265,7 @@ export interface AttributeAssignmentValues {
 
 export interface OptionAssignmentValues {
   optionId: string;
+  splitsListing: boolean;
   position: string;
 }
 
@@ -308,7 +309,10 @@ export function attributeAssignmentBody(
 
 export function optionAssignmentBody(values: OptionAssignmentValues): PutProductTypeOptionBody {
   const position = parsePosition(values.position);
-  return position.ok && position.value !== undefined ? { position: position.value } : {};
+  return {
+    splitsListing: values.splitsListing,
+    ...(position.ok && position.value !== undefined ? { position: position.value } : {}),
+  };
 }
 
 // ---------------------------------------------------------------------------- brands

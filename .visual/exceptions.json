@@ -2170,5 +2170,82 @@
     "selector": "home.hero",
     "property": "screenshot",
     "reason": "plan 2026-11-14-playful-default-design WS-D: opted-in hero adds static accent blob, circular sticker and marker underline on desktop and mobile; original layout and heading typography remain guarded by computed styles and undecorated frozen bytes."
+  },
+  {
+    "page": "catalog",
+    "theme": "light",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "ADR 0052 step 4: the demo clothing fixture splits products by colour, adding more listing cards and changing these pages’ height; this page’s screenshots are masked."
+  },
+  {
+    "page": "catalog",
+    "theme": "dark",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "ADR 0052 step 4: the demo clothing fixture splits products by colour, adding more listing cards and changing these pages’ height; this page’s screenshots are masked."
+  },
+  {
+    "page": "en-catalog",
+    "theme": "light",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "ADR 0052 step 4: the demo clothing fixture splits products by colour, adding more listing cards and changing these pages’ height; this page’s screenshots are masked."
+  },
+  {
+    "page": "en-catalog",
+    "theme": "dark",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "ADR 0052 step 4: the demo clothing fixture splits products by colour, adding more listing cards and changing these pages’ height; this page’s screenshots are masked."
+  },
+  {
+    "page": "en-home",
+    "theme": "light",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "ADR 0052 step 4: the demo clothing fixture splits products by colour, adding more listing cards and changing these pages’ height; this page’s screenshots are masked."
+  },
+  {
+    "page": "en-home",
+    "theme": "dark",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "ADR 0052 step 4: the demo clothing fixture splits products by colour, adding more listing cards and changing these pages’ height; this page’s screenshots are masked."
+  },
+  {
+    "page": "home",
+    "theme": "light",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "ADR 0052 step 4: the demo clothing fixture splits products by colour, adding more listing cards and changing these pages’ height; this page’s screenshots are masked."
+  },
+  {
+    "page": "home",
+    "theme": "dark",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "ADR 0052 step 4: the demo clothing fixture splits products by colour, adding more listing cards and changing these pages’ height; this page’s screenshots are masked."
+  },
+  {
+    "page": "home",
+    "theme": "system",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "ADR 0052 step 4: the demo clothing fixture splits products by colour, adding more listing cards and changing these pages’ height; this page’s screenshots are masked."
+  },
+  {
+    "page": "search",
+    "theme": "light",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "ADR 0052 step 4: the demo clothing fixture splits products by colour, adding more listing cards and changing these pages’ height; this page’s screenshots are masked."
+  },
+  {
+    "page": "search",
+    "theme": "dark",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "ADR 0052 step 4: the demo clothing fixture splits products by colour, adding more listing cards and changing these pages’ height; this page’s screenshots are masked."
   }
 ]
