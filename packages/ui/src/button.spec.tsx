@@ -18,22 +18,22 @@ const baselines: [ButtonVariant, ButtonSize, string][] = [
   [
     "secondary",
     "md",
-    "inline-flex items-center justify-center rounded-control font-medium disabled:opacity-50 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring border border-border bg-background text-foreground enabled:hover:bg-muted",
+    "inline-flex items-center justify-center rounded-control font-medium disabled:opacity-50 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring border-2 border-foreground bg-background text-foreground enabled:hover:bg-muted",
   ],
   [
     "secondary",
     "lg",
-    "inline-flex items-center justify-center rounded-control font-medium disabled:opacity-50 min-h-12 px-6 py-2 text-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring border border-border bg-background text-foreground enabled:hover:bg-muted",
+    "inline-flex items-center justify-center rounded-control font-medium disabled:opacity-50 min-h-12 px-6 py-2 text-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring border-2 border-foreground bg-background text-foreground enabled:hover:bg-muted",
   ],
   [
     "danger",
     "md",
-    "inline-flex items-center justify-center rounded-control font-medium disabled:opacity-50 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring border border-danger bg-background text-danger enabled:hover:bg-muted",
+    "inline-flex items-center justify-center rounded-control font-medium disabled:opacity-50 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring border-2 border-danger bg-background text-danger enabled:hover:bg-muted",
   ],
   [
     "danger",
     "lg",
-    "inline-flex items-center justify-center rounded-control font-medium disabled:opacity-50 min-h-12 px-6 py-2 text-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring border border-danger bg-background text-danger enabled:hover:bg-muted",
+    "inline-flex items-center justify-center rounded-control font-medium disabled:opacity-50 min-h-12 px-6 py-2 text-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring border-2 border-danger bg-background text-danger enabled:hover:bg-muted",
   ],
 ];
 describe("Button compatibility", () => {

@@ -124,7 +124,7 @@ export function AccountOrdersView({
           {[0, 1, 2].map((index) => (
             <div
               key={index}
-              className="flex items-center justify-between gap-4 rounded-card border border-border p-4"
+              className="flex items-center justify-between gap-4 rounded-card border-2 border-foreground p-4"
             >
               <div className="flex flex-1 flex-col gap-2">
                 <Skeleton className="h-6 w-40" />

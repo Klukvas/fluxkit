@@ -87,7 +87,7 @@ export function DeliverySectionView(props: DeliverySectionViewProps) {
           return (
             <label
               key={option.methodCode}
-              className="flex cursor-pointer gap-3 rounded-control border border-border p-3 has-checked:border-primary has-disabled:cursor-not-allowed has-disabled:opacity-60 has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-ring"
+              className="flex cursor-pointer gap-3 rounded-control border-2 border-foreground p-3 has-checked:border-primary has-disabled:cursor-not-allowed has-disabled:opacity-60 has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-ring"
             >
               <input
                 type="radio"

@@ -169,6 +169,7 @@ describe("textStyles", () => {
   // stays on the token scales is the design guard's job (`offScaleClasses` in packages/theme/src/design-guard.spec.ts).
   const classesOf = (role: keyof typeof textStyles): string[] => textStyles[role].split(" ");
   const headingRoles = [
+    "displayTitle",
     "pageTitle",
     "pageTitleCompact",
     "sectionTitle",
@@ -183,18 +184,19 @@ describe("textStyles", () => {
     expect(Object.keys(textStyles).sort()).toEqual([...headingRoles, "meta"].sort());
   });
 
-  it("puts the display face on the page and section titles only (small titles stay in the body face)", () => {
+  it("puts the display face on the hero, page and section titles only (small titles stay in the body face)", () => {
+    expect(classesOf("displayTitle")).toContain("font-display");
     expect(classesOf("pageTitle")).toContain("font-display");
     expect(classesOf("sectionTitle")).toContain("font-display");
     for (const role of headingRoles.filter(
-      (name) => name !== "pageTitle" && name !== "sectionTitle",
+      (name) => name !== "displayTitle" && name !== "pageTitle" && name !== "sectionTitle",
     )) {
       expect(classesOf(role), role).not.toContain("font-display");
     }
   });
 
   it("gives every heading role a weight, and takes sizes from the scale and colours from tokens (no raw values)", () => {
-    for (const role of headingRoles) {
+    for (const role of headingRoles.filter((name) => name !== "displayTitle")) {
       const classes = classesOf(role);
       expect(
         classes.some((name) => /^font-(medium|semibold|bold)$/.test(name)),
@@ -208,6 +210,12 @@ describe("textStyles", () => {
     }
     expect(classesOf("pageTitle")).toContain("text-3xl");
     expect(classesOf("sectionTitle")).toContain("text-xl");
+  });
+
+  it("gives the hero its heavy display role with scale line height", () => {
+    expect(textStyles.displayTitle).toBe(
+      "font-display text-3xl font-black tracking-tight text-foreground",
+    );
   });
 
   it("leaves the colour of a dialog title to its surface (a toned banner card sets its own)", () => {
@@ -281,9 +289,9 @@ describe("Hero (design batch B)", () => {
     },
   );
 
-  it("keeps string title markup unchanged", () => {
+  it("renders string titles with the display role and wrapping layout", () => {
     expect(render(<Hero headingId="h" headingLevel="h1" title="Welcome" />)).toBe(
-      '<section aria-labelledby="h" data-hero="" class="grid items-center gap-6 rounded-card bg-muted p-6 md:p-10"><div class="flex flex-col items-start gap-3"><h1 id="h" class="font-display text-3xl font-bold text-foreground md:text-4xl">Welcome</h1></div></section>',
+      '<section aria-labelledby="h" data-hero="" class="grid items-center gap-6 rounded-card bg-muted p-6 md:p-10"><div class="flex min-w-0 flex-col items-start gap-3"><h1 id="h" class="font-display text-3xl font-black tracking-tight text-foreground w-full break-words md:text-4xl">Welcome</h1></div></section>',
     );
   });
 

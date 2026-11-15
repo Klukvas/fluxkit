@@ -37,7 +37,7 @@ export type EmailAttemptReport =
   | { readonly kind: "no_provider" }
   /** Not due, gone, or held by another sender: nothing done. */
   | { readonly kind: "skipped" }
-  /** Too many immediate attempts wait for the pacing: left to job 9. */
+  /** Pacing capacity or the safe claim wait is exhausted: left to job 9 without a provider attempt. */
   | { readonly kind: "deferred" }
   /** Reached its deadline unsent at the claim. */
   | { readonly kind: "expired"; readonly status: "failed" | "unknown" }
@@ -124,14 +124,26 @@ export class EmailSender {
         `Email ${message.id} (${message.templateKey}) cannot be rendered: ${prepared.code}; failed`,
       );
     } else {
-      await this.pacer.acquire();
-      const started = performance.now();
-      const call = await callEmailProvider(
-        provider,
-        prepared.message,
-        { idempotencyKey: message.id },
-        this.config.tuning.sendTimeoutMs,
+      // Leave enough lease for the provider timeout and the existing record margin.
+      const lastStartAt = Math.min(
+        message.leaseUntil.getTime() - this.config.tuning.sendTimeoutMs - 5_000,
+        message.deadlineAt.getTime(),
       );
+      let started = 0;
+      const admission = await this.pacer.start(lastStartAt - clock().getTime(), () => {
+        if (clock().getTime() >= lastStartAt) return undefined;
+        started = performance.now();
+        return callEmailProvider(
+          provider,
+          prepared.message,
+          { idempotencyKey: message.id },
+          this.config.tuning.sendTimeoutMs,
+        );
+      });
+      if (!admission.started || admission.value === undefined) {
+        return this.changes.defer(message, clock(), limits);
+      }
+      const call = await admission.value;
       durationMs = Math.round(performance.now() - started);
       if (call.kind === "ok") {
         outcome = { kind: "sent", providerMessageId: call.providerMessageId };

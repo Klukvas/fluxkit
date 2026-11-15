@@ -90,7 +90,7 @@ function PostCard({
   imageHosts: readonly string[];
 }) {
   return (
-    <article className="flex h-full flex-col overflow-hidden rounded-card border border-border bg-background">
+    <article className="flex h-full flex-col overflow-hidden rounded-card border-2 border-foreground bg-background">
       {post.cover === null ? null : (
         <Cover cover={post.cover} imageHosts={imageHosts} sizes={CARD_COVER_SIZES} eager={false} />
       )}

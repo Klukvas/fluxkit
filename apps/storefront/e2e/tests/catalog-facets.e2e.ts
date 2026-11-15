@@ -80,12 +80,12 @@ test("a category page filters by its category and offers no category facet; its 
   await expect(page.getByRole("group", { name: "Brand" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Screwdrivers" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 3, name: "Demo Screwdriver" })).toBeVisible();
-  await expect(page.getByRole("heading", { level: 3, name: "Demo T-shirt" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { level: 3, name: /^Demo T-shirt — / })).toHaveCount(0);
 
   await waitForHydration(page);
   await chooseSort(page, "Price: low to high");
   await expect(page).toHaveURL(/\/en\/c\/demo-tools\?sort=price_asc$/);
-  await expect(page.getByRole("heading", { level: 3, name: "Demo T-shirt" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { level: 3, name: /^Demo T-shirt — / })).toHaveCount(0);
 });
 
 test("keeps ?brand= of the product pages working as the brand facet, and sends words on a catalog page to search", async ({

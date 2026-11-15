@@ -339,6 +339,7 @@ describe("admin product types API (real app, real Postgres)", () => {
           productTypeId: type.id,
           optionId: optionB.id,
           optionCode: optionB.code,
+          splitsListing: false,
           position: 1,
           createdAt: expect.any(String),
         },
@@ -820,6 +821,7 @@ describe("admin product types API (real app, real Postgres)", () => {
         productTypeId: type.id,
         optionId: option.id,
         optionCode: option.code,
+        splitsListing: false,
         position: 0,
         createdAt: expect.any(String),
       });

@@ -4,16 +4,18 @@ export const focusRing =
 
 /** Shared look of form controls that hold text. The invalid state follows aria-invalid, so it cannot drift from it. */
 export const controlBase =
-  "min-h-11 w-full rounded-control border border-border-input bg-background px-3 py-2 text-foreground disabled:opacity-50 aria-invalid:border-danger";
+  "min-h-11 w-full rounded-control border-2 border-border-input bg-background px-3 py-2 text-foreground disabled:opacity-50 aria-invalid:border-danger";
 
 /**
  * Text roles of the design kit (review D-19): one class string per role, so a redesign changes a heading style in one place.
  * Sizes come from the type-scale tokens (`--fk-font-size-*`), colours from the colour tokens. Every heading (and legend) of
  * `@fluxkit/ui` and the storefront starts from a role (`design-guard.spec.ts`); a call site adds layout or focus classes only.
- * `font-display` (`--fk-font-display`, the body stack by default) is on `pageTitle` and `sectionTitle` only: a decorative face
+ * `font-display` (`--fk-font-display`, the body stack by default) is on `displayTitle`, `pageTitle` and `sectionTitle` only: a decorative face
  * in small titles hurts legibility.
  */
 export const textStyles = {
+  /** The hero banner heading; heavy display weight, with line height from the scale tokens (no leading class). */
+  displayTitle: "font-display text-3xl font-black tracking-tight text-foreground",
   /** The page's `h1`. */
   pageTitle: "font-display text-3xl font-bold text-foreground",
   /** A smaller page `h1`: status pages (error, not found) and the order page (which adds `sm:text-3xl`). */

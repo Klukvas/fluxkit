@@ -13,6 +13,7 @@ import { and, asc, eq, gt, inArray } from "drizzle-orm";
 import { inputTypeSchema } from "../../catalog/admin/attributes/attributes.schemas.js";
 import { attributeLevelSchema } from "../../catalog/admin/product-types/product-types.schemas.js";
 import { productStatusSchema } from "../../catalog/admin/products/products.schemas.js";
+import { hasUsableProductText } from "../../catalog/store/store-visibility.js";
 import { visibleCategoryTree } from "../../catalog/store/store-categories.js";
 import type { DbExecutor } from "../../common/transaction.js";
 import {
@@ -26,6 +27,7 @@ import {
   price,
   product,
   productCategory,
+  productOption,
   productTypeAttribute,
   productTypeOption,
   variant,
@@ -36,11 +38,13 @@ import {
  * Reads what the search documents and the index settings are built from (ADR 0034 decision 2), in batched queries
  * (no N+1): the catalog definitions once per run, the products page by page. Facts only: what reaches a document is
  * decided by core `buildSearchDocuments`, which filters out internal and hidden attributes, inactive or unpriced
- * variants and products that are not active. This reader never decides visibility of attribute data itself.
+ * variants and products that are not active. The reader applies the store's shared required-text SQL predicate first,
+ * so sync deletes documents for omitted products. It never decides visibility of attribute data itself.
  */
 
 /** The definitions shared by every product of a run. */
 export interface SearchDefinitions {
+  readonly splitOptionByType: ReadonlyMap<string, string>;
   /** Attribute assignments per product type, in the type's position order. */
   readonly assignmentsByType: ReadonlyMap<string, readonly SearchAttributeAssignment[]>;
   /** Every assignment of every type: the settings and the facets are derived from them. */
@@ -122,7 +126,11 @@ export async function readSearchDefinitions(db: DbExecutor): Promise<SearchDefin
       .map((value) => ({ code: value.code, label: value.label })),
   }));
   const typeOptionRows = await db
-    .selectDistinct({ code: option.code })
+    .select({
+      code: option.code,
+      productTypeId: productTypeOption.productTypeId,
+      splitsListing: productTypeOption.splitsListing,
+    })
     .from(productTypeOption)
     .innerJoin(option, eq(option.id, productTypeOption.optionId))
     .orderBy(asc(option.code));
@@ -158,10 +166,25 @@ export async function readSearchDefinitions(db: DbExecutor): Promise<SearchDefin
     assignmentsByType,
     allAssignments,
     options,
-    typeOptionCodes: typeOptionRows,
+    typeOptionCodes: [
+      ...new Map(typeOptionRows.map((row) => [row.code, { code: row.code }])).values(),
+    ],
+    splitOptionByType: new Map(
+      typeOptionRows.filter((row) => row.splitsListing).map((row) => [row.productTypeId, row.code]),
+    ),
     categories,
     attributeNames: new Map(attributeRows.map((row) => [row.code, row.name])),
   };
+}
+
+/** Read after queue claims, so a newly claimed flag change never uses the run's earlier definitions. */
+export async function readSplitOptionsByType(db: DbExecutor): Promise<ReadonlyMap<string, string>> {
+  const rows = await db
+    .select({ productTypeId: productTypeOption.productTypeId, code: option.code })
+    .from(productTypeOption)
+    .innerJoin(option, eq(option.id, productTypeOption.optionId))
+    .where(eq(productTypeOption.splitsListing, true));
+  return new Map(rows.map((row) => [row.productTypeId, row.code]));
 }
 
 export function buildContextFor(
@@ -175,6 +198,7 @@ export function buildContextFor(
     defaultLocale,
     attributes: definitions.assignmentsByType.get(productTypeId) ?? [],
     options: definitions.options,
+    splitOptionCode: definitions.splitOptionByType.get(productTypeId) ?? null,
   };
 }
 
@@ -206,12 +230,17 @@ export async function readSearchProducts(
     })
     .from(product)
     .leftJoin(brand, eq(brand.id, product.brandId))
-    .where(inArray(product.id, [...productIds]))
+    .where(and(inArray(product.id, [...productIds]), hasUsableProductText(db)))
     .orderBy(asc(product.id));
   if (productRows.length === 0) {
     return [];
   }
   const ids = productRows.map((row) => row.id);
+  const chosenOptions = await db
+    .select({ productId: productOption.productId, code: option.code })
+    .from(productOption)
+    .innerJoin(option, eq(option.id, productOption.optionId))
+    .where(inArray(productOption.productId, ids));
   const variantRows = await db
     .select({
       id: variant.id,
@@ -276,6 +305,9 @@ export async function readSearchProducts(
     productTypeId: row.productTypeId,
     facts: {
       id: row.id,
+      optionCodes: chosenOptions
+        .filter((entry) => entry.productId === row.id)
+        .map((entry) => entry.code),
       slug: row.slug,
       status: productStatusSchema.parse(row.status),
       publishedAt: row.publishedAt?.toISOString() ?? null,

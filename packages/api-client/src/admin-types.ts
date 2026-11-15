@@ -481,6 +481,8 @@ export interface AdminPaymentList {
 
 export interface AdminPaymentPage {
   items: { orderId: string; orderNumber: string; payment: AdminPayment }[];
+  /** Full filtered count, independent of cursor and limit; read separately from the page. */
+  total: number;
   limit: number;
   /** Pass as `cursor` for the next page; null on the last page. */
   nextCursor: string | null;
@@ -1104,6 +1106,7 @@ export interface AdminProductTypeAttribute extends AdminProductTypeAttributeAssi
 }
 
 export interface AdminProductTypeOptionAssignment {
+  splitsListing: boolean;
   productTypeId: string;
   optionId: string;
   optionCode: string;
@@ -1137,6 +1140,8 @@ export interface PutProductTypeAttributeBody {
 }
 
 export interface PutProductTypeOptionBody {
+  /** Omitted: false on creation; preserves the stored flag on update. */
+  splitsListing?: boolean;
   position?: number;
 }
 

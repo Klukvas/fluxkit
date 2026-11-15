@@ -46,6 +46,13 @@ export class StoreSearchController {
     summary:
       "Search products: text query, facets (brand, category, in stock, options, filterable attributes), price range, sort and pages",
   })
+  @ApiQuery({
+    name: "groupBy",
+    required: false,
+    schema: { type: "string", enum: ["product", "listing"], default: "product" },
+    description:
+      "Product-wide summaries by default; listing counts and pages the current split groups.",
+  })
   @ApiQuery({ name: "q", required: false, schema: { type: "string", maxLength: 200 } })
   @ApiQuery({ name: "locale", required: false, schema: { type: "string" } })
   @ApiQuery({

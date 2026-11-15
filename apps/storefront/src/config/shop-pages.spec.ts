@@ -73,9 +73,15 @@ describe("shop pages config (config/shop-pages.ts)", () => {
     // A route group (`(site)`, and `(site)/(home)` since ADR 0048) adds no URL segment: look through it, at any depth. A
     // feature slice's own segments (`(feature-<name>)/`) are checked the other way round in `route-structure.spec.ts`: none of
     // them may be a shop page slug.
+    // Parallel slots have no URL segment; their intercepted routes do not reserve shop slugs.
     const firstSegments = (directory: string): string[] =>
       readdirSync(directory, { withFileTypes: true })
-        .filter((entry) => entry.isDirectory() && !entry.name.startsWith("(feature-"))
+        .filter(
+          (entry) =>
+            entry.isDirectory() &&
+            !entry.name.startsWith("(feature-") &&
+            !entry.name.startsWith("@"),
+        )
         .flatMap((entry) =>
           entry.name.startsWith("(")
             ? firstSegments(join(directory, entry.name))

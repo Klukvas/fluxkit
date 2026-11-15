@@ -261,3 +261,17 @@ Launch blocker `TRUST_PROXY` (HANDOFF section 2 item 5), checked against this pl
 - The IPv6 caveat of `docs/deployment.md` (all IPv6 clients behind `docker-proxy` share one window) does not apply while the domain has no `AAAA` record; adding one brings it back.
 - Not verified: the values in `/etc/fluxkit/production.env` today (the owner's check: step 1 of `docs/deployment.md` "Checking per-address limits") and the per-address windows from two networks (steps 2 and 3 there, the owner's action).
 - If `www` or the bare domain is ever switched to **Proxied**, the chain gets a Cloudflare hop: `TRUST_PROXY=2`, the edge must append (`$proxy_add_x_forwarded_for`), and nginx must accept connections from Cloudflare's ranges only, otherwise a client that reaches the host directly chooses its key.
+
+## 19. Demo activation of split catalog cards (2026-11-15, owner's "run it")
+
+Release `db7dc59` (PR 322, deployed automatically) carries the coffee demo's flavoured syrup, the first product type with an option flagged `splits_listing` (ADR 0052 step 4).
+The seed creates missing rows only, so on this database it adds that type and product and touches nothing else.
+
+| Step | Command and result |
+|---|---|
+| 1 | `fluxkit-backup`: `db-2026-11-15T085134Z.dump`, `media-2026-11-15T085134Z.tgz` |
+| 2 | `/opt/fluxkit/fk run --rm --no-deps api node dist/seed/seed.js --dataset coffee --allow-production`: the flavour option, the `demo_flavoured_syrup` type (flavour flagged to split), one product with 4 variants and 3 images; existing products, types and flags unchanged |
+
+Run the seed through the wrapper (section 12, step A5): a plain `docker compose -f infra/docker-compose.prod.yml run ...` from the release directory fails with `env file .../infra/meilisearch.env not found`, because only the wrapper sets `FLUXKIT_ENV_FILE` and `FLUXKIT_MEILI_ENV_FILE`.
+
+Verified from outside: `/store/products?groupBy=listing` lists 92 cards, two of them the syrup («Ваніль» from 129,00 ₴, «Карамель» from 139,00 ₴), each with its own picture and no default variant (so the card shows «Варіанти»); search for `сироп` returns the same two cards; the caramel card's link opens the product page with caramel selected (also checked on a 375 px wide screen).

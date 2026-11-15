@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { Logger } from "@nestjs/common";
 import { MAX_AMOUNT } from "@fluxkit/core";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -10,6 +11,7 @@ import { requireTestDatabaseUrl } from "../../test/env.js";
 import { http } from "../../test/http.js";
 import { defaultLocationId, insertLocation } from "../../test/inventory-fixtures.js";
 import { ensureMigrated } from "../../test/migrate.js";
+import { StoreService } from "./store.service.js";
 import type {
   StoreCategoryNode,
   StoreProductDetail,
@@ -634,6 +636,234 @@ describe("store API (public, real app, real Postgres)", () => {
     await pool.end();
   });
 
+  describe("corrupt catalog required text", () => {
+    async function withText(
+      update: string,
+      id: string | undefined,
+      text: object,
+      check: () => Promise<void>,
+    ): Promise<void> {
+      // Each statement returns the old JSONB before updating, so fixtures are restored even if an assertion fails.
+      const saved = await pool.query<{ text: object }>(update, [id, JSON.stringify(text)]);
+      const old = saved.rows[0];
+      if (old === undefined) {
+        throw new Error("Missing text fixture");
+      }
+      try {
+        await check();
+      } finally {
+        await pool.query(update, [id, JSON.stringify(old.text)]);
+      }
+    }
+
+    const productText = `with old as (select title as text from product where id = $1)
+      update product set title = $2::jsonb from old where product.id = $1 returning old.text`;
+
+    it("omits an untitled product before pagination and search hydration and returns 404", async () => {
+      const path = `/store/products?brand=${slug("brand-a")}&limit=100`;
+      const before = await getOk<Page<StoreProductListItem>>(path);
+      const errors = vi.spyOn(Logger.prototype, "error");
+      try {
+        await withText(productText, ids["p1"], { uk: "" }, async () => {
+          const page = await getOk<Page<StoreProductListItem>>(path);
+          expect(page.total).toBe(before.total - 1);
+          expect(page.items).toHaveLength(before.items.length - 1);
+          expect(page.items.map((item) => item.id)).not.toContain(ids["p1"]);
+          expect(errors.mock.calls.map((call) => call[0])).toContain(
+            `Product "${ids["p1"]}" has no usable required text.`,
+          );
+          errors.mockClear();
+          const service = running.app.get(StoreService);
+          expect(await service.listItemsByIds([ids["p1"] ?? ""], "en")).toEqual({
+            items: [],
+            missing: [ids["p1"]],
+          });
+          expect(errors.mock.calls.map((call) => call[0])).toContain(
+            `Product "${ids["p1"]}" has no usable required text.`,
+          );
+          expect(JSON.stringify(errors.mock.calls)).not.toContain(slug("p1"));
+          expect((await get(`/store/products/${slug("p1")}`)).status).toBe(404);
+        });
+      } finally {
+        errors.mockRestore();
+      }
+    });
+
+    it("counts and fills two pages after excluding newer untitled products", async () => {
+      const path = `/store/products?brand=${slug("brand-a")}`;
+      const before = await getOk<Page<StoreProductListItem>>(`${path}&limit=100`);
+      const created: string[] = [];
+      try {
+        for (let index = 0; index < 3; index += 1) {
+          const key = `untitled-page-${String(index)}`;
+          ids[key] = await createProduct(key, {
+            brand: "brandA",
+            title: { uk: " ", en: "\t\n\u00a0\u2003\ufeff" },
+            publishedDaysAgo: -1,
+          });
+          created.push(ids[key]);
+          await createVariant(key, key.toUpperCase(), {
+            signature: "",
+            position: 0,
+            isDefault: true,
+          });
+        }
+        for (const offset of [0, 1]) {
+          const page = await getOk<Page<StoreProductListItem>>(
+            `${path}&limit=1&offset=${String(offset)}`,
+          );
+          expect(page.total).toBe(before.total);
+          expect(page.items.map((item) => item.id)).toEqual(
+            before.items.slice(offset, offset + 1).map((item) => item.id),
+          );
+          expect(page.items).toHaveLength(1);
+        }
+      } finally {
+        await pool.query("delete from product where id = any($1::uuid[])", [created]);
+      }
+    });
+
+    it("keeps requested, default and first available locale fallback", async () => {
+      for (const [text, expected] of [
+        [{ uk: "Default", en: "Requested" }, "Requested"],
+        [{ uk: "Default", en: "" }, "Default"],
+        [{ uk: "", de: "Available" }, "Available"],
+      ] as const) {
+        await withText(productText, ids["p1"], text, async () => {
+          const detail = await getOk<StoreProductDetail>(`/store/products/${slug("p1")}?locale=en`);
+          expect(detail.title).toBe(expected);
+          const page = await getOk<Page<StoreProductListItem>>(
+            `/store/products?brand=${slug("brand-a")}&locale=en`,
+          );
+          expect(page.items.find((item) => item.id === ids["p1"])?.title).toBe(expected);
+        });
+      }
+    });
+
+    it("hides an unnamed category and all descendants from trees, product links and category filters", async () => {
+      const update = `with old as (select name as text from category where id = $1)
+        update category set name = $2::jsonb from old where category.id = $1 returning old.text`;
+      await withText(update, ids["alpha"], { uk: "" }, async () => {
+        const tree = await getOk<{ items: StoreCategoryNode[] }>("/store/categories");
+        expect(findNode(tree.items, slug("alpha"))).toBeUndefined();
+        expect(findNode(tree.items, slug("grand"))).toBeUndefined();
+        const detail = await getOk<StoreProductDetail>(`/store/products/${slug("p1")}`);
+        expect(detail.categories.map((item) => item.id)).not.toContain(ids["alpha"]);
+        expect(detail.categories.map((item) => item.id)).not.toContain(ids["grand"]);
+        for (const category of ["alpha", "grand"]) {
+          const page = await getOk<Page<StoreProductListItem>>(
+            `/store/products?category=${slug(category)}`,
+          );
+          expect(page.items).toEqual([]);
+          expect(page.total).toBe(0);
+        }
+      });
+    });
+
+    it("omits an unnamed brand without hiding the product", async () => {
+      const update = `with old as (select name as text from brand where id = $1)
+        update brand set name = $2::jsonb from old where brand.id = $1 returning old.text`;
+      await withText(update, ids["brandA"], { uk: "" }, async () => {
+        expect((await getOk<StoreProductDetail>(`/store/products/${slug("p1")}`)).brand).toBeNull();
+        const page = await getOk<Page<StoreProductListItem>>(
+          `/store/products?brand=${slug("brand-a")}`,
+        );
+        expect(page.items.length).toBeGreaterThan(0);
+        expect(page.items.every((item) => item.brand === null)).toBe(true);
+      });
+    });
+
+    it("omits the whole product when a published variant references an unnamed option or value", async () => {
+      const optionUpdate = `with old as (select name as text from option where id = $1)
+        update option set name = $2::jsonb from old where option.id = $1 returning old.text`;
+      const valueUpdate = `with old as (select label as text from option_value where id = $1)
+        update option_value set label = $2::jsonb from old where option_value.id = $1 returning old.text`;
+      const errors = vi.spyOn(Logger.prototype, "error");
+      try {
+        for (const [update, id] of [
+          [optionUpdate, ids["optColor"]],
+          [valueUpdate, ids["valRed"]],
+        ] as const) {
+          await withText(update, id, { uk: "" }, async () => {
+            errors.mockClear();
+            const page = await getOk<Page<StoreProductListItem>>(
+              `/store/products?brand=${slug("brand-a")}`,
+            );
+            expect(page.items.map((item) => item.id)).not.toContain(ids["p1"]);
+            expect(page.total).toBe(page.items.length);
+            expect(errors.mock.calls.map((call) => call[0])).toContain(
+              `Product "${ids["p1"]}" has no usable required text.`,
+            );
+            errors.mockClear();
+            expect(
+              await running.app.get(StoreService).listItemsByIds([ids["p1"] ?? ""], "en"),
+            ).toEqual({
+              items: [],
+              missing: [ids["p1"]],
+            });
+            expect(errors.mock.calls.map((call) => call[0])).toContain(
+              `Product "${ids["p1"]}" has no usable required text.`,
+            );
+            expect((await get(`/store/products/${slug("p1")}`)).status).toBe(404);
+            expect(JSON.stringify(errors.mock.calls)).not.toContain(slug("p1"));
+          });
+        }
+      } finally {
+        errors.mockRestore();
+      }
+    });
+
+    it("omits unnamed public attribute definitions and select labels", async () => {
+      const path = `/store/products/${slug("p1")}`;
+      const update = `with old as (select name as text from attribute where id = $1)
+        update attribute set name = $2::jsonb from old where attribute.id = $1 returning old.text`;
+      await withText(update, ids["attrMaterial"], { uk: "" }, async () => {
+        const detail = await getOk<StoreProductDetail>(path);
+        expect(detail.attributes).not.toHaveProperty(attributeCode("material"));
+        expect(detail.attributeDefinitions.map((item) => item.code)).not.toContain(
+          attributeCode("material"),
+        );
+      });
+      await withText(update, ids["attrWeight"], { uk: "" }, async () => {
+        const detail = await getOk<StoreProductDetail>(path);
+        expect(detail.variants.length).toBeGreaterThan(0);
+        for (const variant of detail.variants) {
+          expect(variant.attributes).not.toHaveProperty(attributeCode("weight"));
+        }
+      });
+      const labelUpdate = `with old as (select label as text from attribute_option where attribute_id = $1 and code = 'cotton')
+        update attribute_option set label = $2::jsonb from old
+        where attribute_option.attribute_id = $1 and attribute_option.code = 'cotton' returning old.text`;
+      await withText(labelUpdate, ids["attrMaterial"], { uk: "" }, async () => {
+        const detail = await getOk<StoreProductDetail>(path);
+        expect(
+          detail.attributeDefinitions
+            .find((item) => item.code === attributeCode("material"))
+            ?.options.map((item) => item.code),
+        ).toEqual(["linen"]);
+        expect(detail.attributes).not.toHaveProperty(attributeCode("material"));
+      });
+      await withText(labelUpdate, ids["attrMaterial"], { uk: "", de: "Cotton" }, async () => {
+        const detail = await getOk<StoreProductDetail>(`${path}?locale=en`);
+        expect(detail.attributes[attributeCode("material")]).toEqual({
+          code: "cotton",
+          label: "Cotton",
+        });
+        expect(
+          detail.attributeDefinitions.find((item) => item.code === attributeCode("material"))
+            ?.options,
+        ).toContainEqual({ code: "cotton", label: "Cotton" });
+      });
+    });
+  });
+
+  it("omits the framework header on successful and error responses", async () => {
+    for (const path of ["/store/config", "/store/products/not-a-real-product"]) {
+      const result = await get(path);
+      expect(result.headers.has("x-powered-by")).toBe(false);
+    }
+  });
+
   describe("no authentication", () => {
     it("serves /store without credentials while /admin is denied by the production default", async () => {
       expect((await get("/store/categories")).status).toBe(200);
@@ -714,6 +944,8 @@ describe("store API (public, real app, real Postgres)", () => {
       const [first, second] = page.items;
       expect(first).toEqual({
         id: ids["p1"],
+        listingKey: ids["p1"],
+        listingOption: null,
         slug: slug("p1"),
         title: "Товар p1",
         brand: { slug: slug("brand-a"), name: "Бренд А" },
@@ -733,6 +965,8 @@ describe("store API (public, real app, real Postgres)", () => {
           "availability",
           "brand",
           "defaultVariantId",
+          "listingKey",
+          "listingOption",
           "id",
           "image",
           "price",
@@ -977,6 +1211,53 @@ describe("store API (public, real app, real Postgres)", () => {
   });
 
   describe("GET /store/products/:slug", () => {
+    it("orders variant optionValues by product option position instead of code or insertion order", async () => {
+      ids["reordered-options"] = await createProduct("reordered-options");
+      await chooseOption("reordered-options", "optColor", 20, ["valRed"]);
+      await chooseOption("reordered-options", "optSize", 3, ["valS"]);
+      await createVariant("reordered-options", "REORDERED", {
+        signature: `color_${runId}=red;size_${runId}=s`,
+        isDefault: true,
+        position: 0,
+        optionValues: [
+          ["optColor", "valRed"],
+          ["optSize", "valS"],
+        ],
+      });
+      const product = await getOk<StoreProductDetail>(
+        `/store/products/${slug("reordered-options")}`,
+      );
+      expect(product.options.map((option) => option.code)).toEqual([
+        `size_${runId}`,
+        `color_${runId}`,
+      ]);
+      expect(product.variants).toHaveLength(1);
+      expect(product.variants[0]?.optionValues).toEqual([
+        { optionCode: `size_${runId}`, valueCode: "s" },
+        { optionCode: `color_${runId}`, valueCode: "red" },
+      ]);
+
+      // Reverse only product option positions; the variant's stored values stay the same.
+      await pool.query(
+        `update product_option set position = case when option_id = $2 then 3 else 20 end
+         where product_id = $1`,
+        [ids["reordered-options"], ids["optColor"]],
+      );
+      const reordered = await getOk<StoreProductDetail>(
+        `/store/products/${slug("reordered-options")}`,
+      );
+      expect(reordered.options.map((option) => option.code)).toEqual([
+        `color_${runId}`,
+        `size_${runId}`,
+      ]);
+      expect(reordered.variants).toHaveLength(1);
+      expect(reordered.variants[0]?.id).toBe(product.variants[0]?.id);
+      expect(reordered.variants[0]?.optionValues).toEqual([
+        { optionCode: `color_${runId}`, valueCode: "red" },
+        { optionCode: `size_${runId}`, valueCode: "s" },
+      ]);
+    });
+
     it("returns the full product in uk", async () => {
       const product = await getOk<StoreProductDetail>(`/store/products/${slug("p1")}?locale=uk`);
       expect(product).toEqual({

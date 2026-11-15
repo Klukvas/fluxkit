@@ -64,6 +64,21 @@ export class SessionRepository {
     };
   }
 
+  /** Compare-and-swap inside the password-change transaction; never recreates a revoked session. */
+  async rotateToken(
+    sessionId: string,
+    oldTokenHash: string,
+    newTokenHash: string,
+    executor: DbExecutor = this.db,
+  ): Promise<{ expiresAt: Date } | undefined> {
+    const [rotated] = await executor
+      .update(adminSession)
+      .set({ tokenHash: newTokenHash })
+      .where(and(eq(adminSession.id, sessionId), eq(adminSession.tokenHash, oldTokenHash)))
+      .returning({ expiresAt: adminSession.expiresAt });
+    return rotated;
+  }
+
   async touch(sessionId: string, lastSeenAt: Date): Promise<void> {
     await this.db.update(adminSession).set({ lastSeenAt }).where(eq(adminSession.id, sessionId));
   }

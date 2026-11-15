@@ -231,6 +231,7 @@ describe("buildSearchDocuments", () => {
     const allowed = new Set([
       "id",
       "productId",
+      "listingKey",
       "productSlug",
       "title",
       "brandName",
@@ -411,7 +412,8 @@ describe("buildSearchDocuments", () => {
   it("exports the document version that triggers a rebuild when it changes", () => {
     // 2: `publishedAt` in milliseconds (search finish review F2).
     // 3: filter values of every public attribute, filterable or not (F2 of the measurements at scale).
-    expect(SEARCH_DOCUMENT_VERSION).toBe(3);
+    // 4: listing keys; 5: shared store required-text visibility (PR C).
+    expect(SEARCH_DOCUMENT_VERSION).toBe(5);
   });
 });
 

@@ -24,10 +24,12 @@ test("a shopper registers with a guest cart, checks out as a customer and finds 
   // The account icon's menu (2026-11-02): a guest gets "Sign in" and "Register".
   await openAccountMenu(page);
   await page.getByRole("link", { name: "Sign in" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
-  await page.getByRole("link", { name: "Create an account" }).click();
+  const signIn = page.getByRole("dialog", { name: "Sign in", exact: true });
+  await expect(signIn).toBeVisible();
+  await signIn.getByRole("link", { name: "Create an account" }).click();
   // Wait for the new page: a field filled while the old page is still there would be filled on the wrong form.
   await expect(page.getByRole("heading", { level: 1, name: "Create an account" })).toBeVisible();
+  await expect(signIn).toHaveCount(0);
   await page.getByLabel("Email", { exact: true }).fill(email);
   await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   await page.getByLabel("First name", { exact: true }).fill("Olena");
@@ -131,4 +133,38 @@ test("signing in merges the guest cart into the account cart and shows the merge
     "999",
   );
   await expect(notice).toHaveCount(0);
+});
+
+test("password rotation keeps the customer signed in after reload", async ({
+  page,
+  otherShopper,
+}, testInfo) => {
+  const email = uniqueEmail(testInfo, "rotation");
+  await otherShopper.register(email, PASSWORD);
+  await page.goto("/en/account/login");
+  await waitForHydration(page);
+  await page.getByLabel("Email", { exact: true }).fill(email);
+  await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page).toHaveURL(/\/en\/account$/);
+  const before = (await page.context().cookies()).find(
+    (cookie) => cookie.name === "fluxkit_customer_session",
+  );
+  expect(before).toBeDefined();
+  await page.goto("/en/account/profile");
+  await waitForHydration(page);
+  await page.getByLabel("Current password", { exact: true }).fill(PASSWORD);
+  await page.getByLabel("New password", { exact: true }).fill("replacement customer password 456");
+  await page.getByRole("button", { name: "Change password", exact: true }).click();
+  await expect(
+    page.getByText("Password changed. Your other devices were signed out."),
+  ).toBeVisible();
+  const after = (await page.context().cookies()).find(
+    (cookie) => cookie.name === "fluxkit_customer_session",
+  );
+  expect(after?.value).toBeDefined();
+  expect(after?.value).not.toBe(before?.value);
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Your details", exact: true })).toBeVisible();
+  expect((await page.request.get("/store/account/me")).status()).toBe(200);
 });

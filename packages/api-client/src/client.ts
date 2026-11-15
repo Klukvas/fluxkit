@@ -54,6 +54,7 @@ export interface LocaleOptions extends CallOptions {
 }
 
 export interface ListProductsOptions extends LocaleOptions {
+  groupBy?: "product" | "listing";
   brand?: string;
   category?: string;
   offset?: number;
@@ -61,6 +62,7 @@ export interface ListProductsOptions extends LocaleOptions {
 }
 
 export interface SearchProductsOptions extends LocaleOptions {
+  groupBy?: "product" | "listing";
   q?: string;
   /** `<facetKey>:<value>` selections, sent as repeated `f` parameters. */
   f?: readonly string[];

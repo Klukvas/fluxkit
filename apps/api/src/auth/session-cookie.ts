@@ -1,6 +1,9 @@
 import type { CookieOptions, Response } from "express";
 import { readTokenCookie, SESSION_TOKEN_PATTERN } from "./session-token.js";
 
+/** Shared HTTP header name for session-cookie response documentation. */
+export const SESSION_COOKIE_RESPONSE_HEADER = "Set-Cookie";
+
 export const SESSION_COOKIE_NAME = "fluxkit_admin_session";
 
 export { SESSION_TOKEN_PATTERN };

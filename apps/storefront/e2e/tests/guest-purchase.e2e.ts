@@ -16,12 +16,18 @@ test("a guest buys a T-shirt from the home page and manages the order through it
 
   await page.goto("/en");
   await waitForHydration(page);
-  await page
-    .getByRole("link", { name: /Demo T-shirt/ })
-    .first()
-    .click();
-  await expect(page).toHaveURL(/\/en\/p\/demo-t-shirt$/);
+  // The home row is limited to eight listing cards; the older T-shirt colours are in the full catalog.
+  await page.getByRole("link", { name: "Browse the catalog", exact: true }).click();
+  const card = page.getByRole("link", { name: "Demo T-shirt — Black", exact: true });
+  await expect(card).toHaveAttribute("href", "/en/p/demo-t-shirt?opt.color=black");
+  await card.click();
+  await expect(page).toHaveURL(
+    (url) => url.pathname === "/en/p/demo-t-shirt" && url.searchParams.get("opt.color") === "black",
+  );
   await expect(page.getByRole("heading", { level: 1, name: "Demo T-shirt" })).toBeVisible();
+  await expect(
+    page.getByRole("group", { name: "Color", exact: true }).getByRole("radio", { name: "Black" }),
+  ).toBeChecked();
 
   await chooseOptions(page, { Color: "White", Size: "M" });
   // The SKU of the chosen variant is the first specification (design batch A, review D-08).

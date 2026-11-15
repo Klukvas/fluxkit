@@ -6,7 +6,7 @@ export const EMAIL_DELIVERY_CONFIG = Symbol("fluxkit:email-delivery-config");
 export interface EmailDeliveryTuning {
   /** Time one `send` gets before the API aborts it (core `EMAIL_SEND_TIMEOUT_MS`, 10 s). */
   readonly sendTimeoutMs: number;
-  /** Most provider calls one process starts per second, job 9 and the immediate attempts together (Resend R7: 10). */
+  /** Most provider calls per second, shared with Redis or per process with memory, job 9 and immediate attempts together (Resend R7: 10). */
   readonly sendsPerSecond: number;
   /** Immediate attempts that may wait for the pacing at once; more are left to job 9. */
   readonly maxWaitingImmediate: number;

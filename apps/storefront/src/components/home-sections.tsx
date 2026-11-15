@@ -275,7 +275,7 @@ function CategoryTiles({
             <li key={category.id}>
               <Link
                 href={localizedHref(locale, `/c/${encodeURIComponent(category.slug)}`)}
-                className={`group flex h-full flex-col overflow-hidden rounded-card border border-border bg-background transition-shadow hover:border-border-input hover:shadow-raised motion-reduce:transition-none ${focusRing}`}
+                className={`group flex h-full flex-col overflow-hidden rounded-card border-2 border-foreground bg-background transition-shadow hover:shadow-raised motion-reduce:transition-none ${focusRing}`}
               >
                 <span className="flex aspect-video items-center justify-center bg-muted text-muted-foreground">
                   {image === undefined ? (
@@ -527,7 +527,7 @@ export function HomeSectionSkeleton({
           {Array.from({ length: count }, (_, index) => (
             <div
               key={index}
-              className="flex flex-col overflow-hidden rounded-card border border-border"
+              className="flex flex-col overflow-hidden rounded-card border-2 border-foreground"
             >
               <Skeleton className="aspect-video" />
               <div className="flex flex-col gap-1 p-3">
@@ -540,7 +540,10 @@ export function HomeSectionSkeleton({
       ) : (
         <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
           {Array.from({ length: count }, (_, index) => (
-            <div key={index} className="flex flex-col gap-2 rounded-card border border-border p-3">
+            <div
+              key={index}
+              className="flex flex-col gap-2 rounded-card border-2 border-foreground p-3"
+            >
               <Skeleton className="aspect-square w-full" />
               <Skeleton className="h-5 w-1/3" />
               <Skeleton className="h-6 w-3/4" />

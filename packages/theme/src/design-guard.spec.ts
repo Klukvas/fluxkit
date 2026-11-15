@@ -478,7 +478,7 @@ function roleOffenders(tags: RegExp): string[] {
 
 describe("design guard, heading roles", () => {
   it("knows the text roles of @fluxkit/ui", () => {
-    for (const role of ["pageTitle", "sectionTitle", "subsectionTitle", "meta"]) {
+    for (const role of ["displayTitle", "pageTitle", "sectionTitle", "subsectionTitle", "meta"]) {
       expect(textRoles.has(role), role).toBe(true);
     }
   });

@@ -194,7 +194,7 @@ test.describe("the results page", () => {
     const filtered = Number(((await resultCount(page).textContent()) ?? "").match(/\d+/)?.[0]);
     expect(filtered).toBeLessThan(total);
     expect(filtered).toBeGreaterThan(0);
-    await expect(page.getByRole("heading", { level: 3, name: "Demo T-shirt" })).toHaveCount(0);
+    await expect(page.getByRole("heading", { level: 3, name: /^Demo T-shirt — / })).toHaveCount(0);
     await expect(page.getByRole("list", { name: "Selected filters" })).toContainText(
       "Price, UAH: From 1000",
     );

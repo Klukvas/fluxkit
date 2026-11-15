@@ -19,7 +19,11 @@ const routes = [
   ["DELETE", `/admin/product-types/${SOME_ID}`, undefined],
   ["PUT", `/admin/product-types/${SOME_ID}/attributes/${OTHER_ID}`, { level: "product" }],
   ["DELETE", `/admin/product-types/${SOME_ID}/attributes/${OTHER_ID}`, undefined],
-  ["PUT", `/admin/product-types/${SOME_ID}/options/${OTHER_ID}`, { position: 1 }],
+  [
+    "PUT",
+    `/admin/product-types/${SOME_ID}/options/${OTHER_ID}`,
+    { position: 1, splitsListing: true },
+  ],
   ["DELETE", `/admin/product-types/${SOME_ID}/options/${OTHER_ID}`, undefined],
 ] as const;
 

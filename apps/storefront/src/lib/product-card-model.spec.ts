@@ -1,8 +1,12 @@
+import { createTranslator } from "@fluxkit/ui";
+import { cardOffer } from "./search-facets";
+import { messagesByLocale } from "../messages";
 import { describe, expect, it } from "vitest";
 import { sentinelTranslator } from "../components/test-helpers";
 import { formatMoney } from "./money";
 import { cardDisplay, listPriceLabel, type CardDisplayInput } from "./product-card-model";
-import { summary } from "./test-fixtures";
+import { option, product, summary, variant } from "./test-fixtures";
+import { findVariant, initialSelection, selectionFromParams } from "./variant-matcher";
 
 const t = sentinelTranslator();
 const money = (amount: number) => formatMoney({ amount, currency: "UAH" }, 2, "uk");
@@ -29,6 +33,7 @@ describe("cardDisplay (the plain view model every card kind renders)", () => {
     const card = cardDisplay({ ...base, product: summary("demo-shirt", { title: "§shirt" }) });
     expect(card).toEqual({
       id: "id-demo-shirt",
+      listingKey: "id-demo-shirt",
       title: "§shirt",
       href: "/uk/p/demo-shirt",
       image: { src: null, alt: "§shirt" },
@@ -197,5 +202,126 @@ describe("cardDisplay: what the card offers to buy (owner design 2026-11-13)", (
         offer: { kind: "catchingUp", linkQuery: "" },
       }),
     ).toBeNull();
+  });
+});
+
+describe("split listing cards", () => {
+  const split = summary("shirt", {
+    listingKey: "id-shirt:color:red",
+    listingOption: {
+      optionCode: "color",
+      valueCode: "red",
+      optionName: "Colour",
+      valueName: "Red",
+    },
+    image: { url: "https://cdn.example.com/red.jpg", alt: null },
+  });
+
+  for (const locale of ["uk", "en"] as const) {
+    it(`uses the API group image and translated suffix in ${locale}, retaining product identity`, () => {
+      const card = cardDisplay({
+        ...base,
+        locale,
+        t: createTranslator(messagesByLocale[locale], locale),
+        product: split,
+      });
+      expect(card.id).toBe(split.id);
+      expect(card.listingKey).toBe(split.listingKey);
+      expect(card.title).toBe(`${split.title} — Red`);
+      expect(card.image).toEqual({ src: split.image?.url, alt: card.title });
+      expect(card.href).toBe(`/${locale}/p/shirt?opt.color=red`);
+    });
+  }
+
+  it("merges a match's other values, with the split authoritative, without authorizing multi-size add", () => {
+    const item = {
+      ...split,
+      match: {
+        variantId: "red-m",
+        variantCount: 1,
+        price: split.price,
+        availability: "in_stock" as const,
+        optionValues: [
+          { optionCode: "color", valueCode: "black" },
+          { optionCode: "size", valueCode: "m" },
+        ],
+      },
+    };
+    const card = cardDisplay({
+      ...base,
+      product: item,
+      offer: cardOffer(item, { facets: [], price: null }),
+    });
+    expect(card.href).toBe("/uk/p/shirt?opt.color=red&opt.size=m");
+    expect(card.purchase?.kind).toBe("choose");
+  });
+
+  it("keeps the split link while unavailable or catching up, and never picks another image", () => {
+    const item = {
+      ...split,
+      image: null,
+      defaultVariantId: "red-s",
+      availability: "out_of_stock" as const,
+    };
+    expect(cardDisplay({ ...base, product: item }).purchase).toBeNull();
+    const card = cardDisplay({
+      ...base,
+      product: item,
+      offer: { kind: "catchingUp", linkQuery: "opt.color=black&opt.size=m" },
+    });
+    expect(card.href).toBe("/uk/p/shirt?opt.color=red");
+    expect(card.purchase).toBeNull();
+    expect(card.availability).toBeNull();
+    expect(card.image.src).toBeNull();
+    expect(
+      cardDisplay({ ...base, product: { ...split, defaultVariantId: "red-s" } }).purchase,
+    ).toEqual({ kind: "add", variantId: "red-s" });
+  });
+
+  it("opens the surviving split value with sparse variants and the split picker after size", () => {
+    // Red/M disappeared after indexing; Black/M is the global default, but Red/S still exists.
+    const detail = product({
+      options: [option("size", ["m", "s"]), option("color", ["black", "red"])],
+      variants: [
+        variant("black-m", { size: "m", color: "black" }),
+        variant("red-s", { size: "s", color: "red" }),
+      ],
+    });
+    const item = { ...split, match: null };
+    const offer = cardOffer(item, {
+      facets: ["opt.size:m"],
+      price: null,
+    });
+    expect(offer).toEqual({ kind: "catchingUp", linkQuery: "opt.size=m" });
+    const card = cardDisplay({ ...base, product: item, offer });
+    const params = new URL(card.href, "https://shop.example").searchParams;
+    const selection = initialSelection(detail, selectionFromParams(Object.fromEntries(params)));
+    expect(selection).toEqual({ size: "s", color: "red" });
+    expect(findVariant(detail, selection)?.id).toBe("red-s");
+    expect(card.href).toBe("/uk/p/shirt?opt.color=red");
+    expect(card.purchase).toBeNull();
+  });
+
+  it("encodes arbitrary codes safely, including prototype member names", () => {
+    const card = cardDisplay({
+      ...base,
+      product: {
+        ...split,
+        listingOption: {
+          optionCode: "constructor",
+          valueCode: "a&b",
+          optionName: "X",
+          valueName: "Y",
+        },
+      },
+    });
+    expect(card.href).toBe("/uk/p/shirt?opt.constructor=a%26b");
+  });
+
+  it("treats older summaries and explicit unsplit summaries as product cards", () => {
+    const old = summary("old");
+    expect(cardDisplay({ ...base, product: old })).toEqual(
+      cardDisplay({ ...base, product: { ...old, listingKey: old.id, listingOption: null } }),
+    );
   });
 });

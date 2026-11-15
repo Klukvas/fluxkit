@@ -9,81 +9,84 @@ describe("LoginThrottle (per client IP, fixed window, in memory)", () => {
     expect(LOGIN_THROTTLE_DEFAULTS).toMatchObject({ maxAttempts: 20, windowMinutes: 10 });
   });
 
-  it("allows 20 attempts and refuses the 21st with the seconds until the window ends", () => {
+  it("allows 20 attempts and refuses the 21st with the seconds until the window ends", async () => {
     const clock = new FakeClock(START);
     const throttle = new LoginThrottle(clock);
     for (let attempt = 1; attempt <= 20; attempt += 1) {
-      expect(throttle.attempt("10.0.0.1"), `attempt ${attempt}`).toEqual({ allowed: true });
+      expect(await throttle.attempt("10.0.0.1"), `attempt ${attempt}`).toEqual({ allowed: true });
     }
     clock.advanceMinutes(4);
-    expect(throttle.attempt("10.0.0.1")).toEqual({ allowed: false, retryAfterSeconds: 6 * 60 });
+    expect(await throttle.attempt("10.0.0.1")).toEqual({
+      allowed: false,
+      retryAfterSeconds: 6 * 60,
+    });
   });
 
-  it("keeps refusing for the rest of the window and does not extend it", () => {
+  it("keeps refusing for the rest of the window and does not extend it", async () => {
     const clock = new FakeClock(START);
     const throttle = new LoginThrottle(clock);
-    for (let attempt = 0; attempt < 20; attempt += 1) throttle.attempt("10.0.0.1");
+    for (let attempt = 0; attempt < 20; attempt += 1) await throttle.attempt("10.0.0.1");
     for (let minute = 1; minute < 10; minute += 1) {
       clock.advanceMinutes(1);
-      expect(throttle.attempt("10.0.0.1").allowed, `minute ${minute}`).toBe(false);
+      expect((await throttle.attempt("10.0.0.1")).allowed, `minute ${minute}`).toBe(false);
     }
   });
 
-  it("starts a fresh window after 10 minutes", () => {
+  it("starts a fresh window after 10 minutes", async () => {
     const clock = new FakeClock(START);
     const throttle = new LoginThrottle(clock);
-    for (let attempt = 0; attempt < 21; attempt += 1) throttle.attempt("10.0.0.1");
+    for (let attempt = 0; attempt < 21; attempt += 1) await throttle.attempt("10.0.0.1");
     clock.advanceMinutes(10);
     for (let attempt = 1; attempt <= 20; attempt += 1) {
-      expect(throttle.attempt("10.0.0.1").allowed, `attempt ${attempt}`).toBe(true);
+      expect((await throttle.attempt("10.0.0.1")).allowed, `attempt ${attempt}`).toBe(true);
     }
-    expect(throttle.attempt("10.0.0.1").allowed).toBe(false);
+    expect((await throttle.attempt("10.0.0.1")).allowed).toBe(false);
   });
 
-  it("is one second short of the reset still closed", () => {
+  it("is one second short of the reset still closed", async () => {
     const clock = new FakeClock(START);
     const throttle = new LoginThrottle(clock);
-    for (let attempt = 0; attempt < 21; attempt += 1) throttle.attempt("10.0.0.1");
+    for (let attempt = 0; attempt < 21; attempt += 1) await throttle.attempt("10.0.0.1");
     clock.set(new Date(Date.parse(START) + 10 * 60_000 - 1000));
-    expect(throttle.attempt("10.0.0.1")).toEqual({ allowed: false, retryAfterSeconds: 1 });
+    expect(await throttle.attempt("10.0.0.1")).toEqual({ allowed: false, retryAfterSeconds: 1 });
   });
 
-  it("counts every client separately", () => {
+  it("counts every client separately", async () => {
     const throttle = new LoginThrottle(new FakeClock(START));
-    for (let attempt = 0; attempt < 21; attempt += 1) throttle.attempt("10.0.0.1");
-    expect(throttle.attempt("10.0.0.1").allowed).toBe(false);
-    expect(throttle.attempt("10.0.0.2")).toEqual({ allowed: true });
+    for (let attempt = 0; attempt < 21; attempt += 1) await throttle.attempt("10.0.0.1");
+    expect((await throttle.attempt("10.0.0.1")).allowed).toBe(false);
+    expect(await throttle.attempt("10.0.0.2")).toEqual({ allowed: true });
   });
 
   describe("bounded memory", () => {
-    it("drops expired windows so the map does not keep old clients", () => {
+    it("drops expired windows so the map does not keep old clients", async () => {
       const clock = new FakeClock(START);
       const throttle = new LoginThrottle(clock, { maxClients: 1000 });
-      for (let client = 0; client < 500; client += 1) throttle.attempt(`10.1.0.${client}`);
+      for (let client = 0; client < 500; client += 1) await throttle.attempt(`10.1.0.${client}`);
       expect(throttle.size).toBe(500);
       clock.advanceMinutes(11);
-      throttle.attempt("10.2.0.1");
+      await throttle.attempt("10.2.0.1");
       expect(throttle.size).toBe(1);
     });
 
-    it("never holds more than maxClients entries even when every window is still open", () => {
+    it("never holds more than maxClients entries even when every window is still open", async () => {
       const throttle = new LoginThrottle(new FakeClock(START), { maxClients: 100 });
       for (let client = 0; client < 5000; client += 1) {
-        throttle.attempt(`10.3.${Math.floor(client / 256)}.${client % 256}`);
+        await throttle.attempt(`10.3.${Math.floor(client / 256)}.${client % 256}`);
         expect(throttle.size).toBeLessThanOrEqual(100);
       }
       expect(throttle.size).toBe(100);
     });
 
-    it("evicts the oldest client first, so a recently throttled client stays throttled", () => {
+    it("evicts the oldest client first, so a recently throttled client stays throttled", async () => {
       const throttle = new LoginThrottle(new FakeClock(START), { maxClients: 3 });
-      for (let attempt = 0; attempt < 21; attempt += 1) throttle.attempt("old");
-      throttle.attempt("a");
-      throttle.attempt("b");
+      for (let attempt = 0; attempt < 21; attempt += 1) await throttle.attempt("old");
+      await throttle.attempt("a");
+      await throttle.attempt("b");
       // "old" is the oldest entry: the fourth client pushes it out. This is the documented trade-off of a bound.
-      throttle.attempt("c");
+      await throttle.attempt("c");
       expect(throttle.size).toBe(3);
-      expect(throttle.attempt("old")).toEqual({ allowed: true });
+      expect(await throttle.attempt("old")).toEqual({ allowed: true });
     });
   });
 
@@ -160,27 +163,27 @@ describe("throttleKeyOf (IPv6 is keyed by its /64 prefix)", () => {
 });
 
 describe("LoginThrottle with IPv6 clients", () => {
-  it("shares one window between addresses of one /64 and keeps another /64 separate", () => {
+  it("shares one window between addresses of one /64 and keeps another /64 separate", async () => {
     const throttle = new LoginThrottle(new FakeClock(START));
     for (let attempt = 0; attempt < 20; attempt += 1) {
-      throttle.attempt(`2001:db8:1:2:${attempt.toString(16)}::${attempt + 1}`);
+      await throttle.attempt(`2001:db8:1:2:${attempt.toString(16)}::${attempt + 1}`);
     }
-    expect(throttle.attempt("2001:db8:1:2:dead:beef:0:1").allowed).toBe(false);
-    expect(throttle.attempt("2001:0DB8:0001:0002::7").allowed).toBe(false);
-    expect(throttle.attempt("2001:db8:1:3::1")).toEqual({ allowed: true });
+    expect((await throttle.attempt("2001:db8:1:2:dead:beef:0:1")).allowed).toBe(false);
+    expect((await throttle.attempt("2001:0DB8:0001:0002::7")).allowed).toBe(false);
+    expect(await throttle.attempt("2001:db8:1:3::1")).toEqual({ allowed: true });
     expect(throttle.size).toBe(2);
   });
 
-  it("counts an invalid address under its raw string, so it is still limited", () => {
+  it("counts an invalid address under its raw string, so it is still limited", async () => {
     const throttle = new LoginThrottle(new FakeClock(START));
-    for (let attempt = 0; attempt < 20; attempt += 1) throttle.attempt("garbage");
-    expect(throttle.attempt("garbage").allowed).toBe(false);
-    expect(throttle.attempt("other-garbage")).toEqual({ allowed: true });
+    for (let attempt = 0; attempt < 20; attempt += 1) await throttle.attempt("garbage");
+    expect((await throttle.attempt("garbage")).allowed).toBe(false);
+    expect(await throttle.attempt("other-garbage")).toEqual({ allowed: true });
   });
 
-  it("limits a mapped IPv4 address together with the plain IPv4 address", () => {
+  it("limits a mapped IPv4 address together with the plain IPv4 address", async () => {
     const throttle = new LoginThrottle(new FakeClock(START));
-    for (let attempt = 0; attempt < 20; attempt += 1) throttle.attempt("::ffff:10.9.9.9");
-    expect(throttle.attempt("10.9.9.9").allowed).toBe(false);
+    for (let attempt = 0; attempt < 20; attempt += 1) await throttle.attempt("::ffff:10.9.9.9");
+    expect((await throttle.attempt("10.9.9.9")).allowed).toBe(false);
   });
 });

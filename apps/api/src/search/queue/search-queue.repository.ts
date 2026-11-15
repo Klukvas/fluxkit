@@ -36,19 +36,22 @@ export class SearchQueueRepository {
     maxChangeSeq?: number,
   ): Promise<ClaimedSync[]> {
     const leaseUntil = new Date(now.getTime() + leaseSeconds * 1000);
+    // Select the page once: a nested-loop plan may otherwise re-execute the limited subquery as leases change,
+    // claiming more than `limit` rows in one statement when queue statistics underestimate the backlog.
     const result = await db.execute<{
       product_id: string;
       change_seq: string;
       attempts: number;
     }>(sql`
-      update search_sync_queue queued set lease_until = ${leaseUntil}
-      from (
+      with due as materialized (
         select product_id from search_sync_queue
         where ${dueAt(now, maxChangeSeq)}
         order by next_attempt_at, product_id
         limit ${limit}
         for update skip locked
-      ) due
+      )
+      update search_sync_queue queued set lease_until = ${leaseUntil}
+      from due
       where queued.product_id = due.product_id
       returning queued.product_id, queued.change_seq, queued.attempts`);
     return result.rows

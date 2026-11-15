@@ -1,3 +1,4 @@
+import { unauthorized } from "../common/problem.js";
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import {
   evaluateSession,
@@ -24,6 +25,7 @@ export interface CreatedSession {
 }
 
 export interface ResolvedSession {
+  tokenHash: string;
   sessionId: string;
   user: { id: string; email: string; role: AdminRole };
 }
@@ -97,9 +99,27 @@ export class SessionService {
       await this.sessions.touch(found.sessionId, now);
     }
     return {
+      tokenHash: hashToken(rawToken),
       sessionId: found.sessionId,
       user: { id: found.user.id, email: found.user.email, role: found.user.role },
     };
+  }
+
+  /** Rotation preserves the absolute expiry and commits with the caller's password change. */
+  async rotate(
+    sessionId: string,
+    oldTokenHash: string,
+    executor: DbExecutor,
+  ): Promise<{ token: string; expiresAt: Date }> {
+    const token = generateSessionToken();
+    const rotated = await this.sessions.rotateToken(
+      sessionId,
+      oldTokenHash,
+      hashToken(token),
+      executor,
+    );
+    if (rotated === undefined) throw unauthorized();
+    return { token, expiresAt: rotated.expiresAt };
   }
 
   /** True when a session was deleted. */
