@@ -587,3 +587,41 @@ describe("createStoreData product answers (a product taken back leaves its page)
     expect(events).toEqual(["beforeRequest"]);
   });
 });
+
+it("threads grouping through SQL reads and isolates listing/product last-good answers", async () => {
+  vi.spyOn(console, "warn").mockImplementation(() => undefined);
+  vi.spyOn(console, "error").mockImplementation(() => undefined);
+  let fail = false;
+  const { data, calls } = setup(({ url }) =>
+    fail
+      ? problem(503, "search_unavailable")
+      : json({
+          items: [],
+          total: new URL(url).searchParams.get("groupBy") === "listing" ? 2 : 1,
+          limit: 24,
+          offset: 0,
+        }),
+  );
+  expect(await data.listProducts("en", { groupBy: "listing" })).toMatchObject({
+    ok: true,
+    data: { total: 2 },
+    stale: false,
+  });
+  fail = true;
+  await expect(data.listProducts("en")).rejects.toBeInstanceOf(StoreUnavailableError);
+  expect(await data.listProducts("en", { groupBy: "listing" })).toMatchObject({
+    ok: true,
+    data: { total: 2 },
+    stale: true,
+  });
+  fail = false;
+  await data.listProducts("en");
+  fail = true;
+  expect(await data.listProducts("en")).toMatchObject({
+    ok: true,
+    data: { total: 1 },
+    stale: true,
+  });
+  expect(new URL(calls[0]?.url ?? "").searchParams.get("groupBy")).toBe("listing");
+  expect(new URL(calls[1]?.url ?? "").searchParams.has("groupBy")).toBe(false);
+});

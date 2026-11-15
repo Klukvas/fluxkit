@@ -10,6 +10,7 @@ import {
   type TestCustomer,
 } from "../../test/customer-fixtures.js";
 import {
+  customerCookieOf,
   customerLogin,
   customerLoginCookie,
   customerSetCookieOf,
@@ -290,7 +291,8 @@ describe("the signed-in customer account: logout, me, profile, change-password",
       expect(result.headers.get("cache-control")).toBe("no-store");
 
       expect(await sessionCount(shopper.id)).toBe(1);
-      expect((await call("GET", "/store/account/me", cookie)).status).toBe(200);
+      expect((await call("GET", "/store/account/me", cookie)).status).toBe(401);
+      expect((await call("GET", "/store/account/me", customerCookieOf(result))).status).toBe(200);
       expect((await call("GET", "/store/account/me", phone)).status).toBe(401);
       expect((await call("GET", "/store/account/me", laptop)).status).toBe(401);
 

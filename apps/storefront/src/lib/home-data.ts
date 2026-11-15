@@ -43,6 +43,7 @@ async function loadProductRow(
   const [list, config] = await Promise.all([
     // The store API lists the newest first (`publishedAt` descending): `sort: "newest"` needs no parameter.
     data.listProducts(locale, {
+      groupBy: "listing",
       limit: section.limit,
       ...(category === undefined ? {} : { category }),
       ...(brand === undefined ? {} : { brand }),

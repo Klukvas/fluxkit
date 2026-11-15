@@ -53,7 +53,7 @@ export class RateLimitGuard implements CanActivate {
     @Inject(RateLimiter) private readonly limiter: RateLimiter,
   ) {}
 
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const name = this.reflector.getAllAndOverride<RateLimitName | undefined>(RATE_LIMIT_KEY, [
       context.getHandler(),
       context.getClass(),
@@ -66,7 +66,7 @@ export class RateLimitGuard implements CanActivate {
     if (clientKey === undefined) {
       return true;
     }
-    const decision = this.limiter.attempt(name, clientKey);
+    const decision = await this.limiter.attempt(name, clientKey);
     if (!decision.allowed) {
       throw tooManyRequests("Too many requests. Try again later.", decision.retryAfterSeconds);
     }

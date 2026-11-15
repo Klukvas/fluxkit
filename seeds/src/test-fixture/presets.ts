@@ -12,6 +12,7 @@ export const productTypePresets: readonly SeedProductType[] = [
     // The storefront's size guide page links next to the colour and size pickers (the e2e checks it on `demo-t-shirt`).
     optionGuidePage: "size-guide",
     optionCodes: ["color", "size"],
+    splitListingOptionCode: "color",
     attributes: [
       { attributeCode: "material", level: "product", isRequired: true },
       { attributeCode: "care_notes", level: "product" },

@@ -27,7 +27,9 @@ export interface CoffeeProductSpec {
   options?: readonly (readonly [string, readonly string[]])[];
   variants: Readonly<Record<string, Commerce>>;
   /** Extra pictures after the main one (`<slug>.webp`), each a file in the coffee folder with its own alt text. */
-  extraImages?: readonly { file: string; alt: I18nText }[];
+  extraImages?: readonly { file: string; alt: I18nText; optionValue?: SeedMedia["optionValue"] }[];
+  /** Existing main picture in the coffee folder, without the extension; defaults to the slug. */
+  image?: string;
   /** Alt text of the main picture; the title when omitted. */
   alt?: I18nText;
 }
@@ -67,10 +69,14 @@ export function coffeeProduct(spec: CoffeeProductSpec): SeedProduct {
     }
   }
   const media: SeedMedia[] = [
-    { file: `${COFFEE_ASSETS_FOLDER}/${spec.slug}.webp`, alt: spec.alt ?? spec.title },
+    {
+      file: `${COFFEE_ASSETS_FOLDER}/${spec.image ?? spec.slug}.webp`,
+      alt: spec.alt ?? spec.title,
+    },
     ...(spec.extraImages ?? []).map((image) => ({
       file: `${COFFEE_ASSETS_FOLDER}/${image.file}.webp`,
       alt: image.alt,
+      ...(image.optionValue === undefined ? {} : { optionValue: image.optionValue }),
     })),
   ];
   return {

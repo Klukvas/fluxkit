@@ -66,6 +66,7 @@ describe("search data (the results page's server read of GET /store/search)", ()
     expect(url.searchParams.get("sort")).toBe("price_asc");
     expect(url.searchParams.get("page")).toBe("2");
     expect(url.searchParams.get("locale")).toBe("en");
+    expect(url.searchParams.get("groupBy")).toBe("listing");
     expect(url.searchParams.has("limit")).toBe(false);
     // Connection first, so a build never needs the API.
     expect(events).toEqual(["beforeRequest", "fetch"]);
@@ -87,7 +88,7 @@ describe("search data (the results page's server read of GET /store/search)", ()
   it("leaves out what is not selected", async () => {
     const { data, calls } = setup(() => json(result));
     await data.search("uk", { q: "", facets: [], price: null, sort: null, page: 1 });
-    expect(new URL(calls[0]?.url ?? "").search).toBe("?locale=uk");
+    expect(new URL(calls[0]?.url ?? "").search).toBe("?locale=uk&groupBy=listing");
   });
 
   it("keeps the answer out of the Next data cache (the address holds free text, so the cache would grow without bound) and sends no cookie", async () => {
@@ -271,4 +272,50 @@ describe("search data (the results page's server read of GET /store/search)", ()
     await expect(data.search("uk", query)).rejects.toThrow();
     expect(error.mock.calls.flat().join(" ")).not.toContain("secret");
   });
+});
+
+it("isolates product and listing shared cache entries and stale-on-error answers", async () => {
+  let fail = false;
+  let now = 0;
+  const { data, calls } = setup(
+    ({ url }) =>
+      fail
+        ? problem(503, "search_unavailable")
+        : json({
+            ...result,
+            total: new URL(url).searchParams.get("groupBy") === "listing" ? 2 : 1,
+          }),
+    {
+      sharedCache: createSharedSearchCache({
+        maxEntries: 10,
+        freshMs: 60_000,
+        staleMs: 300_000,
+        now: () => now,
+      }),
+    },
+  );
+  const plain: SearchQuery = { q: "", facets: [], price: null, sort: null, page: 1 };
+  for (const groupBy of ["product", "listing"] as const) {
+    expect(await data.search("en", plain, { shared: true, groupBy })).toMatchObject({
+      kind: "results",
+      result: { total: groupBy === "listing" ? 2 : 1 },
+    });
+  }
+  expect(calls).toHaveLength(2);
+  fail = true;
+  now = 60_001;
+  for (const groupBy of ["listing", "product"] as const) {
+    expect(await data.search("en", plain, { shared: true, groupBy })).toMatchObject({
+      kind: "results",
+      result: { total: groupBy === "listing" ? 2 : 1 },
+    });
+  }
+  now = 360_000;
+  expect(await data.search("en", plain, { shared: true })).toMatchObject({ kind: "unavailable" });
+  fail = false;
+  expect(await data.search("en", plain, { shared: true })).toMatchObject({
+    kind: "results",
+    result: { total: 2 },
+  });
+  expect(calls).toHaveLength(6);
 });

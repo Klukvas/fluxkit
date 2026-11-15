@@ -48,6 +48,7 @@ describe("deriveIndexSettings", () => {
         // id: the sync deletes the documents a product lost with `productId IN [...] AND NOT id IN [...]`.
         "id",
         "productId",
+        "listingKey",
         "brand",
         "categories",
         "inStock",
@@ -58,8 +59,8 @@ describe("deriveIndexSettings", () => {
         "attr_waterproof",
         "attr_weight",
       ],
-      sortableAttributes: ["price", "publishedAt", "productId"],
-      displayedAttributes: ["id", "productId", "productSlug", "title"],
+      sortableAttributes: ["price", "publishedAt", "productId", "listingKey"],
+      displayedAttributes: ["id", "productId", "listingKey", "productSlug", "title"],
       typoTolerance: {
         enabled: true,
         disableOnAttributes: ["sku", "stems", "stems5"],

@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
-import type { CatalogOutcome, StoreData } from "./store-data";
+import { describe, expect, it, vi } from "vitest";
+import type { FetchLike } from "@fluxkit/api-client";
+import { createStoreData, type CatalogOutcome, type StoreData } from "./store-data";
 import { feature as fixtureFeature } from "../features/fixtures/app/[locale]/(feature-notebook)/_feature/feature";
 import type { FeatureData, RegisteredFeature, StorefrontFeature } from "../features/types";
 import {
@@ -73,6 +74,56 @@ describe("collectSitemapProducts", () => {
 
   it("is empty for an empty catalog", async () => {
     expect(await collectSitemapProducts(catalogOf(0).data, "uk")).toEqual([]);
+  });
+
+  it("lists each product once per locale even when visible listings split it into several cards", async () => {
+    const plain = summary("plain-mug");
+    const products = [summary("split-shirt"), plain];
+    const listings = [
+      ...["red", "black"].map((valueCode) =>
+        summary("split-shirt", {
+          listingKey: `id-split-shirt:color:${valueCode}`,
+          listingOption: {
+            optionCode: "color",
+            valueCode,
+            optionName: "Color",
+            valueName: valueCode,
+          },
+        }),
+      ),
+      plain,
+    ];
+    // Mock only the HTTP boundary: exercise sitemap paging, StoreData and the real client's grouping serialization.
+    const fetch = vi.fn<FetchLike>(async (url) => {
+      const params = new URL(url).searchParams;
+      const items = params.get("groupBy") === "listing" ? listings : products;
+      return new Response(JSON.stringify({ items, total: items.length, limit: 100, offset: 0 }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    });
+    const data = createStoreData({ baseUrl: () => "https://api.example", fetch });
+    const visible = await data.listProducts("uk", { groupBy: "listing", limit: 100 });
+    expect(visible.ok && visible.data.items).toHaveLength(3);
+    fetch.mockClear();
+
+    const entries = buildSitemap({
+      origin: "https://shop.example",
+      locales: ["uk", "en"],
+      defaultLocale: "uk",
+      categories: [],
+      products: await collectSitemapProducts(data, "uk"),
+    });
+    const urls = entries.map((entry) => entry.url);
+    for (const locale of ["uk", "en"])
+      for (const slug of ["split-shirt", "plain-mug"])
+        expect(
+          urls.filter((url) => url === `https://shop.example/${locale}/p/${slug}`),
+        ).toHaveLength(1);
+    expect(urls.some((url) => url.includes("?"))).toBe(false);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const [url, init] = fetch.mock.calls[0] ?? [];
+    expect(new URL(url ?? "").searchParams.get("groupBy")).toBeNull();
+    expect(init).toMatchObject({ next: { revalidate: 3600 } });
   });
 
   it("fails loudly when the API refuses a page (a sitemap with silently missing products is worse)", async () => {

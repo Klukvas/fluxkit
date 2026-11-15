@@ -2172,6 +2172,83 @@
     "reason": "plan 2026-11-14-playful-default-design WS-D: opted-in hero adds static accent blob, circular sticker and marker underline on desktop and mobile; original layout and heading typography remain guarded by computed styles and undecorated frozen bytes."
   },
   {
+    "page": "catalog",
+    "theme": "light",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "ADR 0052 step 4: the demo clothing fixture splits products by colour, adding more listing cards and changing these pages’ height; this page’s screenshots are masked."
+  },
+  {
+    "page": "catalog",
+    "theme": "dark",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "ADR 0052 step 4: the demo clothing fixture splits products by colour, adding more listing cards and changing these pages’ height; this page’s screenshots are masked."
+  },
+  {
+    "page": "en-catalog",
+    "theme": "light",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "ADR 0052 step 4: the demo clothing fixture splits products by colour, adding more listing cards and changing these pages’ height; this page’s screenshots are masked."
+  },
+  {
+    "page": "en-catalog",
+    "theme": "dark",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "ADR 0052 step 4: the demo clothing fixture splits products by colour, adding more listing cards and changing these pages’ height; this page’s screenshots are masked."
+  },
+  {
+    "page": "en-home",
+    "theme": "light",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "ADR 0052 step 4: the demo clothing fixture splits products by colour, adding more listing cards and changing these pages’ height; this page’s screenshots are masked."
+  },
+  {
+    "page": "en-home",
+    "theme": "dark",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "ADR 0052 step 4: the demo clothing fixture splits products by colour, adding more listing cards and changing these pages’ height; this page’s screenshots are masked."
+  },
+  {
+    "page": "home",
+    "theme": "light",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "ADR 0052 step 4: the demo clothing fixture splits products by colour, adding more listing cards and changing these pages’ height; this page’s screenshots are masked."
+  },
+  {
+    "page": "home",
+    "theme": "dark",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "ADR 0052 step 4: the demo clothing fixture splits products by colour, adding more listing cards and changing these pages’ height; this page’s screenshots are masked."
+  },
+  {
+    "page": "home",
+    "theme": "system",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "ADR 0052 step 4: the demo clothing fixture splits products by colour, adding more listing cards and changing these pages’ height; this page’s screenshots are masked."
+  },
+  {
+    "page": "search",
+    "theme": "light",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "ADR 0052 step 4: the demo clothing fixture splits products by colour, adding more listing cards and changing these pages’ height; this page’s screenshots are masked."
+  },
+  {
+    "page": "search",
+    "theme": "dark",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "ADR 0052 step 4: the demo clothing fixture splits products by colour, adding more listing cards and changing these pages’ height; this page’s screenshots are masked."
+  },
+  {
     "page": "cart",
     "selector": "button.secondary",
     "property": "border-bottom-color",
@@ -2874,76 +2951,13 @@
     "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): 2px ink outlines on cards and controls (the header search field and the footer theme options on every page; cards grow by 2px, so full frames shift) and the display hero heading; the changed selectors' computed styles are recorded and declared"
   },
   {
-    "page": "catalog",
-    "theme": "dark",
-    "selector": "page.body",
-    "property": "screenshot",
-    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): 2px ink outlines on cards and controls (the header search field and the footer theme options on every page; cards grow by 2px, so full frames shift) and the display hero heading; the changed selectors' computed styles are recorded and declared"
-  },
-  {
-    "page": "catalog",
-    "theme": "light",
-    "selector": "page.body",
-    "property": "screenshot",
-    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): 2px ink outlines on cards and controls (the header search field and the footer theme options on every page; cards grow by 2px, so full frames shift) and the display hero heading; the changed selectors' computed styles are recorded and declared"
-  },
-  {
     "page": "checkout",
     "selector": "page.body",
     "property": "screenshot",
     "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): 2px ink outlines on cards and controls (the header search field and the footer theme options on every page; cards grow by 2px, so full frames shift) and the display hero heading; the changed selectors' computed styles are recorded and declared"
   },
   {
-    "page": "en-catalog",
-    "theme": "dark",
-    "selector": "page.body",
-    "property": "screenshot",
-    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): 2px ink outlines on cards and controls (the header search field and the footer theme options on every page; cards grow by 2px, so full frames shift) and the display hero heading; the changed selectors' computed styles are recorded and declared"
-  },
-  {
-    "page": "en-catalog",
-    "theme": "light",
-    "selector": "page.body",
-    "property": "screenshot",
-    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): 2px ink outlines on cards and controls (the header search field and the footer theme options on every page; cards grow by 2px, so full frames shift) and the display hero heading; the changed selectors' computed styles are recorded and declared"
-  },
-  {
-    "page": "en-home",
-    "theme": "dark",
-    "selector": "page.body",
-    "property": "screenshot",
-    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): 2px ink outlines on cards and controls (the header search field and the footer theme options on every page; cards grow by 2px, so full frames shift) and the display hero heading; the changed selectors' computed styles are recorded and declared"
-  },
-  {
-    "page": "en-home",
-    "theme": "light",
-    "selector": "page.body",
-    "property": "screenshot",
-    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): 2px ink outlines on cards and controls (the header search field and the footer theme options on every page; cards grow by 2px, so full frames shift) and the display hero heading; the changed selectors' computed styles are recorded and declared"
-  },
-  {
     "page": "en-register",
-    "selector": "page.body",
-    "property": "screenshot",
-    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): 2px ink outlines on cards and controls (the header search field and the footer theme options on every page; cards grow by 2px, so full frames shift) and the display hero heading; the changed selectors' computed styles are recorded and declared"
-  },
-  {
-    "page": "home",
-    "theme": "dark",
-    "selector": "page.body",
-    "property": "screenshot",
-    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): 2px ink outlines on cards and controls (the header search field and the footer theme options on every page; cards grow by 2px, so full frames shift) and the display hero heading; the changed selectors' computed styles are recorded and declared"
-  },
-  {
-    "page": "home",
-    "theme": "light",
-    "selector": "page.body",
-    "property": "screenshot",
-    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): 2px ink outlines on cards and controls (the header search field and the footer theme options on every page; cards grow by 2px, so full frames shift) and the display hero heading; the changed selectors' computed styles are recorded and declared"
-  },
-  {
-    "page": "home",
-    "theme": "system",
     "selector": "page.body",
     "property": "screenshot",
     "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): 2px ink outlines on cards and controls (the header search field and the footer theme options on every page; cards grow by 2px, so full frames shift) and the display hero heading; the changed selectors' computed styles are recorded and declared"
@@ -2982,20 +2996,6 @@
   },
   {
     "page": "register",
-    "selector": "page.body",
-    "property": "screenshot",
-    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): 2px ink outlines on cards and controls (the header search field and the footer theme options on every page; cards grow by 2px, so full frames shift) and the display hero heading; the changed selectors' computed styles are recorded and declared"
-  },
-  {
-    "page": "search",
-    "theme": "dark",
-    "selector": "page.body",
-    "property": "screenshot",
-    "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): 2px ink outlines on cards and controls (the header search field and the footer theme options on every page; cards grow by 2px, so full frames shift) and the display hero heading; the changed selectors' computed styles are recorded and declared"
-  },
-  {
-    "page": "search",
-    "theme": "light",
     "selector": "page.body",
     "property": "screenshot",
     "reason": "Polish round 2026-11-15 (plan 2026-11-14-playful-default-design.md): 2px ink outlines on cards and controls (the header search field and the footer theme options on every page; cards grow by 2px, so full frames shift) and the display hero heading; the changed selectors' computed styles are recorded and declared"
