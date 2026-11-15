@@ -3,6 +3,7 @@
   "paths": {
     "/admin/auth/login": {
       "post": {
+        "description": "On success, revokes the session cookie the request carried. A failed login leaves it unchanged.",
         "operationId": "AuthController_login",
         "parameters": [
           {
@@ -332,7 +333,15 @@
         },
         "responses": {
           "204": {
-            "description": "Password changed; the current session stays signed in."
+            "description": "Password changed; the current token is replaced. Store the new Set-Cookie; the old token no longer works.",
+            "headers": {
+              "Set-Cookie": {
+                "description": "Rotated session cookie with the remaining absolute lifetime.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "400": {
             "description": "Validation failed: malformed request or invalid fields (see errors).",
@@ -3855,7 +3864,15 @@
         },
         "responses": {
           "204": {
-            "description": "Password changed; the current session stays signed in."
+            "description": "Password changed; the current token is replaced. Store the new Set-Cookie; the old token no longer works.",
+            "headers": {
+              "Set-Cookie": {
+                "description": "Rotated session cookie with the remaining absolute lifetime.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "400": {
             "description": "Validation failed: malformed request or invalid fields (see errors).",

@@ -4,7 +4,8 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 import { DRIZZLE, type Database } from "../database/database.module.js";
 import { createTestAdminUser, deleteTestAdminUsers } from "../test/admin-user-fixtures.js";
 import { startApp, type RunningApp } from "../test/app.js";
-import { loginCookie } from "../test/auth-http.js";
+import { hashSessionToken } from "./session-token.js";
+import { loginCookie, sessionCookieOf } from "../test/auth-http.js";
 import { FakeClock } from "../test/fake-clock.js";
 import { http, type HttpResult } from "../test/http.js";
 import { ensureMigrated } from "../test/migrate.js";
@@ -153,20 +154,20 @@ describe("the password hash never leaves the server", () => {
       currentPassword: "not my password",
       newPassword: NEW_PASSWORD,
     });
-    await expectStep(
-      await run("change ok", "POST", "/admin/auth/change-password", cookie, {
-        currentPassword: PASSWORD,
-        newPassword: NEW_PASSWORD,
-      }),
-      204,
-      "change ok",
-    );
+    const changed = await run("change ok", "POST", "/admin/auth/change-password", cookie, {
+      currentPassword: PASSWORD,
+      newPassword: NEW_PASSWORD,
+    });
+    await expectStep(changed, 204, "change ok");
+    const rotatedCookie = sessionCookieOf(changed);
+    if (rotatedCookie === undefined) throw new Error("Expected rotated cookie");
+    const tokens = [cookie, rotatedCookie].map((value) => value.slice(value.indexOf("=") + 1));
     const viewerCookie = await (async () => {
       clock.advanceMinutes(11);
       return loginCookie(running.baseUrl, viewer.email, NEW_PASSWORD, loginRefusals);
     })();
     await run("viewer forbidden", "GET", "/admin/users", viewerCookie);
-    await run("logout", "POST", "/admin/auth/logout", cookie);
+    await run("logout", "POST", "/admin/auth/logout", rotatedCookie);
 
     // Every hash that exists now, including the ones written during this test.
     const hashes = (await db.select({ hash: adminUser.passwordHash }).from(adminUser)).map(
@@ -189,7 +190,14 @@ describe("the password hash never leaves the server", () => {
 
     const printed = output.join("");
     expect(printed.length).toBeGreaterThan(0);
-    for (const fragment of [...forbiddenFragments, PASSWORD, NEW_PASSWORD, "not my password"]) {
+    for (const fragment of [
+      ...forbiddenFragments,
+      ...tokens,
+      ...tokens.map(hashSessionToken),
+      PASSWORD,
+      NEW_PASSWORD,
+      "not my password",
+    ]) {
       expect(printed, `log output must not contain ${fragment.slice(0, 12)}`).not.toContain(
         fragment,
       );

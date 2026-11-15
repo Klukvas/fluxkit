@@ -5,6 +5,8 @@
 One line per user-visible or schema change.
 
 ## Unreleased
+
+- Auth (additive, minor; ADR 0054): admin and customer password changes rotate the current session token without extending expiry (`204` with a new `Set-Cookie`, which manual cookie clients must store); successful admin login revokes the presented session; failed changes roll back atomically.
 - Store cart API (additive, minor): required nullable `freeShipping` carries the lowest offered valid `free_over` threshold and server-computed remaining amount from the cart subtotal, including in checkout's `cart_changed` cart; the drawer and cart-page summary show the server remainder with accessible, token-styled native progress and a reached state (including zero-cost `free_over` methods); no migration.
 - `@fluxkit/ui` `Hero` gains a phrasing-only `ReactNode` title, section `data-*` attributes, `mediaClassName` and an ornament slot (additive); the decorated home reuses it with unchanged markup.
 - Admin: one page header on every screen (title, description, actions; at most one primary action), `ghost` Cancel buttons; `@fluxkit/ui` `Button` gains `variant="ghost"` and a leading `icon`, new `IconButton` (plan `docs/plans/2026-11-13-admin-shell-redesign.md`, PR 2; existing variants render unchanged).

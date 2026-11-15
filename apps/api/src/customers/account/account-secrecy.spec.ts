@@ -1,3 +1,4 @@
+import { hashSessionToken } from "../../auth/session-token.js";
 import { eq } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
@@ -122,14 +123,27 @@ describe("secrets and personal data stay out of logs, tables and responses", () 
       { currentPassword: WRONG, newPassword: NEW_PASSWORD },
       cookie,
     );
-    await post(
+    const changed = await post(
       "/store/account/change-password",
       { currentPassword: PASSWORD, newPassword: NEW_PASSWORD },
       cookie,
     );
-    await post("/store/account/logout", undefined, cookie);
+    expect(changed.status).toBe(204);
+    const rotatedCookie = customerCookieOf(changed);
+    if (rotatedCookie === undefined) throw new Error("Expected rotated cookie");
+    const newToken = rotatedCookie.slice(rotatedCookie.indexOf("=") + 1);
+    expect((await post("/store/account/logout", undefined, rotatedCookie)).status).toBe(204);
     const printed = output.join("");
-    for (const secret of [token, shopper.email, PASSWORD, WRONG, NEW_PASSWORD]) {
+    for (const secret of [
+      token,
+      newToken,
+      hashSessionToken(token),
+      hashSessionToken(newToken),
+      shopper.email,
+      PASSWORD,
+      WRONG,
+      NEW_PASSWORD,
+    ]) {
       expect(printed, secret.slice(0, 14)).not.toContain(secret);
     }
   });
