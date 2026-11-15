@@ -136,7 +136,8 @@ export type IndexAction =
     };
 
 /**
- * What the indexer does for one locale. A running build is continued (or restarted after 24 hours); without one, a missing
+ * What the indexer does for one locale. Only a compatible running build is continued (or restarted after 24 hours);
+ * incompatible or inherited builds without a key are discarded. Without a build, a missing
  * live index, documents built for another version or currency, or an operator's request mean a full rebuild with a swap;
  * a changed settings hash alone is applied to the live index in place (the engine re-indexes in the background and
  * search keeps working).
@@ -149,13 +150,14 @@ export function decideIndexAction(input: {
 }): IndexAction {
   const { state, derived, now } = input;
   if (state !== null && state.buildIndexUid !== null) {
+    // Null also marks an uncertain swap: the build uid may now hold the OLD live index.
+    if (state.buildRebuildKey !== derived.rebuildKey) {
+      return { kind: "rebuild", cause: "stale_build" };
+    }
     const startedAt = state.buildStartedAt?.getTime() ?? 0;
     if (now.getTime() - startedAt > SEARCH_INDEXING.buildMaxAgeHours * 3_600_000) {
       return { kind: "rebuild", cause: "build_expired" };
     }
-    // Null also marks a submitted swap: its build uid may now hold the OLD live index, so it must never resume.
-    if (state.buildRebuildKey !== derived.rebuildKey)
-      return { kind: "rebuild", cause: "stale_build" };
     return { kind: "continue_build" };
   }
   if (state === null || state.liveIndexUid === null) {

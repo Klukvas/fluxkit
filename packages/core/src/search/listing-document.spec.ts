@@ -48,7 +48,7 @@ const facts: SearchProductFacts = {
 };
 describe("listing search documents", () => {
   it("derives stable per-value keys for all sellable documents, with the same filter-document keys", () => {
-    expect(SEARCH_DOCUMENT_VERSION).toBe(4);
+    expect(SEARCH_DOCUMENT_VERSION).toBe(5);
     const docs = buildSearchDocuments(facts, context);
     expect(docs.map((doc) => [doc.id, doc.listingKey])).toEqual([
       ["variant0", "product:color:red"],

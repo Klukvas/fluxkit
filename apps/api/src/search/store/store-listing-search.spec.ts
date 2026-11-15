@@ -1,3 +1,4 @@
+import { SEARCH_DOCUMENT_VERSION } from "@fluxkit/core";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { DRIZZLE, PG_POOL, type Database } from "../../database/database.module.js";
@@ -17,7 +18,7 @@ import { SearchQueueRepository } from "../queue/search-queue.repository.js";
 import { SEARCH_ENGINE } from "../search.module.js";
 import type { StoreSearchResponse } from "./store-search.schemas.js";
 
-describe("listing search v4 (real Postgres, Redis and Meilisearch)", () => {
+describe("listing search v5 (real Postgres, Redis and Meilisearch)", () => {
   const pool = new pg.Pool({ connectionString: requireTestDatabaseUrl() });
   let fx: ListingFixture;
   let world: SearchWorld;
@@ -100,7 +101,7 @@ describe("listing search v4 (real Postgres, Redis and Meilisearch)", () => {
       expect(applied[field]).not.toContain("listingKey");
   }
 
-  async function assertLiveV4() {
+  async function assertLiveCurrent() {
     for (const locale of ["uk", "en"]) {
       const documents = await allDocuments(world.liveUid(locale));
       expect(documents.length).toBeGreaterThan(0);
@@ -109,8 +110,8 @@ describe("listing search v4 (real Postgres, Redis and Meilisearch)", () => {
     expect(
       (await pool.query("select document_version, build_index_uid from search_index_state")).rows,
     ).toEqual([
-      { document_version: 4, build_index_uid: null },
-      { document_version: 4, build_index_uid: null },
+      { document_version: SEARCH_DOCUMENT_VERSION, build_index_uid: null },
+      { document_version: SEARCH_DOCUMENT_VERSION, build_index_uid: null },
     ]);
     expect((await search("", "product")).total).toBe(3);
     expect((await search()).total).toBe(4);
@@ -147,6 +148,45 @@ describe("listing search v4 (real Postgres, Redis and Meilisearch)", () => {
       ["red", null],
     ]);
     expect(result.price).toEqual({ min: 0, max: 4500 });
+  });
+
+  it("removes corrupt split products from documents, listing totals and facets and restores repaired text", async () => {
+    const saved = await pool.query<{ title: object }>("select title from product where id = $1", [
+      fx.splitProduct,
+    ]);
+    try {
+      await pool.query("update product set title = $2::jsonb where id = $1", [
+        fx.splitProduct,
+        JSON.stringify({ uk: " ", en: "\t\u00a0" }),
+      ]);
+      // A full rebuild must omit all sibling listing documents even without a queue mark.
+      await pool.query("update search_index_state set rebuild_requested_at = now()");
+      expect(await indexer.rebuild(new Date(), UNLIMITED_BUDGET)).toMatchObject({
+        swapped: 2,
+        failures: [],
+      });
+      for (const locale of ["uk", "en"]) expect(await splitDocuments(locale)).toEqual([]);
+      const result = await search();
+      expect(result.total).toBe(2);
+      expect(result.items.map((item) => item.id)).not.toContain(fx.splitProduct);
+      expect(
+        result.facets
+          .find((facet) => facet.key === "brand")
+          ?.values.find((value) => value.code === fx.brandSlug)?.count,
+      ).toBe(2);
+    } finally {
+      await pool.query("update product set title = $2::jsonb where id = $1", [
+        fx.splitProduct,
+        JSON.stringify(saved.rows[0]?.title),
+      ]);
+      await pool.query("update search_index_state set rebuild_requested_at = now()");
+      expect(await indexer.rebuild(new Date(), UNLIMITED_BUDGET)).toMatchObject({
+        swapped: 2,
+        failures: [],
+      });
+    }
+    expect((await search()).total).toBe(4);
+    expect(await splitDocuments()).toHaveLength(4);
   });
 
   it("keeps same-SKU intersections, disjunctive values and group-local matches separate from the group offer", async () => {
@@ -346,7 +386,7 @@ describe("listing search v4 (real Postgres, Redis and Meilisearch)", () => {
     await sync();
   });
 
-  it("keeps product search available on a real v3 live index until the v4 rebuild enables listing search", async () => {
+  it("keeps product search available on a real v3 live index until the v5 rebuild enables listing search", async () => {
     for (const locale of ["uk", "en"]) await makeV3Index(world.liveUid(locale));
     await pool.query("update search_index_state set document_version = 3");
     const refused = await http<ProblemBody>(app.baseUrl, "GET", url());
@@ -365,10 +405,10 @@ describe("listing search v4 (real Postgres, Redis and Meilisearch)", () => {
       swapped: 2,
       failures: [],
     });
-    await assertLiveV4();
+    await assertLiveCurrent();
   });
 
-  it("fences overlapping runs at the same completed v4 build so they cannot swap v3 back in", async () => {
+  it("fences overlapping runs at the same completed v5 build so they cannot swap v3 back in", async () => {
     for (const locale of ["uk", "en"]) await makeV3Index(world.liveUid(locale));
     await pool.query("update search_index_state set document_version = 3");
     const now = new Date(Date.now() + 2000);
@@ -436,7 +476,7 @@ describe("listing search v4 (real Postgres, Redis and Meilisearch)", () => {
       expect(lost).toMatchObject({ swapped: 0, failures: [] });
       expect(won).toMatchObject({ swapped: 2, failures: [] });
       expect(completion).toHaveBeenCalledTimes(1);
-      await assertLiveV4();
+      await assertLiveCurrent();
     } finally {
       releaseFirst.resolve();
       releaseSecond.resolve();
@@ -529,7 +569,7 @@ describe("listing search v4 (real Postgres, Redis and Meilisearch)", () => {
       }
       releaseCompletion.resolve();
       expect(await recovered).toMatchObject({ started: 2, swapped: 2, failures: [] });
-      await assertLiveV4();
+      await assertLiveCurrent();
       expect(await listIndexUids(world.prefix)).toEqual(
         [world.liveUid("en"), world.liveUid("uk")].sort(),
       );
@@ -542,7 +582,7 @@ describe("listing search v4 (real Postgres, Redis and Meilisearch)", () => {
     }
   });
 
-  it("rebuilds safely after the engine swaps v4 in but Postgres completion fails", async () => {
+  it("rebuilds safely after the engine swaps v5 in but Postgres completion fails", async () => {
     for (const locale of ["uk", "en"]) await makeV3Index(world.liveUid(locale));
     await pool.query("update search_index_state set document_version = 3");
     const now = new Date(Date.now() + 2000);
@@ -550,7 +590,7 @@ describe("listing search v4 (real Postgres, Redis and Meilisearch)", () => {
     const completion = vi
       .spyOn(SearchIndexStateRepository.prototype, "completeSwap")
       .mockImplementationOnce(async () => {
-        // The engine really swapped: live holds v4 and the build uid now holds v3 with equal document counts.
+        // The engine really swapped: live holds v5 and the build uid now holds v3 with equal document counts.
         const states = await pool.query<{
           locale: string;
           build_index_uid: string;
@@ -585,7 +625,7 @@ describe("listing search v4 (real Postgres, Redis and Meilisearch)", () => {
         failures: [],
       },
     );
-    await assertLiveV4();
+    await assertLiveCurrent();
   });
 
   it("leaves a lost batch claim unchanged and refuses completion for an unclaimed or replaced build", async () => {
@@ -608,7 +648,7 @@ describe("listing search v4 (real Postgres, Redis and Meilisearch)", () => {
         buildRebuildKey: state.buildRebuildKey,
         liveIndexUid: world.liveUid(state.locale),
         settingsHash: "test-completion",
-        documentVersion: 4,
+        documentVersion: SEARCH_DOCUMENT_VERSION,
         currency: "UAH",
         documentsCount: state.buildDocumentsCount,
       };
@@ -645,10 +685,10 @@ describe("listing search v4 (real Postgres, Redis and Meilisearch)", () => {
       swapped: 2,
       failures: [],
     });
-    await assertLiveV4();
+    await assertLiveCurrent();
   });
 
-  it("restarts an inherited paused v3 build and never labels its old documents as v4", async () => {
+  it("restarts an inherited paused v3 build and never labels its old documents as v5", async () => {
     await pool.query("update search_index_state set rebuild_requested_at = now()");
     // A real paused build after its first page, then the on-disk state/documents of a pre-upgrade v3 process.
     const now = new Date(Date.now() + 2000);
@@ -675,10 +715,10 @@ describe("listing search v4 (real Postgres, Redis and Meilisearch)", () => {
     });
     const remaining = await listIndexUids(world.prefix);
     for (const uid of builds) expect(remaining).not.toContain(uid);
-    await assertLiveV4();
+    await assertLiveCurrent();
   });
 
-  it("requires applied filterable, sortable and displayed listing fields even on a live v4 locale", async () => {
+  it("requires applied filterable, sortable and displayed listing fields even on a live v5 locale", async () => {
     const uid = world.liveUid("uk");
     const fields = ["filterableAttributes", "sortableAttributes", "displayedAttributes"] as const;
     const original = {

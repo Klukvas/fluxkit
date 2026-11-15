@@ -99,7 +99,7 @@ export class SearchIndexStateRepository {
       .where(eq(searchIndexState.locale, locale));
   }
 
-  /** Drops a build's bookkeeping (an expired build, or one whose index is gone). */
+  /** Drops an expired, incompatible or missing build's bookkeeping. */
   async dropBuild(db: DbExecutor, locale: string, now: Date): Promise<void> {
     await db
       .update(searchIndexState)

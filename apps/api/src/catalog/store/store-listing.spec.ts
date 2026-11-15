@@ -1,3 +1,4 @@
+import { Logger } from "@nestjs/common";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { startApp, type RunningApp } from "../../test/app.js";
@@ -94,6 +95,60 @@ describe("listing groups (real store API)", () => {
     expect(category.body).toEqual(all);
   });
 
+  it("excludes corrupt products from listing counts, full pages and hit hydration using the shared text rule", async () => {
+    const references = ["blue", "red"].map((value) => ({
+      productId: fx.splitProduct,
+      listingKey: `${fx.splitProduct}:${fx.colorCode}:${value}`,
+    }));
+    const red = await pool.query<{ id: string }>(
+      "select id from option_value where option_id = $1 and code = 'red'",
+      [fx.colorId],
+    );
+    const redId = red.rows[0]?.id;
+    if (redId === undefined) throw new Error("Missing red option fixture");
+    const errors = vi.spyOn(Logger.prototype, "error");
+    try {
+      for (const [table, column, id] of [
+        ["product", "title", fx.splitProduct],
+        ["option", "name", fx.colorId],
+        ["option_value", "label", redId],
+      ] as const) {
+        const saved = await pool.query<{ text: object }>(
+          `select ${column} as text from ${table} where id = $1`,
+          [id],
+        );
+        try {
+          await pool.query(`update ${table} set ${column} = $2::jsonb where id = $1`, [
+            id,
+            JSON.stringify({ uk: " ", en: "\t\u00a0" }),
+          ]);
+          const all = await page("&groupBy=listing");
+          expect(all.items.map((item) => item.id)).not.toContain(fx.splitProduct);
+          expect(all.total).toBe(table === "product" ? 2 : 1);
+          for (let offset = 0; offset < all.total; offset += 1) {
+            const part = await page(`&groupBy=listing&limit=1&offset=${offset}`);
+            expect(part.total).toBe(all.total);
+            expect(part.items).toEqual(all.items.slice(offset, offset + 1));
+          }
+          errors.mockClear();
+          expect(
+            await app.app.get(StoreService).listItemsByListingReferences(references, "en"),
+          ).toEqual({ items: [], missing: [fx.splitProduct] });
+          expect(errors.mock.calls.map((call) => call[0])).toContain(
+            `Product "${fx.splitProduct}" has no usable required text.`,
+          );
+        } finally {
+          await pool.query(`update ${table} set ${column} = $2::jsonb where id = $1`, [
+            id,
+            JSON.stringify(saved.rows[0]?.text),
+          ]);
+        }
+      }
+    } finally {
+      errors.mockRestore();
+    }
+  });
+
   it("resolves option labels per field and picks a value image, then general image, then placeholder", async () => {
     const result = await page("&groupBy=listing&locale=en");
     const split = result.items.filter((item) => item.id === fx.splitProduct);
@@ -161,8 +216,9 @@ describe("listing groups (real store API)", () => {
         spy.mockRestore();
       }
     }
-    expect(await statements(1)).toBe(6);
-    expect(await statements(100)).toBe(6);
+    // Page/count, one batched omitted-ID scan for ERROR logs, and four summary reads.
+    expect(await statements(1)).toBe(7);
+    expect(await statements(100)).toBe(7);
     const queues = await pool.query(
       "select * from search_sync_queue where product_id = any($1::uuid[])",
       [[fx.splitProduct, fx.plainProduct, fx.noAxisProduct]],
