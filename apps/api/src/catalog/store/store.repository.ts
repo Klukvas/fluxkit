@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, asc, desc, eq, exists, inArray, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, exists, inArray, not, sql, type SQL } from "drizzle-orm";
 import { DRIZZLE, type Database } from "../../database/database.module.js";
 import type { DbExecutor } from "../../common/transaction.js";
 import {
@@ -22,6 +22,7 @@ import {
   variant,
   variantOptionValue,
 } from "../../database/schema/index.js";
+import { hasUsableProductText } from "./store-visibility.js";
 import type { I18nText } from "../../database/schema/catalog.js";
 
 type AttributeRow = typeof attribute.$inferSelect;
@@ -222,9 +223,11 @@ export class StoreRepository {
   async listProducts(
     filter: ProductListFilter,
     page: { limit: number; offset: number },
-  ): Promise<{ rows: ProductListRow[]; total: number }> {
-    const where = this.activeProductsWhere(filter);
-    const [rows, total] = await Promise.all([
+  ): Promise<{ rows: ProductListRow[]; total: number; omittedProductIds: string[] }> {
+    const baseWhere = this.activeProductsWhere(filter);
+    const usableText = hasUsableProductText(this.db);
+    const where = and(baseWhere, usableText);
+    const [rows, total, omitted] = await Promise.all([
       this.db
         .select({
           id: product.id,
@@ -241,31 +244,43 @@ export class StoreRepository {
         .limit(page.limit)
         .offset(page.offset),
       this.db.$count(product, where),
+      this.db
+        .select({ id: product.id })
+        .from(product)
+        .where(and(baseWhere, not(usableText))),
     ]);
-    return { rows, total };
+    return { rows, total, omittedProductIds: omitted.map((row) => row.id) };
   }
 
   /** The listable products among `productIds` (active, with a sellable variant), in no particular order. */
   async listProductsByIds(
     productIds: readonly string[],
     shopCurrency: string,
-  ): Promise<ProductListRow[]> {
-    const where = and(
+  ): Promise<{ rows: ProductListRow[]; omittedProductIds: string[] }> {
+    const baseWhere = and(
       this.activeProductsWhere({ categoryIds: undefined, brandSlug: undefined, shopCurrency }),
       inArray(product.id, [...productIds]),
     );
-    return this.db
-      .select({
-        id: product.id,
-        slug: product.slug,
-        title: product.title,
-        publishedAt: product.publishedAt,
-        brandSlug: brand.slug,
-        brandName: brand.name,
-      })
-      .from(product)
-      .leftJoin(brand, eq(brand.id, product.brandId))
-      .where(where);
+    const usableText = hasUsableProductText(this.db);
+    const [rows, omitted] = await Promise.all([
+      this.db
+        .select({
+          id: product.id,
+          slug: product.slug,
+          title: product.title,
+          publishedAt: product.publishedAt,
+          brandSlug: brand.slug,
+          brandName: brand.name,
+        })
+        .from(product)
+        .leftJoin(brand, eq(brand.id, product.brandId))
+        .where(and(baseWhere, usableText)),
+      this.db
+        .select({ id: product.id })
+        .from(product)
+        .where(and(baseWhere, not(usableText))),
+    ]);
+    return { rows, omittedProductIds: omitted.map((row) => row.id) };
   }
 
   /**

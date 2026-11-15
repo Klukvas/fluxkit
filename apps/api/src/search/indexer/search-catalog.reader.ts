@@ -13,6 +13,7 @@ import { and, asc, eq, gt, inArray } from "drizzle-orm";
 import { inputTypeSchema } from "../../catalog/admin/attributes/attributes.schemas.js";
 import { attributeLevelSchema } from "../../catalog/admin/product-types/product-types.schemas.js";
 import { productStatusSchema } from "../../catalog/admin/products/products.schemas.js";
+import { hasUsableProductText } from "../../catalog/store/store-visibility.js";
 import { visibleCategoryTree } from "../../catalog/store/store-categories.js";
 import type { DbExecutor } from "../../common/transaction.js";
 import {
@@ -36,7 +37,8 @@ import {
  * Reads what the search documents and the index settings are built from (ADR 0034 decision 2), in batched queries
  * (no N+1): the catalog definitions once per run, the products page by page. Facts only: what reaches a document is
  * decided by core `buildSearchDocuments`, which filters out internal and hidden attributes, inactive or unpriced
- * variants and products that are not active. This reader never decides visibility of attribute data itself.
+ * variants and products that are not active. The reader applies the store's shared required-text SQL predicate first,
+ * so sync deletes documents for omitted products. It never decides visibility of attribute data itself.
  */
 
 /** The definitions shared by every product of a run. */
@@ -206,7 +208,7 @@ export async function readSearchProducts(
     })
     .from(product)
     .leftJoin(brand, eq(brand.id, product.brandId))
-    .where(inArray(product.id, [...productIds]))
+    .where(and(inArray(product.id, [...productIds]), hasUsableProductText(db)))
     .orderBy(asc(product.id));
   if (productRows.length === 0) {
     return [];

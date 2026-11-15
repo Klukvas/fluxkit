@@ -16,7 +16,7 @@ import type { StoreAttributes, StoreProductDetail } from "./store.schemas.js";
 /**
  * The one place where attribute definitions and values leave the API (ADR 0006 section 10). What is public is
  * decided by core (`selectPublicAttributes`, `publicAttributeDefinitions`: visible on the storefront and not
- * internal); this file only feeds core and never filters attributes itself. Every attribute that reaches a response
+ * internal); this file also removes unusable catalog display text. Every attribute that reaches a response
  * goes through here, so a flag change in core cannot be bypassed by a route.
  */
 
@@ -25,15 +25,27 @@ const logger = new Logger("StoreSerializer");
 const inputTypeSchema = z.enum(["text", "number", "boolean", "select", "multiselect", "date"]);
 
 /**
- * A required text (title, name): the requested locale, else the default locale, else the first available non-empty one
- * (`resolveTextWithFallback`, the rule the order snapshot and the order views share). A text with no usable entry at all can
- * only come from data written around the service; log it and degrade to "".
+ * Cart-only required text: preserve a line even when its title is corrupt, because removing it would change totals.
+ * Uses the same locale fallback as order snapshots; the catalog uses catalogText instead.
  */
 export function requiredText(text: I18nText, locale: StoreLocale, what: string): string {
   const resolved = resolveTextWithFallback(text, locale.locale, locale.defaultLocale);
   if (resolved === undefined) {
     logger.warn(`${what} has no text in any locale.`);
     return "";
+  }
+  return resolved;
+}
+
+/** Catalog required text: omit corrupt data and log only its kind and identifier, never its content. */
+export function catalogText(
+  text: I18nText | undefined,
+  locale: StoreLocale,
+  entity: string,
+): string | undefined {
+  const resolved = resolveTextWithFallback(text, locale.locale, locale.defaultLocale);
+  if (resolved === undefined) {
+    logger.error(`${entity} has no usable required text.`);
   }
   return resolved;
 }
@@ -74,7 +86,23 @@ export function serializeAttributes(
   values: AttributeValues,
   locale: StoreLocale,
 ): StoreAttributes {
-  return selectPublicAttributes(definitionsAtLevel(assignments, level), values, locale);
+  const namedAssignments = assignments.filter(
+    (row) =>
+      catalogText(row.attribute.name, locale, `Attribute "${row.attribute.code}"`) !== undefined,
+  );
+  const definitions = definitionsAtLevel(namedAssignments, level).map((definition) => ({
+    ...definition,
+    options: definition.options.flatMap((option) => {
+      const label = catalogText(
+        option.label,
+        locale,
+        `Attribute option "${definition.code}:${option.code}"`,
+      );
+      // Feed core only usable choices, with the same resolved label as the definition serializer.
+      return label === undefined ? [] : [{ ...option, label: { [locale.locale]: label } }];
+    }),
+  }));
+  return selectPublicAttributes(definitions, values, locale);
 }
 
 /**
@@ -89,25 +117,36 @@ export function serializeAttributeDefinitions(
   const namesByCode = new Map(
     assignments.map((row) => [row.attribute.code, row.attribute.name] as const),
   );
-  return publicAttributeDefinitions(definitionsAtLevel(assignments, "product")).map(
-    (definition) => ({
-      code: definition.code,
-      name: requiredText(
+  return publicAttributeDefinitions(definitionsAtLevel(assignments, "product")).flatMap(
+    (definition) => {
+      const name = catalogText(
         namesByCode.get(definition.code) ?? {},
         locale,
-        `Attribute "${definition.code}" name`,
-      ),
-      inputType: definition.inputType,
-      isLocalized: definition.isLocalized,
-      unit: definition.unit,
-      isFilterable: definition.isFilterable,
-      isComparable: definition.isComparable,
-      isSortable: definition.isSortable,
-      options: definition.options.map((option) => ({
-        code: option.code,
-        // Same fallback as core uses for stored values: never an empty label.
-        label: resolveText(option.label, locale.locale, locale.defaultLocale) ?? option.code,
-      })),
-    }),
+        `Attribute "${definition.code}"`,
+      );
+      if (name === undefined) {
+        return [];
+      }
+      return [
+        {
+          code: definition.code,
+          name,
+          inputType: definition.inputType,
+          isLocalized: definition.isLocalized,
+          unit: definition.unit,
+          isFilterable: definition.isFilterable,
+          isComparable: definition.isComparable,
+          isSortable: definition.isSortable,
+          options: definition.options.flatMap((option) => {
+            const label = catalogText(
+              option.label,
+              locale,
+              `Attribute option "${definition.code}:${option.code}"`,
+            );
+            return label === undefined ? [] : [{ code: option.code, label }];
+          }),
+        },
+      ];
+    },
   );
 }

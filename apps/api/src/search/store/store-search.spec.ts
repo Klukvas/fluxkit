@@ -266,6 +266,92 @@ describe("store search routes (real Postgres, real Meilisearch)", () => {
     expect(result.body.price).toEqual({ min: 1000, max: 4000 });
   });
 
+  it("sync removes products with unusable required text from totals, facets and prices, then restores repaired products", async () => {
+    const path = "/store/search?locale=en&limit=1";
+    const original = await pool.query<{ title: object }>(
+      "select title from product where id = $1",
+      [shirt.id],
+    );
+    const originalOption = await pool.query<{ name: object }>(
+      "select name from option where id = $1",
+      [fx.size.id],
+    );
+    const originalValue = await pool.query<{ label: object }>(
+      "select label from option_value where id = $1",
+      [fx.size.values["s"]],
+    );
+    const mark = async () => {
+      await pool.query(
+        "insert into search_sync_queue (product_id, reason) values ($1, 'product_changed') on conflict (product_id) do update set change_seq = search_sync_queue.change_seq + 1, next_attempt_at = now()",
+        [shirt.id],
+      );
+      await syncIndex();
+    };
+    const assertVisible = async (visible: boolean) => {
+      const result = await get(path);
+      expect(result.status, JSON.stringify(result.body)).toBe(200);
+      const all = await get("/store/search?locale=en&limit=48");
+      expect(all.status, JSON.stringify(all.body)).toBe(200);
+      expect(all.body.items.map((item) => item.id).sort()).toEqual(
+        (visible ? [shirt.id, tee.id] : [tee.id]).sort(),
+      );
+      expect(result.body.total).toBe(visible ? 2 : 1);
+      expect(result.body.pageCount).toBe(visible ? 2 : 1);
+      expect(result.body.price).toEqual({ min: 1000, max: visible ? 4000 : 1000 });
+      const brands = result.body.facets.find((facet) => facet.key === "brand")?.values;
+      expect(brands?.map((value) => [value.code, value.count])).toEqual(
+        visible
+          ? [
+              [brandA, 1],
+              [brandB, 1],
+            ]
+          : [[brandB, 1]],
+      );
+      expect(
+        (await pool.query("select 1 from search_sync_queue where product_id = $1", [shirt.id]))
+          .rowCount,
+      ).toBe(0);
+    };
+    try {
+      await assertVisible(true);
+      for (const [update, id, saved] of [
+        ["update product set title = $2::jsonb where id = $1", shirt.id, original.rows[0]?.title],
+        [
+          "update option set name = $2::jsonb where id = $1",
+          fx.size.id,
+          originalOption.rows[0]?.name,
+        ],
+        [
+          "update option_value set label = $2::jsonb where id = $1",
+          fx.size.values["s"],
+          originalValue.rows[0]?.label,
+        ],
+      ] as const) {
+        expect(saved).toBeDefined();
+        await pool.query(update, [id, JSON.stringify({ uk: " ", en: "\t\u00a0\u2003\ufeff" })]);
+        await mark();
+        await assertVisible(false);
+        await pool.query(update, [id, JSON.stringify(saved)]);
+        await mark();
+        await assertVisible(true);
+      }
+    } finally {
+      await pool.query("update product set title = $2::jsonb where id = $1", [
+        shirt.id,
+        JSON.stringify(original.rows[0]?.title),
+      ]);
+      await pool.query("update option set name = $2::jsonb where id = $1", [
+        fx.size.id,
+        JSON.stringify(originalOption.rows[0]?.name),
+      ]);
+      await pool.query("update option_value set label = $2::jsonb where id = $1", [
+        fx.size.values["s"],
+        JSON.stringify(originalValue.rows[0]?.label),
+      ]);
+      await mark();
+    }
+  });
+
   it("hydrates defaultVariantId from current sellable variants in Postgres without syncing the index", async () => {
     const path = "/store/search?locale=en";
     const initial = await get(path);

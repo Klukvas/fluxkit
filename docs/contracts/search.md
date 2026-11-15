@@ -28,3 +28,9 @@ Routes, shapes and errors: `docs/api/search.md` and `docs/api/openapi.json`. Con
 - The exact `facets` order beyond `brand`, `category`, `inStock`, then options and attributes by code; how many disjunctive counts are exact (at most 3 selected product facets per request); the `detail` texts.
 - Engine error codes in `GET /admin/search/status` (`engine.code`, `engine.rejectedSearches.lastCode`, `lastErrorCode`, `errorCodes`): informational, may gain values. `engine.rejectedSearches` counts per API process.
 - When a new option or filterable attribute becomes a facet key: after job 13 applied the index settings and the API's 30 s cache of the live index's filterable fields expired; until then the key is `unknown_facet_key`.
+
+## Document version 4 (2026-11-15)
+
+- Store list, hydration and the search indexer share one SQL predicate for required product text: a usable title in any locale and usable names/labels for every active variant's referenced option and value, including unpriced variants.
+- A product failing that predicate has no search documents. Incremental sync deletes its existing documents; syncing repaired text restores them, so totals, pages, facets and price ranges converge.
+- The document version changes from 3 to 4: job 14 or `pnpm search:reindex` rebuilds existing indexes on upgrade (ADR 0040). Until sync/rebuild completes, hydration still omits corrupt hits and queues them as stale.

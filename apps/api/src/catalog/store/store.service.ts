@@ -25,7 +25,7 @@ import {
 } from "./store-pricing.js";
 import {
   optionalText,
-  requiredText,
+  catalogText,
   serializeAttributeDefinitions,
   serializeAttributes,
 } from "./store.serializer.js";
@@ -89,12 +89,11 @@ function toBrand(
   row: { brandSlug: string | null; brandName: ProductListRow["brandName"] },
   locale: StoreLocale,
 ) {
-  return row.brandSlug === null || row.brandName === null
-    ? null
-    : {
-        slug: row.brandSlug,
-        name: requiredText(row.brandName, locale, `Brand "${row.brandSlug}" name`),
-      };
+  if (row.brandSlug === null || row.brandName === null) {
+    return null;
+  }
+  const name = catalogText(row.brandName, locale, `Brand "${row.brandSlug}"`);
+  return name === undefined ? null : { slug: row.brandSlug, name };
 }
 
 /** Public catalog reads. Rules of the store contract live here and in the serializer; the repository only queries. */
@@ -140,36 +139,57 @@ export class StoreService {
     return { locale, defaultLocale: this.config.defaultLocale };
   }
 
+  /** An unnamed category hides its entire subtree, just like an inactive ancestor. */
+  private categoryTree(
+    rows: Awaited<ReturnType<StoreRepository["listActiveCategories"]>>,
+    locale: StoreLocale,
+  ): readonly VisibleCategory[] {
+    return visibleCategoryTree(
+      rows.filter((row) => catalogText(row.name, locale, `Category "${row.id}"`) !== undefined),
+    );
+  }
+
   async listCategories(
     requestedLocale: string | undefined,
   ): Promise<{ items: StoreCategoryNode[] }> {
     const locale = this.resolveLocale(requestedLocale);
-    const tree = visibleCategoryTree(await this.store.listActiveCategories());
-    const toNode = (node: VisibleCategory): StoreCategoryNode => ({
-      id: node.row.id,
-      slug: node.row.slug,
-      name: requiredText(node.row.name, locale, `Category "${node.row.slug}" name`),
-      description: optionalText(node.row.description, locale),
-      children: node.children.map(toNode),
-    });
-    return { items: tree.map(toNode) };
+    const tree = this.categoryTree(await this.store.listActiveCategories(), locale);
+    const toNodes = (nodes: readonly VisibleCategory[]): StoreCategoryNode[] =>
+      nodes.flatMap((node) => {
+        const name = catalogText(node.row.name, locale, `Category "${node.row.id}"`);
+        return name === undefined
+          ? []
+          : [
+              {
+                id: node.row.id,
+                slug: node.row.slug,
+                name,
+                description: optionalText(node.row.description, locale),
+                children: toNodes(node.children),
+              },
+            ];
+      });
+    return { items: toNodes(tree) };
   }
 
   async listProducts(query: StoreProductsQuery): Promise<Page<StoreProductListItem>> {
     const locale = this.resolveLocale(query.locale);
     let categoryIds: string[] | undefined;
     if (query.category !== undefined) {
-      const tree = visibleCategoryTree(await this.store.listActiveCategories());
+      const tree = this.categoryTree(await this.store.listActiveCategories(), locale);
       categoryIds = subtreeIds(tree, query.category);
       if (categoryIds.length === 0) {
         // Unknown, inactive or hidden category: an empty list, not an error (and no product query).
         return toPage([], 0, query);
       }
     }
-    const { rows, total } = await this.store.listProducts(
+    const { rows, total, omittedProductIds } = await this.store.listProducts(
       { categoryIds, brandSlug: query.brand, shopCurrency: this.pricing.shopCurrency },
       query,
     );
+    for (const id of omittedProductIds) {
+      catalogText(undefined, locale, `Product "${id}"`);
+    }
     return toPage(await this.toListItems(rows, locale), total, query);
   }
 
@@ -187,6 +207,10 @@ export class StoreService {
     ]);
     const pricedVariants = priceVariants(variants, levels, this.pricing);
     const items = rows.flatMap((row) => {
+      const title = catalogText(row.title, locale, `Product "${row.id}"`);
+      if (title === undefined) {
+        return [];
+      }
       const sellableIds = variants
         .filter((entry) => entry.productId === row.id && pricedVariants.has(entry.id))
         .map((entry) => entry.id);
@@ -202,7 +226,7 @@ export class StoreService {
         {
           id: row.id,
           slug: row.slug,
-          title: requiredText(row.title, locale, `Product "${row.slug}" title`),
+          title,
           brand: toBrand(row, locale),
           image: pickListImage(
             media.filter((entry) => entry.productId === row.id),
@@ -230,7 +254,13 @@ export class StoreService {
     if (productIds.length === 0) {
       return { items: [], missing: [] };
     }
-    const rows = await this.store.listProductsByIds(productIds, this.pricing.shopCurrency);
+    const { rows, omittedProductIds } = await this.store.listProductsByIds(
+      productIds,
+      this.pricing.shopCurrency,
+    );
+    for (const id of omittedProductIds) {
+      catalogText(undefined, locale, `Product "${id}"`);
+    }
     const items = await this.toListItems(rows, locale);
     const byId = new Map(items.map((item) => [item.id, item]));
     return {
@@ -274,6 +304,16 @@ export class StoreService {
       this.store.listMediaForProducts([row.id]),
       this.store.listStockLevels([row.id]),
     ]);
+    // Validate every active variant before limiting the response to priced variants.
+    for (const reference of variantOptionValues) {
+      const choice = options.find((entry) => entry.id === reference.optionId);
+      const value = optionValues.find((entry) => entry.id === reference.optionValueId);
+      const name = catalogText(choice?.name, locale, `Option "${reference.optionId}"`);
+      const label = catalogText(value?.label, locale, `Option value "${reference.optionValueId}"`);
+      if (name === undefined || label === undefined) {
+        throw notFound("Product");
+      }
+    }
     const pricedVariants = priceVariants(variants, levels, this.pricing);
     const sellable = variants.filter((entry) => pricedVariants.has(entry.id));
     const summary = summarizeProduct(
@@ -287,7 +327,7 @@ export class StoreService {
     const sellableIds = new Set(sellable.map((entry) => entry.id));
     return this.toDetail(row, locale, {
       assignments,
-      visibleCategories: flattenCategories(visibleCategoryTree(activeCategories)),
+      visibleCategories: flattenCategories(this.categoryTree(activeCategories, locale)),
       categoryIds,
       options,
       optionValues,
@@ -315,18 +355,18 @@ export class StoreService {
       media: ProductMediaRow[];
     },
   ): StoreProductDetail {
+    const title = catalogText(row.title, locale, `Product "${row.id}"`);
+    if (title === undefined) {
+      throw notFound("Product");
+    }
     const visibleById = new Map(loaded.visibleCategories.map((entry) => [entry.id, entry]));
     const categories = loaded.categoryIds.flatMap((id) => {
       const entry = visibleById.get(id);
-      return entry === undefined
-        ? []
-        : [
-            {
-              id: entry.id,
-              slug: entry.slug,
-              name: requiredText(entry.name, locale, `Category "${entry.slug}" name`),
-            },
-          ];
+      if (entry === undefined) {
+        return [];
+      }
+      const name = catalogText(entry.name, locale, `Category "${entry.id}"`);
+      return name === undefined ? [] : [{ id: entry.id, slug: entry.slug, name }];
     });
     const optionPosition = new Map(
       loaded.options.map((entry, index) => [entry.id, index] as const),
@@ -335,27 +375,33 @@ export class StoreService {
     const sellableValueIds = new Set(
       loaded.variantOptionValues.map((value) => value.optionValueId),
     );
-    const options = loaded.options
-      .map((entry) => ({
-        id: entry.id,
-        code: entry.code,
-        name: requiredText(entry.name, locale, `Option "${entry.code}" name`),
-        values: loaded.optionValues
-          .filter((value) => value.optionId === entry.id && sellableValueIds.has(value.id))
-          .map((value) => ({
-            id: value.id,
-            code: value.code,
-            name: requiredText(value.label, locale, `Option value "${value.code}" label`),
-          })),
-      }))
-      .filter((entry) => entry.values.length > 0);
+    const options = loaded.options.flatMap((entry) => {
+      const name = catalogText(entry.name, locale, `Option "${entry.id}"`);
+      const referencedValues = loaded.optionValues.filter(
+        (value) => value.optionId === entry.id && sellableValueIds.has(value.id),
+      );
+      if (referencedValues.length === 0) {
+        return [];
+      }
+      if (name === undefined) {
+        throw notFound("Product");
+      }
+      const values = referencedValues.map((value) => {
+        const valueName = catalogText(value.label, locale, `Option value "${value.id}"`);
+        if (valueName === undefined) {
+          throw notFound("Product");
+        }
+        return { id: value.id, code: value.code, name: valueName };
+      });
+      return [{ id: entry.id, code: entry.code, name, values }];
+    });
     const offeredValueIds = new Set(
       options.flatMap((entry) => entry.values.map((value) => value.id)),
     );
     return {
       id: row.id,
       slug: row.slug,
-      title: requiredText(row.title, locale, `Product "${row.slug}" title`),
+      title,
       description: optionalText(row.description, locale),
       brand: toBrand(row, locale),
       publishedAt: publishedAtOf(row),

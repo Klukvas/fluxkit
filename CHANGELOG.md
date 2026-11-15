@@ -5,6 +5,8 @@
 One line per user-visible or schema change.
 
 ## Unreleased
+- Search: share the store required-text visibility predicate when indexing; sync deletes corrupt products and restores repaired ones, keeping totals, pages, facets and price ranges accurate. Document version 4 rebuilds existing indexes on upgrade.
+- Store catalog: omit entities and entries without usable required text and log an identifier-only error (untitled products and products with unusable active-variant option text are excluded before list pagination and counting, detail: 404; unnamed category subtrees are hidden; unnamed attributes and unusable attribute select labels are omitted from definitions and values); cart and order snapshots stay unchanged. API responses no longer carry Express's X-Powered-By header.
 - Store cart API (additive, minor): required nullable `freeShipping` carries the lowest offered valid `free_over` threshold and server-computed remaining amount from the cart subtotal, including in checkout's `cart_changed` cart; the drawer and cart-page summary show the server remainder with accessible, token-styled native progress and a reached state (including zero-cost `free_over` methods); no migration.
 - `@fluxkit/ui` `Hero` gains a phrasing-only `ReactNode` title, section `data-*` attributes, `mediaClassName` and an ornament slot (additive); the decorated home reuses it with unchanged markup.
 - Admin: one page header on every screen (title, description, actions; at most one primary action), `ghost` Cancel buttons; `@fluxkit/ui` `Button` gains `variant="ghost"` and a leading `icon`, new `IconButton` (plan `docs/plans/2026-11-13-admin-shell-redesign.md`, PR 2; existing variants render unchanged).

@@ -259,6 +259,7 @@ export async function createApp(
   // The one place Express is configured, so the API, the specs and the OpenAPI export all see the same `request.ip`.
   // 0 (the default) trusts no proxy: the client is the socket address and `X-Forwarded-For` is ignored.
   app.set("trust proxy", env.trustProxy ?? DEFAULT_TRUST_PROXY);
+  app.disable("x-powered-by");
   app.enableShutdownHooks();
   return app;
 }
