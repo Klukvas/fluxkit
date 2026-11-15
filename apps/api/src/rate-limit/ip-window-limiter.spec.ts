@@ -100,18 +100,18 @@ describe("IpWindowLimiter (generalized from the admin login throttle)", () => {
 });
 
 describe("the admin login throttle is the same limiter with the admin limit", () => {
-  it("is an IpWindowLimiter with 20 attempts per 10 minutes", () => {
+  it("keeps the memory window of 20 attempts per 10 minutes", async () => {
     const clock = new FakeClock(START);
     const throttle = new LoginThrottle(clock);
-    expect(throttle).toBeInstanceOf(IpWindowLimiter);
     expect(LOGIN_THROTTLE_DEFAULTS).toEqual({
       maxAttempts: 20,
       windowMinutes: 10,
       maxClients: 10_000,
     });
     for (let attempt = 1; attempt <= 20; attempt += 1) {
-      expect(throttle.attempt("10.0.0.1").allowed, `attempt ${attempt}`).toBe(true);
+      expect((await throttle.attempt("10.0.0.1")).allowed, `attempt ${attempt}`).toBe(true);
     }
-    expect(throttle.attempt("10.0.0.1")).toEqual({ allowed: false, retryAfterSeconds: 600 });
+    expect(await throttle.attempt("10.0.0.1")).toEqual({ allowed: false, retryAfterSeconds: 600 });
+    expect(throttle.size).toBe(1);
   });
 });

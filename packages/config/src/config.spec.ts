@@ -476,3 +476,20 @@ describe("loadEnv MAX_OPEN_ORDERS", () => {
     },
   );
 });
+
+describe("rate limit store configuration", () => {
+  const base = { DATABASE_URL: "postgres://x" };
+  it("defaults to memory without a Redis connection", () => {
+    expect(loadEnv(base).rateLimitStore).toBe("memory");
+  });
+  it("requires REDIS_URL only for redis", () => {
+    expect(() => loadEnv({ ...base, RATE_LIMIT_STORE: "redis" })).toThrow(/REDIS_URL/);
+    expect(
+      loadEnv({ ...base, RATE_LIMIT_STORE: "redis", REDIS_URL: "redis://127.0.0.1:6379" })
+        .rateLimitStore,
+    ).toBe("redis");
+  });
+  it.each(["", "other", "REDIS"])("rejects invalid store %j", (store) => {
+    expect(() => loadEnv({ ...base, RATE_LIMIT_STORE: store })).toThrow(/RATE_LIMIT_STORE/);
+  });
+});

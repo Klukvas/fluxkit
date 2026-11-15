@@ -43,7 +43,7 @@ import { PaymentsModule } from "./payments/payments.module.js";
 import { AdminAuditModule } from "./privacy/audit/admin-audit.module.js";
 import type { PrivacyConfig } from "./privacy/privacy-config.js";
 import { PrivacyModule } from "./privacy/privacy.module.js";
-import { RateLimitModule } from "./rate-limit/rate-limit.module.js";
+import { RateLimitModule, type RateLimitStoreConfig } from "./rate-limit/rate-limit.module.js";
 import type { RateLimitOverrides } from "./rate-limit/rate-limiter.js";
 import { ShippingAdminModule } from "./shipping/admin/shipping-admin.module.js";
 import {
@@ -98,6 +98,7 @@ export interface AppModuleOptions {
   shipmentCallTimeouts?: Partial<ShipmentCallTimeouts>;
   /** Tests only: other numbers for the named rate limits (a concurrency spec places many orders from one address). */
   rateLimits?: RateLimitOverrides;
+  rateLimitStore?: RateLimitStoreConfig;
   /** Tests only: replaces the session-based authenticator. */
   adminAuthenticator?: AdminAuthenticator;
   /** Tests only: a controlled clock for session expiry. */
@@ -133,7 +134,7 @@ export class AppModule {
           scrypt: options.scrypt,
           cleanExpiredSessionsOnBootstrap: options.cleanExpiredSessionsOnBootstrap,
         }),
-        RateLimitModule.register(options.rateLimits),
+        RateLimitModule.register(options.rateLimits, options.rateLimitStore),
         SearchModule.register(searchConfigOf(options.search, options.searchTuning)),
         AdminAuditModule,
         CustomerAuthModule.register({

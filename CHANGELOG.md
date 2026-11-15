@@ -8,6 +8,7 @@
 One line per user-visible or schema change.
 
 ## Unreleased
+- API: optional `RATE_LIMIT_STORE=redis` shares fixed request/service windows and admin login across instances with private HMAC keys; Redis outages use local windows, code-only throttled errors and additive `GET /health` `rateLimitStore` status. Default memory behavior and limits unchanged (ADR 0055).
 - Admin type-option assignments can split listing cards by one option, with value-image guidance and a field-level conflict; fresh seeds activate the separate flavour demo and fixture clothing colours without overwriting saved flags (ADR 0052, step 4).
 - Store/search (additive, minor; ADR 0052 step 2): opt-in listing-group SQL/search pages, group offers and localized listing identity; v4 search documents rebuild automatically with an inherited-build guard, unique build generations, conservative restart after an interrupted swap and listing readiness fallback; product mode remains the default.
 - Catalog/admin (additive, minor; ADR 0052 step 1): migration 0014 adds default-false `product_type_option.splits_listing` (one true option per type) and nullable `search_index_state.build_rebuild_key`; assignment PUT accepts optional `splitsListing`, responses include it, omission preserves stored flags, conflicts return `409 split_option_already_set`, and flag changes mark search transactionally. Store behavior is unchanged; upgrade/rollback: `docs/migrations/0014-split-listing.md`.

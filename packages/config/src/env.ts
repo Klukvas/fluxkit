@@ -242,6 +242,7 @@ const envSchema = z
   .object({
     DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
     REDIS_URL: z.string().min(1).optional(),
+    RATE_LIMIT_STORE: z.enum(["memory", "redis"]).default("memory"),
     PORT: z.coerce.number().int().min(1).max(65535).default(3000),
     FEATURES_ENABLED: z.string().optional(),
     FEATURES_DIR: z.string().min(1).optional(),
@@ -350,6 +351,13 @@ const envSchema = z
     SEARCH_ENGINE_MAX_QUEUE: z.preprocess(blankToUndefined, z.string().optional()),
   })
   .superRefine((env, context) => {
+    if (env.RATE_LIMIT_STORE === "redis" && !env.REDIS_URL) {
+      context.addIssue({
+        code: "custom",
+        path: ["REDIS_URL"],
+        message: "is required when RATE_LIMIT_STORE is redis",
+      });
+    }
     const inProduction = (env.NODE_ENV ?? "").trim().toLowerCase() === "production";
     if (inProduction && env.MEDIA_STORAGE_DRIVER === undefined) {
       context.addIssue({
@@ -556,6 +564,7 @@ const envSchema = z
 export interface AppEnv {
   databaseUrl: string;
   redisUrl: string | undefined;
+  rateLimitStore: "memory" | "redis";
   port: number;
   enabledFeatures: string[];
   featuresDir: string | undefined;
@@ -715,6 +724,7 @@ export function loadEnv(source: Record<string, string | undefined>): AppEnv {
   return {
     databaseUrl: env.DATABASE_URL,
     redisUrl: env.REDIS_URL,
+    rateLimitStore: env.RATE_LIMIT_STORE,
     port: env.PORT,
     enabledFeatures: parseEnabledFeatures(env.FEATURES_ENABLED),
     featuresDir: env.FEATURES_DIR,
