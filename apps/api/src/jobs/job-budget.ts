@@ -12,6 +12,7 @@ export class JobBudget {
   constructor(
     readonly ms: number,
     private readonly clock: () => number = () => performance.now(),
+    private readonly signal?: AbortSignal,
   ) {
     if (!Number.isFinite(ms) || ms < 1) {
       throw new RangeError("A job budget must be a positive number of milliseconds");
@@ -19,8 +20,8 @@ export class JobBudget {
     this.startedAt = clock();
   }
 
-  /** Whether the time is used up: the job must not start another unit of work. */
+  /** Whether time is used up or the signal is aborted: the job must not start another unit of work. */
   exhausted(): boolean {
-    return this.clock() - this.startedAt >= this.ms;
+    return this.signal?.aborted === true || this.clock() - this.startedAt >= this.ms;
   }
 }

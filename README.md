@@ -130,14 +130,14 @@ curl -sS -X POST "$MEILI_URL/keys" \
 
 ## Scheduler and jobs
 
-The API runs its background work itself: every `SCHEDULER_INTERVAL_SECONDS` (default 60) it expires unpaid orders (and gives their stock back), sweeps stale stock reservations, delivers domain events to plugins, and deletes expired carts, customer sessions and old delivered events. With several API instances only one works per tick (a Postgres advisory lock, key `7426003`); a crashed instance releases it by itself. Nothing is needed beyond the database.
+The API runs its background work itself: every `SCHEDULER_INTERVAL_SECONDS` (default 60) it expires unpaid orders (and gives their stock back), sweeps stale stock reservations, delivers domain events to plugins, and deletes expired carts, customer sessions and old delivered events. With several API instances only one works per tick (a Postgres advisory lock, key `7426003`); a crashed instance releases it by itself. A lost lock connection is logged and stops the pass from starting further jobs or units of work; a unit already in progress finishes. Nothing is needed beyond the database.
 
 ```bash
 pnpm jobs:run-once     # = pnpm build && pnpm --filter @fluxkit/api jobs:run-once (node dist/jobs/run-once.js)
 ```
 
 - Runs every job once now and prints one line of counts per job. Use it from a system cron when you set `SCHEDULER_ENABLED=false`, or to run the jobs by hand. Reads `DATABASE_URL` and the other settings from `.env`; takes no arguments.
-- Exit code `0`: all jobs ran. `1`: a job failed (the full error is printed, the connection string removed) or the settings are wrong. `2`: a running scheduler holds the lock, so nothing was run (it is doing this work; try again later).
+- Exit code `0`: all jobs ran. `1`: a job failed (the full error is printed, the connection string removed) or the settings are wrong, or the lock connection is lost (a friendly message is printed). `2`: a running scheduler holds the lock, so nothing was run (it is doing this work; try again later).
 - If the scheduler is off everywhere and no cron runs this command, unpaid orders keep their stock reserved. `GET /health` does not show the scheduler yet.
 - Jobs, retry rules and the handler contract: `docs/api/jobs.md`, `docs/contracts/events.md`.
 

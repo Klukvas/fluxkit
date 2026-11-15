@@ -96,6 +96,41 @@ describe("JobsRunner (real Postgres, injected time)", () => {
     expect(reports.every((report) => report.ok)).toBe(true);
   });
 
+  it("starts no job when the signal is already aborted", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const list = vi.spyOn(running.app.get(JobsRepository), "listDueOrders");
+    expect(await runner.runAll(START, { signal: controller.signal })).toEqual([]);
+    expect(list).not.toHaveBeenCalled();
+  });
+
+  it("stops the current job between units and starts no later job after abort", async () => {
+    const firstOrder = await maker.place([{ quantity: 1 }]);
+    await maker.place([{ quantity: 1 }]);
+    const row = await orderRow(pool, firstOrder.number);
+    const controller = new AbortController();
+    const orders = running.app.get(OrdersService);
+    const expireOne = orders.expireOne.bind(orders);
+    const expire = vi.spyOn(orders, "expireOne").mockImplementation(async (...args) => {
+      const result = await expireOne(...args);
+      controller.abort();
+      return result;
+    });
+    const sweep = vi.spyOn(running.app.get(ReservationsService, { strict: false }), "expireDue");
+    const reports = await runner.runAll(new Date(row.expires_at.getTime() + 11 * MINUTE), {
+      signal: controller.signal,
+    });
+    expect(expire).toHaveBeenCalledTimes(1);
+    expect(reports).toEqual([
+      {
+        name: "expire-orders",
+        ok: true,
+        result: expect.objectContaining({ scanned: 1, truncated: true }),
+      },
+    ]);
+    expect(sweep).not.toHaveBeenCalled();
+  });
+
   it("expires orders BEFORE the sweep: a stale order's reservations are released, not swept, and orphans are swept", async () => {
     const order = await maker.place([{ quantity: 2 }]);
     const row = await orderRow(pool, order.number);
