@@ -145,3 +145,11 @@ in read-only QA. Declare intentional visual differences separately in `.visual/e
 
 `tests/playful-home.e2e.ts` checks both locales at desktop and 360 px (including dark), ornaments and highlight, opaque LCP picture,
 reveal wrappers and CLS < 0.05 before/after ready with `support/layout-shift.ts`; reduced motion has no hero or reveal animations.
+
+`tests/split-listing.e2e.ts` (ADR 0052 step 3) creates its own product type, split assignment and two-colour product through the
+admin API, using fixture colour/size definitions without changing fixture flags. With search on it rebuilds the suite's scoped
+index (the scheduler is off); with search off it checks SQL lists. It checks catalog/category/home/search, grid/list and uk/en,
+preselected colour with size inside the product, sole-variant add versus multi-size choose and keyboard/no-JS links.
+Finally it resets the split flag, archives the test product and rebuilds search so later specs are unaffected. Sitemap uniqueness
+(one URL per product/locale, never per listing card) is covered by `src/lib/sitemap.spec.ts` through the real StoreData/client and
+a mocked HTTP boundary: the shared one-hour sitemap cache may be warmed by earlier specs before these products exist.
