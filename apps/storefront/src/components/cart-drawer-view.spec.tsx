@@ -5,6 +5,7 @@ import { initialCartState, type CartState } from "../lib/cart-store";
 import { cartLine, cartOf } from "../lib/test-fixtures";
 import { messagesByLocale } from "../messages";
 import { CartDrawerView, type CartDrawerViewProps } from "./cart-drawer-view";
+import { EmptyCartIllustration } from "./empty-cart-illustration";
 import { findElements } from "./test-helpers";
 
 const t = createTranslator(messagesByLocale.en, "en");
@@ -78,8 +79,29 @@ describe("CartDrawerView", () => {
     const html = renderToStaticMarkup(<CartDrawerView {...props(ready())} />);
     expect(html).toContain("Your cart is empty");
     expect(html).toContain('href="/en/catalog"');
-    expect(html).toContain('<svg aria-hidden="true"');
+    const illustration = renderToStaticMarkup(<EmptyCartIllustration />);
+    expect(html).toContain(illustration);
+    expect(illustration).toContain('aria-hidden="true" focusable="false"');
+    expect(illustration).toContain('class="fk-empty-cart-float"');
+    expect(html.indexOf(illustration)).toBeLessThan(html.indexOf("Your cart is empty"));
     expect(html).not.toContain('href="/en/checkout"');
+  });
+  it("keeps the bag out of loading, error and populated states and preserves the empty catalog close handler", () => {
+    for (const state of [
+      initialCartState,
+      { ...initialCartState, status: "error" as const },
+      ready(cartOf([cartLine("drawer")])),
+    ]) {
+      expect(renderToStaticMarkup(<CartDrawerView {...props(state)} />)).not.toContain(
+        "fk-empty-cart-float",
+      );
+    }
+    const input = props(ready());
+    const link = findElements(
+      CartDrawerView(input),
+      (element) => element.props.href === "/en/catalog",
+    )[0];
+    expect(link?.props.onClick).toBe(input.onClose);
   });
   it("renders server totals without deriving them from draft quantities or prices", () => {
     const cart = {
