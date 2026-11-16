@@ -1,6 +1,6 @@
 # Several API and storefront instances
 
-- Status: APPROVED by the owner on 2026-11-14 (all four decisions of section 8 as proposed: Redis for the limits and the email pacer, storefront caches per process with URL hashing at the edge, `RATE_LIMIT_STORE`, per-process fallback with an error log while Redis is down, HMAC key derived from `ORDER_TOKEN_SECRET` with its own label). Four PRs as in section 7: PR 1 to 3 merged (303, 316, 319); PR 4 designed in section 9 (2026-11-16).
+- Status: APPROVED by the owner on 2026-11-14 (all four decisions of section 8 as proposed: Redis for the limits and the email pacer, storefront caches per process with URL hashing at the edge, `RATE_LIMIT_STORE`, per-process fallback with an error log while Redis is down, HMAC key derived from `ORDER_TOKEN_SECRET` with its own label). Four PRs as in section 7: PR 1 to 3 merged (303, 316, 319); PR 4 merged (343) as designed in section 9 (2026-11-16).
 - Source: `docs/HANDOFF.md` section 2 item 6. Related: ADR 0040 (storefront shared catalog lists), ADR 0051 (product detail answer cache), ADR 0009/0010/0016/0031/0036 (in-memory windows, "single process, Redis later"), ADR 0018/0021/0025 (scheduler).
 - Coordination: the `launch-blockers` session is changing `apps/api/src/rate-limit/` (catalog windows, `TRUST_PROXY`). Code of this plan starts only after that PR is merged; the plan is written against its interface.
 
