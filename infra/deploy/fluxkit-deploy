@@ -7,7 +7,7 @@
 # (git archive --format=tar <sha> infra). By hand, as root: fluxkit-deploy deploy <sha> < infra.tar
 #
 # Order: lock, unpack, pull every image (a missing image changes nothing), backup, switch FLUXKIT_IMAGE_TAG and
-# /opt/fluxkit/current, start. When the new release does not become healthy, the previous one is started again; that
+# /opt/fluxkit/current, infrastructure, migrate, roll api then storefront, edge. When the new release does not become healthy, the previous one is started again; that
 # cannot undo a migration the new release ran (the old API refuses a newer database: restore the backup).
 #
 # Optional features (docs/deployment.md, "Optional features"): to switch one on, add its name to FEATURES_ENABLED in the env
@@ -25,6 +25,7 @@ MEILI_ENV_FILE=${FLUXKIT_MEILI_ENV_FILE:-/etc/fluxkit/meilisearch.env}
 BACKUP_COMMAND=${FLUXKIT_DEPLOY_BACKUP:-/usr/local/sbin/fluxkit-backup}
 PRUNE_COMMAND=${FLUXKIT_DEPLOY_PRUNE:-/usr/local/sbin/fluxkit-prune-images}
 LOCK_FILE=${FLUXKIT_DEPLOY_LOCK:-/run/lock/fluxkit-deploy.lock}
+# Test-only: FLUXKIT_DEPLOY_SKIP_PULL=1 uses locally built/tagged smoke images. Never set on the host.
 WAIT_SECONDS=300
 
 log() { echo "fluxkit deploy: $*"; }
@@ -39,6 +40,107 @@ compose() {
 
 env_value() { sed -n "s/^$1=//p" "$ENV_FILE"; }
 
+replica_count() {
+  local value
+  value=$(env_value "$1")
+  value=${value:-1}
+  [[ "$value" =~ ^[1-9][0-9]*$ ]] || fail "$1 must be a positive integer in $ENV_FILE"
+  echo "$value"
+}
+
+remove_replicas() {
+  local id
+  for id in $1; do
+    docker stop "$id" >/dev/null || return 1
+    docker rm "$id" >/dev/null || return 1
+    # One disappearing address at a time, on success and on failure, while both edges refresh Docker DNS.
+    sleep 11
+  done
+}
+
+wait_healthy() {
+  local ids=$1 deadline=$((SECONDS + WAIT_SECONDS)) id state pending
+  while true; do
+    pending=false
+    for id in $ids; do
+      state=$(docker inspect -f '{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{end}}' "$id") || return 1
+      case "$state" in
+        "running healthy") ;;
+        "running starting"|"created "*) pending=true ;;
+        *) log "replica $id failed health: $state"; return 1 ;;
+      esac
+    done
+    [ "$pending" = true ] || return 0
+    [ "$SECONDS" -lt "$deadline" ] || { log "replicas did not become healthy within ${WAIT_SECONDS}s"; return 1; }
+    sleep 1
+  done
+}
+
+roll_service() {
+  local release=$1 service=$2 count=$3 old_ids old_count=0 expected_hash id actual_hash
+  local unchanged=true new_ids='' all_ids start_ok step new_count
+  old_ids=$(compose "$release" ps --status running -q "$service" | tr '\n' ' ') || return 1
+  expected_hash=$(compose "$release" config --hash "$service") || return 1
+  expected_hash=${expected_hash##* }
+  [ -n "$expected_hash" ] || return 1
+  for id in $old_ids; do
+    old_count=$((old_count + 1))
+    actual_hash=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.config-hash"}}' "$id") || return 1
+    [ "$actual_hash" = "$expected_hash" ] || unchanged=false
+  done
+  if [ "$unchanged" = true ] && [ "$old_count" -eq "$count" ]; then
+    log "$service: $count replicas already use this configuration"
+    return 0
+  fi
+
+  # Docker DNS publishes starting containers too. Admit at most one unready address at a time so two edge tries suffice.
+  for ((step = 1; step <= count; step++)); do
+    log "$service: starting replacement $step/$count alongside $old_count old replicas"
+    start_ok=true
+    compose "$release" up -d --no-build --no-deps --no-recreate --scale "$service=$((old_count + step))" "$service" || start_ok=false
+    all_ids=$(compose "$release" ps -a -q "$service" | tr '\n' ' ') || return 1
+    new_count=0
+    for id in $all_ids; do
+      case " $old_ids " in
+        *" $id "*) ;;
+        *)
+          new_count=$((new_count + 1))
+          case " $new_ids " in
+            *" $id "*) ;;
+            # Newest first: if this stage fails, withdraw its unready address before healthy staged replicas.
+            *) new_ids="$id $new_ids" ;;
+          esac
+          ;;
+      esac
+    done
+    if [ "$start_ok" != true ] || [ "$new_count" -ne "$step" ] || ! wait_healthy "$new_ids"; then
+      log "$service: replacements failed; removing only the new replicas, keeping the old ones"
+      remove_replicas "$new_ids" || return 1
+      return 1
+    fi
+  done
+  # Both edges cache Docker DNS for 10 seconds. Let them discover the healthy new addresses before removing any old one.
+  log "$service: replacements healthy; waiting for edge DNS refresh"
+  sleep 11
+  log "$service: draining and removing $old_count old replicas"
+  remove_replicas "$old_ids" || return 1
+  log "$service: $count replacements serving"
+}
+
+start_release() {
+  local release=$1 api_count=$2 storefront_count=$3
+  log "starting infrastructure"
+  compose "$release" up -d --wait --wait-timeout "$WAIT_SECONDS" --no-build postgres meilisearch redis || return 1
+  log "running migrations to completion"
+  # Foreground completion, including the exit code: an unhealthy or failed migration never starts new API replicas.
+  compose "$release" up --no-build --no-deps --force-recreate --exit-code-from migrate migrate || return 1
+  roll_service "$release" api "$api_count" || return 1
+  roll_service "$release" storefront "$storefront_count" || return 1
+  log "starting edge and remaining services"
+  # The replicas' hashes already match; the completed migration is not rerun. Only changed remaining services recreate.
+  compose "$release" up -d --wait --wait-timeout "$WAIT_SECONDS" --no-build || return 1
+}
+
 # Under the forced command the client's words arrive in SSH_ORIGINAL_COMMAND; by hand they are the arguments.
 read -r action tag extra <<< "${SSH_ORIGINAL_COMMAND:-$*}" || true
 if [ "${action:-}" != deploy ] || ! [[ "${tag:-}" =~ ^[0-9a-f]{7,40}$ ]] || [ -n "${extra:-}" ]; then
@@ -50,6 +152,11 @@ exec 9> "$LOCK_FILE"
 flock -n 9 || fail "another deployment is running"
 
 [ -n "$(env_value FLUXKIT_IMAGE_PREFIX)" ] || fail "set FLUXKIT_IMAGE_PREFIX (registry repository prefix) in $ENV_FILE"
+api_replicas=$(replica_count FLUXKIT_API_REPLICAS)
+storefront_replicas=$(replica_count FLUXKIT_STOREFRONT_REPLICAS)
+if [ "$api_replicas" -gt 1 ] && [ "$(env_value RATE_LIMIT_STORE)" != redis ]; then
+  fail "more than one api replica requires RATE_LIMIT_STORE=redis in $ENV_FILE"
+fi
 previous_tag=$(env_value FLUXKIT_IMAGE_TAG)
 [ -n "$previous_tag" ] || fail "FLUXKIT_IMAGE_TAG missing in $ENV_FILE"
 previous_release=$(readlink -f "$FLUXKIT_ROOT/current") || fail "$FLUXKIT_ROOT/current is missing"
@@ -67,7 +174,12 @@ else
 fi
 
 log "release $tag (running: $previous_tag)"
-FLUXKIT_IMAGE_TAG=$tag compose "$release_dir" pull --quiet
+if [ "${FLUXKIT_DEPLOY_SKIP_PULL:-0}" = 1 ]; then
+  log "test-only: registry pull skipped"
+else
+  log "pulling release images"
+  FLUXKIT_IMAGE_TAG=$tag compose "$release_dir" pull --quiet
+fi
 
 if [ -x "$BACKUP_COMMAND" ]; then
   log "backup before the switch"
@@ -80,7 +192,7 @@ cp -p "$ENV_FILE" "$ENV_FILE.pre-deploy"
 sed -i "s/^FLUXKIT_IMAGE_TAG=.*/FLUXKIT_IMAGE_TAG=$tag/" "$ENV_FILE"
 ln -sfn "$release_dir" "$FLUXKIT_ROOT/current"
 
-if compose "$release_dir" up -d --wait --wait-timeout "$WAIT_SECONDS" --no-build; then
+if start_release "$release_dir" "$api_replicas" "$storefront_replicas"; then
   log "release $tag is up"
   if [ -x "$PRUNE_COMMAND" ]; then
     "$PRUNE_COMMAND" || log "warning: image cleanup failed; the release runs (run $PRUNE_COMMAND by hand)"
@@ -92,6 +204,8 @@ log "release $tag did not become healthy; starting $previous_tag again" >&2
 compose "$release_dir" logs --tail 50 migrate api >&2 || true
 cp -p "$ENV_FILE.pre-deploy" "$ENV_FILE"
 ln -sfn "$previous_release" "$FLUXKIT_ROOT/current"
-compose "$previous_release" up -d --wait --wait-timeout "$WAIT_SECONDS" --no-build ||
+# Roll back through the same hash check: unchanged old replicas are never recreated. If an earlier service already
+# rolled successfully, replace it with healthy previous-release replicas before draining it. Migrations cannot be undone.
+start_release "$previous_release" "$api_replicas" "$storefront_replicas" ||
   fail "the previous release $previous_tag did not start either; if $tag ran a migration, restore the backup (docs/deployment.md, \"Updates and migrations\")"
 fail "release $tag failed; $previous_tag runs again"

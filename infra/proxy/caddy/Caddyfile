@@ -1,12 +1,13 @@
 # Fluxkit edge proxy, Caddy 2 alternative to the nginx edge of infra/docker-compose.prod.yml (docs/deployment.md).
 # Same routing and headers as infra/proxy/nginx; Caddy obtains and renews the certificate itself (ACME, ports 80 and 443).
-# Checked with `caddy validate` and a run against the built admin SPA (docs/deployment.md, "Caddy"); the full stack
-# smoke test runs the nginx edge only.
+# Checked with `caddy validate` (caddy:2.10-alpine) and, before the replica changes, a run against the built admin SPA;
+# `uri_hash` over `dynamic a` was checked to pin each URL to one of three backends. The full stack smoke test runs nginx only.
 #
 # Environment (read when Caddy loads this file):
 #   FLUXKIT_DOMAIN              the shop host name
-#   FLUXKIT_API_UPSTREAM        default api:3000
-#   FLUXKIT_STOREFRONT_UPSTREAM default storefront:3001
+#   FLUXKIT_API_HOST / FLUXKIT_API_PORT               default api / 3000
+#   FLUXKIT_STOREFRONT_HOST / FLUXKIT_STOREFRONT_PORT default storefront / 3001
+# These replace the old *_UPSTREAM host:port variables: dynamic A lookups need separate host and port.
 #   FLUXKIT_ADMIN_SITE          directory that holds admin-ui/ (the built apps/admin/dist), default /srv/fluxkit/site
 #   FLUXKIT_ADMIN_IMG_SRC       " https://<host>" for each STOREFRONT_IMAGE_HOSTS entry, with the leading space; empty
 #                               when there are none (the nginx edge derives it itself; here you write it)
@@ -23,8 +24,25 @@
 	header Cross-Origin-Opener-Policy same-origin
 }
 
+(replica_retries) {
+	# Dial failures can retry any method; after a sent request only GET/HEAD may retry.
+	lb_try_duration 5s
+	lb_try_interval 250ms
+	lb_retry_match method GET HEAD
+	# Passive failures exclude a gone address while DNS catches up, including with uri_hash.
+	fail_duration 10s
+	transport http {
+		dial_timeout 2s
+	}
+}
+
 (to_api) {
-	reverse_proxy {$FLUXKIT_API_UPSTREAM:api:3000} {
+	reverse_proxy {
+		dynamic a {$FLUXKIT_API_HOST:api} {$FLUXKIT_API_PORT:3000} {
+			refresh 10s
+			versions ipv4
+		}
+		import replica_retries
 		# The edge owns HSTS (the API sends none today; this keeps it one header if it ever does).
 		header_down -Strict-Transport-Security
 		header_down -X-Powered-By
@@ -82,7 +100,13 @@
 
 	# Everything else: the storefront. /docs, /docs-json and /health are not routed to the API (they answer 404 here).
 	handle {
-		reverse_proxy {$FLUXKIT_STOREFRONT_UPSTREAM:storefront:3001} {
+		reverse_proxy {
+			dynamic a {$FLUXKIT_STOREFRONT_HOST:storefront} {$FLUXKIT_STOREFRONT_PORT:3001} {
+				refresh 10s
+				versions ipv4
+			}
+			lb_policy uri_hash
+			import replica_retries
 			header_down -Strict-Transport-Security
 			header_down -X-Powered-By
 		}

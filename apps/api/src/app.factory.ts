@@ -10,6 +10,7 @@ import {
   DEFAULT_TRUST_PROXY,
   type AppEnv,
 } from "@fluxkit/config";
+import { DrainingExpressAdapter } from "./common/draining-express-adapter.js";
 import { AppModule } from "./app.module.js";
 import type { AdminAuthenticator } from "./auth/admin-authenticator.js";
 import { DEFAULT_ADMIN_AUTH_CONFIG } from "./auth/auth-config.js";
@@ -254,6 +255,7 @@ export async function createApp(
       scrypt: options.scrypt,
       cleanExpiredSessionsOnBootstrap: options.cleanExpiredSessionsOnBootstrap,
     }),
+    new DrainingExpressAdapter(),
     { logger: options.logLevels ?? ["error", "warn", "log"] },
   );
   // The payment webhook keeps its exact body bytes (ADR 0032 decision 12): mounted before Nest registers its JSON parser

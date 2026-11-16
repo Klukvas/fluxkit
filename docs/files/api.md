@@ -55,6 +55,7 @@
 
 ## Common (`src/common/`)
 
+- `draining-express-adapter.ts` - Express adapter whose `beforeClose` stops accepting, answers with `Connection: close` and drains HTTP before Nest lifecycle teardown (wired in `app.factory.ts` for signal and programmatic shutdown); `draining-express-adapter.spec.ts` uses real in-flight HTTP requests and idle keep-alive connections for `close()` and SIGTERM. Must NOT close application resources itself.
 - `common.module.ts` - global module: the problem filter for every route and the locale and pricing configuration (`LOCALE_CONFIG`, `PRICING_CONFIG`).
 - `provider-package-loader.ts` - `loadProviderPackages({kind, enabled, providersDir, codePattern, variable})`: the one manifest scan and dynamic import of provider packages (`"fluxkit": {"provider", "kind"}`; other kinds skipped, codes unique per kind, `main` must stay inside the package, `providerModule` required); used by the shipping and the email loader, which keep their own messages by kind. Must NOT import any provider statically.
 - `locale.ts` - re-exports `LOCALE_CONFIG` and `LocaleConfig` (`defaultLocale`, `locales`) of `@fluxkit/api-kit` (ADR 0049), fed from `DEFAULT_LOCALE` and `LOCALES`.

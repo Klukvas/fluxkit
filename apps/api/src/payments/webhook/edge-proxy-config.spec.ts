@@ -279,7 +279,8 @@ describe("Caddy edge: the payment webhook handle", () => {
       expect(handleBlock, `the webhook handle must not use ${forbidden}`).not.toContain(forbidden);
     }
     expect(handleBlock).not.toMatch(/import\s+admin_security|Content-Security-Policy/);
-    expect(toApi).toMatch(/reverse_proxy\s+\{\$FLUXKIT_API_UPSTREAM:api:3000\}/);
+    expect(toApi).toMatch(/reverse_proxy\s+\{/);
+    expect(toApi).toContain("dynamic a {$FLUXKIT_API_HOST:api} {$FLUXKIT_API_PORT:3000}");
     // Only the admin SPA handles import the security headers.
     const importers = [...text.matchAll(/handle\s+(@\w+)\s*\{/g)]
       .filter((match) =>

@@ -93,7 +93,7 @@ plan text is marked "new": each is needed for "a deploy no longer drops requests
   `api` replica (one host). `stop_grace_period` long enough for a drain.
 - **Guard (new)**: the deploy script refuses more than one `api` replica unless `RATE_LIMIT_STORE=redis` (otherwise every limit is
   N times larger).
-- **Edge**: nginx `hash $request_uri consistent` on the storefront upstream; the API upstream stays round robin. Both keep
+- **Edge**: nginx `hash $request_uri` on the storefront upstream (plain: `consistent` does not pin a URL with `resolve`, found while building, ADR 0057); the API upstream stays round robin. Both keep
   `resolve`. A short `proxy_connect_timeout` and explicit `proxy_next_upstream` so a replica that is stopping (connection refused,
   or its address gone) costs one quick retry on the other replica, never a `502`. Caddy: `dynamic a` upstreams with
   `lb_policy uri_hash` (storefront) and retries (`lb_try_duration`), so it also sees every replica.

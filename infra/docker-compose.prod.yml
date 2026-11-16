@@ -4,8 +4,8 @@
 #   docker compose --env-file infra/production.env -f infra/docker-compose.prod.yml up -d --wait
 # Services: postgres, migrate (runs the pending migrations, then exits), api (also runs the scheduler), storefront, edge
 # (nginx: TLS, routing, the admin SPA), meilisearch (catalog search, ADR 0034), redis (shared state for several API instances,
-# docs/plans/2026-11-14-multi-instance.md; no running code uses it yet). Only the edge publishes ports.
-# Run exactly ONE api replica: the rate limits, caches, mail pacing and the local media disk are still per process.
+# docs/plans/2026-11-14-multi-instance.md; used with RATE_LIMIT_STORE=redis). Only the edge publishes ports.
+# More than one api replica needs RATE_LIMIT_STORE=redis; infra/deploy/fluxkit-deploy enforces it.
 name: ${COMPOSE_PROJECT_NAME:-fluxkit}
 
 x-hardening: &hardening
@@ -127,6 +127,10 @@ services:
 
   api:
     <<: *hardening
+    deploy:
+      replicas: ${FLUXKIT_API_REPLICAS:-1}
+    # Let HTTP requests drain before the scheduler, database and Redis close, before Docker sends SIGKILL.
+    stop_grace_period: 30s
     image: ${FLUXKIT_IMAGE_PREFIX:-fluxkit}-api:${FLUXKIT_IMAGE_TAG:-latest}
     env_file: ["${FLUXKIT_ENV_FILE:-production.env}"]
     environment: *api-environment
@@ -146,6 +150,10 @@ services:
 
   storefront:
     <<: *hardening
+    deploy:
+      replicas: ${FLUXKIT_STOREFRONT_REPLICAS:-1}
+    # Give Next time to finish requests in flight before Docker sends SIGKILL.
+    stop_grace_period: 30s
     image: ${FLUXKIT_IMAGE_PREFIX:-fluxkit}-storefront:${FLUXKIT_IMAGE_TAG:-latest}
     build:
       context: ..
