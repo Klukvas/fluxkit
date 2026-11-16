@@ -13,6 +13,7 @@ One line per user-visible or schema change.
 
 ## Unreleased
 
+- Storefront (additive optional config, minor): runtime `STOREFRONT_DEMO_NOTICE=true` enables a permanent demo strip, a first-visit dialog remembered in browser storage, and a checkout warning, with uk/en FluxLab links. Unset or blank defaults to false for client shops; payment and order behavior is unchanged.
 - Add a removable Brevo transactional email provider (`EMAIL_PROVIDER=brevo`, `BREVO_API_KEY`); Free branding requires a paid plan to remove. Inline idempotency remains unverified: ambiguous mail stops `unknown` without automatic replay; no fallback or webhook/suppression yet.
 - Migration 0016 adds immutable email provider/time pins with conservative legacy backfill and guarded rollback, accepts bounded bracketed provider message IDs separately from error codes, and exposes nullable admin `pinnedProviderCode` with uk/en cancellation warnings. Pinned terminal failures retain `unknown`; optional provider replay windows are consumed by the sender.
 - Production example: `api` waits for a healthy `redis` before it starts (with `RATE_LIMIT_STORE=redis` the API refuses to start while Redis does not answer, so a release that recreated Redis could fail its start and roll back). No API, schema or variable change.

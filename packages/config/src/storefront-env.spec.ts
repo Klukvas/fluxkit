@@ -168,6 +168,7 @@ describe("loadStorefrontEnv errors", () => {
       storefrontPublicUrl: "http://localhost:3001",
       imageHosts: [],
       forwardClientAddress: false,
+      demoNotice: false,
     });
   });
 });
@@ -200,6 +201,25 @@ describe("loadStorefrontEnv STOREFRONT_FORWARD_CLIENT_ADDRESS (ADR 0038)", () =>
       expect(() =>
         loadStorefrontEnv({ ...base, STOREFRONT_FORWARD_CLIENT_ADDRESS: value }),
       ).toThrow(/Invalid storefront environment: STOREFRONT_FORWARD_CLIENT_ADDRESS/);
+    },
+  );
+});
+
+describe("loadStorefrontEnv STOREFRONT_DEMO_NOTICE", () => {
+  it.each([undefined, "", "  ", "false"])("is off for %j", (value) => {
+    expect(loadStorefrontEnv({ ...base, STOREFRONT_DEMO_NOTICE: value }).demoNotice).toBe(false);
+  });
+
+  it("is on only for exactly true", () => {
+    expect(loadStorefrontEnv({ ...base, STOREFRONT_DEMO_NOTICE: "true" }).demoNotice).toBe(true);
+  });
+
+  it.each(["TRUE", "True", "FALSE", "1", "0", "yes", "on", "true ", " false", "no"])(
+    "refuses %j without echoing the value",
+    (value) => {
+      expect(() => loadStorefrontEnv({ ...base, STOREFRONT_DEMO_NOTICE: value })).toThrow(
+        "Invalid storefront environment: STOREFRONT_DEMO_NOTICE: must be exactly true or false (or unset, which means false)",
+      );
     },
   );
 });

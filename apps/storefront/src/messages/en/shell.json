@@ -63,5 +63,13 @@
   "funnel.checkout": "Checkout",
   "funnel.order": "Order",
   "funnel.completed": "completed",
-  "funnel.compact": "Step {step} of {total}: {label}"
+  "funnel.compact": "Step {step} of {total}: {label}",
+  "demo.strip": "This is a demo shop: the products, prices and orders are not real.",
+  "demo.stripLink": "I want a shop like this",
+  "demo.title": "This is a demo shop",
+  "demo.body": "This is a demo of an online shop template. The products, prices and orders are made up: nothing is delivered and no money is taken. Try everything: the cart, checkout, your account. Use made-up details, not real ones.",
+  "demo.cta": "Want a shop like this for your business? FluxLab builds it.",
+  "demo.explore": "Explore the demo",
+  "demo.order": "Order a shop like this",
+  "demo.checkout": "Demo shop: the order will not be fulfilled and no money is taken. Use made-up details."
 }
