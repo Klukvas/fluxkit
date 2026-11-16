@@ -1,3 +1,4 @@
+import type { AdminEmailStatus } from "@fluxkit/api-client";
 import { SPA } from "../support/env.ts";
 import { expect, test, unique } from "../support/fixtures.ts";
 import { seedEmailSuppression } from "../support/email-suppression-db.ts";
@@ -23,7 +24,7 @@ test("email: status, a test mail to the own address, the list, the detail, a res
   const main = page.getByRole("main");
 
   // Status: a configured provider, the sender, the six statuses in a table, no setup steps.
-  await expect(main.getByText("fake", { exact: true })).toBeVisible();
+  await expect(main.getByRole("definition").filter({ hasText: /^fake$/ })).toBeVisible();
   await expect(main.getByText("Fluxkit E2E <shop@example.com>")).toBeVisible();
   await expect(main.getByText("No email provider is configured")).toHaveCount(0);
   const counts = main.getByRole("table", { name: "Mails by status in the last 24 hours" });
@@ -269,4 +270,136 @@ test("email: suppressions toggle addresses and require full-address confirmation
       csrf: "1",
     },
   ]);
+});
+
+test("email: advisory all-account usage, null limits, ordered fallback, loading, error and off states", async ({
+  page,
+  signIn,
+  guard,
+}) => {
+  await signIn("owner");
+  const period = {
+    start: "2026-11-16T00:00:00.000Z",
+    end: "2026-11-17T00:00:00.000Z",
+    accepted: 120,
+    limit: 100,
+    limitSource: "env" as const,
+    warning: "limit_reached" as const,
+  };
+  const usage = {
+    source: "retained_email_message" as const,
+    lowerBound: true as const,
+    lowerBoundScope: "provider_all_accounts" as const,
+    countScope: "provider_all_accounts" as const,
+    credentialChangedAt: null,
+    credentialHistory: "unknown" as const,
+    warningBasis: "all_accounts_vs_configured_limit" as const,
+    timeZone: "UTC" as const,
+    daily: period,
+    monthly: {
+      ...period,
+      start: "2026-11-01T00:00:00.000Z",
+      end: "2026-12-01T00:00:00.000Z",
+      accepted: 900,
+      limit: 3000,
+      warning: "none" as const,
+    },
+    providerResetAt: "2026-11-17T00:00:00.000Z",
+  };
+  const status: AdminEmailStatus = {
+    configured: true,
+    providerCode: "resend",
+    from: { address: "shop@example.com", displayName: "Fluxkit E2E" },
+    replyTo: null,
+    since: "2026-11-15T12:00:00.000Z",
+    counts: { pending: 0, sending: 0, sent: 0, failed: 0, unknown: 0, cancelled: 0 },
+    queueDepth: 0,
+    oldestPendingAt: null,
+    errorCodes: [],
+    usageAsOf: "2026-11-16T12:00:00.000Z",
+    providers: [
+      {
+        code: "resend",
+        role: "primary",
+        cooldownReason: "quota_exceeded",
+        cooldownUntil: "2026-11-17T00:05:00.000Z",
+        recoveryProbe: "idle",
+        usage,
+      },
+      {
+        code: "brevo",
+        role: "fallback",
+        cooldownReason: null,
+        cooldownUntil: null,
+        recoveryProbe: "idle",
+        usage: {
+          ...usage,
+          daily: { ...period, accepted: 240, limit: 300, warning: "near_limit" },
+          monthly: { ...usage.monthly, limit: null, warning: "none" },
+          providerResetAt: null,
+        },
+      },
+    ],
+  };
+  let mode: "loading" | "ready" | "error" | "off" = "loading";
+  let release: () => void = () => undefined;
+  const pending = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/admin/email/status", async (route) => {
+    if (mode === "loading") await pending;
+    if (mode === "error") {
+      await route.fulfill({
+        status: 503,
+        contentType: "application/problem+json",
+        body: JSON.stringify({
+          type: "about:blank",
+          title: "Unavailable",
+          status: 503,
+          code: "service_unavailable",
+        }),
+      });
+      return;
+    }
+    await route.fulfill({
+      json:
+        mode === "off"
+          ? { ...status, configured: false, providerCode: null, from: null, providers: [] }
+          : status,
+    });
+  });
+  const writesBefore = guard.writes().length;
+  await page.goto(`${SPA}/email`);
+  const main = page.getByRole("main");
+  await expect(main.getByText("Loading…", { exact: true })).toBeVisible();
+  mode = "ready";
+  release();
+  const chain = main.getByRole("region", { name: "Provider route and local usage" });
+  await expect(chain).toBeVisible();
+  await expect(chain.getByRole("heading", { level: 3 })).toHaveText(["resend", "brevo"]);
+  const daily = chain.getByRole("progressbar", { name: "resend: Fluxkit sends today (UTC)" });
+  await expect(daily).toHaveAttribute("aria-valuenow", "100");
+  await expect(daily).toHaveAttribute("aria-valuetext", "120 / 100");
+  await expect(daily).toHaveAttribute("value", "100");
+  await expect(daily).toHaveAttribute("max", "100");
+  await expect(
+    chain.getByText("No configured limit; this does not mean unlimited service."),
+  ).toBeVisible();
+  await expect(
+    chain.getByText("Provider reset time is unknown. UTC is Fluxkit’s reporting convention."),
+  ).toBeVisible();
+  await expect(
+    chain.getByText("Account changes are not tracked. Counts include sends across all accounts."),
+  ).toHaveCount(2);
+  await expect(chain.getByText(/lower bound across all accounts/)).toBeVisible();
+  await expect(chain.getByText("Set on the server.", { exact: true })).toHaveCount(4);
+  mode = "error";
+  await page.reload();
+  await expect(main.getByRole("button", { name: "Try again" })).toBeVisible();
+  mode = "off";
+  await main.getByRole("button", { name: "Try again" }).click();
+  await expect(main.getByText("No email provider is configured", { exact: true })).toBeVisible();
+  await expect(main.getByRole("region", { name: "Provider route and local usage" })).toHaveCount(0);
+  await expect(main.getByRole("button", { name: "Send test email" })).toBeDisabled();
+  expect(guard.writes().length).toBe(writesBefore);
 });

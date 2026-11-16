@@ -53,7 +53,7 @@ describe("admin email templates and preview (no database rows, no provider call)
       `/admin/email/templates/${key}/preview?locale=${locale}`,
     );
     expect(result.status).toBe(200);
-    expect(result.body).toMatchObject({ key, version: 1, locale });
+    expect(result.body).toMatchObject({ key, version: key === "admin.test" ? 2 : 1, locale });
     expect(result.body.subject.length).toBeGreaterThan(0);
     expect(result.body.html).toContain("<");
     expect(result.body.text.length).toBeGreaterThan(0);

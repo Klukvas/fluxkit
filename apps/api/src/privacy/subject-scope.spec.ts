@@ -27,6 +27,7 @@ describe("privacy subject scope (review F1 to F3, real Postgres)", () => {
   const runId = randomBytes(3).toString("hex");
   let world: ShipmentWorld;
   let sequence = 0;
+  let mailIds: readonly string[] = [];
 
   const owner = () => world.orders.owner;
   const nextEmail = (label: string) => {
@@ -118,6 +119,7 @@ describe("privacy subject scope (review F1 to F3, real Postgres)", () => {
     );
     const id = result.rows[0]?.id;
     if (id === undefined) throw new Error("Test setup bug: no mail row");
+    mailIds = [...mailIds, id];
     return id;
   }
 
@@ -132,6 +134,7 @@ describe("privacy subject scope (review F1 to F3, real Postgres)", () => {
     );
     const id = result.rows[0]?.id;
     if (id === undefined) throw new Error("Test setup bug: no mail row");
+    mailIds = [...mailIds, id];
     return id;
   }
 
@@ -155,6 +158,7 @@ describe("privacy subject scope (review F1 to F3, real Postgres)", () => {
   }, 60_000);
 
   afterAll(async () => {
+    await world.pool.query("delete from email_message where id = any($1::uuid[])", [mailIds]);
     await world.stop();
   });
 

@@ -1,5 +1,9 @@
 # Changelog
 
+- Email: exhausted-chain scheduling honors a message-specific `not_sent` Retry-After while allowing an earlier eligible provider to recover.
+
+- Email step 2 (ADR 0056): ordered safe fallback with mandatory suppression/webhook startup readiness, durable route/pin/cooldowns and fenced recovery probes; migration `0018_email_provider_routing` adds operational state and a partial accepted-send usage index, with guarded rollback. Admin status/client/UI add qualified UTC retained provider-wide usage and cooldowns; legacy fields and permissions remain. New admin test template v2 describes the route and retains queued v1 rendering. No live provider verification or production activation.
+
 - Email pacing: `RATE_LIMIT_STORE=redis` shares provider slots across instances using Redis TIME and expiring timestamp-only keys; runtime failures use per-process pacing with the existing throttled store error and degraded readiness (ADR 0055, multi-instance PR 3). All modes bound admission by the lease/deadline, defer without spending an attempt, guarantee ownership through the lease without admission database reads, and preserve local start spacing through delayed timers and Redis fallback/recovery. Stale shared slots are reacquired within the remaining budget; reservation spacing accounts for observed Redis reply latency separately from timer lateness.
 - Search rebuild: job 14 no longer leaks a Meilisearch index when a run fails or stops after creating its build index, or when deleting the old index after a swap fails; the build uid is recorded before the index exists and the old index is deleted before the swap completion, so the next run continues in it or deletes it.
 - Search sync: a queue claim no longer leases more rows than its page limit when the database statistics are stale (the limited page is materialized once), so job 13 keeps its budget and leaves the rest due.

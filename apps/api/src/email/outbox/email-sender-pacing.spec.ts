@@ -65,12 +65,12 @@ describe("sender pacing admission (real Postgres, fake clock)", () => {
 
   it("never calls the provider if a delayed timer crosses the deadline", async () => {
     install(100, async () => {
-      world.clock.set(new Date(world.clock.now().getTime() + 2_000));
+      world.clock.set(new Date(world.clock.now().getTime() + 8_000));
     });
     const id = await world.enqueued();
     await world.pool.query("update email_message set deadline_at = $2 where id = $1", [
       id,
-      new Date(world.clock.now().getTime() + 1_000),
+      new Date(world.clock.now().getTime() + 6_000),
     ]);
     expect(await world.attempt(id)).toEqual({ kind: "deferred" });
     expect(world.provider().calls).toEqual([]);
@@ -98,7 +98,7 @@ describe("sender pacing admission (real Postgres, fake clock)", () => {
       if (boundary === "deadline") {
         await world.pool.query("update email_message set deadline_at = $2 where id = $1", [
           id,
-          new Date(boundaryAt),
+          new Date(boundaryAt + 300 + 5_000),
         ]);
       }
       install(boundaryAt - startAt - 1, async (ms) => {

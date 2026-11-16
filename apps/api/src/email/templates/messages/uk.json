@@ -6,6 +6,7 @@
   "admin.test.subject": "Тестовий лист від {shop}",
   "admin.test.heading": "Тестовий лист",
   "admin.test.body": "Надсилання пошти працює: цей лист передано провайдеру {provider}.",
+  "admin.test.body_route": "Цей лист перевіряє налаштований маршрут пошти магазину. У черзі листів видно, який провайдер його прийняв.",
   "admin.test.note": "Ви запросили цю перевірку в адмін-панелі. Нічого робити не потрібно.",
   "customer.password_reset.subject": "Відновлення пароля в {shop}",
   "customer.password_reset.heading": "Відновлення пароля",

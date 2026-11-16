@@ -43,7 +43,7 @@ describe("email sender: claim, render, send outside a transaction, record (real 
     expect(sent?.message.html).toContain('lang="en"');
     expect(sent?.message.html).toContain(emailTheme.color.primary);
     expect(sent?.message.html).toContain(`href="${TEST_STOREFRONT_PUBLIC_URL}/en"`);
-    expect(sent?.message.text).toContain("this message was handed to the provider fake");
+    expect(sent?.message.text).toContain("This message tests the shop’s configured email route");
     expect(sent?.message.text).toContain(`${TEST_STOREFRONT_PUBLIC_URL}/en`);
     expect(await world.row(id)).toMatchObject({
       status: "sent",

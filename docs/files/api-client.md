@@ -19,3 +19,5 @@ Typed clients for the public store API (`createStoreClient`) and the admin API (
 
 - `src/admin-types.ts`, `src/admin-operations.ts`, `src/admin-client.ts` — additive full/masked-address suppression page/list parameters and GET/DELETE methods, removal audit vocabulary, suppression export metadata; full recipient under email.manage, no separate reveal endpoint or automatic write retry.
 - `src/admin-client.spec.ts`, `src/admin-contract.spec.ts` — route/method/query/CSRF and OpenAPI suppression shape parity.
+
+- `src/admin-types.ts`, `src/admin-contract.spec.ts` — additive ordered email provider status/UTC retained all-account usage types and OpenAPI parity, plus nullable durable `routeProviderCode`; preserve legacy status fields and permissions.

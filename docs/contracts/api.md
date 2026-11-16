@@ -205,3 +205,8 @@ Not contract (internal): the number of days and minutes behind the defaults beyo
 | `DELETE /admin/email/suppressions/{id}` | `email.manage`, CSRF, UUID; 204 after atomic removal/audit `email_suppression.removed` targeting `email_suppression`; replay receipts kept; no automatic resend |
 
 Sender error `suppressed` is terminal `failed` without a pin, `unknown` with a pin. A failed shared lookup defers without provider I/O. No existing response member is removed.
+
+### Additive email routing and usage (2026-11-16)
+
+- Existing email response members and `email.manage` permissions remain. `GET /admin/email/status` adds `usageAsOf` and ordered `providers` (primary/fallback, cooldown and recovery state, qualified UTC retained accepted-send usage). Off mode returns `providers: []`. The legacy counts remain rolling 24-hour status changes.
+- Email list/detail adds nullable `routeProviderCode`; `providerCode` identifies acceptance only for `sent`, while `pinnedProviderCode` records possible earlier acceptance and forbids automatic provider changes. No attempt ledger is exposed. Exact additive schema: [email API](../api/email.md), generated OpenAPI and typed client. No existing field is removed; this is additive under the template's pre-release SemVer contract.

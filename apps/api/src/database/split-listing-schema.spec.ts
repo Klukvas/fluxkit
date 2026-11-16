@@ -43,6 +43,9 @@ describe("0014 split listing migration (real Postgres, _test database only)", ()
   });
 
   async function down(): Promise<void> {
+    await pool.query(
+      await readFile(`${migrationsFolder}/0018_email_provider_routing.down.sql`, "utf8"),
+    );
     await pool.query(await readFile(`${migrationsFolder}/0017_email_suppression.down.sql`, "utf8"));
     await pool.query(
       await readFile(`${migrationsFolder}/0016_email_provider_pin.down.sql`, "utf8"),

@@ -20,6 +20,12 @@ export class JobBudget {
     this.startedAt = clock();
   }
 
+  remainingMs(): number {
+    return this.signal?.aborted === true
+      ? 0
+      : Math.max(0, this.ms - (this.clock() - this.startedAt));
+  }
+
   /** Whether time is used up or the signal is aborted: the job must not start another unit of work. */
   exhausted(): boolean {
     return this.signal?.aborted === true || this.clock() - this.startedAt >= this.ms;

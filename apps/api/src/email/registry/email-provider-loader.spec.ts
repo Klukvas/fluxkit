@@ -54,6 +54,31 @@ describe("loadEmailProvider", () => {
     expect(await loadEmailProvider({ provider: "none", providersDir: dir })).toEqual([]);
   });
 
+  it("loads every selected package in primary/fallback order", async () => {
+    await writeProvider("one", email("resend"), MODULE);
+    await writeProvider("two", email("brevo"), MODULE);
+    expect(
+      (
+        await loadEmailProvider({ provider: "brevo", fallbacks: ["resend"], providersDir: dir })
+      ).map((provider) => provider.code),
+    ).toEqual(["brevo", "resend"]);
+    await expect(
+      loadEmailProvider({ provider: "resend", fallbacks: ["missing"], providersDir: dir }),
+    ).rejects.toThrow(/missing/);
+  });
+
+  it.each([
+    { provider: "none", fallbacks: ["resend"] },
+    { provider: "resend", fallbacks: ["resend"] },
+    { provider: "resend", fallbacks: ["brevo", "brevo"] },
+    { provider: "resend", fallbacks: ["none"] },
+    { provider: "resend", fallbacks: [""] },
+  ])("refuses invalid chains before the shared loader Set", (options) => {
+    expect(() => loadEmailProvider({ ...options, providersDir: dir })).toThrow(
+      /EMAIL_FALLBACK_PROVIDERS/,
+    );
+  });
+
   it("imports only the selected provider, not another one beside it", async () => {
     await writeProvider("one", email("resend"), MODULE);
     await writeProvider("two", email("fake"), MUST_NOT_IMPORT);

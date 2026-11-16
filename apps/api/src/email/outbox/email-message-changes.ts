@@ -2,9 +2,12 @@ import { Inject, Injectable } from "@nestjs/common";
 import {
   decideEmailTransition,
   EMAIL_LEASE_SECONDS,
+  EMAIL_RETRY_MAX_DELAY_MINUTES,
   emailRetryDeadline,
   type EmailMessageActor,
   type EmailProviderCapabilities,
+  type EmailProviderPort,
+  nextEmailAttempt,
   type EmailMessageStatus,
   type EmailRecipientKind,
 } from "@fluxkit/core";
@@ -18,6 +21,14 @@ import {
   type EmailRecordDecision,
 } from "./email-outcome.js";
 import {
+  admitEmailProvider,
+  clearEmailProviderProbe,
+  recordEmailProviderCooldown,
+  emailChainWaitMs,
+  SAFE_FALLBACK_REASONS,
+  COOLDOWN_REASONS,
+} from "./email-provider-state.js";
+import {
   EmailOutboxRepository,
   type EmailMessageRow,
   type NewEmailMessageRow,
@@ -25,6 +36,8 @@ import {
 
 /** Configuration may recover between job passes; holding a pin must not postpone every retry to expiry. */
 const PINNED_PROVIDER_RECHECK_MS = 60_000;
+// Compute ordinary backoff independently of this mail's expiry; another provider may recover sooner.
+const CHAIN_BACKOFF_HORIZON_MS = EMAIL_RETRY_MAX_DELAY_MINUTES * 60_000 + 1_000;
 
 /** A new mail as the writer stores it; `status`, `attempts` and the lease are the writer's. */
 export type NewEmailMessage = Omit<
@@ -33,6 +46,7 @@ export type NewEmailMessage = Omit<
   | "status"
   | "attempts"
   | "leaseUntil"
+  | "routeProviderCode"
   | "pinnedProviderCode"
   | "pinnedAt"
   | "providerCode"
@@ -57,6 +71,8 @@ export interface ClaimedEmailMessage {
   readonly deadlineAt: Date;
   readonly leaseUntil: Date;
   readonly providerCode?: string | null;
+  readonly routeProviderCode?: string | null;
+  readonly providerProbeToken?: string;
   readonly pinnedProviderCode: string | null;
   readonly pinnedAt: Date | null;
 }
@@ -111,6 +127,7 @@ function claimedOf(row: EmailMessageRow): ClaimedEmailMessage {
     deadlineAt: row.deadlineAt,
     leaseUntil: row.leaseUntil,
     providerCode: row.providerCode,
+    routeProviderCode: row.routeProviderCode,
     pinnedProviderCode: row.pinnedProviderCode,
     pinnedAt: row.pinnedAt,
   });
@@ -155,6 +172,10 @@ export class EmailMessageChanges {
     providerCode: string | undefined,
     limits: JobLimits = DEFAULT_JOB_LIMITS,
     capabilities?: EmailProviderCapabilities,
+    routing?: {
+      readonly providers: readonly EmailProviderPort[];
+      readonly excluded: readonly string[];
+    },
   ): Promise<EmailClaimResult> {
     return withJobTransaction(
       this.database,
@@ -173,6 +194,97 @@ export class EmailMessageChanges {
             : { pinnedProviderCode: row.pinnedProviderCode, pinnedAt: row.pinnedAt };
         if (row.status === "sending" && pin.pinnedProviderCode === null) {
           throw new Error("An expired email attempt has no provider code");
+        }
+        const pinnedProvider = routing?.providers.find(
+          (item) => item.code === pin.pinnedProviderCode,
+        );
+        const preDecision = decideEmailClaim({
+          status: row.status as EmailMessageStatus,
+          deadlineAt: row.deadlineAt,
+          pinnedAt: pin.pinnedAt,
+          capabilities:
+            routing === undefined
+              ? pin.pinnedProviderCode !== null && pin.pinnedProviderCode !== providerCode
+                ? undefined
+                : capabilities
+              : pinnedProvider?.capabilities,
+          now,
+        });
+        if (preDecision.to !== "sending") {
+          await this.outbox.update(tx, id, {
+            ...pin,
+            status: preDecision.to,
+            leaseUntil: null,
+            lastErrorCode: preDecision.lastErrorCode,
+            updatedAt: now,
+          });
+          return { kind: "expired", status: preDecision.to };
+        }
+        let probeToken: string | undefined;
+        if (routing !== undefined) {
+          const desired = pin.pinnedProviderCode ?? row.routeProviderCode;
+          const start =
+            desired === null
+              ? 0
+              : Math.max(
+                  0,
+                  routing.providers.findIndex((item) => item.code === desired),
+                );
+          const candidates =
+            pin.pinnedProviderCode === null
+              ? routing.providers
+                  .slice(start)
+                  .filter((item) => !routing.excluded.includes(item.code))
+              : routing.providers.filter((item) => item.code === pin.pinnedProviderCode);
+          providerCode = undefined;
+          capabilities = undefined;
+          let waitMs = Number.POSITIVE_INFINITY;
+          for (const candidate of candidates) {
+            const admission = await admitEmailProvider(tx, candidate.code);
+            if (!admission.allowed) {
+              waitMs = Math.min(waitMs, admission.waitMs);
+              continue;
+            }
+            providerCode = candidate.code;
+            capabilities = candidate.capabilities;
+            probeToken = admission.probeToken;
+            break;
+          }
+          if (providerCode === undefined && candidates.length > 0 && now < row.deadlineAt) {
+            if (pin.pinnedAt === null) {
+              const retry = nextEmailAttempt({
+                attempts: Math.max(1, row.attempts),
+                failure: { reason: "not_sent" },
+                now,
+                deadlineAt: new Date(now.getTime() + CHAIN_BACKOFF_HORIZON_MS),
+              });
+              if (retry.status !== "pending") throw new Error("email_chain_backoff_invalid");
+              waitMs = await emailChainWaitMs(
+                tx,
+                routing.providers.map((item) => item.code),
+                retry.nextAttemptAt.getTime() - now.getTime(),
+              );
+            }
+            await this.outbox.update(tx, id, {
+              ...pin,
+              status: "pending",
+              leaseUntil: null,
+              routeProviderCode: pin.pinnedProviderCode === null ? null : row.routeProviderCode,
+              nextAttemptAt: new Date(
+                Math.min(
+                  emailRetryDeadline(
+                    row.deadlineAt,
+                    pin.pinnedAt,
+                    pinnedProvider?.capabilities,
+                  ).getTime(),
+                  now.getTime() + Math.max(1000, waitMs),
+                ),
+              ),
+              lastErrorCode: "provider_cooldown",
+              updatedAt: now,
+            });
+            return { kind: "skipped" };
+          }
         }
         const providerMissing =
           pin.pinnedProviderCode !== null && pin.pinnedProviderCode !== providerCode;
@@ -219,7 +331,13 @@ export class EmailMessageChanges {
             providerCode,
             updatedAt: now,
           });
-          return { kind: "claimed", message: claimedOf(claimed) };
+          return {
+            kind: "claimed",
+            message: {
+              ...claimedOf(claimed),
+              ...(probeToken === undefined ? {} : { providerProbeToken: probeToken }),
+            },
+          };
         }
         await this.outbox.update(tx, id, {
           ...pin,
@@ -256,6 +374,8 @@ export class EmailMessageChanges {
           status: "pending",
           attempts: row.attempts - 1,
           leaseUntil: null,
+          routeProviderCode:
+            row.pinnedProviderCode === null ? row.providerCode : row.routeProviderCode,
           nextAttemptAt: new Date(Math.min(now.getTime() + 1_000, row.deadlineAt.getTime())),
           updatedAt: now,
         });
@@ -309,6 +429,11 @@ export class EmailMessageChanges {
     now: Date,
     limits: JobLimits = DEFAULT_JOB_LIMITS,
     capabilities?: EmailProviderCapabilities,
+    routing?: {
+      readonly nextProviderCode: string | null;
+      readonly chainCodes: readonly string[];
+      readonly probeToken?: string;
+    },
   ): Promise<EmailRecordResult> {
     return withJobTransaction(
       this.database,
@@ -333,7 +458,7 @@ export class EmailMessageChanges {
                 pinnedAt: new Date((row.leaseUntil as Date).getTime() - EMAIL_LEASE_SECONDS * 1000),
               }
             : { pinnedProviderCode: row.pinnedProviderCode, pinnedAt: row.pinnedAt };
-        const decision = decideEmailRecord({
+        let decision = decideEmailRecord({
           attempts: row.attempts,
           deadlineAt: row.deadlineAt,
           now,
@@ -341,10 +466,60 @@ export class EmailMessageChanges {
           pinnedAt: pin.pinnedAt,
           capabilities,
         });
+        let routeProviderCode: string | null = null;
+        if (routing !== undefined && row.providerCode !== null) {
+          if (outcome.kind === "sent")
+            await clearEmailProviderProbe(tx, row.providerCode, routing.probeToken);
+          if (outcome.kind === "provider_failed") {
+            const reason = outcome.failure.reason;
+            if (COOLDOWN_REASONS.some((item) => item === reason)) {
+              await recordEmailProviderCooldown(
+                tx,
+                row.providerCode,
+                outcome.failure,
+                row.attempts,
+              );
+            }
+            if (pin.pinnedAt === null && SAFE_FALLBACK_REASONS.some((item) => item === reason)) {
+              if (routing.nextProviderCode !== null && now < row.deadlineAt) {
+                routeProviderCode = routing.nextProviderCode;
+                decision = { status: "pending", nextAttemptAt: now, lastErrorCode: reason };
+              } else {
+                const backoff = nextEmailAttempt({
+                  attempts: row.attempts,
+                  failure: { reason: "not_sent" },
+                  now,
+                  deadlineAt: new Date(now.getTime() + CHAIN_BACKOFF_HORIZON_MS),
+                });
+                if (backoff.status !== "pending") throw new Error("email_chain_backoff_invalid");
+                const waitMs = await emailChainWaitMs(
+                  tx,
+                  routing.chainCodes,
+                  backoff.nextAttemptAt.getTime() - now.getTime(),
+                  reason === "not_sent"
+                    ? {
+                        providerCode: row.providerCode,
+                        waitMs: Math.max(
+                          backoff.nextAttemptAt.getTime() - now.getTime(),
+                          (outcome.failure.retryAfterSeconds ?? 0) * 1_000,
+                        ),
+                      }
+                    : undefined,
+                );
+                const nextAttemptAt = new Date(now.getTime() + waitMs);
+                decision =
+                  nextAttemptAt < row.deadlineAt
+                    ? { status: "pending", nextAttemptAt, lastErrorCode: reason }
+                    : { status: "failed", lastErrorCode: "deadline_passed" };
+              }
+            }
+          }
+        }
         switch (decision.status) {
           case "sent":
             await this.outbox.update(tx, row.id, {
               ...pin,
+              routeProviderCode,
               status: "sent",
               providerMessageId: decision.providerMessageId,
               sentAt: decision.sentAt,
@@ -356,6 +531,7 @@ export class EmailMessageChanges {
           case "pending":
             await this.outbox.update(tx, row.id, {
               ...pin,
+              routeProviderCode,
               status: "pending",
               nextAttemptAt: decision.nextAttemptAt,
               leaseUntil: null,
@@ -367,6 +543,7 @@ export class EmailMessageChanges {
           case "unknown":
             await this.outbox.update(tx, row.id, {
               ...pin,
+              routeProviderCode,
               status: decision.status,
               leaseUntil: null,
               lastErrorCode: decision.lastErrorCode,

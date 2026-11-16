@@ -17,7 +17,7 @@ Nothing here is legal advice. TODO(fluxkit): legal review of this guide, the ret
 
 The exact list of every column, with its class and what an export and an erasure do with it, is code: `apps/api/src/privacy/inventory/`, and `docs/privacy/data-inventory.md` is generated from it (a spec fails when they differ). A new column fails CI until someone classifies it. Redis and Meilisearch hold no personal data today.
 
-Outside the database: the mail provider, the carrier and the payment provider receive part of the data when you enable them (section 6). Server logs and the edge proxy's access logs are the host's.
+Outside the database: every configured primary/fallback mail provider, the carrier and the payment provider receive part of the data when you enable them (section 6). Server logs and the edge proxy's access logs are the host's.
 
 ## 2. How long it is kept
 
@@ -72,16 +72,16 @@ Fill this in with the owner's lawyer. Every cell marked UNKNOWN is unknown to th
 
 | Service | Receives | Entity, role, data location, transfer mechanism, DPA | Status |
 |---|---|---|---|
-| Mail provider (Resend, when `EMAIL_PROVIDER=resend`) | recipient address and the rendered mail (order contents, tracking number, links) | UNKNOWN | TODO(fluxkit): legal review |
+| Mail providers (Resend and/or Brevo, selected by `EMAIL_PROVIDER` or `EMAIL_FALLBACK_PROVIDERS`) | recipient/sender/reply-to addresses and rendered mail (order contents, tracking number, bearer links); message UUID/category | UNKNOWN for each selected provider, including fallback; Brevo EU database hosting does not establish EU-only processing | TODO(fluxkit): legal review |
 | Carrier (Nova Post, when enabled) | recipient names, phone, pickup point or address, the sender profile | UNKNOWN | TODO(fluxkit): legal review |
 | Payment provider (Monobank, when enabled) | amount, currency, payment id, the order number as description, basket lines; card data is entered on the provider's page | UNKNOWN | TODO(fluxkit): legal review |
 | Hosting | everything: database, files, logs, backups | UNKNOWN (no host chosen) | TODO(fluxkit): legal review |
 
-The export lists which of these the shop uses, so a person sees who received their data.
+The export lists every currently configured mail provider in chain order, alongside configured shipping/payment providers. It says who may receive data, not which service actually received a particular message. Include all of them in the shop's completed privacy notice; no keys or account identity are exported.
 
 ## 7. Before an EU launch
 
-Ask a lawyer and an accountant: whether the rules apply to your shop and whether an EU representative is needed (O1); processor roles, terms and data locations (O2, O7); the final privacy notice, terms and cookie text (O3); which identity check you accept for requests by email (O4); which order fields tax and accounting law require you to keep, and for how long, to set `ORDER_CONTACT_RETENTION_DAYS` (O5); whether a record of processing or a notification to an authority is required (O6); your breach contacts and procedure (O8).
+Ask a lawyer and an accountant: whether the rules apply to your shop and whether an EU representative is needed (O1); processor roles, terms and data locations (O2, O7); the final privacy notice naming every selected primary/fallback email processor, terms and cookie text (O3); which identity check you accept for requests by email (O4); which order fields tax and accounting law require you to keep, and for how long, to set `ORDER_CONTACT_RETENTION_DAYS` (O5); whether a record of processing or a notification to an authority is required (O6); your breach contacts and procedure (O8).
 
 
 ## Ephemeral rate-limit counters
@@ -94,3 +94,10 @@ With `RATE_LIMIT_STORE=redis`, Redis holds security counters (legitimate interes
 - Owner/manager (`email.manage`) can list masked entries in Email → Suppressions and remove an entry after confirmation. Removal and an IDs-only audit event are atomic; receipts remain to prevent duplicate webhook replay. No automatic resend or remote blocklist removal occurs. Reconcile a genuinely new event and the remote reason before trying delivery again.
 - Export includes suppression reason/source/first/last times only in verified address scope: a verified customer or an operator request by address after identity verification. Suppression IDs/event keys/receipts are excluded. Erasure in that same scope deletes the suppression and linked-by-address receipts; an unverified account deletion keeps the global block. No customer foreign-key cascade can bypass this rule.
 - Active suppression remains until authorized removal or scoped erasure. Erasure permits future mail and later valid feedback can recreate the block. TODO(fluxkit): legal review — whether a minimal keyed-hash block should survive erasure under legitimate interests, and for how long, remains an owner/legal open item; no exemption is assumed by this implementation. Processor data and backups remain subject to the existing erasure runbook.
+
+## Email routing metadata and usage (ADR 0056 step 2)
+
+- Fallback startup requires the shared suppression guard, applied migration 0017/queryable suppression/receipts and authenticated webhook setup for every provider including primary. Missing/delayed feedback and historical remote blocks still require operator checks. Suppression applies before every attempt, including fallback/auth/test/resend. A block never authorizes switching providers.
+- Migration 0018 adds a deferred route and provider cooldown/recovery state; these contain operational provider codes/times/random probe tokens, with no address, rendered body, account identity or secret. A durable ambiguity pin stays on its original provider/UUID across configuration changes. Cancellation stops local retries but cannot recall an earlier submission; manual resend may duplicate it. See the cutover/removal/guarded rollback procedure in [deployment](../deployment.md#ordered-email-fallback-and-usage-adr-0056-step-2).
+- Email status compares **retained local accepted sends through each provider, across all accounts**, with configured limits. Daily/monthly periods are UTC. This is a lower bound, not delivery/billing data or remaining balance: cleanup/erasure reduce it, unknown acceptance/other applications are omitted, and account changes are untracked (`credentialHistory=unknown`, change time null). Key rotation preserves provider-code history. The meter never delays erasure, changes retention or drives routing. Defaults: Resend 100/day, 3,000/month; Brevo 300/day, no configured monthly limit; other providers no configured limits. `EMAIL_USAGE_LIMITS` is read-only server configuration; null is not unlimited service.
+- TODO(fluxkit): not live-verified — provider quota/refusal/reset behaviour, Brevo inline deduplication/remote queue timing and feedback delivery. Brevo Free can accept queued mail after the local deadline and adds branding; removing branding needs a paid plan. Owner-controlled sends and legal/DPA/retention review remain pending for every processor. Keep legal-page text as operator placeholders until those reviews and the shop's own wording are complete.

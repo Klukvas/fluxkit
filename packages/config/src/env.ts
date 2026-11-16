@@ -9,6 +9,7 @@ import {
   type EmailMailbox,
   type EmailProviderChoice,
 } from "./email.js";
+import { emailRoutingValues, emailRoutingIssues, type EmailUsageLimits } from "./email-routing.js";
 import { parseEnabledFeatures } from "./features.js";
 import {
   DEFAULT_MEILI_INDEX_PREFIX,
@@ -249,15 +250,17 @@ const envSchema = z
     SHIPPING_PROVIDERS_ENABLED: z.string().optional(),
     // The list is checked in `superRefine` (a problem names the rule, never an entry); no value means no online payment.
     PAYMENT_PROVIDERS_ENABLED: z.string().optional(),
-    // Blank counts as unset, like the storefront variables. Exact values only: a typo must not silently mean `none`.
+    // Blank counts as unset; trim/lowercase before strict choice validation. A typo never silently means `none`.
     EMAIL_PROVIDER: z.preprocess(
-      (value) => (typeof value === "string" ? blankToUndefined(value.trim()) : value),
+      (value) => (typeof value === "string" ? blankToUndefined(value.trim().toLowerCase()) : value),
       z
         .enum(EMAIL_PROVIDER_CHOICES, {
-          error: `must be one of ${EMAIL_PROVIDER_CHOICES.join(", ")} (lower case, exact)`,
+          error: `must be one of ${EMAIL_PROVIDER_CHOICES.join(", ")} (trimmed, case-insensitive)`,
         })
         .optional(),
     ),
+    EMAIL_FALLBACK_PROVIDERS: z.string().optional(),
+    EMAIL_USAGE_LIMITS: z.string().optional(),
     EMAIL_FROM: z.preprocess(blankToUndefined, mailboxVariable("EMAIL_FROM").optional()),
     EMAIL_REPLY_TO: z.preprocess(blankToUndefined, mailboxVariable("EMAIL_REPLY_TO").optional()),
     STOREFRONT_PUBLIC_URL: z.preprocess(
@@ -452,6 +455,13 @@ const envSchema = z
       }
     }
     const emailProvider = env.EMAIL_PROVIDER ?? DEFAULT_EMAIL_PROVIDER;
+    for (const issue of emailRoutingIssues(
+      emailProvider,
+      env.EMAIL_FALLBACK_PROVIDERS,
+      env.EMAIL_USAGE_LIMITS,
+      inProduction,
+    ))
+      context.addIssue(issue);
     if (inProduction && TEST_ONLY_EMAIL_PROVIDERS.includes(emailProvider)) {
       context.addIssue({
         code: "custom",
@@ -577,10 +587,14 @@ export interface AppEnv {
    */
   enabledPaymentProviders: string[];
   /**
-   * `EMAIL_PROVIDER` (ADR 0031): `none` (default) loads no provider and no mail is sent; `resend` or `fake` names the one
-   * provider package the API loads. `fake` is test-only and refused in production.
+   * `EMAIL_PROVIDER` (ADR 0031): `none` (default) loads no provider and no mail is sent; `resend`, `brevo` or `fake` names the primary
+   * provider package the API loads; ordered fallbacks are additive. `fake` is test-only and refused in production.
    */
   emailProvider: EmailProviderChoice;
+  /** Ordered fallback codes; empty preserves single-provider/off behaviour. */
+  emailFallbackProviders: string[];
+  /** Advisory caps only; missing providers use defaults. */
+  emailUsageLimits: EmailUsageLimits;
   /** `EMAIL_FROM`; set whenever `emailProvider` is not `none`. The display name is the shop name in mail. */
   emailFrom: EmailMailbox | undefined;
   /** `EMAIL_REPLY_TO`, optional. */
@@ -731,6 +745,11 @@ export function loadEnv(source: Record<string, string | undefined>): AppEnv {
     enabledShippingProviders: parseEnabledShippingProviders(env.SHIPPING_PROVIDERS_ENABLED),
     enabledPaymentProviders: enabledPaymentProviders(env.PAYMENT_PROVIDERS_ENABLED),
     emailProvider: env.EMAIL_PROVIDER ?? DEFAULT_EMAIL_PROVIDER,
+    ...emailRoutingValues(
+      env.EMAIL_PROVIDER ?? DEFAULT_EMAIL_PROVIDER,
+      env.EMAIL_FALLBACK_PROVIDERS,
+      env.EMAIL_USAGE_LIMITS,
+    ),
     emailFrom: env.EMAIL_FROM,
     emailReplyTo: env.EMAIL_REPLY_TO,
     storefrontPublicUrl:

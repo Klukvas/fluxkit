@@ -36,7 +36,7 @@ export class EmailWebhookController {
   @ApiOperation({
     summary: "Receive authenticated email suppression feedback",
     description:
-      "Selected provider only, with webhook credentials configured. Maximum 64 KiB. 204 only after commit, also for duplicate/ignored events. Event age must be within seven days old and five minutes future. Controller, guard and raw-body server failures return 429 with Retry-After: 5 so Brevo retries instead of discarding on 5xx. Ingestion uses transaction-local 2-second lock and 5-second statement timeouts.",
+      "Configured primary and fallback providers only, with webhook credentials configured. Maximum 64 KiB. 204 only after commit, also for duplicate/ignored events. Event age must be within seven days old and five minutes future. Controller, guard and raw-body server failures return 429 with Retry-After: 5 so Brevo retries instead of discarding on 5xx. Ingestion uses transaction-local 2-second lock and 5-second statement timeouts.",
   })
   @ApiParam({
     name: "provider",
@@ -52,7 +52,7 @@ export class EmailWebhookController {
     @Param("provider") code: string,
     @Req() request: RequestWithRawEmailWebhookBody,
   ): Promise<void> {
-    const provider = this.registry.get();
+    const provider = this.registry.get(code);
     if (provider === undefined || provider.code !== code || provider.webhookVerifier === undefined)
       throw notFound("Email webhook");
     const now = this.clock.now();

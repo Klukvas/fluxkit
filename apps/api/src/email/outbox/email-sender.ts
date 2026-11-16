@@ -29,8 +29,13 @@ import { EmailMessageChanges, type ClaimedEmailMessage } from "./email-message-c
 import type { EmailAttemptOutcome, NotRenderableCode } from "./email-outcome.js";
 import { callEmailProvider, failureOfCall } from "./email-provider-call.js";
 import { SendPacer } from "./send-pacer.js";
+import { SAFE_FALLBACK_REASONS } from "./email-provider-state.js";
+import { resolveAdminTestVersion } from "../templates/admin-test.template.js";
 
-/** Injection token of the per-process `SendPacer` shared by job 9 and the immediate attempts. */
+/** Bootstrap attestation that the shared suppression service is wired into this sender. */
+export const EMAIL_SUPPRESSION_GUARD_WIRED = Symbol("fluxkit:email-suppression-guard-wired");
+
+/** Injection token of the pacer shared by job 9 and immediate attempts. */
 export const EMAIL_SEND_PACER = Symbol("fluxkit:email-send-pacer");
 
 /** What one attempt on one mail did (job 9 counts these). Ids and codes only. */
@@ -95,6 +100,10 @@ export class EmailSender {
     return this.providers.get();
   }
 
+  fallbackEnabled(): boolean {
+    return (this.providers.list?.().length ?? 1) > 1;
+  }
+
   /**
    * One attempt on the mail `id`: claims it at `clock()`, sends it, records the result at `clock()` after the call.
    * Database errors of the claim or the record propagate (the caller logs them; the row stays due or leased and is tried
@@ -104,31 +113,67 @@ export class EmailSender {
     id: string,
     clock: () => Date,
     limits: JobLimits = DEFAULT_JOB_LIMITS,
+    remainingMs?: () => number,
   ): Promise<EmailAttemptReport> {
-    const provider = this.providers.get();
+    const primary = this.providers.get();
+    const chain = this.providers.list?.() ?? (primary === undefined ? [] : [primary]);
+    let excluded: readonly string[] = [];
+    let passLeaseEnd: number | undefined;
+    const passRemaining = () =>
+      Math.min(
+        remainingMs?.() ?? Number.POSITIVE_INFINITY,
+        passLeaseEnd === undefined ? Number.POSITIVE_INFINITY : passLeaseEnd - clock().getTime(),
+      );
+    for (let position = 0; position < Math.max(1, chain.length); position += 1) {
+      const result = await this.attemptProvider(id, clock, limits, chain, excluded, passRemaining);
+      passLeaseEnd ??= result.leaseUntil;
+      if (result.nextProviderCode === undefined) return result.report;
+      excluded = [...excluded, result.providerCode as string];
+      // The safe route was committed with A's result. Leave it for another claim if this job cannot cover B.
+      if (passRemaining() < this.config.tuning.sendTimeoutMs + 5_000) return result.report;
+    }
+    throw new Error("email_routing_pass_exhausted");
+  }
+
+  private async attemptProvider(
+    id: string,
+    clock: () => Date,
+    limits: JobLimits,
+    chain: readonly EmailProviderPort[],
+    excluded: readonly string[],
+    remainingMs?: () => number,
+  ): Promise<{
+    readonly report: EmailAttemptReport;
+    readonly nextProviderCode?: string;
+    readonly providerCode?: string;
+    readonly leaseUntil?: number;
+  }> {
+    const primary = chain[0];
     const claim = await this.changes.claim(
       id,
       clock(),
-      provider?.code,
+      primary?.code,
       limits,
-      provider?.capabilities,
+      primary?.capabilities,
+      chain.length > 0 ? { providers: chain, excluded } : undefined,
     );
     if (claim.kind === "skipped") {
-      return claim;
+      return { report: claim };
     }
     if (claim.kind === "expired") {
       this.logger.warn(`Email ${id}: deadline passed before it could be sent; ${claim.status}`);
-      return claim;
+      return { report: claim };
     }
-    if (provider === undefined) return { kind: "no_provider" };
     const message = claim.message;
+    const provider = chain.find((item) => item.code === message.providerCode) ?? primary;
+    if (provider === undefined) return { report: { kind: "no_provider" } };
     let suppressed: boolean;
     try {
       suppressed = await this.suppressions.isSuppressed(message.toAddress);
     } catch {
       // A failed shared lookup cannot authorize a send. Do not log the DB error: it can contain the address.
       this.logger.warn(`Email ${message.id}: suppression_lookup_failed; deferred`);
-      return this.changes.defer(message, clock(), limits);
+      return { report: await this.changes.defer(message, clock(), limits) };
     }
     const prepared = suppressed ? undefined : await this.prepare(message);
     let outcome: EmailAttemptOutcome;
@@ -147,7 +192,12 @@ export class EmailSender {
       // Leave enough lease for the provider timeout and the existing record margin.
       const lastStartAt = Math.min(
         message.leaseUntil.getTime() - this.config.tuning.sendTimeoutMs - 5_000,
-        emailRetryDeadline(message.deadlineAt, message.pinnedAt, provider.capabilities).getTime(),
+        emailRetryDeadline(message.deadlineAt, message.pinnedAt, provider.capabilities).getTime() -
+          this.config.tuning.sendTimeoutMs -
+          5_000,
+        remainingMs === undefined
+          ? Number.POSITIVE_INFINITY
+          : clock().getTime() + Math.max(0, remainingMs() - this.config.tuning.sendTimeoutMs),
       );
       let started = 0;
       // No DB I/O after final pacing admission. Feedback committed during the wait cannot recall this admitted send;
@@ -163,7 +213,7 @@ export class EmailSender {
         );
       });
       if (!admission.started || admission.value === undefined) {
-        return this.changes.defer(message, clock(), limits);
+        return { report: await this.changes.defer(message, clock(), limits) };
       }
       const call = await admission.value;
       durationMs = Math.round(performance.now() - started);
@@ -175,18 +225,33 @@ export class EmailSender {
         outcome = { kind: "provider_failed", failure };
       }
     }
+    const next =
+      message.pinnedProviderCode === null &&
+      reason !== undefined &&
+      SAFE_FALLBACK_REASONS.some((item) => item === reason)
+        ? chain
+            .slice(chain.findIndex((item) => item.code === provider.code) + 1)
+            .find((item) => !excluded.includes(item.code))
+        : undefined;
     const recorded = await this.changes.record(
       message,
       outcome,
       clock(),
       limits,
       provider.capabilities,
+      chain.length > 1 || message.providerProbeToken !== undefined
+        ? {
+            nextProviderCode: next?.code ?? null,
+            chainCodes: chain.map((item) => item.code),
+            probeToken: message.providerProbeToken,
+          }
+        : undefined,
     );
     if (recorded.kind === "lost") {
       this.logger.warn(
         `Email ${message.id} (${message.templateKey}) attempt ${String(message.attempts)}: not recorded, the row was claimed again meanwhile`,
       );
-      return recorded;
+      return { report: recorded };
     }
     const { decision } = recorded;
     this.logAttempt(
@@ -198,7 +263,14 @@ export class EmailSender {
       durationMs,
     );
     const kind = decision.status === "pending" ? "retry" : decision.status;
-    return { kind, reason };
+    return {
+      report: { kind, reason },
+      leaseUntil: message.leaseUntil.getTime(),
+      providerCode: provider.code,
+      ...(decision.status === "pending" && next !== undefined
+        ? { nextProviderCode: next.code }
+        : {}),
+    };
   }
 
   /**
@@ -246,7 +318,9 @@ export class EmailSender {
       // EmailOutboxModule refuses to start with a provider and no EMAIL_FROM.
       throw new Error("EMAIL_FROM is not configured");
     }
-    const entry = this.templates.get(message.templateKey);
+    const current = this.templates.get(message.templateKey);
+    const entry =
+      current === undefined ? undefined : resolveAdminTestVersion(current, message.templateVersion);
     // The same stored input must give the same bytes on every attempt (R4): another version of the template cannot
     // render this mail. A deploy that raises a version fails the queued mails of that template; an admin resends them.
     if (entry === undefined || entry.template.version !== message.templateVersion) {

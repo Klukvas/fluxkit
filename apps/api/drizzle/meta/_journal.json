@@ -127,6 +127,13 @@
       "when": 1794827031304,
       "tag": "0017_email_suppression",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1794837706505,
+      "tag": "0018_email_provider_routing",
+      "breakpoints": true
     }
   ]
 }

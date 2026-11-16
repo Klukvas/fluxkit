@@ -110,6 +110,7 @@ export const emailMessage = pgTable(
     // Codes only: a provider's message text can echo an address.
     providerCode: text("provider_code"),
     providerMessageId: text("provider_message_id"),
+    routeProviderCode: text("route_provider_code"),
     pinnedProviderCode: text("pinned_provider_code"),
     pinnedAt: timestamp("pinned_at", { withTimezone: true }),
     lastErrorCode: text("last_error_code"),
@@ -202,6 +203,13 @@ export const emailMessage = pgTable(
     check(
       "email_message_deadline_check",
       sql`${t.deadlineAt} > ${t.createdAt} AND ${t.deadlineAt} <= ${t.createdAt} + interval ${sql.raw(`'${DEADLINE_HOURS} hours'`)}`,
+    ),
+    index("email_message_provider_sent_at_idx")
+      .on(t.providerCode, t.sentAt)
+      .where(sql`${t.status} = 'sent'`),
+    check(
+      "email_message_route_provider_code_check",
+      sql`${t.routeProviderCode} IS NULL OR ${t.routeProviderCode} ~ ${sql.raw(`'${PROVIDER_CODE_PATTERN}'`)}`,
     ),
     check(
       "email_message_provider_code_check",
@@ -356,5 +364,32 @@ export const emailWebhookReceipt = pgTable(
     ),
     index("email_webhook_receipt_received_at_idx").on(t.receivedAt),
     index("email_webhook_receipt_to_address_idx").on(t.toAddress),
+  ],
+);
+
+/** Shared operational cooldowns and fenced recovery probes. No account identifiers or personal data. */
+export const emailProviderState = pgTable(
+  "email_provider_state",
+  {
+    providerCode: text("provider_code").primaryKey(),
+    unavailableUntil: timestamp("unavailable_until", { withTimezone: true }).notNull(),
+    reason: text("reason").notNull(),
+    probeToken: uuid("probe_token"),
+    probeUntil: timestamp("probe_until", { withTimezone: true }),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    check(
+      "email_provider_state_provider_code_check",
+      sql`${t.providerCode} ~ ${sql.raw(`'${PROVIDER_CODE_PATTERN}'`)}`,
+    ),
+    check(
+      "email_provider_state_reason_check",
+      sql`${t.reason} IN ('quota_exceeded', 'rate_limited', 'misconfigured')`,
+    ),
+    check(
+      "email_provider_state_probe_check",
+      sql`(${t.probeToken} IS NULL) = (${t.probeUntil} IS NULL)`,
+    ),
   ],
 );

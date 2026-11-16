@@ -4,6 +4,7 @@ import { EMAIL_MESSAGE_STATUSES } from "@fluxkit/core";
 import type { DbExecutor } from "../../common/transaction.js";
 import { emailMessage } from "../../database/schema/index.js";
 import type { EmailMessageRow } from "../outbox/index.js";
+import { emailUsagePeriods, safeEmailUsageCount } from "./email-usage.js";
 
 /** The filters of `GET /admin/email/messages`, already validated. */
 export interface EmailMessageFilter {
@@ -84,34 +85,76 @@ export class EmailAdminRepository {
     return rows[0];
   }
 
+  /** One bound range query per provider; caller owns the repeatable-read snapshot and shared asOf. */
+  async usage(
+    db: DbExecutor,
+    code: string,
+    asOf: Date,
+  ): Promise<{ daily: number; monthly: number }> {
+    const periods = emailUsagePeriods(asOf);
+    const result = await db.execute<{ accepted_month: string; accepted_today: string }>(sql`
+      select count(*)::text as accepted_month,
+             count(*) filter (where sent_at >= ${periods.daily.start.toISOString()}::timestamptz)::text as accepted_today
+      from email_message
+      where status = 'sent' and provider_code = ${code}
+        and sent_at >= ${periods.monthly.start.toISOString()}::timestamptz
+        and sent_at < ${asOf.toISOString()}::timestamptz
+    `);
+    const row = result.rows[0];
+    if (row === undefined) throw new Error("email_usage_count_missing");
+    return {
+      daily: safeEmailUsageCount(row.accepted_today),
+      monthly: safeEmailUsageCount(row.accepted_month),
+    };
+  }
+
+  async providerState(db: DbExecutor, code: string) {
+    const result = await db.execute<{
+      unavailable_until: Date;
+      reason: "quota_exceeded" | "rate_limited" | "misconfigured";
+      recovery_probe: "available" | "in_flight";
+      cooling: boolean;
+    }>(sql`
+      select unavailable_until, reason,
+             (unavailable_until > clock_timestamp()) as cooling,
+             case when probe_until > clock_timestamp() then 'in_flight' else 'available' end as recovery_probe
+      from email_provider_state where provider_code = ${code}
+    `);
+    const row = result.rows[0];
+    return {
+      cooldownUntil: row === undefined ? null : new Date(row.unavailable_until).toISOString(),
+      cooldownReason: row?.reason ?? null,
+      recoveryProbe: row === undefined || row.cooling ? ("idle" as const) : row.recovery_probe,
+    };
+  }
+
   /**
    * Counts by status of the mails whose last change is at or after `since`, the open queue (all pending and sending mails,
    * whatever their age), the creation time of the oldest pending mail and the most common error codes of the window.
    */
   async summarize(db: DbExecutor, since: Date): Promise<EmailStatusSummary> {
-    const [byStatus, open, errors] = await Promise.all([
-      db
-        .select({ status: emailMessage.status, count: sql<number>`count(*)::int` })
-        .from(emailMessage)
-        .where(gte(emailMessage.updatedAt, since))
-        .groupBy(emailMessage.status),
-      db
-        .select({
-          depth: sql<number>`count(*)::int`,
-          oldestPending: sql<Date | null>`min(${emailMessage.createdAt}) filter (where ${emailMessage.status} = 'pending')`,
-        })
-        .from(emailMessage)
-        .where(sql`${emailMessage.status} in ('pending', 'sending')`),
-      db
-        .select({ code: emailMessage.lastErrorCode, count: sql<number>`count(*)::int` })
-        .from(emailMessage)
-        .where(
-          and(gte(emailMessage.updatedAt, since), sql`${emailMessage.lastErrorCode} is not null`),
-        )
-        .groupBy(emailMessage.lastErrorCode)
-        .orderBy(sql`count(*) desc`, emailMessage.lastErrorCode)
-        .limit(STATUS_ERROR_CODE_LIMIT),
-    ]);
+    // A transaction owns one PostgreSQL client; serial queries preserve its snapshot without queueing.
+    const byStatus = await db
+      .select({ status: emailMessage.status, count: sql<number>`count(*)::int` })
+      .from(emailMessage)
+      .where(gte(emailMessage.updatedAt, since))
+      .groupBy(emailMessage.status);
+    const open = await db
+      .select({
+        depth: sql<number>`count(*)::int`,
+        oldestPending: sql<Date | null>`min(${emailMessage.createdAt}) filter (where ${emailMessage.status} = 'pending')`,
+      })
+      .from(emailMessage)
+      .where(sql`${emailMessage.status} in ('pending', 'sending')`);
+    const errors = await db
+      .select({ code: emailMessage.lastErrorCode, count: sql<number>`count(*)::int` })
+      .from(emailMessage)
+      .where(
+        and(gte(emailMessage.updatedAt, since), sql`${emailMessage.lastErrorCode} is not null`),
+      )
+      .groupBy(emailMessage.lastErrorCode)
+      .orderBy(sql`count(*) desc`, emailMessage.lastErrorCode)
+      .limit(STATUS_ERROR_CODE_LIMIT);
     const counts = Object.fromEntries(EMAIL_MESSAGE_STATUSES.map((status) => [status, 0]));
     for (const row of byStatus) {
       counts[row.status] = row.count;

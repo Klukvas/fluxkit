@@ -19,6 +19,14 @@ beforeAll(async () => {
 });
 
 const dynamicKeys = (): string[] => [
+  ...["primary", "fallback"].map((value) => `mail.usage.role.${value}`),
+  ...["daily", "monthly"].map((value) => `mail.usage.${value}`),
+  ...["default", "env", "admin"].map((value) => `mail.usage.limitSource.${value}`),
+  ...["idle", "available", "in_flight"].map((value) => `mail.usage.probe.${value}`),
+  ...["near_limit", "limit_reached"].flatMap((value) => [
+    `mail.usage.warning.${value}`,
+    `mail.usage.summary.${value}`,
+  ]),
   ...SUPPRESSION_REASONS.map((reason) => `mail.suppressions.reason.${reason}`),
   "mail.suppressions.notice.removed",
   "mail.suppressions.notice.unknown",

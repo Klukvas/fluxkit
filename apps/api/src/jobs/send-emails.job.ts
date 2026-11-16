@@ -32,7 +32,7 @@ export interface SendEmailsResult {
   expired: number;
   /** Not due any more, held by another sender, or claimed again meanwhile. */
   skipped: number;
-  /** The provider answered a reason that concerns every mail (rate limit, quota, configuration): the run stopped. */
+  /** The provider answered a reason that concerns every mail (rate limit, quota, configuration): the affected provider paused (only single-provider mode stops the run). */
   paused: boolean;
   /** Open mails while no provider is loaded (`EMAIL_PROVIDER=none`); they stay pending. */
   waitingWithoutProvider: number;
@@ -44,7 +44,8 @@ export interface SendEmailsResult {
 export interface SendEmailsDeps {
   database: Database;
   outbox: Pick<EmailOutboxRepository, "listDue" | "countOpen">;
-  sender: Pick<EmailSender, "provider" | "attempt" | "warnWaitingWithoutProvider">;
+  sender: Pick<EmailSender, "provider" | "attempt" | "warnWaitingWithoutProvider"> &
+    Partial<Pick<EmailSender, "fallbackEnabled">>;
 }
 
 export interface SendEmailsOptions {
@@ -124,7 +125,14 @@ export async function sendEmails(
       result.scanned += 1;
       let report;
       try {
-        report = await deps.sender.attempt(mail.id, clock, jobLimits);
+        report = await deps.sender.attempt(
+          mail.id,
+          clock,
+          jobLimits,
+          options.budget === undefined || deps.sender.fallbackEnabled?.() !== true
+            ? undefined
+            : () => options.budget?.remainingMs() ?? 0,
+        );
       } catch (error) {
         result.failures.push({ messageId: mail.id, error: summarizeError(error) });
         continue;
@@ -158,9 +166,10 @@ export async function sendEmails(
       if (reason !== undefined && PROVIDER_WIDE_REASONS.includes(reason)) {
         result.paused = true;
         logger.warn(
-          `Job send-emails: the provider answered ${reason}; the run stops, the other mails wait for their next attempt`,
+          `Job send-emails: the provider answered ${reason}; ${deps.sender.fallbackEnabled?.() === true ? "the affected provider pauses; other due mail continues" : "the run stops"}`,
         );
-        return result;
+        // Empty fallback keeps legacy single-provider pausing; chains use durable per-provider cooldowns.
+        if (deps.sender.fallbackEnabled?.() !== true) return result;
       }
     }
     if (due.length < limits.batchSize) {

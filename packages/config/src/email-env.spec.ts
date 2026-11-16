@@ -42,7 +42,7 @@ describe("EMAIL_PROVIDER", () => {
     }
   });
 
-  it.each(["None", "FAKE", "smtp", "resend,fake", "none,fake"])(
+  it.each(["smtp", "resend,fake", "none,fake"])(
     "refuses %j loudly, naming the variable, never the value",
     (value) => {
       const message = messageOf({ ...base, EMAIL_PROVIDER: value, EMAIL_FROM: FROM });
@@ -50,6 +50,12 @@ describe("EMAIL_PROVIDER", () => {
       expect(message).not.toContain(value);
     },
   );
+
+  it("normalizes provider choice consistently with the ordered fallback list", () => {
+    expect(loadEnv({ ...base, EMAIL_PROVIDER: " ReSeNd ", EMAIL_FROM: FROM }).emailProvider).toBe(
+      "resend",
+    );
+  });
 
   it("lists fake as the only test-only provider", () => {
     expect([...TEST_ONLY_EMAIL_PROVIDERS]).toEqual(["fake"]);

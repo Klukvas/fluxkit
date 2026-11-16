@@ -61,3 +61,10 @@ export {
   loadStorefrontEnv,
   type StorefrontEnv,
 } from "./storefront-env.js";
+
+export {
+  parseEmailFallbackProviders,
+  parseEmailUsageLimits,
+  type EmailUsageLimit,
+  type EmailUsageLimits,
+} from "./email-routing.js";

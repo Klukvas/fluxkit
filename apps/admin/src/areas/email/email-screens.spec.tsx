@@ -34,6 +34,8 @@ const NOW = new Date("2026-10-26T12:00:00.000Z");
 
 function status(overrides: Partial<AdminEmailStatus> = {}): AdminEmailStatus {
   return {
+    usageAsOf: NOW.toISOString(),
+    providers: [],
     configured: true,
     providerCode: "resend",
     from: { address: "shop@example.com", displayName: "Demo Shop" },
@@ -66,6 +68,7 @@ function message(overrides: Partial<AdminEmailMessage> = {}): AdminEmailMessage 
     providerCode: "resend",
     providerMessageId: "pm-1",
     pinnedProviderCode: null,
+    routeProviderCode: null,
     lastErrorCode: null,
     resendOf: null,
     createdByAdminId: null,
@@ -288,6 +291,8 @@ describe("the message list", () => {
         leftoverText(
           html
             .split("order.placed")
+            .join(" ")
+            .split("resend")
             .join(" ")
             .split("anna@example.com")
             .join(" ")

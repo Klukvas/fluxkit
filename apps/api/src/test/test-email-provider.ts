@@ -59,7 +59,7 @@ interface Planned {
 @Injectable()
 @SetMetadata(EMAIL_PROVIDER_METADATA, emailProviderMetadata(TEST_EMAIL_PROVIDER_CODE))
 export class TestEmailProvider implements EmailProviderPort {
-  readonly code = TEST_EMAIL_PROVIDER_CODE;
+  readonly code: string = TEST_EMAIL_PROVIDER_CODE;
   readonly capabilities = Object.freeze({ idempotencyKeys: true, maxRecipients: 1 });
 
   /** Accepted mails, oldest first; a replay of a key adds nothing. */

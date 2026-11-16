@@ -32,6 +32,7 @@ export interface EmailRow {
   lease_until: Date | null;
   deadline_at: Date;
   provider_code: string | null;
+  route_provider_code: string | null;
   pinned_provider_code: string | null;
   pinned_at: Date | null;
   provider_message_id: string | null;
@@ -165,6 +166,7 @@ export class EmailWorld {
 
   async clear(): Promise<void> {
     await this.pool.query("delete from email_message");
+    await this.pool.query("delete from email_provider_state");
     await this.pool.query("delete from email_webhook_receipt");
     await this.pool.query("delete from email_suppression");
     for (const running of this.apps) {
@@ -174,6 +176,7 @@ export class EmailWorld {
 
   async stop(): Promise<void> {
     await this.pool.query("delete from email_message");
+    await this.pool.query("delete from email_provider_state");
     await this.pool.query("delete from email_webhook_receipt");
     await this.pool.query("delete from email_suppression");
     for (const running of this.apps) {

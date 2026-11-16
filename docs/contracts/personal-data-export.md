@@ -17,7 +17,7 @@ JSON, UTF-8. The top-level keys appear in this order: `format`, `generatedAt`, `
 | `emailSuppressions[]` | `reason`, `sourceProvider`, `firstSeenAt`, `lastSeenAt` in verified address scope only; no repeated address, entry ID, receipt or event key |
 | `sessions[]` | `createdAt`, `lastSeenAt` |
 | `cart` | `{lines: [{sku, title, quantity, seenUnitAmount, seenCurrency}]}` or `null` |
-| `processors[]` | `{kind: "email" \| "payment" \| "shipping", name}` of the providers the shop uses; no legal role is stated |
+| `processors[]` | `{kind: "email" \| "payment" \| "shipping", name}` of every currently configured primary/fallback email provider in chain order and configured payment/shipping providers; no legal role, account identity or credential is stated |
 
 ## Rules
 
@@ -27,3 +27,5 @@ JSON, UTF-8. The top-level keys appear in this order: `format`, `generatedAt`, `
 - TODO(fluxkit): legal review of the content (plan task O4) before an EU launch.
 
 - Shared email suppression is address-scoped (ADR 0056): verified customer address or an operator email-subject request only. An unverified account exports an empty `emailSuppressions` list and cannot erase the global block. No webhook receipt is exported. This additive field retains v1.
+
+- `processors` enumerates the complete configured email chain even if a fallback has not accepted this subject's mail. Configuration is not a per-message delivery history; removed historical processors cannot be reconstructed from this list. Actual accepting provider, pins/routes, cooldown/probe tokens, usage comparisons, account identities and secrets are not added to `mail` or the export. The advisory retained usage meter never changes subject scope, erasure or retention.

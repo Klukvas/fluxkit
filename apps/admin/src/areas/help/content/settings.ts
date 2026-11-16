@@ -24,15 +24,15 @@ export const SETTINGS_ARTICLES: readonly HelpArticle[] = [
       {
         kind: "paragraph",
         text: {
-          uk: "Постачальника задають налаштування сервера. Без постачальника магазин не надсилає жодного листа (зокрема відновлення пароля). Шаблон містить постачальника Resend і тестового «fake».",
-          en: "The provider is set in the server configuration. Without a provider the shop sends no mail at all (password resets included). The template has the Resend provider and the test provider “fake”.",
+          uk: "Налаштування сервера задають основного постачальника та впорядкований резервний ланцюжок: наприклад, Resend, потім Brevo. Без постачальника магазин не надсилає листів, зокрема відновлення пароля. Резерв використовують лише після підтвердженої відмови без надсилання; відмова одержувачу або невідомий результат не дозволяють перейти до іншого сервісу.",
+          en: "Server settings choose a primary provider and an ordered fallback chain, for example Resend followed by Brevo. Without a provider the shop sends no mail, including password resets. Fallback follows a proven refusal without submission; recipient rejection or an unknown outcome never permits switching services.",
         },
       },
       {
         kind: "warning",
         text: {
-          uk: "«fake» лише для тестів: він нічого не доставляє. Resend поки перевірено лише на імітаторі. Щоб листи не потрапляли в спам, для адреси відправника потрібен підтверджений домен (SPF, DKIM, DMARC) — це налаштовує власник домену разом із розробником.",
-          en: "“fake” is for tests only: it delivers nothing. Resend has so far been checked only against a simulator. For mail not to land in spam, the sender address needs a verified domain (SPF, DKIM, DMARC): the domain owner sets this up with the developer.",
+          uk: "«fake» лише для тестів і нічого не доставляє. Перед запуском власник домену з розробником перевіряють реальне надсилання та підтверджують домен відправника для кожного налаштованого сервісу (SPF, DKIM, DMARC). Brevo Free додає власне брендування та може прийняти лист у чергу з пізнішою доставкою; прибрати брендування можна на платному тарифі.",
+          en: "“fake” is for tests only and delivers nothing. Before launch, the domain owner and developer check live sending and verify the sender domain for every configured service (SPF, DKIM, DMARC). Brevo Free adds its branding and may accept mail into a queue for later delivery; removing the branding requires a paid plan.",
         },
       },
       {
@@ -43,8 +43,27 @@ export const SETTINGS_ARTICLES: readonly HelpArticle[] = [
       {
         kind: "paragraph",
         text: {
-          uk: "Екран «Електронна пошта» показує постачальника, відправника, скільки листів надіслано за 24 години, що чекає в черзі і найчастіші помилки. «Надіслати тестовий лист» надсилає лист на вашу власну адресу (до 5 на годину).",
-          en: "The Email screen shows the provider, the sender, how many mails were sent in 24 hours, what waits in the queue and the most common errors. “Send test email” sends a mail to your own address (up to 5 an hour).",
+          uk: "Екран «Електронна пошта» показує ланцюжок постачальників, їхні паузи та перевірку відновлення, відправника, зміни станів за 24 години, чергу й помилки. «Надіслати тестовий лист» перевіряє налаштований маршрут на вашу власну адресу (до 5 на годину). У черзі видно фактичного постачальника прийнятого листа та закріпленого або наступного постачальника.",
+          en: "The Email screen shows the ordered provider chain, cooldowns and recovery probes, sender, status changes over 24 hours, queue and errors. “Send test email” tests the configured route to your own address (up to 5 an hour). The outbox shows the actual accepting provider and any pinned or next provider.",
+        },
+      },
+      {
+        kind: "heading",
+        id: "usage",
+        text: { uk: "Локальна статистика використання", en: "Local usage history" },
+      },
+      {
+        kind: "paragraph",
+        text: {
+          uk: "Денні та місячні лічильники — збережені прийняті листи Fluxkit за календарними періодами UTC через цього постачальника, за всіма його обліковими записами. Очищення й стирання даних можуть зменшити число; невідомі результати та використання іншими програмами не враховані. Це нижня межа локальної історії, а не точний залишок поточного облікового запису. Зміни ключів і облікових записів поки не відстежуються.",
+          en: "Daily and monthly counts are retained accepted Fluxkit sends in calendar UTC periods through that provider, across all accounts. Cleanup and erasure can lower them; unknown outcomes and other applications are outside these counts. This is a lower bound of local history, not the current account’s exact remaining balance. Key and account changes are not tracked yet.",
+        },
+      },
+      {
+        kind: "note",
+        text: {
+          uk: "Порівняння з установленим на сервері лімітом попереджає від 80% та від 100%; число може перевищувати ліміт. «Немає налаштованого ліміту» не означає необмежений тариф. Статистика не перемикає постачальників. Час скидання Brevo невідомий: його денний період UTC є правилом звіту Fluxkit.",
+          en: "Comparison with the server-configured cap warns at 80% and 100%; counts can exceed the cap. “No configured limit” does not mean unlimited service. These counts never switch providers. Brevo’s reset time is unknown: its UTC day is Fluxkit’s reporting convention.",
         },
       },
       { kind: "screen", route: "email" },
@@ -76,8 +95,8 @@ export const SETTINGS_ARTICLES: readonly HelpArticle[] = [
       {
         kind: "note",
         text: {
-          uk: "Листи облікового запису (відновлення пароля тощо) повторно не надсилаються: покупець просить новий. Лист, що чекає, можна «Скасувати відправлення».",
-          en: "Account mails (password reset and the like) cannot be resent: the shopper asks for a new one. A waiting mail can be stopped with “Cancel sending”.",
+          uk: "Листи облікового запису (відновлення пароля тощо) повторно не надсилаються: покупець просить новий. Закріплений лист або стан «Невідомо» означає, що попередня спроба могла бути прийнята. «Скасувати відправлення» зупиняє лише локальні повторні спроби: попередній лист ще може надійти. Повторне надсилання створює новий лист і може дати дублікат.",
+          en: "Account mails (password reset and the like) cannot be resent: the shopper asks for a new one. Pinned mail or “Unknown” means an earlier attempt may have been accepted. “Cancel sending” stops local retries only: earlier mail may still arrive. Resending creates a new mail and can produce a duplicate.",
         },
       },
       { kind: "screen", route: "emailMessages" },

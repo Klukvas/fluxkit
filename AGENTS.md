@@ -48,6 +48,7 @@ Root scripts (always check `package.json` before using; do not invent commands):
   `pnpm check:env` (code reads no variable missing from `.env.example`), `pnpm test:e2e` (builds, then storefront and admin Playwright suites; see `apps/storefront/e2e/README.md`),
   `pnpm jobs:run-once` (builds, runs the scheduled jobs once), `pnpm search:reindex` (builds, rebuilds the search index),
   `pnpm feature-matrix <mode>`: `on`, `off`, `deleted`, `providers-on`, `providers-off`, `providers-deleted`, `providers-nova-post`, `providers-email-none`, `providers-email-fake`, `providers-email-resend`, `providers-email-brevo`,
+  `providers-email-failover`, `providers-email-failover-exhausted`, `providers-email-failover-pinned`, `providers-email-suppression`,
   `providers-payment-none`, `providers-payment-fake`, `providers-payment-monobank`, `search-off`, `search-on` (`deleted` and `providers-deleted` only with `CI=true`, they remove files;
   `on`, `off` and `deleted` cover the `example` and `blog` features, see the script's header).
 - App dev servers (no root `dev` yet): `pnpm --filter @fluxkit/storefront dev`, `pnpm --filter @fluxkit/admin dev` (run `pnpm build` once first so workspace packages exist).
@@ -55,8 +56,8 @@ Root scripts (always check `package.json` before using; do not invent commands):
 - Planned, added later: root `pnpm dev`. Until a script exists it is intentionally absent, not stubbed: a script that always passes would mask missing checks.
 - Integration tests need real services and fail (not skip) without `DATABASE_URL` (database name must end in `_test`), `REDIS_URL`, `MEILI_URL` and `MEILI_MASTER_KEY`; see the README quick start.
 - Configuration (all in `.env.example` and `docs/contracts/config.md`), besides the services: `FEATURES_ENABLED`, `ORDER_TOKEN_SECRET`, `MAX_OPEN_ORDERS`, `TRUST_PROXY`,
-  `SCHEDULER_ENABLED`, `SCHEDULER_INTERVAL_SECONDS`; shipping `SHIPPING_PROVIDERS_ENABLED`, `NOVA_POST_API_KEY`, `NOVA_POST_ENVIRONMENT`; email `EMAIL_PROVIDER`, `EMAIL_FROM`, `EMAIL_REPLY_TO`,
-  `STOREFRONT_PUBLIC_URL`, `RESEND_API_KEY`; payments `PAYMENT_PROVIDERS_ENABLED`, `MONOBANK_TOKEN`; privacy `ORDER_CONTACT_RETENTION_DAYS`; search `SEARCH_ENABLED`, `MEILI_URL` (also read by the API),
+  `SCHEDULER_ENABLED`, `SCHEDULER_INTERVAL_SECONDS`; shipping `SHIPPING_PROVIDERS_ENABLED`, `NOVA_POST_API_KEY`, `NOVA_POST_ENVIRONMENT`; email `EMAIL_PROVIDER`, `EMAIL_FALLBACK_PROVIDERS`, `EMAIL_USAGE_LIMITS`, `EMAIL_FROM`, `EMAIL_REPLY_TO`,
+  `STOREFRONT_PUBLIC_URL`, `RESEND_API_KEY`, `BREVO_API_KEY`, `BREVO_WEBHOOK_SECRET`; payments `PAYMENT_PROVIDERS_ENABLED`, `MONOBANK_TOKEN`; privacy `ORDER_CONTACT_RETENTION_DAYS`; search `SEARCH_ENABLED`, `MEILI_URL` (also read by the API),
   `MEILI_API_KEY`, `MEILI_INDEX_PREFIX`; storefront `STOREFRONT_FORWARD_CLIENT_ADDRESS`, `STOREFRONT_REQUIRE_LEGAL_TEXT` (build time only); admin dev server `ADMIN_DEV_API_URL`.
   Test only (fake providers): `FAKE_EMAIL_CAPTURE_FILE`, `FAKE_PAYMENT_ADOPT_WEBHOOKS`. E2E only: `E2E_DATABASE_URL`, `E2E_PORT`, `E2E_API_PORT`, `E2E_STOREFRONT_PORT`,
   `E2E_STOREFRONT_UNFORWARDED_PORT`, `E2E_SEARCH`, `E2E_FEATURES`, `ADMIN_E2E_PORT`, `ADMIN_E2E_API_PORT`, `ADMIN_E2E_FEATURES`; visual comparison only (`scripts/visual-compare.sh` sets the two directories itself):
@@ -344,6 +345,7 @@ CI (`.github/workflows/ci.yml`) runs on every PR and on pushes to `main`; all jo
 - `feature-matrix` (`scripts/feature-matrix.sh`): `on` (`FEATURES_ENABLED=example,blog`: the blog's migration runs, routes exist, `features` lists them), `off` (404, no blog tables), `deleted`
   (every feature's folders removed: the package and its app slices; lint/types/boundaries/tests still pass). Core must never depend on a feature. The other modes (section 1) check
   provider plugins (`providers-*`) and search (`search-off`: routes 404, no search table writes; `search-on`: seeds, reindexes against a real engine and finds the seeded product).
+  Email routing modes: `providers-email-failover`, `providers-email-failover-exhausted`, `providers-email-failover-pinned`, `providers-email-suppression`.
 - `policy`: `pnpm check:licenses` (policy in `scripts/license-policy.json`), `pnpm audit:prod` (fails on high severity in production dependencies),
   and `pnpm notices` (uploads `THIRD_PARTY_NOTICES.md` as an artifact; ship it with client deliveries).
 - `docs` (PRs only, `scripts/check-docs.mjs`): changed controllers need `docs/api/` updates, schema/migration changes need `CHANGELOG.md`, new packages need `docs/files/`,

@@ -869,7 +869,40 @@ export interface AdminEmailMailbox {
   displayName: string | null;
 }
 
+/** Retained local accepted sends; advisory comparison across all accounts of the provider. */
+export interface AdminEmailUsagePeriod {
+  start: string;
+  end: string;
+  accepted: number;
+  limit: number | null;
+  limitSource: "default" | "env" | "admin";
+  warning: "none" | "near_limit" | "limit_reached";
+}
+
+export interface AdminEmailProviderStatus {
+  code: string;
+  role: "primary" | "fallback";
+  cooldownUntil: string | null;
+  cooldownReason: "quota_exceeded" | "rate_limited" | "misconfigured" | null;
+  recoveryProbe: "idle" | "available" | "in_flight";
+  usage: {
+    source: "retained_email_message";
+    lowerBound: true;
+    lowerBoundScope: "provider_all_accounts";
+    countScope: "provider_all_accounts";
+    credentialChangedAt: string | null;
+    credentialHistory: "unknown" | "tracked";
+    warningBasis: "all_accounts_vs_configured_limit";
+    timeZone: "UTC";
+    daily: AdminEmailUsagePeriod;
+    monthly: AdminEmailUsagePeriod;
+    providerResetAt: string | null;
+  };
+}
+
 export interface AdminEmailStatus {
+  usageAsOf: string;
+  providers: AdminEmailProviderStatus[];
   /** `false` with `EMAIL_PROVIDER=none`: nothing is sent, test send and resend answer 409 `email_not_configured`. */
   configured: boolean;
   providerCode: string | null;
@@ -904,6 +937,7 @@ export interface AdminEmailMessage {
   providerCode: string | null;
   providerMessageId: string | null;
   pinnedProviderCode: string | null;
+  routeProviderCode: string | null;
   lastErrorCode: string | null;
   resendOf: string | null;
   createdByAdminId: string | null;

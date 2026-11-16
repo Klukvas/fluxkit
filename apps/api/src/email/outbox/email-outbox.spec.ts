@@ -33,7 +33,7 @@ describe("email outbox: enqueue, claim and record (real Postgres)", () => {
       const row = await world.row(id);
       expect(row).toMatchObject({
         template_key: "admin.test",
-        template_version: 1,
+        template_version: 2,
         locale: "en",
         to_address: TEST_RECIPIENT,
         recipient_kind: "admin",

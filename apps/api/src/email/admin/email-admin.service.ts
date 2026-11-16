@@ -28,6 +28,7 @@ import {
   sampleEmailLinks,
   type EmailTemplateSource,
 } from "../templates/index.js";
+import { providerUsage } from "./email-usage.js";
 import { EmailAdminRepository, type EmailMessageFilter } from "./email-admin.repository.js";
 import {
   isResendableRow,
@@ -90,20 +91,46 @@ export class EmailAdminService {
   ) {}
 
   async status(): Promise<EmailStatusResponse> {
-    const since = new Date(this.clock.now().getTime() - STATUS_WINDOW_HOURS * HOUR_MS);
-    const summary = await this.repository.summarize(this.database, since);
-    const provider = this.providers.get();
-    return {
-      configured: this.providers.deliveryEnabled(),
-      providerCode: provider?.code ?? null,
-      from: this.config.from,
-      replyTo: this.config.replyTo,
-      since: since.toISOString(),
-      counts: summary.counts as EmailStatusResponse["counts"],
-      queueDepth: summary.queueDepth,
-      oldestPendingAt: summary.oldestPendingAt?.toISOString() ?? null,
-      errorCodes: [...summary.errorCodes],
-    };
+    const asOf = this.clock.now();
+    const since = new Date(asOf.getTime() - STATUS_WINDOW_HOURS * HOUR_MS);
+    return this.database.transaction(
+      async (tx) => {
+        const summary = await this.repository.summarize(tx, since);
+        const primary = this.providers.get();
+        const selected = this.providers.list?.() ?? (primary === undefined ? [] : [primary]);
+        let providers: EmailStatusResponse["providers"] = [];
+        for (const [index, provider] of selected.entries()) {
+          providers = [
+            ...providers,
+            {
+              code: provider.code,
+              role: index === 0 ? "primary" : "fallback",
+              ...(await this.repository.providerState(tx, provider.code)),
+              usage: providerUsage(
+                provider.code,
+                asOf,
+                await this.repository.usage(tx, provider.code, asOf),
+                this.config.usageLimits,
+              ),
+            },
+          ];
+        }
+        return {
+          configured: this.providers.deliveryEnabled(),
+          providerCode: this.providers.get()?.code ?? null,
+          from: this.config.from,
+          replyTo: this.config.replyTo,
+          since: since.toISOString(),
+          counts: summary.counts as EmailStatusResponse["counts"],
+          queueDepth: summary.queueDepth,
+          oldestPendingAt: summary.oldestPendingAt?.toISOString() ?? null,
+          errorCodes: [...summary.errorCodes],
+          usageAsOf: asOf.toISOString(),
+          providers,
+        };
+      },
+      { isolationLevel: "repeatable read", accessMode: "read only" },
+    );
   }
 
   /** Sends `admin.test` to the CALLER's own address only: the body has no recipient (ADR 0031 decision 15). */

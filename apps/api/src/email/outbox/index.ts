@@ -39,6 +39,7 @@ export {
 } from "./email-outbox.service.js";
 export {
   EMAIL_SEND_PACER,
+  EMAIL_SUPPRESSION_GUARD_WIRED,
   EmailSender,
   PROVIDER_WIDE_REASONS,
   type EmailAttemptReport,

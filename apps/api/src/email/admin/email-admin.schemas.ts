@@ -82,12 +82,44 @@ const countsSchema = z.object(
   ) as Record<(typeof EMAIL_MESSAGE_STATUSES)[number], z.ZodNumber>,
 );
 
+const emailUsagePeriodSchema = z.object({
+  start: timestampSchema,
+  end: timestampSchema,
+  accepted: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
+  limit: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).nullable(),
+  limitSource: z.enum(["default", "env", "admin"]),
+  warning: z.enum(["none", "near_limit", "limit_reached"]),
+});
+
+export const emailProviderStatusSchema = z.object({
+  code: z.string(),
+  role: z.enum(["primary", "fallback"]),
+  cooldownUntil: timestampSchema.nullable(),
+  cooldownReason: z.enum(["quota_exceeded", "rate_limited", "misconfigured"]).nullable(),
+  recoveryProbe: z.enum(["idle", "available", "in_flight"]),
+  usage: z.object({
+    source: z.literal("retained_email_message"),
+    lowerBound: z.literal(true),
+    lowerBoundScope: z.literal("provider_all_accounts"),
+    countScope: z.literal("provider_all_accounts"),
+    credentialChangedAt: timestampSchema.nullable(),
+    credentialHistory: z.enum(["unknown", "tracked"]),
+    warningBasis: z.literal("all_accounts_vs_configured_limit"),
+    timeZone: z.literal("UTC"),
+    daily: emailUsagePeriodSchema,
+    monthly: emailUsagePeriodSchema,
+    providerResetAt: timestampSchema.nullable(),
+  }),
+});
+
 export const emailStatusResponseSchema = z.object({
   configured: z.boolean().meta({
     description:
       "`false` with `EMAIL_PROVIDER=none`: nothing is sent and test send and resend answer 409.",
   }),
   providerCode: z.string().nullable(),
+  usageAsOf: timestampSchema,
+  providers: z.array(emailProviderStatusSchema),
   from: mailboxSchema.nullable().meta({ description: "`EMAIL_FROM`." }),
   replyTo: mailboxSchema.nullable().meta({ description: "`EMAIL_REPLY_TO`." }),
   since: timestampSchema.meta({
@@ -126,6 +158,10 @@ export const emailMessageResponseSchema = z.object({
   deadlineAt: timestampSchema,
   providerCode: z.string().nullable(),
   providerMessageId: z.string().nullable(),
+  routeProviderCode: z.string().nullable().meta({
+    description:
+      "Durably selected next provider after a proven refusal; null starts at the primary.",
+  }),
   pinnedProviderCode: z.string().nullable().meta({
     description: "Provider of an earlier possibly accepted attempt; cancellation cannot recall it.",
   }),
