@@ -53,3 +53,25 @@ export function parseResendEnv(env: Readonly<Record<string, string | undefined>>
   }
   return Object.freeze({ apiKey: key });
 }
+
+/** The single webhook-secret accessor; blank disables ingestion, an unsafe nonblank value fails startup. */
+export function readResendWebhookSecret(
+  env: Readonly<Record<string, string | undefined>>,
+): string | undefined {
+  const secret = env.RESEND_WEBHOOK_SECRET ?? "";
+  if (secret.trim() === "") return undefined;
+  const encoded = secret.startsWith("whsec_") ? secret.slice(6) : "";
+  const decoded = Buffer.from(encoded.length <= 172 ? encoded : "", "base64");
+  if (
+    secret.length > 180 ||
+    !/^[A-Za-z0-9+/]+={0,2}$/.test(encoded) ||
+    decoded.length < 16 ||
+    decoded.length > 128 ||
+    decoded.toString("base64") !== encoded
+  ) {
+    throw new ResendConfigError(
+      "RESEND_WEBHOOK_SECRET must be whsec_ followed by canonical base64 encoding of 16 to 128 bytes (the value is not shown).",
+    );
+  }
+  return secret;
+}

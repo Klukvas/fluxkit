@@ -1,7 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { parseBrevoEnv } from "./config.js";
+import { parseBrevoEnv, readBrevoWebhookSecret } from "./config.js";
 
 describe("Brevo configuration", () => {
+  it("rejects API-key reuse as the webhook credential without disclosing either value", () => {
+    const secret = "Invented_Shared_Credential_For_Unit_Tests_0123456789";
+    expect(() =>
+      readBrevoWebhookSecret({ BREVO_API_KEY: secret, BREVO_WEBHOOK_SECRET: secret }),
+    ).toThrow("BREVO_WEBHOOK_SECRET must differ from BREVO_API_KEY (the values are not shown).");
+    expect(
+      readBrevoWebhookSecret({ BREVO_API_KEY: secret, BREVO_WEBHOOK_SECRET: " " }),
+    ).toBeUndefined();
+    expect(
+      readBrevoWebhookSecret({ BREVO_API_KEY: "different", BREVO_WEBHOOK_SECRET: secret }),
+    ).toBe(secret);
+  });
   it("accepts bounded header-safe keys without inventing a prefix", () => {
     for (const key of ["x", "arbitrary-prefix_123", "X".repeat(1024)]) {
       expect(parseBrevoEnv({ BREVO_API_KEY: key })).toEqual({ apiKey: key });

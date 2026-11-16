@@ -16,11 +16,14 @@ import type { Transaction } from "../../common/transaction.js";
 import {
   customer,
   emailMessage,
+  emailSuppression,
+  emailWebhookReceipt,
   payment,
   paymentRefund,
   salesOrder,
   shipment,
 } from "../../database/schema/index.js";
+import { lockEmailSuppressionAddress } from "../../email/suppression/email-suppression-lock.js";
 import { subjectMailCondition, subjectOrdersCondition, type ResolvedSubject } from "../subject.js";
 
 /** A mail to the subject that a sender holds under a live lease: wait for it (the lease is 2 minutes) and try again. */
@@ -273,6 +276,16 @@ export class PrivacyErasureService {
     }
     if (gathered.mailIds.length > 0) {
       await tx.delete(emailMessage).where(inArray(emailMessage.id, [...gathered.mailIds]));
+    }
+    // Unverified account ownership cannot clear a global address block or its retry receipts.
+    if (subject.scope.guestEmail !== null) {
+      await lockEmailSuppressionAddress(tx, subject.scope.guestEmail);
+      await tx
+        .delete(emailWebhookReceipt)
+        .where(eq(emailWebhookReceipt.toAddress, subject.scope.guestEmail));
+      await tx
+        .delete(emailSuppression)
+        .where(eq(emailSuppression.toAddress, subject.scope.guestEmail));
     }
     let customerDeleted = false;
     if (subject.customer !== undefined) {

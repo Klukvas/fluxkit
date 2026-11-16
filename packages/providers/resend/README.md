@@ -6,12 +6,13 @@ Purpose: the Resend email provider (code `resend`), ADR 0031 decision 17. It imp
 - Manifest: `"fluxkit": { "provider": "resend", "kind": "email" }` in `package.json`.
 - Entry: `src/index.ts` exports `providerModule`, loaded dynamically by `apps/api` only when `EMAIL_PROVIDER=resend`.
 - Dependencies: `@fluxkit/core`, `zod` 4.6.7 (the version the workspace pins); Node 22 `fetch`. No HTTP library, no Resend SDK.
-- Routes, DB tables, migrations: none. Extension points used: the email provider loader and registry (`apps/api/src/email/registry`).
+- Plugin-owned routes, DB tables, migrations: none. Extension points used: the email provider loader/registry and optional raw-byte webhook verifier (`apps/api/src/email/registry`). Core owns the shared suppression storage and webhook route.
 
 ## Variable (read by this package, never by `loadEnv`)
 | Variable | Rule |
 |---|---|
 | `RESEND_API_KEY` | Required with `EMAIL_PROVIDER=resend`: `re_` followed by 16 to 256 visible ASCII characters (trimmed). Missing or malformed: the API refuses to start, naming the variable, never the value. Never logged, stored or returned; it travels only in `Authorization: Bearer <key>`. Use a **sending-only** key (the plugin calls no other route). Rotating it needs a restart. |
+| `RESEND_WEBHOOK_SECRET` | Optional: blank disables `POST /webhooks/email/resend`. Nonblank must be `whsec_` plus canonical base64 of 16–128 bytes, otherwise startup fails without showing the value. Read once through `readResendWebhookSecret`; restart after rotation. |
 
 There is no URL variable: the endpoint is the constant `https://api.resend.com/emails` (Resend documents no other region, R17), redirects are refused, and only a test can point `ResendHttp` at a stub on `127.0.0.1`.
 
@@ -50,7 +51,19 @@ Mapped by HTTP status first (R8: `validation_error` appears on 400, 401 and 403)
 `retry-after` is passed on as `retryAfterSeconds` when it is whole seconds (R7 documents seconds only; an HTTP-date or other form is ignored and the core schedule applies; at most 31 days). The plugin never repeats a request: one `send` is at most one request. Its only time limit is the caller's signal (the API's 10 s). It logs one warning per failure (`send: HTTP 429 -> rate_limited (rate_limit_exceeded,429) after 12 ms`) and nothing on success; never the key, an address, a subject, a body or Resend's text.
 
 ## Unverified (nothing was sent to Resend)
-R3 (`reply_to`), R5 (the id is a UUID), R6 (403 without `User-Agent`), R9 (error body `{statusCode, name, message}`, LIKELY), R8's split of a bad key between 400 and 401, the quoted display name in `from`, the `retry-after` and rate-limit headers, R15 (whether a send to an address on Resend's suppression list answers `200`), R17 (no other region), R18 (data location, DPA: an owner action). Webhooks (R10 to R14) are not used in v1.
+R3 (`reply_to`), R5 (the id is a UUID), R6 (403 without `User-Agent`), R9 (error body `{statusCode, name, message}`, LIKELY), R8's split of a bad key between 400 and 401, the quoted display name in `from`, the `retry-after` and rate-limit headers, R15 (whether a send to an address on Resend's suppression list answers `200`), R17 (no other region), R18 (data location, DPA: an owner action). Webhook live checks are listed below.
+
+## Suppression webhook
+
+With `EMAIL_PROVIDER=resend` and `RESEND_WEBHOOK_SECRET` set, configure an HTTPS subscription to `/webhooks/email/resend` for `email.bounced`, `email.complained`, `email.suppressed` and `suppression.added`. Use the endpoint's signing secret, never the API key. Optional edge IP allowlisting may supplement authentication using the provider's current official ranges; it never replaces signature verification. Keep trusted-proxy settings aligned with the actual edge.
+
+The plugin checks `svix-id`, `svix-timestamp` and every supported `v1` in the space-separated `svix-signature` header. HMAC-SHA256 covers the ID, timestamp and original raw bytes; equal-length digests use constant-time comparison. Signed timestamps are within ±5 minutes. Permanent bounces alone become `hard_bounce`; complaints become `complaint`; `email.suppressed` and `suppression.added` become `blocked`. Soft bounces, delivery events and `suppression.removed` are ignored; there is no automatic unsuppression. `email.*` uses bounded `data.to` arrays; `suppression.added` uses `data.email`. Normalized recipients get stable per-recipient receipt keys, independent of array order. Vendor text is discarded.
+
+Core enforces the separate 7-day event-age / 5-minute future policy, commits receipts and suppression atomically, and retains receipts 8 days. Manual removal keeps receipts; replay cannot re-add a removed block. Reconcile older events and existing remote blocks before production fallback. Never remove remote blocks to improve delivery rates.
+
+TODO(fluxkit): not live-verified — subscriptions, exact event shapes (including permanent bounce/suppression), timestamps, stable retry IDs and historical-block reconciliation. Local vectors prove the verifier, not subscription delivery.
+
+Tests include the [official complete Svix vector](https://docs.svix.com/receiving/verifying-payloads/how-manual) and self-generated raw-byte vectors. The `whsec_MfKQ…` / `msg_p5j…` / `1614265330` / `{"test": 2432232314}` tuple computes `PxHZe96mbQZz2qjqqFruykIqYbPOK6W3bwdPtIj4ocY=`; the documentation's illustrative `g0hM9…` signature does not authenticate that tuple and is tested as a rejection.
 
 ## Plan S1: the live check (the owner runs it; needs the owner's go)
 One real mail to the owner's own address through `scripts/spikes/resend-verify.mjs` (`scripts/spikes/README.md`). Steps:
@@ -71,4 +84,4 @@ One real mail to the owner's own address through `scripts/spikes/resend-verify.m
 ## Tests
 `pnpm --filter @fluxkit/provider-resend test`: a local stub Resend on `127.0.0.1` (`src/test-support/stub-resend.ts`, invented data only; it models R4 idempotency, refuses what Resend documents refusing and, as its own rule, unknown body members) and a no-network guard (`src/test-support/no-network.ts`, a Vitest setup file) that fails a spec file on any request to another host (`src/no-network-wired.spec.ts` checks it is wired). Specs: the request shape, every status mapping, `retry-after`, idempotent replay and conflicts, the size cap, transport failures and aborts, hostile values, secrets (no fragment of the key or a personal value in logs or results), configuration, the module, the core contract check `checkEmailProviderContract`, the stub's strictness, and a static check of the sources (only `api.resend.com`, no socket module, no other variable).
 
-How to remove: delete `packages/providers/resend` and set `EMAIL_PROVIDER` to `none` (or another provider); remove `RESEND_API_KEY` from the environment. Nothing in core or `apps/api` references it (CI: `scripts/feature-matrix.sh providers-deleted`). Mail already queued stays `pending` until a provider is configured again or its deadline passes.
+How to remove: delete `packages/providers/resend` and set `EMAIL_PROVIDER` to `none` (or another provider); remove `RESEND_API_KEY` and `RESEND_WEBHOOK_SECRET` from the environment and disable the remote subscription. No static provider import exists in core or `apps/api` (CI: `scripts/feature-matrix.sh providers-deleted`). Shared suppression and receipts remain core data and still block every sender. Mail already queued stays `pending` until a provider is configured again or its deadline passes.

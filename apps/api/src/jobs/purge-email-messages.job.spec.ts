@@ -83,7 +83,7 @@ describe("purge-email-messages (job 10; real Postgres, injected time)", () => {
     ];
     const ids = await Promise.all(cases.map(([status, age]) => row(status, age)));
     const result = await run();
-    expect(result).toEqual({ deleted: 4, tokensDeleted: 0, truncated: false });
+    expect(result).toEqual({ deleted: 4, tokensDeleted: 0, receiptsDeleted: 0, truncated: false });
     for (const [index, [status, age, deleted]] of cases.entries()) {
       expect({ status, age, gone: !(await exists(ids[index] ?? "")) }).toEqual({
         status,
@@ -125,6 +125,7 @@ describe("purge-email-messages (job 10; real Postgres, injected time)", () => {
     expect(await run({ batchSize: 2, maxBatches: 2 })).toEqual({
       deleted: 4,
       tokensDeleted: 0,
+      receiptsDeleted: 0,
       truncated: true,
     });
     expect((await run({ batchSize: 2, maxBatches: 2 })).deleted).toBe(1);
@@ -150,6 +151,31 @@ describe("purge-email-messages (job 10; real Postgres, injected time)", () => {
     const left = await world.pool.query<{ id: string }>("select id from customer_auth_token");
     expect(left.rows.map((entry) => entry.id).sort()).toEqual([boundary, unused].sort());
     expect(left.rows.map((entry) => entry.id)).not.toContain(old);
+  });
+
+  it("purges receipts strictly older than eight days without removing suppression", async () => {
+    await world.pool.query(
+      `insert into email_suppression (to_address,reason,source_provider,first_seen_at,last_seen_at)
+      values ($1,'blocked','resend',$2,$2)`,
+      [TEST_RECIPIENT, now()],
+    );
+    for (const [key, age] of [
+      ["old", 8 * DAY + 1],
+      ["boundary", 8 * DAY],
+      ["fresh", 0],
+    ] as const) {
+      await world.pool.query(
+        `insert into email_webhook_receipt (provider_code,event_key,to_address,event_at,received_at)
+        values ('resend',$1,$2,$3,$3)`,
+        [key, TEST_RECIPIENT, new Date(now().getTime() - age)],
+      );
+    }
+    expect((await run()).receiptsDeleted).toBe(1);
+    expect(
+      (await world.pool.query("select event_key from email_webhook_receipt order by event_key"))
+        .rows,
+    ).toEqual([{ event_key: "boundary" }, { event_key: "fresh" }]);
+    expect((await world.pool.query("select 1 from email_suppression")).rows).toHaveLength(1);
   });
 
   it("is job 10 of the tick (jobs 11 to 14, the payment reconcile, the privacy retention and the search index, run after it)", async () => {

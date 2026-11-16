@@ -1,4 +1,4 @@
-import { Inject, Injectable, SetMetadata } from "@nestjs/common";
+import { Inject, Injectable, Optional, SetMetadata } from "@nestjs/common";
 import {
   EMAIL_LIMITS,
   EMAIL_PROVIDER_METADATA,
@@ -12,6 +12,7 @@ import {
   type EmailSent,
   type OutgoingEmail,
   type ProviderAbortSignal,
+  type EmailWebhookVerifier,
 } from "@fluxkit/core";
 import { mapResendAnswer } from "./answer-map.js";
 import { ResendHttp, type ResendExchange } from "./http.js";
@@ -35,6 +36,7 @@ export const RESEND_PROVIDER_CODE = "resend";
 export const RESEND_HTTP = Symbol("RESEND_HTTP");
 /** Nest token of the logger. */
 export const RESEND_LOGGER = Symbol("RESEND_LOGGER");
+export const RESEND_WEBHOOK_VERIFIER = Symbol("RESEND_WEBHOOK_VERIFIER");
 
 export interface ResendLogger {
   warn(message: string): void;
@@ -62,6 +64,7 @@ export class ResendEmailProvider implements EmailProviderPort {
   constructor(
     @Inject(RESEND_HTTP) private readonly http: ResendHttp,
     @Inject(RESEND_LOGGER) private readonly logger: ResendLogger,
+    @Optional() @Inject(RESEND_WEBHOOK_VERIFIER) readonly webhookVerifier?: EmailWebhookVerifier,
   ) {}
 
   async send(

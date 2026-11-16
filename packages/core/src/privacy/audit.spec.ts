@@ -24,6 +24,7 @@ describe("the admin audit action list (ADR 0033 decision 9)", () => {
       "privacy.exported",
       "privacy.erased",
       "privacy.request_changed",
+      "email_suppression.removed",
     ]);
     expect(ADMIN_AUDIT_ACTIONS.some((action) => action.endsWith(".viewed"))).toBe(false);
     expect([...ADMIN_AUDIT_TARGET_KINDS]).toEqual([
@@ -31,6 +32,7 @@ describe("the admin audit action list (ADR 0033 decision 9)", () => {
       "order",
       "admin_user",
       "privacy_request",
+      "email_suppression",
     ]);
   });
 

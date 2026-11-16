@@ -1,15 +1,19 @@
 import { Logger, Module } from "@nestjs/common";
-import { parseBrevoEnv } from "./config.js";
+import { parseBrevoEnv, readBrevoWebhookSecret } from "./config.js";
+import { createBrevoWebhookVerifier } from "./webhook.js";
+import type { EmailWebhookVerifier } from "@fluxkit/core";
 import { BrevoHttp } from "./http.js";
 import {
   BREVO_HTTP,
   BREVO_LOGGER,
+  BREVO_WEBHOOK_VERIFIER,
   BrevoEmailProvider,
   type BrevoLogger,
 } from "./brevo-provider.js";
 
 export {
   parseBrevoEnv,
+  readBrevoWebhookSecret,
   BREVO_API_ORIGIN,
   BREVO_SEND_PATH,
   BREVO_USER_AGENT,
@@ -32,6 +36,7 @@ export {
 } from "./http.js";
 export { brevoBodyOf, type BrevoEmailBody } from "./request.js";
 export { BREVO_PROVIDER_CODE, BrevoEmailProvider, type BrevoLogger } from "./brevo-provider.js";
+export { createBrevoWebhookVerifier } from "./webhook.js";
 
 /**
  * Entry point read by the API's email provider loader (named export `providerModule`, ADR 0031 decision 4). Mounted only
@@ -47,6 +52,13 @@ export { BREVO_PROVIDER_CODE, BrevoEmailProvider, type BrevoLogger } from "./bre
     {
       provide: BREVO_HTTP,
       useFactory: (): BrevoHttp => new BrevoHttp({ apiKey: parseBrevoEnv(process.env).apiKey }),
+    },
+    {
+      provide: BREVO_WEBHOOK_VERIFIER,
+      useFactory: (): EmailWebhookVerifier | undefined => {
+        const secret = readBrevoWebhookSecret(process.env);
+        return secret === undefined ? undefined : createBrevoWebhookVerifier(secret);
+      },
     },
     BrevoEmailProvider,
   ],

@@ -4,7 +4,7 @@ Status: draft. The document builder is implemented in `packages/core/src/privacy
 
 ## Format `fluxkit.personal-data-export/v1`
 
-JSON, UTF-8. The top-level keys appear in this order: `format`, `generatedAt`, `subject`, `account`, `orders`, `mail`, `sessions`, `cart`, `processors`.
+JSON, UTF-8. The top-level keys appear in this order: `format`, `generatedAt`, `subject`, `account`, `orders`, `mail`, `emailSuppressions`, `sessions`, `cart`, `processors`.
 
 | Key | Shape |
 |---|---|
@@ -14,6 +14,7 @@ JSON, UTF-8. The top-level keys appear in this order: `format`, `generatedAt`, `
 | `account` | the customer's `email`, `firstName`, `lastName`, `phone`, `isActive`, `emailVerifiedAt`, `lastLoginAt`, `passwordChangedAt`, `createdAt`, `updatedAt`; `null` for a guest subject |
 | `orders[]` | `number`, `status`, `locale`, `currency`, amounts (`subtotalAmount`, `shippingTotal`, `discountTotal`, `taxTotal`, `totalAmount`, minor-unit integers), times (`placedAt`, `expiresAt`, `paidAt`, `fulfilledAt`, `cancelledAt`, `expiredAt`), `cancellationReason`, `paymentReference`, `contact` (`email`, `phone`, `firstName`, `lastName`; all `null` on an erased order), `shippingAddress` and `billingAddress` (`countryCode` plus the address fields; only `countryCode` on an erased order), `lines[]`, `adjustments[]`, `shippingMethod`, `shipments[]`, `payments[]` (with `refunds[]`), `statusHistory[]` |
 | `mail[]` | `templateKey`, `locale`, `status`, `createdAt`, `sentAt` (no body is stored, so none is exported) |
+| `emailSuppressions[]` | `reason`, `sourceProvider`, `firstSeenAt`, `lastSeenAt` in verified address scope only; no repeated address, entry ID, receipt or event key |
 | `sessions[]` | `createdAt`, `lastSeenAt` |
 | `cart` | `{lines: [{sku, title, quantity, seenUnitAmount, seenCurrency}]}` or `null` |
 | `processors[]` | `{kind: "email" \| "payment" \| "shipping", name}` of the providers the shop uses; no legal role is stated |
@@ -24,3 +25,5 @@ JSON, UTF-8. The top-level keys appear in this order: `format`, `generatedAt`, `
 - Never present at any depth: password and token hashes, `accessTokenHash`, `requestFingerprint`, idempotency keys, `providerRef`, `providerPaymentId`, `redirectUrl`, admin ids and `createdBy`, lockout counters, any key ending in `Id`. The builder copies only the keys above; `findForbiddenExportKeys` is the scanner the tests (and later the API specs) use.
 - A change of an existing key or meaning is a new format version (`v2`) served next to `v1`; adding a key is a minor change.
 - TODO(fluxkit): legal review of the content (plan task O4) before an EU launch.
+
+- Shared email suppression is address-scoped (ADR 0056): verified customer address or an operator email-subject request only. An unverified account exports an empty `emailSuppressions` list and cannot erase the global block. No webhook receipt is exported. This additive field retains v1.

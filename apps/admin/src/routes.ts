@@ -392,6 +392,15 @@ export const ROUTES: readonly AppRoute[] = [
     ),
   ),
   route(
+    "emailSuppressions",
+    "listEmailSuppressions",
+    "page.emailSuppressions.title",
+    areaPage(
+      () => import("./areas/email"),
+      (module) => module.EmailSuppressionsPage,
+    ),
+  ),
+  route(
     "emailMessageDetail",
     "getEmailMessage",
     "page.emailMessageDetail.title",

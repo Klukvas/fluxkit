@@ -461,3 +461,26 @@ Core, no flag. Self-contained: no other module imports it; it must NOT import th
 - `email/outbox/email-pinned.spec.ts` — real-Postgres pin/reclaim, second-instance fencing, cutoff, provider removal/restoration, unsupported dedupe and cancel regressions; `database/migrations.spec.ts` covers 0016 legacy backfill, preflight, unsafe down and up/down/up/down.
 - `database/schema/email.ts`, `drizzle/0016_email_provider_pin.sql`, `.down.sql` and generated journal/snapshot — nullable `pinned_provider_code`/`pinned_at` pair checks, conservative stopped-sender backfill and separate ID check; down refuses incompatible IDs/active pins. Both pin columns are non-personal operational metadata in the inventory.
 - `email/admin/email-admin.schemas.ts` / mapper — additive nullable `pinnedProviderCode` in message responses; generated OpenAPI and API client stay in parity.
+
+## Email suppression (ADR 0056 step 1b)
+
+- `src/email/webhooks/email-webhook-raw-body.ts` — route-scoped 64-KiB exact-byte reader; must not parse JSON, log bytes or change payment handling.
+- `src/email/webhooks/email-webhook-exception.filter.ts` — controller-scoped server-error to 429 problem filter and email-only Express body-error boundary; fixed five-second Retry-After, code-only logs, intentional client statuses preserved.
+- `src/email/webhooks/email-webhook-exception.spec.ts` — server-status/client-status matrix and asynchronous raw-byte assembly/error-boundary regressions; no external provider calls.
+- `src/email/webhooks/email-webhook.controller.ts` — selected-plugin authentication, core fact/age checks, rate limit, commit-before-204 and transient 429; no routing/delivery tracking.
+- `src/email/suppression/email-suppression.module.ts` — global shared gate/service and webhook/admin controllers, active with delivery off too.
+- `src/email/suppression/email-suppression.schemas.ts` — bounded pagination and full/masked recipient API/OpenAPI schemas under email.manage; no recipient query or separate reveal endpoint.
+- `src/email/suppression/email-suppression.service.ts` — shared normalized lookup, transactional receipts/chronological upsert, full/masked-address list and atomic audit/removal; no provider payload storage.
+- `src/email/suppression/email-suppressions.controller.ts` — email.manage list and CSRF-protected UUID removal; no auto resend.
+- `src/email/suppression/email-suppression.spec.ts` — real-Postgres concurrency, dedupe, ordering, removal/replay and atomic audit checks.
+- `src/email/outbox/email-suppression-send.spec.ts` — shared gate on job/immediate/admin/resend, ambiguity precedence, lookup failure, admission race and log secrecy.
+- `src/database/schema/email.ts` — adds suppression/receipt constraints and indexes with no customer/outbox foreign key.
+- `drizzle/0017_email_suppression.sql`, `drizzle/0017_email_suppression.down.sql`, `drizzle/meta/0017_snapshot.json` — generated schema migration/snapshot and guarded rollback; refuses active suppression, receipts or retained audit targets.
+- `src/privacy/inventory/`, `src/privacy/export/personal-data.reader.ts`, `src/privacy/erasure/privacy-erasure.service.ts` — D16 classification, verified-address metadata export and suppression/receipt erasure; unverified account scope cannot clear global blocks.
+- `src/jobs/purge-email-messages.job.ts` — also drains eight-day receipts in bounded SKIP LOCKED batches; retains active blocks.
+
+- `src/email/suppression/email-suppression-lock.ts` — transaction-scoped address advisory lock shared by ingestion and verified-address erasure, acquired even with no existing row; ingestion-only named 2-second lock / 5-second statement timeouts; prevents partial cross-table erasure races.
+- `src/email/webhooks/edge-email-webhook-config.spec.ts` — both production edges forward email raw bodies to the API with a 64-KiB cap and leave payment routing intact.
+
+- `src/test/migrate.ts` — guarded test-only schema reset option for migration rollback fixtures; preserves the `_test` database and advisory-lock protections.
+- `src/database/*-schema.spec.ts`, `src/database/migrate-entry.spec.ts`, `src/database/migrations.spec.ts` — include suppression/receipt cleanup, names and 0017 rollback/journal expectations without relaxing older schema assertions.

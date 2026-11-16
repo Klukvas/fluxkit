@@ -15,9 +15,12 @@ function restore(value: string | undefined): void {
 
 describe("the provider module (what the API's loader mounts)", () => {
   const saved = process.env.RESEND_API_KEY;
+  const savedWebhook = process.env.RESEND_WEBHOOK_SECRET;
 
   afterEach(() => {
     restore(saved);
+    if (savedWebhook === undefined) delete process.env.RESEND_WEBHOOK_SECRET;
+    else process.env.RESEND_WEBHOOK_SECRET = savedWebhook;
   });
 
   it("provides a marked resend provider and calls nothing at startup", async () => {
@@ -48,5 +51,21 @@ describe("the provider module (what the API's loader mounts)", () => {
     }
     expect(message).toMatch(/RESEND_API_KEY must be re_ followed by/);
     expect(message).not.toContain("re_short");
+  });
+
+  it("exposes a verifier only for a configured valid webhook secret and rejects unsafe configuration", async () => {
+    process.env.RESEND_API_KEY = KEY;
+    delete process.env.RESEND_WEBHOOK_SECRET;
+    const disabled = await Test.createTestingModule({ imports: [providerModule] }).compile();
+    expect(disabled.get(ResendEmailProvider).webhookVerifier).toBeUndefined();
+    await disabled.close();
+    process.env.RESEND_WEBHOOK_SECRET = "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw";
+    const enabled = await Test.createTestingModule({ imports: [providerModule] }).compile();
+    expect(enabled.get(ResendEmailProvider).webhookVerifier).toBeTypeOf("function");
+    await enabled.close();
+    process.env.RESEND_WEBHOOK_SECRET = "invalid";
+    await expect(Test.createTestingModule({ imports: [providerModule] }).compile()).rejects.toThrow(
+      /^RESEND_WEBHOOK_SECRET /,
+    );
   });
 });

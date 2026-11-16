@@ -12,6 +12,7 @@ export const EMAIL_WRITE_OPERATIONS = [
   "sendTestEmail",
   "resendEmailMessage",
   "cancelEmailMessage",
+  "removeEmailSuppression",
 ] as const satisfies readonly AdminOperationName[];
 
 export function canManageEmail(permissions: readonly string[] | null): boolean {

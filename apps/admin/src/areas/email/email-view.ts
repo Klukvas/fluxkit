@@ -43,6 +43,7 @@ export function categoryLabelKey(category: AdminEmailTemplateCategory): string {
  * sender writes itself (`docs/api/jobs.md`, ADR 0031 decisions 6 and 7).
  */
 export const ERROR_CODE_REASONS = [
+  "suppressed",
   "unavailable",
   "rate_limited",
   "rejected",

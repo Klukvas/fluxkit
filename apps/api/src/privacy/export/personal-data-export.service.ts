@@ -78,6 +78,7 @@ export class PersonalDataExportService {
             },
       orders: orderFacts,
       mail,
+      emailSuppressions: await this.reader.suppressionFacts(db, subject),
       sessions,
       cart: cartFacts,
       processors: this.reader.processors(),

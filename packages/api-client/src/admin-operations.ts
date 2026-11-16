@@ -377,6 +377,15 @@ export const ADMIN_OPERATIONS = {
   listAuditEvents: operation("GET", "/admin/audit-events", [200], "users.manage", {
     query: ["limit", "offset", "action", "adminUserId", "targetKind", "targetId", "from", "to"],
   }),
+  listEmailSuppressions: operation("GET", "/admin/email/suppressions", [200], "email.manage", {
+    query: ["limit", "offset"],
+  }),
+  removeEmailSuppression: operation(
+    "DELETE",
+    "/admin/email/suppressions/{id}",
+    [204],
+    "email.manage",
+  ),
   getEmailStatus: operation("GET", "/admin/email/status", [200], "email.manage"),
   sendTestEmail: operation("POST", "/admin/email/test", [202], "email.manage", { body: "json" }),
   listEmailMessages: operation("GET", "/admin/email/messages", [200], "email.manage", {

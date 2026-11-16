@@ -99,6 +99,7 @@ describe("route table", () => {
       shippingProviderDetail: "shipping.manage",
       email: "email.manage",
       emailMessages: "email.manage",
+      emailSuppressions: "email.manage",
       emailMessageDetail: "email.manage",
       emailTemplates: "email.manage",
       emailTemplatePreview: "email.manage",
@@ -234,6 +235,7 @@ describe("lazy pages and their message files", () => {
     for (const id of [
       "email",
       "emailMessages",
+      "emailSuppressions",
       "emailMessageDetail",
       "emailTemplates",
       "emailTemplatePreview",

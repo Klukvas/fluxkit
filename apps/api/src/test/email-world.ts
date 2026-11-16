@@ -165,6 +165,8 @@ export class EmailWorld {
 
   async clear(): Promise<void> {
     await this.pool.query("delete from email_message");
+    await this.pool.query("delete from email_webhook_receipt");
+    await this.pool.query("delete from email_suppression");
     for (const running of this.apps) {
       this.provider(running)?.reset();
     }
@@ -172,6 +174,8 @@ export class EmailWorld {
 
   async stop(): Promise<void> {
     await this.pool.query("delete from email_message");
+    await this.pool.query("delete from email_webhook_receipt");
+    await this.pool.query("delete from email_suppression");
     for (const running of this.apps) {
       await running.app.close();
     }

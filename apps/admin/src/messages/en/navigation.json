@@ -24,6 +24,7 @@
   "page.customerDetail.title": "Customer",
   "page.payments.title": "Payments to review",
   "page.email.title": "Email",
+  "page.emailSuppressions.title": "Suppressions",
   "page.emailMessages.title": "Messages",
   "page.emailMessageDetail.title": "Message",
   "page.emailTemplates.title": "Templates",

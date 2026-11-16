@@ -1,5 +1,6 @@
 import type { ProviderAbortSignal } from "../shipping/provider-port.js";
 import type { EmailAddress } from "./address.js";
+import type { EmailWebhookVerifier } from "./webhook.js";
 import { EMAIL_CODE_PATTERN, EMAIL_LIMITS, EMAIL_PROVIDER_CODE_PATTERN } from "./limits.js";
 
 /*
@@ -169,6 +170,8 @@ export interface EmailProviderPort {
   /** Matches `EMAIL_PROVIDER_CODE_PATTERN`, e.g. `resend`. */
   readonly code: string;
   readonly capabilities: EmailProviderCapabilities;
+  /** Authenticates raw provider feedback. Undefined when this plugin has no configured webhook secret. */
+  readonly webhookVerifier?: EmailWebhookVerifier;
   /**
    * Hands one mail to the service. `ok` means accepted by the service, not delivered. Never throws for a service
    * answer; a thrown error is treated by the API as `unavailable`.

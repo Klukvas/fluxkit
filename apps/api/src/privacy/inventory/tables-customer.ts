@@ -174,6 +174,59 @@ export const customerTables: Inventory = {
     ),
   },
 
+  email_suppression: {
+    id: classified(
+      "pseudonymous",
+      "D16",
+      "excluded",
+      "delete_row",
+      "Internal entry ID; removed only in verified address scope or by an authorized admin.",
+    ),
+    to_address: classified(
+      "personal",
+      "D16",
+      "excluded",
+      "delete_row",
+      "Normalized global block address; export does not repeat the subject address. Retained until authorized removal or verified-address erasure.",
+    ),
+    ...many(
+      classified(
+        "pseudonymous",
+        "D16",
+        "included",
+        "delete_row",
+        "Subject-linked safety metadata; retained until authorized removal or verified-address erasure.",
+      ),
+      "reason",
+      "source_provider",
+      "first_seen_at",
+      "last_seen_at",
+    ),
+  },
+
+  email_webhook_receipt: {
+    ...many(
+      classified(
+        "pseudonymous",
+        "D16",
+        "excluded",
+        "delete_row",
+        "Internal retry receipt; expires eight days after receipt or on verified-address erasure. Never exported.",
+      ),
+      "provider_code",
+      "event_key",
+      "event_at",
+      "received_at",
+    ),
+    to_address: classified(
+      "personal",
+      "D16",
+      "excluded",
+      "delete_row",
+      "Normalized address for scoped erasure; job 10 deletes receipts after eight days. No repeated address in export.",
+    ),
+  },
+
   domain_event: {
     ...none("D17", "id", "type", "created_at", "dispatched_at", "attempts", "last_error_code"),
     ...many(

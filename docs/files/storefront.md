@@ -148,3 +148,5 @@ Run: `pnpm --filter @fluxkit/storefront dev -p 3001` (needs `pnpm build` once so
 - `src/components/product-grid.spec.tsx` - repeated product ids keep distinct row keys, suffixes and grid/list no-JS purchase links.
 - `src/lib/sitemap.spec.ts` - real StoreData/client with a mocked HTTP boundary guards product-mode reads, unchanged one-hour cache settings and one product URL per locale despite split visible cards; independent of the e2e server's shared cache.
 - `e2e/tests/split-listing.e2e.ts` - isolated admin-created split assignment, real search/SQL cards, group links/size/gallery names, add versus choose and keyboard/no-JS; flag restored and product archived afterwards.
+
+- `src/lib/personal-data.spec.ts` — export download fixture includes additive `emailSuppressions` metadata; storefront behavior is unchanged.
