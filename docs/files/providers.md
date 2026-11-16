@@ -66,3 +66,11 @@ Payment, shipping and email provider plugins, one package per provider. Each pro
   - `src/brevo-provider.ts`, `src/index.ts` — port/Nest discovery wiring; idempotency false pending live verification.
   - `src/test-support/`, `src/*.spec.ts` — loopback-only stub with 30-minute dedupe/lost-response models, core contract and transport/config/request/hostile/secret/no-network checks; cannot establish live behaviour.
   - `README.md` — setup, Free branding/paid removal, pin/window/unknown safety, mapping, removal and all live-check TODOs.
+
+- `resend/src/webhook.ts` — raw-byte Svix HMAC authentication before JSON parse, Permanent bounce/complaint/blocked facts, stable per-recipient event keys; no vendor text or automatic unsuppression.
+- `resend/src/webhook.spec.ts` — official/corrected and negative Svix vectors, raw byte changes, signed timestamp, event/recipient bounds and secret parser.
+- `resend/src/config.ts` — `readResendWebhookSecret`, the one accessor for optional signing credentials; invalid nonblank fails startup.
+- `brevo/src/webhook.ts` — bounded bearer comparison with fixed SHA-256 digests, allowlisted single-object facts, versioned tuple digest; no API-key reuse or body-signature claim.
+- `brevo/src/webhook.spec.ts` — bearer rejection, event shapes/allowlist, tuple stability/difference and secret parser tests; not live evidence.
+- `brevo/src/config.ts` — `readBrevoWebhookSecret`, the one optional bearer-secret accessor.
+- Both plugin `src/index.ts` factories inject their optional verifier beside the transport; blank secret exposes no active webhook. READMEs list subscriptions, header, optional edge allowlist and pending live checks.

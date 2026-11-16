@@ -33,6 +33,7 @@ describe("no network in tests, and only api.brevo.com in the plugin", () => {
         "index.ts",
         "request.ts",
         "brevo-provider.ts",
+        "webhook.ts",
       ].sort(),
     );
     for (const [name, text] of sources) {
@@ -58,17 +59,19 @@ describe("no network in tests, and only api.brevo.com in the plugin", () => {
     expect([...http]).toEqual(["127.0.0.1"]);
   });
 
-  it("reads no variable but BREVO_API_KEY, and only in the module factory and the parser", () => {
+  it("reads only its API key and webhook secret, in module factories and the config accessors", () => {
     for (const [name, text] of shippedSources()) {
       const reads = [...text.matchAll(/process\.env(?:\.([A-Z_]+))?/g)].map((match) => match[0]);
       const variables = [...text.matchAll(/env\.([A-Z][A-Z0-9_]+)/g)].map((match) => match[1]);
       if (name === "index.ts") {
-        expect(reads, name).toEqual(["process.env"]);
+        expect(reads, name).toEqual(["process.env", "process.env"]);
       } else {
         expect(reads, name).toEqual([]);
       }
       expect(
-        variables.every((variable) => variable === "BREVO_API_KEY"),
+        variables.every(
+          (variable) => variable === "BREVO_API_KEY" || variable === "BREVO_WEBHOOK_SECRET",
+        ),
         name,
       ).toBe(true);
     }

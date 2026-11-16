@@ -67,6 +67,7 @@ export const CONTEXT_HELP: Readonly<Partial<Record<RouteId, ContextHelpTarget>>>
   shippingProviderDetail: CARRIERS,
   email: { article: "email", section: "status" },
   emailMessages: { article: "email", section: "messages" },
+  emailSuppressions: { article: "email", section: "messages" },
   emailMessageDetail: { article: "email", section: "messages" },
   emailTemplates: { article: "email", section: "templates" },
   emailTemplatePreview: { article: "email", section: "templates" },

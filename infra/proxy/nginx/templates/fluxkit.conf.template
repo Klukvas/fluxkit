@@ -105,6 +105,21 @@ server {
         include /etc/nginx/fluxkit/proxy-to-api.conf;
     }
 
+    # Email provider feedback (ADR 0056): preserve signed raw bytes and enforce the API's 64-KiB limit.
+    location ~ ^/webhooks/email(/|$) {
+        client_max_body_size 64k;
+        proxy_intercept_errors on;
+        error_page 502 503 504 =429 /_email-webhook-retry;
+        include /etc/nginx/fluxkit/proxy-to-api.conf;
+    }
+
+    location = /_email-webhook-retry {
+        internal;
+        add_header Retry-After "5" always;
+        add_header Strict-Transport-Security "max-age=31536000" always;
+        return 429;
+    }
+
     # The admin SPA (ADR 0027). Hashed assets first: a missing file is a 404, never the HTML.
     location ~ ^/admin-ui/assets/ {
         root /srv/fluxkit/site;

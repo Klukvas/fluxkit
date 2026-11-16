@@ -22,7 +22,7 @@ describe("0014 split listing migration (real Postgres, _test database only)", ()
   const otherOptionId = randomUUID();
 
   beforeAll(async () => {
-    await ensureMigrated();
+    await ensureMigrated([], { reset: true });
     lock = await pool.connect();
     await lock.query("select pg_advisory_lock($1)", [SCHEMA_LOCK_KEY]);
   });
@@ -43,6 +43,7 @@ describe("0014 split listing migration (real Postgres, _test database only)", ()
   });
 
   async function down(): Promise<void> {
+    await pool.query(await readFile(`${migrationsFolder}/0017_email_suppression.down.sql`, "utf8"));
     await pool.query(
       await readFile(`${migrationsFolder}/0016_email_provider_pin.down.sql`, "utf8"),
     );

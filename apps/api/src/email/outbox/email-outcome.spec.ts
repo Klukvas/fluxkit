@@ -54,6 +54,13 @@ describe("decideEmailClaim (what a claim does with a due row)", () => {
 describe("decideEmailRecord (what the record step writes after an attempt)", () => {
   const base = { attempts: 1, deadlineAt: DEADLINE, now: NOW };
 
+  it.each([null, NOW])("suppression is terminal, preserving earlier ambiguity (%s)", (pinnedAt) => {
+    expect(decideEmailRecord({ ...base, pinnedAt, outcome: { kind: "suppressed" } })).toEqual({
+      status: pinnedAt === null ? "failed" : "unknown",
+      lastErrorCode: "suppressed",
+    });
+  });
+
   it("records a sent mail with its provider id and time", () => {
     expect(
       decideEmailRecord({ ...base, outcome: { kind: "sent", providerMessageId: "re_123" } }),

@@ -44,7 +44,11 @@ const ROW_FACTS: Readonly<Record<string, { purpose: string; retention: string }>
   D13: { purpose: "Delivery (C)", retention: "Forever" },
   D14: { purpose: "Payment and refunds (C, L)", retention: "Forever" },
   D15: { purpose: "Payment journal (L)", retention: "Forever" },
-  D16: { purpose: "Mail delivery (C)", retention: "Job 10: 30 days (`failed`, `unknown`: 90)" },
+  D16: {
+    purpose: "Mail delivery and recipient safety (C, LI)",
+    retention:
+      "Outbox job 10: 30 days (`failed`, `unknown`: 90); suppression until authorized removal or verified-address erasure; webhook receipts eight days after receipt (job 10)",
+  },
   D17: { purpose: "Event outbox (C)", retention: "Job 4: 7 days after dispatch" },
   D18: { purpose: "Staff access (LI)", retention: "Forever (deactivate only)" },
   D19: {

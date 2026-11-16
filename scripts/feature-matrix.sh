@@ -404,6 +404,8 @@ GUARD
     ;;
   providers-email-none)
     run_api "" "" "none"
+    expect_status 404 POST /webhooks/email/resend -H 'Content-Type: application/json' -d '{}'
+    expect_status 404 POST /webhooks/email/brevo -H 'Content-Type: application/json' -d '{}'
     grep -F "Email provider loaded: none" /tmp/fluxkit-matrix-api.log \
       || { echo "expected the email registry to report no provider" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
     ! grep -qi "fake" /tmp/fluxkit-matrix-api.log \
@@ -449,7 +451,9 @@ console.log("matrix-guard: active");
 GUARD
     invented_key="re_matrix_invented_$(date +%s)_0000000000"
     RESEND_API_KEY="$invented_key" EMAIL_FROM="Fluxkit Demo Shop <shop@mail.example>" \
-      STOREFRONT_PUBLIC_URL=http://127.0.0.1:3001 MATRIX_NODE_IMPORT="$guard_dir/no-resend.mjs" run_api "" "" "resend"
+      STOREFRONT_PUBLIC_URL=http://127.0.0.1:3001 RESEND_WEBHOOK_SECRET= BREVO_WEBHOOK_SECRET= MATRIX_NODE_IMPORT="$guard_dir/no-resend.mjs" run_api "" "" "resend"
+    expect_status 404 POST /webhooks/email/resend -H 'Content-Type: application/json' -d '{}'
+    expect_status 404 POST /webhooks/email/brevo -H 'Content-Type: application/json' -d '{}'
     # Give anything started in the background at boot (the scheduler's first tick) a moment to run.
     sleep 3
     grep -F "Email provider loaded: resend" /tmp/fluxkit-matrix-api.log \
@@ -463,6 +467,30 @@ GUARD
       || { echo "the fetch wrapper was not loaded into the API" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
     ! grep -F "matrix-guard: refused" /tmp/fluxkit-matrix-api.log \
       || { echo "the API sent a request to Resend at startup" >&2; exit 1; }
+    stop_api
+    RESEND_API_KEY="$invented_key" RESEND_WEBHOOK_SECRET="whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw" \
+      EMAIL_FROM="Fluxkit Demo Shop <shop@mail.example>" STOREFRONT_PUBLIC_URL=http://127.0.0.1:3001 \
+      MATRIX_NODE_IMPORT="$guard_dir/no-resend.mjs" run_api "" "" "resend"
+    node --input-type=module - "$port" "resend" <<'EMAIL_WEBHOOK'
+import assert from "node:assert/strict";
+import { createHmac } from "node:crypto";
+const [port, provider] = process.argv.slice(2);
+const body = provider === "resend" ? '{"type":"email.delivered"}' : '{"event":"delivered"}';
+const headers = {"content-type": "application/json"};
+if (provider === "resend") {
+  const id = "msg_matrix_authenticated";
+  const timestamp = String(Math.floor(Date.now()/1000));
+  const signature = createHmac("sha256", Buffer.from("MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw", "base64"))
+    .update(`${id}.${timestamp}.${body}`).digest("base64");
+  Object.assign(headers, {"svix-id": id, "svix-timestamp": timestamp, "svix-signature": `v1,${signature}`});
+} else headers.authorization = "Bearer matrix_webhook_public_test_token_01234567890123456789";
+const url = `http://127.0.0.1:${port}/webhooks/email/${provider}`;
+const result = await fetch(url, {method:"POST", headers, body});
+assert.equal(result.status, 204, await result.text());
+const rejected = await fetch(url, {method:"POST", headers:{"content-type":"application/json"}, body});
+assert.equal(rejected.status, 401);
+console.log(`${provider} authenticated ignored webhook -> 204; missing auth -> 401`);
+EMAIL_WEBHOOK
     rm -rf "$guard_dir"
     ;;
   providers-email-brevo)
@@ -494,7 +522,9 @@ console.log("matrix-guard: active");
 GUARD
     invented_key="matrix_invented_$(date +%s)_0000000000"
     BREVO_API_KEY="$invented_key" EMAIL_FROM="Fluxkit Demo Shop <shop@mail.example>" \
-      STOREFRONT_PUBLIC_URL=http://127.0.0.1:3001 MATRIX_NODE_IMPORT="$guard_dir/no-brevo.mjs" run_api "" "" "brevo"
+      STOREFRONT_PUBLIC_URL=http://127.0.0.1:3001 RESEND_WEBHOOK_SECRET= BREVO_WEBHOOK_SECRET= MATRIX_NODE_IMPORT="$guard_dir/no-brevo.mjs" run_api "" "" "brevo"
+    expect_status 404 POST /webhooks/email/resend -H 'Content-Type: application/json' -d '{}'
+    expect_status 404 POST /webhooks/email/brevo -H 'Content-Type: application/json' -d '{}'
     # Give anything started in the background at boot (the scheduler's first tick) a moment to run.
     sleep 3
     grep -F "Email provider loaded: brevo" /tmp/fluxkit-matrix-api.log \
@@ -508,6 +538,30 @@ GUARD
       || { echo "the fetch wrapper was not loaded into the API" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
     ! grep -F "matrix-guard: refused" /tmp/fluxkit-matrix-api.log \
       || { echo "the API sent a request to Brevo at startup" >&2; exit 1; }
+    stop_api
+    BREVO_API_KEY="$invented_key" BREVO_WEBHOOK_SECRET="matrix_webhook_public_test_token_01234567890123456789" \
+      EMAIL_FROM="Fluxkit Demo Shop <shop@mail.example>" STOREFRONT_PUBLIC_URL=http://127.0.0.1:3001 \
+      MATRIX_NODE_IMPORT="$guard_dir/no-brevo.mjs" run_api "" "" "brevo"
+    node --input-type=module - "$port" "brevo" <<'EMAIL_WEBHOOK'
+import assert from "node:assert/strict";
+import { createHmac } from "node:crypto";
+const [port, provider] = process.argv.slice(2);
+const body = provider === "resend" ? '{"type":"email.delivered"}' : '{"event":"delivered"}';
+const headers = {"content-type": "application/json"};
+if (provider === "resend") {
+  const id = "msg_matrix_authenticated";
+  const timestamp = String(Math.floor(Date.now()/1000));
+  const signature = createHmac("sha256", Buffer.from("MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw", "base64"))
+    .update(`${id}.${timestamp}.${body}`).digest("base64");
+  Object.assign(headers, {"svix-id": id, "svix-timestamp": timestamp, "svix-signature": `v1,${signature}`});
+} else headers.authorization = "Bearer matrix_webhook_public_test_token_01234567890123456789";
+const url = `http://127.0.0.1:${port}/webhooks/email/${provider}`;
+const result = await fetch(url, {method:"POST", headers, body});
+assert.equal(result.status, 204, await result.text());
+const rejected = await fetch(url, {method:"POST", headers:{"content-type":"application/json"}, body});
+assert.equal(rejected.status, 401);
+console.log(`${provider} authenticated ignored webhook -> 204; missing auth -> 401`);
+EMAIL_WEBHOOK
     rm -rf "$guard_dir"
     ;;
   providers-payment-none)

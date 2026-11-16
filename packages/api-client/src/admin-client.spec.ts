@@ -656,3 +656,52 @@ describe("types the admin screens rely on", () => {
     expectTypeOf<AdminConfig["lowStockThreshold"]>().toEqualTypeOf<number>();
   });
 });
+
+describe("shared email suppressions", () => {
+  it("lists full and masked addresses with bounded-page options only and removes by opaque id with CSRF", async () => {
+    const page = {
+      items: [
+        {
+          id: "11111111-1111-4111-8111-111111111111",
+          toAddress: "alice@example.com",
+          toAddressMasked: "a***@e***.com",
+          reason: "complaint",
+          sourceProvider: "resend",
+          firstSeenAt: "2026-11-16T10:00:00.000Z",
+          lastSeenAt: "2026-11-16T10:00:00.000Z",
+        },
+      ],
+      limit: 50,
+      offset: 0,
+      total: 1,
+    };
+    const stub = fakeFetch((call) =>
+      call.init.method === "DELETE" ? new Response(null, { status: 204 }) : jsonOk(page),
+    );
+    const client = createAdminClient({ baseUrl: BASE, fetch: stub.fetch });
+    const result = await client.listEmailSuppressions({ limit: 50, offset: 0 });
+    expect(result.ok && result.data).toEqual(page);
+    expect(stub.calls[0]?.url).toBe(`${BASE}/admin/email/suppressions?limit=50&offset=0`);
+    await expect(client.removeEmailSuppression(page.items[0]?.id ?? "")).resolves.toMatchObject({
+      ok: true,
+      status: 204,
+    });
+    expect(stub.calls).toHaveLength(2);
+    expect(stub.calls[1]?.url).toBe(
+      `${BASE}/admin/email/suppressions/11111111-1111-4111-8111-111111111111`,
+    );
+    expect(stub.calls[1]?.init.headers.get(CSRF_HEADER)).toBe("1");
+    expect(stub.calls[1]?.init.body).toBeUndefined();
+  });
+
+  it("does not retry a removal whose reply is lost", async () => {
+    const stub = fakeFetch(() => {
+      throw new TypeError("connection_lost");
+    });
+    const client = createAdminClient({ baseUrl: BASE, fetch: stub.fetch });
+    await expect(
+      client.removeEmailSuppression("11111111-1111-4111-8111-111111111111"),
+    ).rejects.toBeInstanceOf(NetworkError);
+    expect(stub.calls).toHaveLength(1);
+  });
+});

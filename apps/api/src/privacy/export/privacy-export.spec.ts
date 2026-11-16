@@ -23,6 +23,7 @@ interface ExportDoc {
     shippingMethod: Record<string, unknown> | null;
   }[];
   mail: Record<string, unknown>[];
+  emailSuppressions: Record<string, unknown>[];
   sessions: Record<string, unknown>[];
   cart: { lines: Record<string, unknown>[] } | null;
   processors: { kind: string; name: string }[];
@@ -139,11 +140,13 @@ describe("personal data export and the admin privacy requests (privacy plan step
         "account",
         "orders",
         "mail",
+        "emailSuppressions",
         "sessions",
         "cart",
         "processors",
       ]);
       expect(doc.format).toBe(PERSONAL_DATA_EXPORT_FORMAT);
+      expect(doc.emailSuppressions).toEqual([]);
       expect(doc.subject).toEqual({ kind: "customer" });
       expect(doc.account).toMatchObject({
         email: memberEmail,

@@ -42,7 +42,8 @@ describe("email area source guards", () => {
   });
 
   it("sends every write exactly once, through the single flight and run-write", () => {
-    const writes = /adminClient\.(sendTestEmail|resendEmailMessage|cancelEmailMessage)\(/g;
+    const writes =
+      /adminClient\.(sendTestEmail|resendEmailMessage|cancelEmailMessage|removeEmailSuppression)\(/g;
     let seen = 0;
     for (const { name, code } of sources) {
       for (const match of code.matchAll(writes)) {
@@ -57,7 +58,7 @@ describe("email area source guards", () => {
         expect(code, name).toMatch(/createSingleFlight/);
       }
     }
-    expect(seen).toBe(3);
+    expect(seen).toBe(4);
   });
 
   it("never retries a write: no loop, timer or second call around the writes", () => {
@@ -79,6 +80,18 @@ describe("email area source guards", () => {
     expect(page.indexOf("async function confirm()")).toBeLessThan(
       page.indexOf("adminClient.resendEmailMessage("),
     );
+  });
+
+  it("confirms suppression removal with the full address and never resends mail", () => {
+    const page = sources.find((source) => source.name === "suppressions-page.tsx")?.code ?? "";
+    expect(page).toMatch(/onRemove=\{ask\}/);
+    expect(page).toMatch(/<ConfirmDialog/);
+    expect(page).toMatch(/onConfirm=\{\(\) => void confirm\(\)\}/);
+    expect(page.match(/adminClient\.removeEmailSuppression\(/g)).toHaveLength(1);
+    const ask = page.slice(page.indexOf("function ask("), page.indexOf("function close("));
+    expect(ask).not.toMatch(/adminClient/);
+    expect(page).toContain("{asking?.toAddress}");
+    expect(page).not.toMatch(/resendEmailMessage|sendTestEmail/);
   });
 
   it("never asks for or shows a credential: no password field, no input named like a key, token or secret", () => {

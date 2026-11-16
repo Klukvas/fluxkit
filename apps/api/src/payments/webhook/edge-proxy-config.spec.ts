@@ -327,7 +327,13 @@ describe("edge: one X-Forwarded-For rule for the API and the storefront (search 
   const proxied = locationsOf(server).filter((entry) =>
     /^\s*proxy_pass\s/m.test(withoutComments(withSnippets(entry.body))),
   );
-  const proxiedPatterns = ["^/(store|media)(/|$)", "^/admin(/|$)", "^/webhooks/payments(/|$)", "/"];
+  const proxiedPatterns = [
+    "^/(store|media)(/|$)",
+    "^/admin(/|$)",
+    "^/webhooks/payments(/|$)",
+    "^/webhooks/email(/|$)",
+    "/",
+  ];
 
   it("sets the header in one snippet only, replacing what the client sent (the shipped TRUST_PROXY=1)", () => {
     expect(forwardedRule).toEqual(["X-Forwarded-For $remote_addr"]);

@@ -227,3 +227,12 @@ Run, headers and conventions: `apps/admin/README.md`. Plan: `docs/plans/2026-10-
 - `src/areas/home/home-page.spec.tsx` - the neutral Start subtitle (no area the user may not open) in both languages, also with an empty workspace.
 - `src/messages/{uk,en}/home.json` - lazy workspace labels and state/action text in both UI languages.
 - `e2e/tests/home.e2e.ts` - response-derived counter totals, navigation, isolated failure/retry and phone overflow/checklist checks; requires real services.
+
+- `src/areas/email/suppressions-page.tsx` — permission-gated suppression page data/query and full-address removal confirmation; never automatically retries/resends a write.
+- `src/areas/email/suppressions-view.tsx` — masked-by-default recipient table with per-row show/hide, reason/source/time with token styling, pagination, loading/empty/error and confirmation states.
+- `src/areas/email/suppressions.spec.tsx` — suppression states, gating/removal and uk/en rendering checks.
+- `src/areas/email/index.tsx`, `src/router/paths.ts`, `src/routes.ts` — Email Suppressions lazy route and email.manage navigation.
+- `src/messages/en/email.json`, `src/messages/uk/email.json` — suppression labels, reasons, confirmation and errors in both locales.
+
+- `e2e/support/email-suppression-db.ts` — seeds one reserved-domain suppression in the explicitly guarded disposable `_e2e_test` database using the API's existing pg dependency; no live send/test-only API.
+- `e2e/tests/email.e2e.ts` — also exercises per-row address show/hide, full-address confirmation/Keep, one CSRF DELETE and no resend in the real browser.

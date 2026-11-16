@@ -124,6 +124,8 @@ const EMAIL_ROUTES = [
   "GET /admin/email/status",
   "POST /admin/email/test",
   "GET /admin/email/messages",
+  "GET /admin/email/suppressions",
+  "DELETE /admin/email/suppressions/:id",
   "GET /admin/email/messages/:id",
   "POST /admin/email/messages/:id/resend",
   "POST /admin/email/messages/:id/cancel",
@@ -728,6 +730,18 @@ describe("admin route permissions", () => {
         permission: "email.manage",
         call: (url) => http(url, "POST", "/admin/email/test", { body: {} }),
         allowedStatus: 409,
+      },
+      {
+        name: "GET /admin/email/suppressions",
+        permission: "email.manage",
+        call: (url) => http(url, "GET", "/admin/email/suppressions"),
+        allowedStatus: 200,
+      },
+      {
+        name: "DELETE /admin/email/suppressions/:id",
+        permission: "email.manage",
+        call: (url) => http(url, "DELETE", `/admin/email/suppressions/${SOME_ID}`),
+        allowedStatus: 404,
       },
       {
         name: "GET /admin/email/messages",

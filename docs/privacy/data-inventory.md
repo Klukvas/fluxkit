@@ -56,6 +56,11 @@ Purposes and legal bases are proposals taken from the plan. TODO(fluxkit): legal
 | `email_message` | `template_key`, `locale`, `recipient_kind`, `status`, `created_at`, `sent_at` | pseudonymous (Q) | D16 | included | delete_row |  |
 | `email_message` | `customer_id`, `order_id`, `dedupe_key`, `provider_message_id` | pseudonymous (Q) | D16 | excluded | delete_row | Internal id or provider reference only the shop can use. |
 | `email_message` | `admin_user_id`, `created_by_admin_id` | staff (S) | D20 | excluded | set_null | Admin actor id; admin ids are not exported. |
+| `email_suppression` | `id` | pseudonymous (Q) | D16 | excluded | delete_row | Internal entry ID; removed only in verified address scope or by an authorized admin. |
+| `email_suppression` | `to_address` | personal (P) | D16 | excluded | delete_row | Normalized global block address; export does not repeat the subject address. Retained until authorized removal or verified-address erasure. |
+| `email_suppression` | `reason`, `source_provider`, `first_seen_at`, `last_seen_at` | pseudonymous (Q) | D16 | included | delete_row | Subject-linked safety metadata; retained until authorized removal or verified-address erasure. |
+| `email_webhook_receipt` | `provider_code`, `event_key`, `event_at`, `received_at` | pseudonymous (Q) | D16 | excluded | delete_row | Internal retry receipt; expires eight days after receipt or on verified-address erasure. Never exported. |
+| `email_webhook_receipt` | `to_address` | personal (P) | D16 | excluded | delete_row | Normalized address for scoped erasure; job 10 deletes receipts after eight days. No repeated address in export. |
 | `health_check` | all 2 columns | none | D24 | not_applicable | not_applicable | |
 | `inventory_level` | all 6 columns | none | D24 | not_applicable | not_applicable | |
 | `location` | all 6 columns | none | D24 | not_applicable | not_applicable | |
@@ -155,7 +160,7 @@ Purposes and legal bases are proposals taken from the plan. TODO(fluxkit): legal
 | D13 | Delivery (C) | Forever |
 | D14 | Payment and refunds (C, L) | Forever |
 | D15 | Payment journal (L) | Forever |
-| D16 | Mail delivery (C) | Job 10: 30 days (`failed`, `unknown`: 90) |
+| D16 | Mail delivery and recipient safety (C, LI) | Outbox job 10: 30 days (`failed`, `unknown`: 90); suppression until authorized removal or verified-address erasure; webhook receipts eight days after receipt (job 10) |
 | D17 | Event outbox (C) | Job 4: 7 days after dispatch |
 | D18 | Staff access (LI) | Forever (deactivate only) |
 | D19 | Staff sign-in | Removed after expiry by the expired-session cleanup |

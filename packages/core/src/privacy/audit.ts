@@ -17,6 +17,7 @@ export const ADMIN_AUDIT_ACTIONS = Object.freeze([
   "privacy.exported",
   "privacy.erased",
   "privacy.request_changed",
+  "email_suppression.removed",
 ] as const);
 
 export type AdminAuditAction = (typeof ADMIN_AUDIT_ACTIONS)[number];
@@ -26,6 +27,7 @@ export const ADMIN_AUDIT_TARGET_KINDS = Object.freeze([
   "order",
   "admin_user",
   "privacy_request",
+  "email_suppression",
 ] as const);
 
 export type AdminAuditTargetKind = (typeof ADMIN_AUDIT_TARGET_KINDS)[number];

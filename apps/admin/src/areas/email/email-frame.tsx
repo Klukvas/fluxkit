@@ -10,10 +10,11 @@ import { describeErrorCode } from "./email-view";
 export const focusClass =
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 
-/** The three lists of the Email area, in the order of the sub-navigation (all need email.manage). */
+/** The screens of the Email area, in the order of the sub-navigation (all need email.manage). */
 export const EMAIL_SCREENS = [
   { id: "email", labelKey: "mail.nav.status" },
   { id: "emailMessages", labelKey: "mail.nav.messages" },
+  { id: "emailSuppressions", labelKey: "mail.nav.suppressions" },
   { id: "emailTemplates", labelKey: "mail.nav.templates" },
 ] as const satisfies readonly { id: RouteId; labelKey: string }[];
 

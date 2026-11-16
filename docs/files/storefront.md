@@ -159,3 +159,4 @@ Run: `pnpm --filter @fluxkit/storefront dev -p 3001` (needs `pnpm build` once so
 - `e2e/tests/split-listing.e2e.ts` - isolated admin-created split assignment, real search/SQL cards, group links/size/gallery names, add versus choose and keyboard/no-JS; flag restored and product archived afterwards.
 
 - `src/lib/server-api-fetch.ts` - default server API fetch for `store-data.ts` (including feature reads) and `search-data.ts`: retries GET/HEAD exactly once for a pre-response connection failure through the cause chain, retaining options/signal; never retries writes, aborts/timeouts or HTTP statuses. `server-api-fetch.spec.ts` covers allowed errors, exclusions and unchanged second failure. Browser transport stays unchanged.
+- `src/lib/personal-data.spec.ts` — export download fixture includes additive `emailSuppressions` metadata; storefront behavior is unchanged.

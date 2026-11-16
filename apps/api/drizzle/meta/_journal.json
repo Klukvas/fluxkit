@@ -120,6 +120,13 @@
       "when": 1794788880753,
       "tag": "0016_email_provider_pin",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1794827031304,
+      "tag": "0017_email_suppression",
+      "breakpoints": true
     }
   ]
 }

@@ -11,6 +11,7 @@ import { summarizeError } from "../../common/error-summary.js";
 import { DEFAULT_JOB_LIMITS, type JobLimits } from "../../common/job-limits.js";
 import { LOCALE_CONFIG, type LocaleConfig } from "../../common/locale.js";
 import { EmailProviderRegistry, type EmailProviderSource } from "../registry/index.js";
+import { EmailSuppressionService } from "../suppression/email-suppression.service.js";
 import {
   EMAIL_THEME,
   EmailRenderError,
@@ -85,6 +86,8 @@ export class EmailSender {
     @Inject(LOCALE_CONFIG) private readonly locale: LocaleConfig,
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(EMAIL_SEND_PACER) private readonly pacer: SendPacer,
+    @Inject(EmailSuppressionService)
+    private readonly suppressions: Pick<EmailSuppressionService, "isSuppressed">,
   ) {}
 
   /** The loaded provider, `undefined` with `EMAIL_PROVIDER=none`. */
@@ -119,11 +122,23 @@ export class EmailSender {
     }
     if (provider === undefined) return { kind: "no_provider" };
     const message = claim.message;
-    const prepared = await this.prepare(message);
+    let suppressed: boolean;
+    try {
+      suppressed = await this.suppressions.isSuppressed(message.toAddress);
+    } catch {
+      // A failed shared lookup cannot authorize a send. Do not log the DB error: it can contain the address.
+      this.logger.warn(`Email ${message.id}: suppression_lookup_failed; deferred`);
+      return this.changes.defer(message, clock(), limits);
+    }
+    const prepared = suppressed ? undefined : await this.prepare(message);
     let outcome: EmailAttemptOutcome;
     let reason: EmailProviderFailureReason | undefined;
     let durationMs = 0;
-    if (prepared.kind === "not_renderable") {
+    if (suppressed) {
+      outcome = { kind: "suppressed" };
+    } else if (prepared === undefined) {
+      throw new Error("email_prepare_missing");
+    } else if (prepared.kind === "not_renderable") {
       outcome = prepared;
       this.logger.error(
         `Email ${message.id} (${message.templateKey}) cannot be rendered: ${prepared.code}; ${message.pinnedAt === null ? "failed" : "unknown"}`,
@@ -135,6 +150,8 @@ export class EmailSender {
         emailRetryDeadline(message.deadlineAt, message.pinnedAt, provider.capabilities).getTime(),
       );
       let started = 0;
+      // No DB I/O after final pacing admission. Feedback committed during the wait cannot recall this admitted send;
+      // a deferred or later attempt always performs a fresh shared suppression lookup above (ADR 0055 / 0056).
       const admission = await this.pacer.start(lastStartAt - clock().getTime(), () => {
         if (clock().getTime() >= lastStartAt) return undefined;
         started = performance.now();

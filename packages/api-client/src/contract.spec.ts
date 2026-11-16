@@ -739,6 +739,16 @@ const personalDataExport: Shape<PersonalDataExport> = {
     account: { nullable: exportRecord },
     orders: { array: exportRecord },
     mail: { array: exportRecord },
+    emailSuppressions: {
+      array: {
+        object: {
+          reason: { enum: ["hard_bounce", "complaint", "unsubscribe", "blocked"] },
+          sourceProvider: "string",
+          firstSeenAt: "string",
+          lastSeenAt: "string",
+        },
+      },
+    },
     sessions: { array: exportRecord },
     cart: { nullable: exportRecord },
     processors: {

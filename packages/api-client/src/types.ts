@@ -804,6 +804,13 @@ export interface PersonalDataExport {
   account: ExportJsonObject | null;
   orders: ExportJsonObject[];
   mail: ExportJsonObject[];
+  /** Shared email blocks in verified address scope; internal IDs, event keys and repeated addresses are excluded. */
+  emailSuppressions: {
+    reason: "hard_bounce" | "complaint" | "unsubscribe" | "blocked";
+    sourceProvider: string;
+    firstSeenAt: string;
+    lastSeenAt: string;
+  }[];
   sessions: ExportJsonObject[];
   cart: ExportJsonObject | null;
   processors: { kind: "email" | "payment" | "shipping"; name: string }[];

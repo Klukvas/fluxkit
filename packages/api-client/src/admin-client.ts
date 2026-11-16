@@ -27,6 +27,7 @@ import type {
   AdminEmailMessageDetail,
   AdminEmailMessageId,
   AdminEmailMessageList,
+  AdminEmailSuppressionList,
   AdminAuditAction,
   AdminAuditEventList,
   AdminErasurePreview,
@@ -448,6 +449,9 @@ export interface AdminClient {
   listAuditEvents(options?: AdminListAuditEventsOptions): Result<AdminAuditEventList>;
 
   // email (ADR 0031 decision 15; every operation needs `email.manage`)
+  listEmailSuppressions(options?: AdminPageOptions): Result<AdminEmailSuppressionList>;
+  /** Removes a local block only; never resends mail or changes a remote provider blocklist. */
+  removeEmailSuppression(id: string, options?: CallOptions): Result<undefined>;
   getEmailStatus(options?: CallOptions): Result<AdminEmailStatus>;
   /** To the signed-in admin's own address (no recipient in the body). `409 rule_violation` `email_not_configured` without a provider. */
   sendTestEmail(body: SendAdminTestEmailBody, options?: CallOptions): Result<AdminEmailMessageId>;
@@ -802,6 +806,9 @@ export function createAdminClient(options: AdminClientOptions): AdminClient {
       call("rejectPrivacyRequest", { pathParams: { id }, body, options: opts }),
     listAuditEvents: (opts) => call("listAuditEvents", { options: opts }),
 
+    listEmailSuppressions: (opts) => call("listEmailSuppressions", { options: opts }),
+    removeEmailSuppression: (id, opts) =>
+      call("removeEmailSuppression", { pathParams: { id }, options: opts }),
     getEmailStatus: (opts) => call("getEmailStatus", { options: opts }),
     sendTestEmail: (body, opts) => call("sendTestEmail", { body, options: opts }),
     listEmailMessages: (opts) => call("listEmailMessages", { options: opts }),

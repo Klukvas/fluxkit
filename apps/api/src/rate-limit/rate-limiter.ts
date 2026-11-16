@@ -36,6 +36,7 @@ export const RATE_LIMITS = Object.freeze({
   emailResend: { maxAttempts: 30, windowMinutes: 60 },
   // ADR 0032 decisions 12 and 14: the payment webhook, per address; generous because the provider's addresses are
   // unknown (M25) and one address may carry every notification of the shop.
+  emailWebhook: { maxAttempts: 300, windowMinutes: 1 },
   paymentWebhook: { maxAttempts: 300, windowMinutes: 1 },
   // ADR 0032 decision 14 (numbers of the refund and resync windows fixed in plan step 8, open question 8): a new payment
   // attempt calls the provider and makes an invoice; the status reads may read the provider (single flight per attempt);
@@ -98,6 +99,7 @@ export const RATE_LIMIT_SUBJECTS: Readonly<Record<RateLimitName, RateLimitSubjec
     emailTest: "adminUser",
     emailResend: "adminUser",
     paymentWebhook: "clientAddress",
+    emailWebhook: "clientAddress",
     paymentCreate: "clientAddress",
     paymentStatus: "clientAddress",
     paymentRefund: "adminUser",
