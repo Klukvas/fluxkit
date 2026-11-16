@@ -1,6 +1,6 @@
 # 0057. Single-host replica rollout
 
-Status: implements the owner's approved multi-instance PR 4 design (2026-11-16, plan section 9); built, not merged. Supplements ADR 0055. No migration or new dependency.
+Status: implements the owner's approved multi-instance PR 4 design (2026-11-16, plan section 9); merged 2026-11-16 (PR 343). Supplements ADR 0055. No migration or new dependency.
 
 ## Context
 
