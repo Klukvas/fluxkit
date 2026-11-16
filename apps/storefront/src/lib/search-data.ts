@@ -4,6 +4,7 @@ import {
   type FetchLike,
   type SearchResult,
 } from "@fluxkit/api-client";
+import { serverApiFetch } from "./server-api-fetch";
 import { retryAfterSeconds } from "./failure";
 import { SERVER_READ_TIMEOUT_MS } from "./request-timeout";
 import type { SearchQuery } from "./search-query";
@@ -101,7 +102,7 @@ async function readSearch(
   groupBy: "product" | "listing",
 ): Promise<SearchOutcome> {
   const forwarded = (await dependencies.forwardedFor?.()) ?? null;
-  const inner: FetchLike = dependencies.fetch ?? globalThis.fetch.bind(globalThis);
+  const inner: FetchLike = dependencies.fetch ?? serverApiFetch;
   const client = createStoreClient({
     baseUrl: dependencies.baseUrl(),
     fetch: (url, init) =>

@@ -279,7 +279,8 @@ describe("Caddy edge: the payment webhook handle", () => {
       expect(handleBlock, `the webhook handle must not use ${forbidden}`).not.toContain(forbidden);
     }
     expect(handleBlock).not.toMatch(/import\s+admin_security|Content-Security-Policy/);
-    expect(toApi).toMatch(/reverse_proxy\s+\{\$FLUXKIT_API_UPSTREAM:api:3000\}/);
+    expect(toApi).toMatch(/reverse_proxy\s+\{/);
+    expect(toApi).toContain("dynamic a {$FLUXKIT_API_HOST:api} {$FLUXKIT_API_PORT:3000}");
     // Only the admin SPA handles import the security headers.
     const importers = [...text.matchAll(/handle\s+(@\w+)\s*\{/g)]
       .filter((match) =>
@@ -287,6 +288,30 @@ describe("Caddy edge: the payment webhook handle", () => {
       )
       .map((match) => match[1]);
     expect(importers).toEqual(["@adminAssets", "@adminPages"]);
+  });
+});
+
+describe("edge: replica retirement (ADR 0057)", () => {
+  it.each(["fluxkit_api", "fluxkit_storefront"])(
+    "nginx: %s limits busy keep-alive connection lifetime inside the stop grace",
+    (name) => {
+      const text = withoutComments(nginxTemplate);
+      const start = text.indexOf(`upstream ${name} {`);
+      expect(start).toBeGreaterThan(-1);
+      const upstream = blockAt(text, text.indexOf("{", start)).body;
+      expect(directives(upstream, "keepalive_time")).toEqual(["10s"]);
+    },
+  );
+
+  it("Caddy: both dynamic pools refresh within the retry window without passive failure exclusion", () => {
+    const text = withoutComments(caddyfile);
+    const pools = [...text.matchAll(/dynamic a [^\n]+ \{/g)].map(
+      (match) => blockAt(text, match.index + match[0].length - 1).body,
+    );
+    expect(pools).toHaveLength(2);
+    for (const pool of pools) expect(pool).toMatch(/^\s*refresh 1s\s*$/m);
+    expect(text).toMatch(/^\s*lb_try_duration 5s\s*$/m);
+    expect(text).not.toMatch(/^\s*fail_duration\s/m);
   });
 });
 

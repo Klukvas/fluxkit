@@ -13,6 +13,8 @@ One line per user-visible or schema change.
 
 ## Unreleased
 
+- Production example: configurable API/storefront replicas, guarded rolling host deploys, HTTP drain before resource shutdown, one server GET/HEAD connection retry, shared media and edge hashing/retries (ADR 0057); the single edge still has a restart gap.
+
 - Email webhook resilience: unexpected controller/guard/raw-reader failures and email-only edge upstream 502/503/504 return retryable 429 with five-second Retry-After; ingestion bounds PostgreSQL locks/statements. Brevo refuses reuse of the API key as its webhook secret.
 
 - Email step 1b: migration `0017_email_suppression` adds shared normalized recipient blocks and eight-day webhook receipts; authenticated Resend/Brevo feedback routes, guarded sending, admin suppression list under email.manage with full addresses, masked-by-default UI, per-row show/hide and full-address removal confirmation with audit, verified-address privacy export/erasure and job-10 receipt purge. No fallback routing is enabled.
