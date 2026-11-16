@@ -19,6 +19,7 @@ export {
   RESEND_USER_AGENT,
   ResendConfigError,
   type ResendConfig,
+  validateIntegrationSecret,
 } from "./config.js";
 export {
   mapResendAnswer,

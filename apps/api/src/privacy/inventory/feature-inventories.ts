@@ -13,7 +13,15 @@ export interface FeatureInventorySource {
 
 const columnEntrySchema = z
   .object({
-    class: z.enum(["personal", "pseudonymous", "staff", "secret_hash", "free_text", "none"]),
+    class: z.enum([
+      "personal",
+      "pseudonymous",
+      "staff",
+      "secret_hash",
+      "encrypted_secret",
+      "free_text",
+      "none",
+    ]),
     ref: z.string(),
     export: z.enum(["included", "excluded", "not_applicable"]),
     erasure: z.enum([

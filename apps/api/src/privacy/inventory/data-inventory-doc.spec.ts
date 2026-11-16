@@ -71,6 +71,10 @@ const ROW_FACTS: Readonly<Record<string, { purpose: string; retention: string }>
     retention:
       "Requests 1095 days after completion, audit events 365 days; only when `ORDER_CONTACT_RETENTION_DAYS` is set (job 12)",
   },
+  D26: {
+    purpose: "Provider credentials of the shop (C, LI)",
+    retention: "Encrypted value until the owner retires it; version rows and ids stay (ADR 0058)",
+  },
 };
 
 const CLASS_LABELS: Readonly<Record<ColumnEntry["class"], string>> = {
@@ -78,6 +82,7 @@ const CLASS_LABELS: Readonly<Record<ColumnEntry["class"], string>> = {
   pseudonymous: "pseudonymous (Q)",
   staff: "staff (S)",
   secret_hash: "secret hash (H)",
+  encrypted_secret: "encrypted secret (E)",
   free_text: "free text (F)",
   none: "none",
 };
@@ -125,7 +130,7 @@ function renderDataInventory(inventory: Inventory): string {
     "",
     "Regenerate after changing the registry: `UPDATE_PRIVACY_DOC=1 pnpm --filter @fluxkit/api exec vitest run src/privacy/inventory/data-inventory-doc.spec.ts`.",
     "",
-    "Classes: personal (P) identifies a person directly; pseudonymous (Q) identifies through another table or a third party; staff (S) is staff personal data; secret hash (H) is not personal by itself but linkable; free text (F) is admin text that MAY contain personal data; none holds no personal data. Export: `included`, `excluded` (with a reason), `not_applicable`. Erasure: `delete_row`, `cascade`, `anonymise`, `set_null`, `clear`, `keep`, `out_of_scope`, `not_applicable`.",
+    "Classes: personal (P) identifies a person directly; pseudonymous (Q) identifies through another table or a third party; staff (S) is staff personal data; secret hash (H) is not personal by itself but linkable; encrypted secret (E) is a reversible envelope of a shop credential, never shopper data; free text (F) is admin text that MAY contain personal data; none holds no personal data. Export: `included`, `excluded` (with a reason), `not_applicable`. Erasure: `delete_row`, `cascade`, `anonymise`, `set_null`, `clear`, `keep`, `out_of_scope`, `not_applicable`.",
     "",
     "Purposes and legal bases are proposals taken from the plan. TODO(fluxkit): legal review of the purposes, bases and retention periods (plan tasks O3, O5).",
     "",

@@ -247,7 +247,8 @@
                           "shipping.manage",
                           "email.manage",
                           "payments.refund",
-                          "privacy.manage"
+                          "privacy.manage",
+                          "integrations.manage"
                         ]
                       }
                     }
@@ -2619,7 +2620,14 @@
             "in": "query",
             "schema": {
               "type": "string",
-              "enum": ["customer", "order", "admin_user", "privacy_request", "email_suppression"]
+              "enum": [
+                "customer",
+                "order",
+                "admin_user",
+                "privacy_request",
+                "email_suppression",
+                "integration"
+              ]
             }
           },
           {
@@ -2650,7 +2658,10 @@
                 "privacy.exported",
                 "privacy.erased",
                 "privacy.request_changed",
-                "email_suppression.removed"
+                "email_suppression.removed",
+                "admin_user.step_up_failed",
+                "integration.secret_changed",
+                "integration.secret_retired"
               ]
             }
           },
@@ -2720,7 +2731,10 @@
                               "privacy.exported",
                               "privacy.erased",
                               "privacy.request_changed",
-                              "email_suppression.removed"
+                              "email_suppression.removed",
+                              "admin_user.step_up_failed",
+                              "integration.secret_changed",
+                              "integration.secret_retired"
                             ]
                           },
                           "targetKind": {
@@ -2730,7 +2744,8 @@
                               "order",
                               "admin_user",
                               "privacy_request",
-                              "email_suppression"
+                              "email_suppression",
+                              "integration"
                             ]
                           },
                           "targetId": {
@@ -29979,6 +29994,880 @@
         "summary": "Preview a template with its sample variables",
         "tags": ["admin-email"],
         "x-fluxkit-permission": "email.manage"
+      }
+    },
+    "/admin/integrations": {
+      "get": {
+        "description": "One entry per installed provider package that declares secrets, enabled or not. Each secret reports only whether it is set and where (`env`, `set`, `not_set`). Makes no call to a provider.",
+        "operationId": "IntegrationsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The integrations and the current revision.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "revision": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Rises with every integration change; send it back as `expectedRevision`."
+                    },
+                    "storage": {
+                      "type": "string",
+                      "enum": ["ready", "disabled"],
+                      "description": "`disabled`: `SECRETS_ENCRYPTION_KEY` is not set on the server, so nothing can be saved here."
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": ["email", "payment", "shipping"]
+                          },
+                          "providerCode": {
+                            "type": "string"
+                          },
+                          "secrets": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "field": {
+                                  "type": "string"
+                                },
+                                "purpose": {
+                                  "type": "string",
+                                  "enum": ["outbound", "webhook"]
+                                },
+                                "envVariable": {
+                                  "type": "string",
+                                  "description": "The server variable that overrides the stored value when it is set."
+                                },
+                                "state": {
+                                  "type": "string",
+                                  "enum": ["not_set", "set", "env"],
+                                  "description": "`env`: set on the server, read-only here. `set`: a value is stored. `not_set`: neither. The value itself is never returned."
+                                },
+                                "last4": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "enum": [null],
+                                  "description": "Always null: no part of a secret is ever returned."
+                                },
+                                "versionId": {
+                                  "nullable": true,
+                                  "description": "The stored credential version, for `retire-secret`; null when nothing is stored.",
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "generation": {
+                                  "nullable": true,
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                "savedAt": {
+                                  "nullable": true,
+                                  "type": "string",
+                                  "format": "date-time",
+                                  "description": "ISO 8601, UTC."
+                                },
+                                "keyAvailable": {
+                                  "nullable": true,
+                                  "description": "Whether this server holds the master key that sealed the stored value; false means it must be entered again. Null when nothing is stored.",
+                                  "type": "boolean"
+                                }
+                              },
+                              "required": [
+                                "field",
+                                "purpose",
+                                "envVariable",
+                                "state",
+                                "last4",
+                                "versionId",
+                                "generation",
+                                "savedAt",
+                                "keyAvailable"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          }
+                        },
+                        "required": ["id", "kind", "providerCode", "secrets", "updatedAt"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["revision", "storage", "items"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List the installed providers that can hold credentials",
+        "tags": ["admin-integrations"],
+        "x-fluxkit-permission": "integrations.manage"
+      }
+    },
+    "/admin/integrations/{id}": {
+      "get": {
+        "operationId": "IntegrationsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Integration id from `GET /admin/integrations`.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The integration.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "revision": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Rises with every integration change; send it back as `expectedRevision`."
+                    },
+                    "storage": {
+                      "type": "string",
+                      "enum": ["ready", "disabled"],
+                      "description": "`disabled`: `SECRETS_ENCRYPTION_KEY` is not set on the server, so nothing can be saved here."
+                    },
+                    "integration": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": ["email", "payment", "shipping"]
+                        },
+                        "providerCode": {
+                          "type": "string"
+                        },
+                        "secrets": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "field": {
+                                "type": "string"
+                              },
+                              "purpose": {
+                                "type": "string",
+                                "enum": ["outbound", "webhook"]
+                              },
+                              "envVariable": {
+                                "type": "string",
+                                "description": "The server variable that overrides the stored value when it is set."
+                              },
+                              "state": {
+                                "type": "string",
+                                "enum": ["not_set", "set", "env"],
+                                "description": "`env`: set on the server, read-only here. `set`: a value is stored. `not_set`: neither. The value itself is never returned."
+                              },
+                              "last4": {
+                                "type": "string",
+                                "nullable": true,
+                                "enum": [null],
+                                "description": "Always null: no part of a secret is ever returned."
+                              },
+                              "versionId": {
+                                "nullable": true,
+                                "description": "The stored credential version, for `retire-secret`; null when nothing is stored.",
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "generation": {
+                                "nullable": true,
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              "savedAt": {
+                                "nullable": true,
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "ISO 8601, UTC."
+                              },
+                              "keyAvailable": {
+                                "nullable": true,
+                                "description": "Whether this server holds the master key that sealed the stored value; false means it must be entered again. Null when nothing is stored.",
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "field",
+                              "purpose",
+                              "envVariable",
+                              "state",
+                              "last4",
+                              "versionId",
+                              "generation",
+                              "savedAt",
+                              "keyAvailable"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "updatedAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "ISO 8601, UTC."
+                        }
+                      },
+                      "required": ["id", "kind", "providerCode", "secrets", "updatedAt"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["revision", "storage", "integration"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get one integration",
+        "tags": ["admin-integrations"],
+        "x-fluxkit-permission": "integrations.manage"
+      }
+    },
+    "/admin/integrations/{id}/secrets/{field}": {
+      "put": {
+        "description": "Encrypts the value and stores it as a new candidate version, replacing an earlier candidate of the same credential. The value is never returned and, in this release, not yet used at runtime: providers still read the server environment. Asks for the owner's current password (wrong: `403`, `rule: current_password_incorrect`); limited per admin and per address, and answers `503` when the shared limits are unavailable. `409` rules: `integration_env_override`, `integration_storage_disabled`, `integration_revision_stale`, `integration_unavailable`.",
+        "operationId": "IntegrationsController_putSecret",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Integration id from `GET /admin/integrations`.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "field",
+            "required": true,
+            "in": "path",
+            "description": "A secret field the provider declares, e.g. `api_key`.",
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]{0,31}$"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "expectedRevision": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "The `revision` of the last read. Another change since then answers 409 (`rule: integration_revision_stale`)."
+                  },
+                  "value": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4096,
+                    "writeOnly": true,
+                    "format": "password",
+                    "description": "The credential as the provider shows it: printable ASCII without spaces. Stored encrypted; never returned."
+                  },
+                  "currentPassword": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024,
+                    "writeOnly": true,
+                    "format": "password",
+                    "description": "The signed-in owner's current password, asked again for every change."
+                  }
+                },
+                "required": ["expectedRevision", "value", "currentPassword"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The integration after the change.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "revision": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Rises with every integration change; send it back as `expectedRevision`."
+                    },
+                    "storage": {
+                      "type": "string",
+                      "enum": ["ready", "disabled"],
+                      "description": "`disabled`: `SECRETS_ENCRYPTION_KEY` is not set on the server, so nothing can be saved here."
+                    },
+                    "integration": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": ["email", "payment", "shipping"]
+                        },
+                        "providerCode": {
+                          "type": "string"
+                        },
+                        "secrets": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "field": {
+                                "type": "string"
+                              },
+                              "purpose": {
+                                "type": "string",
+                                "enum": ["outbound", "webhook"]
+                              },
+                              "envVariable": {
+                                "type": "string",
+                                "description": "The server variable that overrides the stored value when it is set."
+                              },
+                              "state": {
+                                "type": "string",
+                                "enum": ["not_set", "set", "env"],
+                                "description": "`env`: set on the server, read-only here. `set`: a value is stored. `not_set`: neither. The value itself is never returned."
+                              },
+                              "last4": {
+                                "type": "string",
+                                "nullable": true,
+                                "enum": [null],
+                                "description": "Always null: no part of a secret is ever returned."
+                              },
+                              "versionId": {
+                                "nullable": true,
+                                "description": "The stored credential version, for `retire-secret`; null when nothing is stored.",
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "generation": {
+                                "nullable": true,
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              "savedAt": {
+                                "nullable": true,
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "ISO 8601, UTC."
+                              },
+                              "keyAvailable": {
+                                "nullable": true,
+                                "description": "Whether this server holds the master key that sealed the stored value; false means it must be entered again. Null when nothing is stored.",
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "field",
+                              "purpose",
+                              "envVariable",
+                              "state",
+                              "last4",
+                              "versionId",
+                              "generation",
+                              "savedAt",
+                              "keyAvailable"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "updatedAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "ISO 8601, UTC."
+                        }
+                      },
+                      "required": ["id", "kind", "providerCode", "secrets", "updatedAt"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["revision", "storage", "integration"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable: a transient failure, try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Store a provider credential",
+        "tags": ["admin-integrations"],
+        "x-fluxkit-permission": "integrations.manage"
+      }
+    },
+    "/admin/integrations/{id}/retire-secret": {
+      "post": {
+        "description": "Deletes the encrypted value of a candidate version; the version stays as a tombstone. Works without `SECRETS_ENCRYPTION_KEY`. Asks for the owner's current password like the save. `409`: `integration_revision_stale`, or `invalid_transition` (`rule: integration_version_not_retirable`).",
+        "operationId": "IntegrationsController_retireSecret",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Integration id from `GET /admin/integrations`.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "expectedRevision": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "The `revision` of the last read. Another change since then answers 409 (`rule: integration_revision_stale`)."
+                  },
+                  "versionId": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                    "format": "uuid"
+                  },
+                  "currentPassword": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024,
+                    "writeOnly": true,
+                    "format": "password",
+                    "description": "The signed-in owner's current password, asked again for every change."
+                  }
+                },
+                "required": ["expectedRevision", "versionId", "currentPassword"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The integration after the change.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "revision": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Rises with every integration change; send it back as `expectedRevision`."
+                    },
+                    "storage": {
+                      "type": "string",
+                      "enum": ["ready", "disabled"],
+                      "description": "`disabled`: `SECRETS_ENCRYPTION_KEY` is not set on the server, so nothing can be saved here."
+                    },
+                    "integration": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": ["email", "payment", "shipping"]
+                        },
+                        "providerCode": {
+                          "type": "string"
+                        },
+                        "secrets": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "field": {
+                                "type": "string"
+                              },
+                              "purpose": {
+                                "type": "string",
+                                "enum": ["outbound", "webhook"]
+                              },
+                              "envVariable": {
+                                "type": "string",
+                                "description": "The server variable that overrides the stored value when it is set."
+                              },
+                              "state": {
+                                "type": "string",
+                                "enum": ["not_set", "set", "env"],
+                                "description": "`env`: set on the server, read-only here. `set`: a value is stored. `not_set`: neither. The value itself is never returned."
+                              },
+                              "last4": {
+                                "type": "string",
+                                "nullable": true,
+                                "enum": [null],
+                                "description": "Always null: no part of a secret is ever returned."
+                              },
+                              "versionId": {
+                                "nullable": true,
+                                "description": "The stored credential version, for `retire-secret`; null when nothing is stored.",
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "generation": {
+                                "nullable": true,
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              "savedAt": {
+                                "nullable": true,
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "ISO 8601, UTC."
+                              },
+                              "keyAvailable": {
+                                "nullable": true,
+                                "description": "Whether this server holds the master key that sealed the stored value; false means it must be entered again. Null when nothing is stored.",
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "field",
+                              "purpose",
+                              "envVariable",
+                              "state",
+                              "last4",
+                              "versionId",
+                              "generation",
+                              "savedAt",
+                              "keyAvailable"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "updatedAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "ISO 8601, UTC."
+                        }
+                      },
+                      "required": ["id", "kind", "providerCode", "secrets", "updatedAt"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["revision", "storage", "integration"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable: a transient failure, try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Remove a stored provider credential",
+        "tags": ["admin-integrations"],
+        "x-fluxkit-permission": "integrations.manage"
       }
     },
     "/admin/privacy/lookup": {

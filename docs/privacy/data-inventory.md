@@ -6,7 +6,7 @@ Every database column of the core schema with its class, purpose, retention and 
 
 Regenerate after changing the registry: `UPDATE_PRIVACY_DOC=1 pnpm --filter @fluxkit/api exec vitest run src/privacy/inventory/data-inventory-doc.spec.ts`.
 
-Classes: personal (P) identifies a person directly; pseudonymous (Q) identifies through another table or a third party; staff (S) is staff personal data; secret hash (H) is not personal by itself but linkable; free text (F) is admin text that MAY contain personal data; none holds no personal data. Export: `included`, `excluded` (with a reason), `not_applicable`. Erasure: `delete_row`, `cascade`, `anonymise`, `set_null`, `clear`, `keep`, `out_of_scope`, `not_applicable`.
+Classes: personal (P) identifies a person directly; pseudonymous (Q) identifies through another table or a third party; staff (S) is staff personal data; secret hash (H) is not personal by itself but linkable; encrypted secret (E) is a reversible envelope of a shop credential, never shopper data; free text (F) is admin text that MAY contain personal data; none holds no personal data. Export: `included`, `excluded` (with a reason), `not_applicable`. Erasure: `delete_row`, `cascade`, `anonymise`, `set_null`, `clear`, `keep`, `out_of_scope`, `not_applicable`.
 
 Purposes and legal bases are proposals taken from the plan. TODO(fluxkit): legal review of the purposes, bases and retention periods (plan tasks O3, O5).
 
@@ -63,6 +63,13 @@ Purposes and legal bases are proposals taken from the plan. TODO(fluxkit): legal
 | `email_webhook_receipt` | `provider_code`, `event_key`, `event_at`, `received_at` | pseudonymous (Q) | D16 | excluded | delete_row | Internal retry receipt; expires eight days after receipt or on verified-address erasure. Never exported. |
 | `email_webhook_receipt` | `to_address` | personal (P) | D16 | excluded | delete_row | Normalized address for scoped erasure; job 10 deletes receipts after eight days. No repeated address in export. |
 | `health_check` | all 2 columns | none | D24 | not_applicable | not_applicable | |
+| `integration` | `id`, `kind`, `provider_code`, `created_at`, `updated_at` | none | D26 | not_applicable | not_applicable |  |
+| `integration` | `updated_by` | staff (S) | D26 | excluded | set_null | Admin actor id; admin ids are not exported. |
+| `integration_credential_version` | `id`, `integration_id`, `generation`, `purpose`, `state`, `created_at`, `retired_at`, `revoked_at` | none | D26 | not_applicable | not_applicable |  |
+| `integration_credential_version` | `created_by` | staff (S) | D26 | excluded | set_null | Admin actor id; admin ids are not exported. |
+| `integration_revision` | all 3 columns | none | D26 | not_applicable | not_applicable | |
+| `integration_secret` | `id`, `version_id`, `field`, `created_at` | none | D26 | not_applicable | not_applicable |  |
+| `integration_secret` | `key_id`, `nonce`, `ciphertext`, `tag` | encrypted secret (E) | D26 | excluded | out_of_scope | An encrypted credential of the shop's own provider account (ADR 0058): no shopper's data, never exported or returned by any API, removed only when the owner retires it. |
 | `inventory_level` | all 6 columns | none | D24 | not_applicable | not_applicable | |
 | `location` | all 6 columns | none | D24 | not_applicable | not_applicable | |
 | `media` | all 9 columns | none | D24 | not_applicable | not_applicable | |
@@ -171,3 +178,4 @@ Purposes and legal bases are proposals taken from the plan. TODO(fluxkit): legal
 | D23 | Catalog images | Job 7 removes abandoned uploads |
 | D24 | No personal data (catalog, pricing, inventory, shipping methods, search, health) | Not applicable |
 | D25 | Accountability (L, LI) | Requests 1095 days after completion, audit events 365 days; only when `ORDER_CONTACT_RETENTION_DAYS` is set (job 12) |
+| D26 | Provider credentials of the shop (C, LI) | Encrypted value until the owner retires it; version rows and ids stay (ADR 0058) |

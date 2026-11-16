@@ -134,6 +134,13 @@
       "when": 1794837706505,
       "tag": "0018_email_provider_routing",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1794859651850,
+      "tag": "0019_integration_credentials",
+      "breakpoints": true
     }
   ]
 }

@@ -1,5 +1,5 @@
 import type { NestExpressApplication } from "@nestjs/platform-express";
-import type { SearchEnv } from "@fluxkit/config";
+import type { SearchEnv, SecretsKeyRing } from "@fluxkit/config";
 import type { AdminRole } from "@fluxkit/core";
 import { createApp } from "../app.factory.js";
 import type { AdminAuthenticator } from "../auth/admin-authenticator.js";
@@ -122,6 +122,12 @@ export interface StartAppOptions {
   search?: SearchEnv;
   /** Shorter engine timeouts of catalog search. */
   searchTuning?: Partial<SearchTuning>;
+  /** `SECRETS_ENCRYPTION_KEY` and its predecessor as `loadEnv` parses them; defaults to none (the store is off). */
+  secretsKeyRing?: SecretsKeyRing;
+  /** Where the integration store looks for provider packages; defaults to nowhere, so no real package is read. */
+  integrationProvidersDir?: string;
+  /** The environment the integration store checks for overrides; defaults to an empty one. */
+  integrationEnvironment?: Readonly<Record<string, string | undefined>>;
 }
 
 export async function startApp(options: StartAppOptions = {}): Promise<RunningApp> {
@@ -144,6 +150,7 @@ export async function startApp(options: StartAppOptions = {}): Promise<RunningAp
       orderPaymentTtlMinutes: options.orderPaymentTtlMinutes,
       orderGuestAccessDays: options.orderGuestAccessDays,
       orderTokenSecret: options.orderTokenSecret ?? TEST_ORDER_TOKEN_SECRET,
+      secretsKeyRing: options.secretsKeyRing ?? null,
       emailFrom: options.emailFrom === null ? undefined : (options.emailFrom ?? TEST_EMAIL_FROM),
       emailReplyTo: options.emailReplyTo ?? undefined,
       storefrontPublicUrl:
@@ -181,6 +188,8 @@ export async function startApp(options: StartAppOptions = {}): Promise<RunningAp
       paymentCallTimeoutMs: options.paymentCallTimeoutMs,
       mediaTuning: options.mediaTuning,
       searchTuning: options.searchTuning,
+      integrationProvidersDir: options.integrationProvidersDir ?? "",
+      integrationEnvironment: options.integrationEnvironment ?? {},
     },
   );
   await app.listen(0, "127.0.0.1");

@@ -14,6 +14,7 @@ export {
   parseNovaPostEnv,
   type NovaPostConfig,
   type NovaPostEnvironment,
+  validateIntegrationSecret,
 } from "./config.js";
 export { NovaPostCallError, NovaPostHttp, type NovaPostLogger } from "./http.js";
 export {

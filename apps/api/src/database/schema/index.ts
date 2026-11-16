@@ -13,3 +13,4 @@ export * from "./payments.js";
 export * from "./privacy.js";
 export * from "./search.js";
 export * from "./banners.js";
+export * from "./integrations.js";

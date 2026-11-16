@@ -40,6 +40,10 @@ describe("catalog schema (real Postgres)", () => {
     await pool.query('drop schema if exists "drizzle" cascade');
     // Reverse dependency order, no CASCADE (same reasoning as migrations.spec.ts).
     for (const name of [
+      "integration_secret",
+      "integration_credential_version",
+      "integration",
+      "integration_revision",
       "email_provider_state",
       "email_webhook_receipt",
       "email_suppression",
@@ -1478,7 +1482,7 @@ describe("catalog schema (real Postgres)", () => {
           'customer', 'customer_session', 'cart', 'cart_item', 'sales_order', 'order_item',
           'order_adjustment', 'order_status_change', 'order_item_reservation', 'domain_event',
           'media_upload', 'shipping_method', 'shipping_provider_setting', 'order_shipping', 'shipment',
-          'shipment_status_change', 'customer_auth_token', 'email_message', 'email_suppression', 'email_webhook_receipt', 'email_provider_state', 'payment', 'payment_event',
+          'shipment_status_change', 'customer_auth_token', 'email_message', 'email_suppression', 'email_webhook_receipt', 'email_provider_state', 'integration_revision', 'integration', 'integration_credential_version', 'integration_secret', 'payment', 'payment_event',
           'payment_refund', 'privacy_request', 'admin_audit_event',
           'search_sync_queue', 'search_index_state', 'search_synonym_group', 'banner', 'banner_image'
         )
@@ -1503,7 +1507,7 @@ describe("catalog schema (real Postgres)", () => {
           'customer', 'customer_session', 'cart', 'cart_item', 'sales_order', 'order_item',
           'order_adjustment', 'order_status_change', 'order_item_reservation', 'domain_event',
           'media_upload', 'shipping_method', 'shipping_provider_setting', 'order_shipping', 'shipment',
-          'shipment_status_change', 'customer_auth_token', 'email_message', 'email_suppression', 'email_webhook_receipt', 'email_provider_state', 'payment', 'payment_event',
+          'shipment_status_change', 'customer_auth_token', 'email_message', 'email_suppression', 'email_webhook_receipt', 'email_provider_state', 'integration_revision', 'integration', 'integration_credential_version', 'integration_secret', 'payment', 'payment_event',
           'payment_refund', 'privacy_request', 'admin_audit_event',
           'search_sync_queue', 'search_index_state', 'search_synonym_group', 'banner', 'banner_image'
         )

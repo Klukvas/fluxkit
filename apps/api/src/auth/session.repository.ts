@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, eq, lte, ne, or, sql } from "drizzle-orm";
+import { and, eq, gt, lte, ne, or, sql } from "drizzle-orm";
 import type { DbExecutor } from "../common/transaction.js";
 import { DRIZZLE, type Database } from "../database/database.module.js";
 import { adminSession, adminUser } from "../database/schema/index.js";
@@ -81,6 +81,30 @@ export class SessionRepository {
 
   async touch(sessionId: string, lastSeenAt: Date): Promise<void> {
     await this.db.update(adminSession).set({ lastSeenAt }).where(eq(adminSession.id, sessionId));
+  }
+
+  /**
+   * Whether this session of this user still exists and has not reached its expiry, locked until the transaction ends
+   * so a concurrent sign-out waits for the caller's change or is seen by it. A revoked session has no row.
+   */
+  async isLiveForUpdate(
+    transaction: DbExecutor,
+    sessionId: string,
+    userId: string,
+    now: Date,
+  ): Promise<boolean> {
+    const rows = await transaction
+      .select({ id: adminSession.id })
+      .from(adminSession)
+      .where(
+        and(
+          eq(adminSession.id, sessionId),
+          eq(adminSession.userId, userId),
+          gt(adminSession.expiresAt, now),
+        ),
+      )
+      .for("update");
+    return rows.length === 1;
   }
 
   async deleteById(sessionId: string): Promise<void> {

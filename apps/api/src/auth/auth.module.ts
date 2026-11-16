@@ -23,6 +23,7 @@ import { ExpiredSessionCleanup } from "./session-cleanup.js";
 import { SessionRepository } from "./session.repository.js";
 import { SessionService } from "./session.service.js";
 import { UsersController } from "./users/users.controller.js";
+import { AdminStepUpService } from "./step-up/admin-step-up.service.js";
 import { UsersService } from "./users/users.service.js";
 
 export interface AuthModuleOptions {
@@ -70,6 +71,7 @@ export class AuthModule implements NestModule {
         AdminUserRepository,
         AuthService,
         UsersService,
+        AdminStepUpService,
         SessionAdminAuthenticator,
         options.authenticator === undefined
           ? { provide: ADMIN_AUTHENTICATOR, useExisting: SessionAdminAuthenticator }
@@ -85,6 +87,7 @@ export class AuthModule implements NestModule {
         PasswordHasher,
         SessionService,
         AdminGuard,
+        AdminStepUpService,
       ],
     };
   }

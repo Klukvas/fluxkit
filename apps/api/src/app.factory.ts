@@ -48,6 +48,7 @@ import {
   emailWebhookRawBody,
 } from "./email/webhooks/email-webhook-raw-body.js";
 import { emailWebhookBodyErrorHandler } from "./email/webhooks/email-webhook-exception.filter.js";
+import type { IntegrationsConfig } from "./integrations/integrations.config.js";
 import { DEFAULT_PAYMENTS_CONFIG } from "./payments/payments-config.js";
 import type { SearchTuning } from "./search/search-config.js";
 import {
@@ -91,6 +92,7 @@ export type CreateAppEnv = Pick<AppEnv, "databaseUrl" | "enabledFeatures" | "fea
       | "orderGuestAccessDays"
       | "orderContactRetentionDays"
       | "orderTokenSecret"
+      | "secretsKeyRing"
       | "rateLimitStore"
       | "redisUrl"
       | "maxOpenOrders"
@@ -140,6 +142,10 @@ export interface CreateAppOptions {
   shipmentCallTimeouts?: Partial<ShipmentCallTimeouts>;
   /** Tests only: where provider packages are looked up (default `<repo>/packages/providers`). */
   shippingProvidersDir?: string;
+  /** Tests only: where the integration store looks for installed provider packages (default `<repo>/packages/providers`). */
+  integrationProvidersDir?: string;
+  /** Tests only: the environment the integration store checks for overrides and `NODE_ENV` (default: the process's). */
+  integrationEnvironment?: Readonly<Record<string, string | undefined>>;
   /** Default true. `pnpm jobs:run-once` passes false: it changes nothing but the data its jobs handle. */
   cleanExpiredSessionsOnBootstrap?: boolean;
   /** Default `["error", "warn", "log"]`. The command line passes `["error", "warn"]` and prints its own report. */
@@ -165,6 +171,16 @@ export function mediaConfigOf(env: CreateAppEnv, tuning: Partial<MediaTuning> = 
     maxBytes: env.mediaMaxBytes ?? DISABLED_MEDIA_CONFIG.maxBytes,
     maxPixels: env.mediaMaxPixels ?? DISABLED_MEDIA_CONFIG.maxPixels,
     tuning: { ...DEFAULT_MEDIA_TUNING, ...tuning },
+  };
+}
+
+function integrationsConfigOf(env: CreateAppEnv, options: CreateAppOptions): IntegrationsConfig {
+  const environment = options.integrationEnvironment ?? process.env;
+  return {
+    keyRing: env.secretsKeyRing ?? null,
+    providersDir: options.integrationProvidersDir ?? DEFAULT_SHIPPING_PROVIDERS_DIR,
+    isProduction: (environment["NODE_ENV"] ?? "").trim().toLowerCase() === "production",
+    environment,
   };
 }
 
@@ -258,6 +274,7 @@ export async function createApp(
         databaseUrl: env.databaseUrl,
         secret: env.orderTokenSecret,
       },
+      integrations: integrationsConfigOf(env, options),
       shipmentCallTimeouts: options.shipmentCallTimeouts,
       adminAuthenticator: options.adminAuthenticator,
       clock: options.clock,

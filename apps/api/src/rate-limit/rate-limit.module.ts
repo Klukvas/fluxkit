@@ -9,6 +9,12 @@ import {
 } from "./window-store.js";
 
 import { RateLimitGuard } from "./rate-limit.guard.js";
+import {
+  createStrictRedisClient,
+  RedisStrictWindows,
+  STRICT_WINDOWS,
+  UnavailableStrictWindows,
+} from "./strict-windows.js";
 import { RATE_LIMIT_OVERRIDES, RateLimiter, type RateLimitOverrides } from "./rate-limiter.js";
 
 export interface RateLimitStoreConfig {
@@ -52,11 +58,23 @@ export class RateLimitModule {
                 );
           },
         },
+        {
+          // Strict limits need Redis whatever RATE_LIMIT_STORE says; without REDIS_URL the sensitive actions answer 503.
+          provide: STRICT_WINDOWS,
+          useFactory: () =>
+            config?.redisUrl && config.secret
+              ? new RedisStrictWindows(
+                  createStrictRedisClient(config.redisUrl),
+                  config.prefix ?? rateLimitPrefix(config.databaseUrl),
+                  config.secret,
+                )
+              : new UnavailableStrictWindows(),
+        },
         { provide: RATE_LIMIT_OVERRIDES, useValue: overrides },
         RateLimiter,
         RateLimitGuard,
       ],
-      exports: [RateLimiter, RateLimitGuard, WINDOW_STORE],
+      exports: [RateLimiter, RateLimitGuard, WINDOW_STORE, STRICT_WINDOWS],
     };
   }
 }

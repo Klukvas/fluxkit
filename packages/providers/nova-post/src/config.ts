@@ -62,3 +62,19 @@ export function parseNovaPostEnv(
   const chosen = environment as NovaPostEnvironment;
   return Object.freeze({ apiKey: key, environment: chosen, baseUrl: NOVA_POST_BASE_URLS[chosen] });
 }
+
+/**
+ * The format rule of one managed secret field (`fluxkit.secrets` in package.json, ADR 0058), asked by the admin
+ * integration store before it encrypts a pasted value. Answers the problem (it names the rule, never the value) or
+ * `undefined`. The same accessors check the value when it comes from the environment.
+ */
+export function validateIntegrationSecret(field: string, value: string): string | undefined {
+  if (field !== "api_key") return "Unknown secret field.";
+  try {
+    parseNovaPostEnv({ NOVA_POST_API_KEY: value });
+    return undefined;
+  } catch (error) {
+    if (error instanceof NovaPostConfigError) return error.message;
+    throw error;
+  }
+}

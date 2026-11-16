@@ -6,7 +6,14 @@
   "description": "Monobank acquiring (Plata by mono) payment provider: invoices, status reads, invalidation, refunds and ECDSA-signed webhooks through https://api.monobank.ua with the shop's X-Token.",
   "fluxkit": {
     "provider": "monobank",
-    "kind": "payment"
+    "kind": "payment",
+    "secrets": [
+      {
+        "field": "token",
+        "purpose": "outbound",
+        "env": "MONOBANK_TOKEN"
+      }
+    ]
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
