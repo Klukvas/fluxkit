@@ -259,7 +259,9 @@ export function MessageFacts({
   items.push(
     {
       id: "provider",
-      term: t("mail.detail.providerCode"),
+      term: t(
+        message.status === "sent" ? "mail.detail.acceptingProvider" : "mail.detail.providerCode",
+      ),
       description:
         message.providerCode === null ? (
           <span className="text-muted-foreground">{none}</span>
@@ -274,7 +276,20 @@ export function MessageFacts({
         message.pinnedProviderCode === null ? (
           none
         ) : (
-          <span className="break-all font-mono">{message.pinnedProviderCode}</span>
+          <div className="flex flex-col gap-1">
+            <span className="break-all font-mono">{message.pinnedProviderCode}</span>
+            <p className="text-sm text-muted-foreground">{t("mail.detail.pinNote")}</p>
+          </div>
+        ),
+    },
+    {
+      id: "routeProvider",
+      term: t("mail.detail.routeProviderCode"),
+      description:
+        message.routeProviderCode === null ? (
+          none
+        ) : (
+          <span className="break-all font-mono">{message.routeProviderCode}</span>
         ),
     },
     {

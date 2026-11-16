@@ -17,6 +17,7 @@ import { PATHS } from "../../router/paths";
 import { ResourceFallback, type ResourceFallbackState } from "../../views/status-views";
 import { ErrorCodeText, StatusLine } from "./email-frame";
 import { MESSAGE_STATUSES, ageText, mailboxText, messageHref, statusLabelKey } from "./email-view";
+import { ProviderUsageView } from "./provider-usage-view";
 import type { TestSendView } from "./test-send";
 import { standaloneLinkClass } from "../../views/links";
 
@@ -292,6 +293,12 @@ export function StatusView({ t, uiLocale, state, now, onRetry, testSend }: Statu
         </h2>
         <DescriptionList items={facts} />
       </section>
+      <ProviderUsageView
+        t={t}
+        uiLocale={uiLocale}
+        providers={status.providers}
+        asOf={status.usageAsOf}
+      />
       <section aria-labelledby="email-counts" className="flex max-w-2xl flex-col gap-3">
         <h2 id="email-counts" className="text-lg font-semibold text-foreground">
           {t("mail.status.countsTitle")}

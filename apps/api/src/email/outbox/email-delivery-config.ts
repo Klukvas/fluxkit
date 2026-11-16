@@ -30,5 +30,8 @@ export interface EmailDeliveryConfig {
    * `null` only for callers that never issue or render one. Never logged.
    */
   readonly tokenSecret: string | null;
+  readonly usageLimits?: Readonly<
+    Record<string, { readonly daily: number | null; readonly monthly: number | null }>
+  >;
   readonly tuning: EmailDeliveryTuning;
 }

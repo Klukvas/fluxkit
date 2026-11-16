@@ -305,6 +305,25 @@ export function MessageResultsView({
       cell: (row) => <span className="break-all">{row.to}</span>,
     },
     {
+      id: "provider",
+      header: t("mail.list.columnProvider"),
+      cell: (row) => (
+        <div className="flex flex-col gap-1">
+          <span className="break-all font-mono">{row.providerCode ?? t("mail.detail.none")}</span>
+          {row.pinnedProviderCode === null ? null : (
+            <span className="text-sm text-muted-foreground">
+              {t("mail.list.pinned", { code: row.pinnedProviderCode })}
+            </span>
+          )}
+          {row.routeProviderCode === null ? null : (
+            <span className="text-sm text-muted-foreground">
+              {t("mail.list.route", { code: row.routeProviderCode })}
+            </span>
+          )}
+        </div>
+      ),
+    },
+    {
       id: "attempts",
       header: t("mail.list.columnAttempts"),
       align: "end",

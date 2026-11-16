@@ -44,6 +44,8 @@ export function categoryLabelKey(category: AdminEmailTemplateCategory): string {
  */
 export const ERROR_CODE_REASONS = [
   "suppressed",
+  "provider_cooldown",
+  "pinned_provider_unavailable",
   "unavailable",
   "rate_limited",
   "rejected",

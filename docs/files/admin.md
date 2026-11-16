@@ -236,3 +236,5 @@ Run, headers and conventions: `apps/admin/README.md`. Plan: `docs/plans/2026-10-
 
 - `e2e/support/email-suppression-db.ts` — seeds one reserved-domain suppression in the explicitly guarded disposable `_e2e_test` database using the API's existing pg dependency; no live send/test-only API.
 - `e2e/tests/email.e2e.ts` — also exercises per-row address show/hide, full-address confirmation/Keep, one CSRF DELETE and no resend in the real browser.
+
+- `src/areas/email/provider-usage-view.tsx` — ordered provider roles, shared cooldown/recovery state and UTC retained local all-account usage; clamps only visual bars, never edits limits or drives routing. `provider-usage.css` styles native progress tracks/fills with theme tokens; `provider-usage-view.spec.tsx` covers uk/en accessibility, over-cap values and off mode.

@@ -36,6 +36,7 @@ export function toEmailMessageResponse(row: EmailMessageRow): EmailMessageRespon
     providerCode: row.providerCode,
     providerMessageId: row.providerMessageId,
     pinnedProviderCode: row.pinnedProviderCode,
+    routeProviderCode: row.routeProviderCode,
     lastErrorCode: row.lastErrorCode,
     resendOf: row.resendOf,
     createdByAdminId: row.createdByAdminId,

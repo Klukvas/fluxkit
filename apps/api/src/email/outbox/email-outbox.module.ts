@@ -6,7 +6,7 @@ import { EmailMessageChanges } from "./email-message-changes.js";
 import { EmailOutboxRepository } from "./email-outbox.repository.js";
 import { EmailOutbox } from "./email-outbox.service.js";
 import { DatabaseGuestOrderAccess } from "./guest-order-access.js";
-import { EMAIL_SEND_PACER, EmailSender } from "./email-sender.js";
+import { EMAIL_SUPPRESSION_GUARD_WIRED, EMAIL_SEND_PACER, EmailSender } from "./email-sender.js";
 import { WINDOW_STORE, type WindowStore } from "../../rate-limit/window-store.js";
 import { SendPacer } from "./send-pacer.js";
 
@@ -47,9 +47,11 @@ export class EmailOutboxModule {
         EmailMessageChanges,
         EmailOutbox,
         EmailSender,
+        { provide: EMAIL_SUPPRESSION_GUARD_WIRED, useValue: true },
       ],
       exports: [
         EMAIL_DELIVERY_CONFIG,
+        EMAIL_SUPPRESSION_GUARD_WIRED,
         EmailTemplatesModule,
         EmailOutboxRepository,
         EmailMessageChanges,

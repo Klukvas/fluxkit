@@ -14,6 +14,7 @@ export type EmailMessageUpdate = Partial<
     | "attempts"
     | "nextAttemptAt"
     | "leaseUntil"
+    | "routeProviderCode"
     | "pinnedProviderCode"
     | "pinnedAt"
     | "providerCode"

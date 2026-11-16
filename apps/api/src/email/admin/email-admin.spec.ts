@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { providerUsage } from "./email-usage.js";
 import type { ProblemBody } from "../../common/problem.filter.js";
 import { TEST_EMAIL_FROM } from "../../test/app.js";
 import { createTestCustomer, deleteTestCustomers } from "../../test/customer-fixtures.js";
@@ -103,6 +104,17 @@ describe("admin email API (real Postgres, test provider)", () => {
       expect(result.status).toBe(200);
       expect(result.body).toEqual({
         configured: true,
+        usageAsOf: world().clock.now().toISOString(),
+        providers: [
+          {
+            code: "fake",
+            role: "primary",
+            cooldownUntil: null,
+            cooldownReason: null,
+            recoveryProbe: "idle",
+            usage: providerUsage("fake", world().clock.now(), { daily: 0, monthly: 0 }),
+          },
+        ],
         providerCode: "fake",
         from: TEST_EMAIL_FROM,
         replyTo: null,
@@ -156,9 +168,11 @@ describe("admin email API (real Postgres, test provider)", () => {
         "from",
         "oldestPendingAt",
         "providerCode",
+        "providers",
         "queueDepth",
         "replyTo",
         "since",
+        "usageAsOf",
       ]);
     });
   });
@@ -385,7 +399,7 @@ describe("admin email API (real Postgres, test provider)", () => {
       expect(result.body).toMatchObject({
         id,
         templateKey: "admin.test",
-        templateVersion: 1,
+        templateVersion: 2,
         locale: "en",
         to: TEST_RECIPIENT,
         recipientKind: "admin",
@@ -622,7 +636,7 @@ describe("admin email API (real Postgres, test provider)", () => {
         `/admin/email/messages/${original}/resend`,
       );
       expect(result.status).toBe(202);
-      expect((await world().row(result.body.messageId)).template_version).toBe(1);
+      expect((await world().row(result.body.messageId)).template_version).toBe(2);
       await untilStatus(result.body.messageId, "sent");
     });
 

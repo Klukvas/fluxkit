@@ -1,0 +1,12 @@
+/* Native progress values own the fill width; all paint comes from the admin's theme tokens. */
+.email-usage-progress::-webkit-progress-bar {
+  background: var(--fk-color-muted);
+}
+
+.email-usage-progress::-webkit-progress-value {
+  background: currentColor;
+}
+
+.email-usage-progress::-moz-progress-bar {
+  background: currentColor;
+}

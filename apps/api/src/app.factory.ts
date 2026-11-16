@@ -71,6 +71,8 @@ export type CreateAppEnv = Pick<AppEnv, "databaseUrl" | "enabledFeatures" | "fea
       AppEnv,
       | "defaultLocale"
       | "emailProvider"
+      | "emailFallbackProviders"
+      | "emailUsageLimits"
       | "emailFrom"
       | "emailReplyTo"
       | "storefrontPublicUrl"
@@ -185,6 +187,7 @@ export async function createApp(
   });
   const emailProviders = await loadEmailProvider({
     provider: env.emailProvider ?? "none",
+    fallbacks: env.emailFallbackProviders ?? [],
     providersDir: options.emailProvidersDir ?? DEFAULT_EMAIL_PROVIDERS_DIR,
   });
   const app = await NestFactory.create<NestExpressApplication>(
@@ -202,6 +205,7 @@ export async function createApp(
       emailProviders: [...emailProviders, ...(options.extraEmailProviders ?? [])],
       emailDelivery: {
         from: env.emailFrom ?? null,
+        usageLimits: env.emailUsageLimits ?? {},
         replyTo: env.emailReplyTo ?? null,
         storefrontPublicUrl: env.storefrontPublicUrl ?? null,
         tokenSecret: env.orderTokenSecret ?? null,

@@ -57,7 +57,10 @@ describe("JobsRunner (real Postgres, injected time)", () => {
     await catalog.init();
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    // These jobs inspect the whole email domain; other suites' retained mail must not affect an empty tick.
+    await pool.query("delete from email_message");
+    await pool.query("delete from customer_auth_token");
     errors = vi.spyOn(Logger.prototype, "error").mockImplementation(() => undefined);
     logs = vi.spyOn(Logger.prototype, "log").mockImplementation(() => undefined);
   });

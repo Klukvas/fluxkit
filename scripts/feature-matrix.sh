@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Feature and provider matrix (AGENTS.md section 18).
-# Usage: scripts/feature-matrix.sh on|off|deleted|providers-on|providers-off|providers-deleted|providers-nova-post|providers-email-fake|providers-email-none|providers-email-resend|providers-email-brevo|providers-payment-fake|providers-payment-none|providers-payment-monobank|search-on|search-off
+# Usage: scripts/feature-matrix.sh on|off|deleted|providers-on|providers-off|providers-deleted|providers-nova-post|providers-email-fake|providers-email-none|providers-email-resend|providers-email-brevo|providers-email-failover|providers-email-failover-exhausted|providers-email-failover-pinned|providers-email-suppression|providers-payment-fake|providers-payment-none|providers-payment-monobank|search-on|search-off
 #   on      build, migrate and start the API with FEATURES_ENABLED=example,blog: expect /health, /example/ping, the blog's
 #           table and migrations table, `features` ["blog","example"] in GET /store/config, the blog's store routes (200, an
 #           unknown post 404) and its admin routes with their permissions (every one 401 signed out, where an unknown /admin
@@ -401,6 +401,18 @@ GUARD
     ! grep -F "matrix-guard: refused" /tmp/fluxkit-matrix-api.log \
       || { echo "the API sent a request to Nova Post at startup" >&2; exit 1; }
     rm -rf "$guard_dir"
+    ;;
+  providers-email-failover|providers-email-failover-exhausted|providers-email-failover-pinned|providers-email-suppression)
+    # Explicit NODE_ENV=test fixtures mount two independent authenticated in-process provider modules.
+    # Every send stays inside the fixture; these modes never load real provider credentials or call remote HTTP.
+    pnpm build
+    case "$mode" in
+      providers-email-failover) pattern="advances after proven|deferred B|single recovery probe" ;;
+      providers-email-failover-exhausted) pattern="exhausted routes" ;;
+      providers-email-failover-pinned) pattern="ambiguous acceptance|never advances" ;;
+      providers-email-suppression) pattern="shared suppression again" ;;
+    esac
+    NODE_ENV=test pnpm --filter @fluxkit/api exec vitest run src/email/outbox/email-fallback.spec.ts --testNamePattern "$pattern"
     ;;
   providers-email-none)
     run_api "" "" "none"

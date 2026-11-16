@@ -6,6 +6,7 @@
   "admin.test.subject": "Test email from {shop}",
   "admin.test.heading": "Test email",
   "admin.test.body": "Email delivery works: this message was handed to the provider {provider}.",
+  "admin.test.body_route": "This message tests the shop’s configured email route. The outbox shows which provider accepted it.",
   "admin.test.note": "You asked for this test in the admin. No action is needed.",
   "customer.password_reset.subject": "Reset your password at {shop}",
   "customer.password_reset.heading": "Reset your password",

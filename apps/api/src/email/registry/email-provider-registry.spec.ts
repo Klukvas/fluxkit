@@ -74,13 +74,15 @@ describe("EmailProviderRegistry", () => {
     expect(log).toHaveBeenCalledWith("Email provider loaded: alpha");
   });
 
-  it("refuses two loaded providers: exactly one is active", () => {
-    expect(() =>
-      EmailRegistryModule.register([providerModuleOf("one"), providerModuleOf("two")]),
-    ).toThrow(/Only one email provider can be active, but 2 were loaded \(one, two\)/);
+  it("keeps the loaded chain order and supports lookup without changing the primary", async () => {
+    const registry = await start([providerModuleOf("two"), providerModuleOf("one")]);
+    expect(registry.list().map((provider) => provider.code)).toEqual(["two", "one"]);
+    expect(registry.get()?.code).toBe("two");
+    expect(registry.get("one")?.code).toBe("one");
+    expect(registry.get("missing")).toBeUndefined();
     expect(() =>
       EmailRegistryModule.register([providerModuleOf("dup"), providerModuleOf("dup")]),
-    ).toThrow(/Only one email provider can be active/);
+    ).toThrow(/must be distinct/);
   });
 
   it("fails startup when two marked classes in one module declare the same code", async () => {

@@ -390,9 +390,10 @@ export class PersonalDataReader {
 
   /** The providers the shop uses (codes); no legal role is stated (ADR 0033 decision 7). */
   processors(): ExportProcessorFacts[] {
-    const email = this.emailProviders.get();
+    const primary = this.emailProviders.get();
+    const emails = this.emailProviders.list?.() ?? (primary === undefined ? [] : [primary]);
     return [
-      ...(email === undefined ? [] : [{ kind: "email" as const, name: email.code }]),
+      ...emails.map((email) => ({ kind: "email" as const, name: email.code })),
       ...this.paymentProviders.list().map((provider) => ({
         kind: "payment" as const,
         name: provider.code,

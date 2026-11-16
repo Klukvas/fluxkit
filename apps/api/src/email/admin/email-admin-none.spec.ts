@@ -38,6 +38,7 @@ describe("admin email routes with EMAIL_PROVIDER=none (no provider loaded)", () 
     expect(result.status).toBe(200);
     expect(result.body).toMatchObject({
       configured: false,
+      providers: [],
       providerCode: null,
       from: null,
       replyTo: null,

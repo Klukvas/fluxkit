@@ -3,18 +3,12 @@ import { DiscoveryModule } from "@nestjs/core";
 import type { LoadedEmailProvider } from "./email-provider-loader.js";
 import { EmailProviderRegistry, LOADED_EMAIL_PROVIDER_CODE } from "./email-provider-registry.js";
 
-/**
- * Mounts the one loaded provider module and the registry that finds its provider. With no provider loaded it imports
- * nothing but discovery and the registry reports `none`: no routes, no tables, no outbound calls. Exactly one provider is
- * active, so a second one (for example `EMAIL_PROVIDER=fake` plus a test provider) stops the startup.
- */
+/** Mounts the ordered primary/fallback modules. Duplicate configured codes are refused before discovery. */
 @Module({})
 export class EmailRegistryModule {
   static register(providers: readonly LoadedEmailProvider[]): DynamicModule {
-    if (providers.length > 1) {
-      throw new Error(
-        `Only one email provider can be active, but ${providers.length} were loaded (${providers.map((provider) => provider.code).join(", ")}).`,
-      );
+    if (new Set(providers.map((provider) => provider.code)).size !== providers.length) {
+      throw new Error("Email provider codes must be distinct in the ordered provider chain.");
     }
     return {
       module: EmailRegistryModule,
@@ -22,7 +16,10 @@ export class EmailRegistryModule {
       global: true,
       imports: [DiscoveryModule, ...providers.map((provider) => provider.module)],
       providers: [
-        { provide: LOADED_EMAIL_PROVIDER_CODE, useValue: providers[0]?.code ?? null },
+        {
+          provide: LOADED_EMAIL_PROVIDER_CODE,
+          useValue: providers.map((provider) => provider.code),
+        },
         EmailProviderRegistry,
       ],
       exports: [EmailProviderRegistry],

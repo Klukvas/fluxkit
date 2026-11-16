@@ -28022,7 +28022,7 @@
     },
     "/webhooks/email/{provider}": {
       "post": {
-        "description": "Selected provider only, with webhook credentials configured. Maximum 64 KiB. 204 only after commit, also for duplicate/ignored events. Event age must be within seven days old and five minutes future. Controller, guard and raw-body server failures return 429 with Retry-After: 5 so Brevo retries instead of discarding on 5xx. Ingestion uses transaction-local 2-second lock and 5-second statement timeouts.",
+        "description": "Configured primary and fallback providers only, with webhook credentials configured. Maximum 64 KiB. 204 only after commit, also for duplicate/ignored events. Event age must be within seven days old and five minutes future. Controller, guard and raw-body server failures return 429 with Retry-After: 5 so Brevo retries instead of discarding on 5xx. Ingestion uses transaction-local 2-second lock and 5-second statement timeouts.",
         "operationId": "EmailWebhookController_receive",
         "parameters": [
           {
@@ -28363,6 +28363,197 @@
                       "nullable": true,
                       "type": "string"
                     },
+                    "usageAsOf": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "providers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "string"
+                          },
+                          "role": {
+                            "type": "string",
+                            "enum": ["primary", "fallback"]
+                          },
+                          "cooldownUntil": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "cooldownReason": {
+                            "nullable": true,
+                            "type": "string",
+                            "enum": ["quota_exceeded", "rate_limited", "misconfigured"]
+                          },
+                          "recoveryProbe": {
+                            "type": "string",
+                            "enum": ["idle", "available", "in_flight"]
+                          },
+                          "usage": {
+                            "type": "object",
+                            "properties": {
+                              "source": {
+                                "type": "string",
+                                "enum": ["retained_email_message"]
+                              },
+                              "lowerBound": {
+                                "type": "boolean",
+                                "enum": [true]
+                              },
+                              "lowerBoundScope": {
+                                "type": "string",
+                                "enum": ["provider_all_accounts"]
+                              },
+                              "countScope": {
+                                "type": "string",
+                                "enum": ["provider_all_accounts"]
+                              },
+                              "credentialChangedAt": {
+                                "nullable": true,
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "ISO 8601, UTC."
+                              },
+                              "credentialHistory": {
+                                "type": "string",
+                                "enum": ["unknown", "tracked"]
+                              },
+                              "warningBasis": {
+                                "type": "string",
+                                "enum": ["all_accounts_vs_configured_limit"]
+                              },
+                              "timeZone": {
+                                "type": "string",
+                                "enum": ["UTC"]
+                              },
+                              "daily": {
+                                "type": "object",
+                                "properties": {
+                                  "start": {
+                                    "type": "string",
+                                    "format": "date-time",
+                                    "description": "ISO 8601, UTC."
+                                  },
+                                  "end": {
+                                    "type": "string",
+                                    "format": "date-time",
+                                    "description": "ISO 8601, UTC."
+                                  },
+                                  "accepted": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "limit": {
+                                    "nullable": true,
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "exclusiveMinimum": true,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "limitSource": {
+                                    "type": "string",
+                                    "enum": ["default", "env", "admin"]
+                                  },
+                                  "warning": {
+                                    "type": "string",
+                                    "enum": ["none", "near_limit", "limit_reached"]
+                                  }
+                                },
+                                "required": [
+                                  "start",
+                                  "end",
+                                  "accepted",
+                                  "limit",
+                                  "limitSource",
+                                  "warning"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "monthly": {
+                                "type": "object",
+                                "properties": {
+                                  "start": {
+                                    "type": "string",
+                                    "format": "date-time",
+                                    "description": "ISO 8601, UTC."
+                                  },
+                                  "end": {
+                                    "type": "string",
+                                    "format": "date-time",
+                                    "description": "ISO 8601, UTC."
+                                  },
+                                  "accepted": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "limit": {
+                                    "nullable": true,
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "exclusiveMinimum": true,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "limitSource": {
+                                    "type": "string",
+                                    "enum": ["default", "env", "admin"]
+                                  },
+                                  "warning": {
+                                    "type": "string",
+                                    "enum": ["none", "near_limit", "limit_reached"]
+                                  }
+                                },
+                                "required": [
+                                  "start",
+                                  "end",
+                                  "accepted",
+                                  "limit",
+                                  "limitSource",
+                                  "warning"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "providerResetAt": {
+                                "nullable": true,
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "ISO 8601, UTC."
+                              }
+                            },
+                            "required": [
+                              "source",
+                              "lowerBound",
+                              "lowerBoundScope",
+                              "countScope",
+                              "credentialChangedAt",
+                              "credentialHistory",
+                              "warningBasis",
+                              "timeZone",
+                              "daily",
+                              "monthly",
+                              "providerResetAt"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "role",
+                          "cooldownUntil",
+                          "cooldownReason",
+                          "recoveryProbe",
+                          "usage"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
                     "from": {
                       "nullable": true,
                       "description": "`EMAIL_FROM`.",
@@ -28473,6 +28664,8 @@
                   "required": [
                     "configured",
                     "providerCode",
+                    "usageAsOf",
+                    "providers",
                     "from",
                     "replyTo",
                     "since",
@@ -28818,6 +29011,11 @@
                             "nullable": true,
                             "type": "string"
                           },
+                          "routeProviderCode": {
+                            "nullable": true,
+                            "description": "Durably selected next provider after a proven refusal; null starts at the primary.",
+                            "type": "string"
+                          },
                           "pinnedProviderCode": {
                             "nullable": true,
                             "description": "Provider of an earlier possibly accepted attempt; cancellation cannot recall it.",
@@ -28879,6 +29077,7 @@
                           "deadlineAt",
                           "providerCode",
                           "providerMessageId",
+                          "routeProviderCode",
                           "pinnedProviderCode",
                           "lastErrorCode",
                           "resendOf",
@@ -29056,6 +29255,11 @@
                       "nullable": true,
                       "type": "string"
                     },
+                    "routeProviderCode": {
+                      "nullable": true,
+                      "description": "Durably selected next provider after a proven refusal; null starts at the primary.",
+                      "type": "string"
+                    },
                     "pinnedProviderCode": {
                       "nullable": true,
                       "description": "Provider of an earlier possibly accepted attempt; cancellation cannot recall it.",
@@ -29122,6 +29326,7 @@
                     "deadlineAt",
                     "providerCode",
                     "providerMessageId",
+                    "routeProviderCode",
                     "pinnedProviderCode",
                     "lastErrorCode",
                     "resendOf",
@@ -29421,6 +29626,11 @@
                       "nullable": true,
                       "type": "string"
                     },
+                    "routeProviderCode": {
+                      "nullable": true,
+                      "description": "Durably selected next provider after a proven refusal; null starts at the primary.",
+                      "type": "string"
+                    },
                     "pinnedProviderCode": {
                       "nullable": true,
                       "description": "Provider of an earlier possibly accepted attempt; cancellation cannot recall it.",
@@ -29482,6 +29692,7 @@
                     "deadlineAt",
                     "providerCode",
                     "providerMessageId",
+                    "routeProviderCode",
                     "pinnedProviderCode",
                     "lastErrorCode",
                     "resendOf",

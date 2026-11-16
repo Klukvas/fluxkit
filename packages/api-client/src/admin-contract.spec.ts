@@ -700,8 +700,44 @@ const emailSuppression: Shape<Admin.AdminEmailSuppression> = {
 const emailMailbox: Shape<Admin.AdminEmailMailbox> = {
   object: { address: "string", displayName: { nullable: "string" } },
 };
+const emailUsagePeriod: Shape<Admin.AdminEmailUsagePeriod> = {
+  object: {
+    start: "string",
+    end: "string",
+    accepted: "integer",
+    limit: { nullable: "integer" },
+    limitSource: { enum: ["default", "env", "admin"] },
+    warning: { enum: ["none", "near_limit", "limit_reached"] },
+  },
+};
+const emailProviderStatus: Shape<Admin.AdminEmailProviderStatus> = {
+  object: {
+    code: "string",
+    role: { enum: ["primary", "fallback"] },
+    cooldownUntil: { nullable: "string" },
+    cooldownReason: { nullable: { enum: ["quota_exceeded", "rate_limited", "misconfigured"] } },
+    recoveryProbe: { enum: ["idle", "available", "in_flight"] },
+    usage: {
+      object: {
+        source: { enum: ["retained_email_message"] },
+        lowerBound: { literal: true },
+        lowerBoundScope: { enum: ["provider_all_accounts"] },
+        countScope: { enum: ["provider_all_accounts"] },
+        credentialChangedAt: { nullable: "string" },
+        credentialHistory: { enum: ["unknown", "tracked"] },
+        warningBasis: { enum: ["all_accounts_vs_configured_limit"] },
+        timeZone: { enum: ["UTC"] },
+        daily: emailUsagePeriod,
+        monthly: emailUsagePeriod,
+        providerResetAt: { nullable: "string" },
+      },
+    },
+  },
+};
 const emailStatusResult: Shape<AdminEmailStatus> = {
   object: {
+    usageAsOf: "string",
+    providers: { array: emailProviderStatus },
     configured: "boolean",
     providerCode: { nullable: "string" },
     from: { nullable: emailMailbox },
@@ -741,6 +777,7 @@ const emailMessage: Shape<AdminEmailMessage> = {
     providerCode: { nullable: "string" },
     providerMessageId: { nullable: "string" },
     pinnedProviderCode: { nullable: "string" },
+    routeProviderCode: { nullable: "string" },
     lastErrorCode: { nullable: "string" },
     resendOf: { nullable: "string" },
     createdByAdminId: { nullable: "string" },

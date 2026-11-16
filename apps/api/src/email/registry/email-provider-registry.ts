@@ -7,7 +7,7 @@ import {
   type EmailProviderPort,
 } from "@fluxkit/core";
 
-/** Injection token: the code of the one provider that was loaded, or `null` for `none`; the registry must find exactly it. */
+/** Injection token: the ordered loaded provider codes; string/null remain compatible with single-provider callers. */
 export const LOADED_EMAIL_PROVIDER_CODE = Symbol("fluxkit:loaded-email-provider-code");
 
 /** Every method of `EmailProviderPort` the API calls; a marked class that lacks one stops the startup. */
@@ -16,7 +16,9 @@ const PORT_METHODS = ["send"] as const satisfies readonly (keyof EmailProviderPo
 /** Read-only view of the registry for the code that sends mail. */
 export interface EmailProviderSource {
   /** The active provider, `undefined` with `EMAIL_PROVIDER=none`. */
-  get(): EmailProviderPort | undefined;
+  get(code?: string): EmailProviderPort | undefined;
+  /** Configured primary then fallbacks. Optional for legacy single-provider test doubles. */
+  list?(): readonly EmailProviderPort[];
   /** Whether a provider is configured (`emailDelivery` of `GET /store/config` and `GET /admin/config`). */
   deliveryEnabled(): boolean;
 }
@@ -35,31 +37,24 @@ function implementsPort(value: unknown): value is EmailProviderPort {
   );
 }
 
-/**
- * Finds the email provider once, at startup (ADR 0031 decision 4; the technique of `ShippingProviderRegistry`): every Nest
- * provider whose class carries `EMAIL_PROVIDER_METADATA` (`SetMetadata(EMAIL_PROVIDER_METADATA,
- * emailProviderMetadata(code))`). Core and this app import no provider package. Startup fails loudly (never a skipped
- * provider) when
- * - a marked class is malformed (bad code, not a static provider, no `send` or capabilities, `code` differs from the
- *   metadata),
- * - two classes declare the same code (exactly one provider is active),
- * - the provider named by `EMAIL_PROVIDER` contributes no marked class, or a marked class exists although
- *   `EMAIL_PROVIDER` is `none` or names another code.
- */
+/** Discovers exactly the configured ordered chain; malformed, duplicate, missing or stray providers fail startup. */
 @Injectable()
 export class EmailProviderRegistry implements OnApplicationBootstrap, EmailProviderSource {
   private readonly logger = new Logger(EmailProviderRegistry.name);
-  private provider: EmailProviderPort | undefined;
+  private providers: readonly EmailProviderPort[] = [];
 
   constructor(
     @Inject(DiscoveryService) private readonly discovery: DiscoveryService,
-    @Inject(LOADED_EMAIL_PROVIDER_CODE) private readonly expectedCode: string | null,
+    @Inject(LOADED_EMAIL_PROVIDER_CODE)
+    private readonly expectedCode: string | null | readonly string[],
   ) {}
 
   onApplicationBootstrap(): void {
     this.discover();
     // The observable of the CI matrix (scripts/feature-matrix.sh): no route, so no new public contract.
-    this.logger.log(`Email provider loaded: ${this.provider?.code ?? "none"}`);
+    this.logger.log(
+      `Email provider loaded: ${this.providers.map((provider) => provider.code).join(", ") || "none"}`,
+    );
   }
 
   /** Scans the providers and replaces the registry; called once at bootstrap (public so a test can assert on a fresh scan). */
@@ -103,26 +98,43 @@ export class EmailProviderRegistry implements OnApplicationBootstrap, EmailProvi
       }
       found.set(code, instance);
     }
-    if (this.expectedCode !== null && !found.has(this.expectedCode)) {
-      throw new Error(
-        `Email provider "${this.expectedCode}" is enabled but its module contains no provider marked with EMAIL_PROVIDER_METADATA for that code.`,
-      );
+    const expected =
+      this.expectedCode === null
+        ? []
+        : typeof this.expectedCode === "string"
+          ? [this.expectedCode]
+          : this.expectedCode;
+    for (const code of expected) {
+      if (!found.has(code))
+        throw new Error(
+          `Email provider "${code}" is enabled but its module contains no provider marked with EMAIL_PROVIDER_METADATA for that code.`,
+        );
     }
     for (const code of found.keys()) {
-      if (code !== this.expectedCode) {
+      if (!expected.includes(code))
         throw new Error(
-          `Email provider "${code}" was found but EMAIL_PROVIDER is ${this.expectedCode === null ? "none" : `"${this.expectedCode}"`}.`,
+          `Email provider "${code}" was found but EMAIL_PROVIDER is ${expected.length === 0 ? "none" : `"${expected.join(", ")}"`}.`,
         );
-      }
     }
-    this.provider = this.expectedCode === null ? undefined : found.get(this.expectedCode);
+    this.providers = expected.map((code) => {
+      const provider = found.get(code);
+      if (provider === undefined)
+        throw new Error("Email provider registry changed during discovery.");
+      return provider;
+    });
   }
 
-  get(): EmailProviderPort | undefined {
-    return this.provider;
+  get(code?: string): EmailProviderPort | undefined {
+    return code === undefined
+      ? this.providers[0]
+      : this.providers.find((provider) => provider.code === code);
+  }
+
+  list(): readonly EmailProviderPort[] {
+    return [...this.providers];
   }
 
   deliveryEnabled(): boolean {
-    return this.provider !== undefined;
+    return this.providers.length > 0;
   }
 }
