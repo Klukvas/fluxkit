@@ -164,6 +164,107 @@ Mapping is a proposed adapter policy under ADR 0031, not a claim that every comb
 - **Configuration and readiness:** plugin-owned `RESEND_WEBHOOK_SECRET` (valid `whsec_` signing secret) and `BREVO_WEBHOOK_SECRET` (dedicated bearer token, at least 32 random bytes encoded header-safely), blank examples only. Single-provider operation can omit webhook credentials with its route disabled; the local sender check remains active. With a nonempty fallback list, **every** selected provider needs valid webhook credentials and a registered verifier/route; test fixtures supply equivalent fake verifiers/secrets. “List in place” means step-1b schema/journal + guard + handlers + secrets pass the local bootstrap checks in 4.1, not that the table has rows. Bootstrap resolves the mandatory suppression service and provider handlers, checks the step-1b journal version, reads required columns with a zero-row query and checks the app role's required SELECT/INSERT/UPDATE/DELETE privileges without writing. Startup never migrates or calls a provider. It cannot prove remote subscription, matching token, reachability or historical completeness: before production fallback the operator configures/tests both subscriptions and reconciles existing remote suppressions; record that evidence separately.
 - **Routing separation:** webhook ingestion only adds/updates suppression; it never marks mail delivered, unpins, changes a route/cooldown or extends Brevo's 30-minute idempotency window. Lack of feedback is not non-acceptance. A suppression blocks all providers even while pinned; it does not authorize a switch. Docs, fake matrix coverage and implementation files are listed in sections 6–7.
 
+### 4.6 Email usage meter (owner requested planning on 2026-11-16)
+
+- The owner approves writing this addition ("да, пиши план"), not DB secret storage or live activation. Code anchors in this subsection are checked at HEAD `7aba8fb4` (PR 338 merged); earlier sections retain their original baseline. Implement with step 2; [admin integrations](2026-11-16-admin-integrations.md) remains PROPOSED and is not a prerequisite for approved fallback.
+- **Local acceptance, not delivery/billing:** count `email_message` rows with `status = 'sent'` by **`provider_code`** and **`sent_at`**. Do not use `created_at`, `updated_at`, attempts or `pinned_provider_code`. Evidence: `apps/api/src/database/schema/email.ts:110`, `:119`, `:194`; claim stores attempted provider at `apps/api/src/email/outbox/email-message-changes.ts:219`, successful record stores acceptance at `:345`. One row has one recipient (`schema/email.ts:92`). Include admin tests and manual resends (new rows); retries of the same accepted row count once. Exclude unknown/pinned-pending/sending/cancelled rows from accepted counts; they may still have consumed remote quota.
+- **Periods:** today is [00:00 UTC, next 00:00 UTC); month is [first day 00:00 UTC, first day next month 00:00 UTC), not a rolling 24-hour/30-day period or browser timezone. Capture one server `asOf` for all counts in one consistent DB snapshot; count only `sent_at < asOf`. Resend documents daily reset at UTC midnight. Brevo reset time/timezone is **UNKNOWN**: label its daily bar “Fluxkit sends today (UTC)”, with `providerResetAt: null`. Monthly UTC is our reporting convention, not an inferred billing cycle. [Resend quota rules](https://resend.com/docs/knowledge-base/account-quotas-and-limits).
+- **Scope is provider-wide, across accounts:** label “Fluxkit sends through this provider (all accounts)”. A key/account change does not reset `provider_code` history; counts may exceed the new account's actual usage. Before the integrations store exists, account-change time is UNKNOWN (`credentialChangedAt: null`), not “unchanged”. After it exists, record/display the latest credential change time and warn when it intersects a reporting window (including operator env cutovers); account equivalence remains UNKNOWN. No account identity is exposed. A later version-scoped meter needs the credential-binding column and must label excluded legacy rows.
+- **Lower bound of retained Fluxkit history, not the current account.** Resend counts every To/CC/BCC recipient and received mail; other applications on that account are outside this DB. [Accounting](https://resend.com/docs/knowledge-base/account-quotas-and-limits). Ambiguous acceptance/lost local records also undercount. Job 10 deletes sent rows after 30 days (`apps/api/src/jobs/purge-email-messages.job.ts:48`), so a 31-day month's first day can disappear; ADR 0035 erasure can delete newer mail. V1 shows **retained local accepted sends across all accounts**, `lowerBound: true`, `lowerBoundScope: "provider_all_accounts"`, with a permanent note that cleanup/erasure can reduce the count. Do not extend personal-data retention or block erasure for a meter. No exact remaining balance, historic reconstruction or attempt ledger. A later non-personal daily aggregate requires separate schema/retention approval.
+
+| Provider | Default configurable limits | Official evidence / uncertainty |
+|---|---|---|
+| Resend | Daily 100; monthly 3,000 | Free plan: [pricing](https://resend.com/pricing), [quota rules](https://resend.com/docs/knowledge-base/account-quotas-and-limits). Update configured limits when the client upgrades. |
+| Brevo | Daily 300; monthly **null** | 300/day, no rollover: [Free-plan FAQ](https://help.brevo.com/hc/en-us/articles/208580669-FAQs-What-are-the-limits-of-the-Free-plan). [Product page](https://www.brevo.com/products/transactional-email/) advertises 9,000/month; independent monthly cap **UNKNOWN**, so no 9,000/9,300 default. Reset timezone remains UNKNOWN (B5/B6). |
+| Other installed/test providers | Daily/monthly null | No invented commercial allowance; tests set explicit limits. |
+
+- **Storage/upgrade:** before integrations lands, proposed optional env **`EMAIL_USAGE_LIMITS`** is the sole override: bounded JSON object keyed by validated installed provider code, with `daily`/`monthly` positive safe integers or null. Reject unknown fields, negative/zero/unsafe limits and malformed input without echoing it. Missing provider uses defaults; explicit null means no configured cap. Unset/blank env means defaults. Operator edits it on upgrade and restarts; UI labels “Set on the server”. After the integration store is approved/built: nonblank env complete object → `integration_setting` quota config → defaults. Only owner `integrations.manage` edits stored limits; manager `email.manage` remains read-only for limits. No separate quota-settings table or DB secrets in step 2. Same resolver/semantics as integrations section 4.
+- **Warnings:** <80% normal, >=80% local comparison near configured limit, >=100% local comparison at/over configured limit, separately for each non-null daily/monthly cap; strongest wins. Actual numbers may exceed the cap; clamp only the visual bar, not counts. Null means “No configured limit”, not unlimited service. Accessible text, token colors, uk/en loading/empty/error states. Always qualify the comparison as all-account local history against the configured cap, not exhaustion of the current account. If a credential changed within either window, show “Includes sends before credential change”; if unknown, show “Account changes are not tracked”. A local threshold is not proof of provider refusal; zero is not proof of unused quota.
+- **Routing:** recommend informational only in step 2. Local counts can fall, race and omit account usage; Brevo's reset is unknown. Retain response-based safe routing from 4.2. Optional later owner-approved “prefer fallback at local daily threshold” may skip only a new unpinned dispatch before any network call; never unpin, bypass suppression, invent a refusal/cooldown/reset or claim exact quota reservation. Off by default; no flag introduced in this step.
+
+#### Additive admin API
+
+- Extend **`GET /admin/email/status`**, not a second status endpoint. Keep `configured`, `providerCode`, `from`, `replyTo`, `since`, `counts`, `queueDepth`, `oldestPendingAt`, `errorCodes` unchanged. Legacy counts stay rolling 24-hour `updated_at` counts (`apps/api/src/email/admin/email-admin.repository.ts:91`).
+- Add `usageAsOf` and `usage` on ordered `providers[]` members from 4.4. Permission stays **`email.manage`** (owner/manager, `packages/core/src/auth/roles.ts:1`). No credential state/secrets. Off mode has empty `providers` and keeps legacy counts. At most 5-second status cache with its actual timestamp; never fetch provider data on each page refresh.
+- Response **fragment**, additive to legacy fields and 4.4's cooldown members:
+
+```json
+{
+  "usageAsOf": "2026-11-16T12:00:00.000Z",
+  "providers": [{
+    "code": "resend",
+    "role": "primary",
+    "usage": {
+      "source": "retained_email_message",
+      "lowerBound": true,
+      "lowerBoundScope": "provider_all_accounts",
+      "countScope": "provider_all_accounts",
+      "credentialChangedAt": null,
+      "credentialHistory": "unknown",
+      "warningBasis": "all_accounts_vs_configured_limit",
+      "timeZone": "UTC",
+      "daily": {
+        "start": "2026-11-16T00:00:00.000Z",
+        "end": "2026-11-17T00:00:00.000Z",
+        "accepted": 80,
+        "limit": 100,
+        "limitSource": "default",
+        "warning": "near_limit"
+      },
+      "monthly": {
+        "start": "2026-11-01T00:00:00.000Z",
+        "end": "2026-12-01T00:00:00.000Z",
+        "accepted": 900,
+        "limit": 3000,
+        "limitSource": "default",
+        "warning": "none"
+      },
+      "providerResetAt": "2026-11-17T00:00:00.000Z"
+    }
+  }]
+}
+```
+
+- `credentialHistory` is `unknown` until integrations tracks changes, then `tracked`; `credentialChangedAt` is nullable and a key-change timestamp, not proof of account identity. Daily/monthly `start` delimit counts; history is not reset on change. `lowerBoundScope` never means the current account.
+- Warning codes: `none`, `near_limit`, `limit_reached` (local comparison only); limit sources: `default`, `env`, future `admin`. Brevo has monthly `limit: null` and `providerResetAt: null`; still show UTC monthly count, without percentage. Resend reset means daily quota reset; the existing 00:05 retry margin/cooldown is distinct from midnight reporting.
+
+#### Indexed query and reversible schema sketch
+
+- One bound query per configured provider, in one consistent snapshot. `$1` provider, `$2` month start, `$3` day start, `$4` captured asOf. All instants are bound `timestamptz`, never interpolated; no expression around indexed `sent_at`. Convert count text/bigint to a checked safe JSON integer.
+
+```text
+QUERY sketch:
+SELECT count(*)::text AS accepted_month,
+       count(*) FILTER (WHERE sent_at >= $3::timestamptz)::text AS accepted_today
+FROM email_message
+WHERE status = 'sent'
+  AND provider_code = $1
+  AND sent_at >= $2::timestamptz
+  AND sent_at < $4::timestamptz;
+
+UP sketch (include in next step-2 migration; NOT a migration to run):
+CREATE INDEX email_message_provider_sent_at_idx
+  ON email_message (provider_code, sent_at) WHERE status = 'sent';
+
+DOWN sketch (other step-2 rollback guards still apply):
+DROP INDEX email_message_provider_sent_at_idx;
+-- Combined with routing migration: remove that journal row only once.
+-- If separate: DELETE FROM drizzle.__drizzle_migrations
+--              WHERE created_at = <EXACT_USAGE_MIGRATION_JOURNAL_WHEN>;
+```
+
+- HEAD journal ends at **0016**; next **0017** is likely consumed by step 1b. Allocate this index with the actual next step-2 migration after checking the journal, not a competing 0017. No new personal-data column. Add schema/snapshot parity; up/down/up/down only on an authorized `_test` DB. Bound lock time; large outboxes need a separately reviewed concurrent-index rollout outside a transaction, not an unbounded blocking build.
+- On representative history, `EXPLAIN (ANALYZE, BUFFERS)` should show Index Only Scan or bounded Index/Bitmap Scan using provider equality and the current-month time range; no all-history/full-table scan at production scale. Tiny fixtures can legitimately use Seq Scan: record realistic plans/buffers, do not disable the planner to claim success. Complexity is proportional to retained current-month rows for the selected providers, not total history.
+
+#### Optional provider observations, tests and implementation docs
+
+- Later record last validated Resend `x-resend-daily-quota` (free only) / `x-resend-monthly-quota` **used** values from existing send responses, with observedAt, known period and credential generation. Missing means unknown, never zero; do not sum observations or mix accounts, and fence stale/out-of-order observations. Keep them separate from local counts. `429` types include `daily_quota_exceeded`/`monthly_quota_exceeded`; rate limit is 10 requests/s/team. [Headers/limits](https://resend.com/docs/api-reference/rate-limit).
+- No documented Resend quota-usage endpoint is assumed. `GET /emails/metrics` is aggregated sent/delivered data, cached up to 15 minutes, not quota balance. [Metrics](https://resend.com/docs/api-reference/emails/get-metrics).
+- Optional Brevo `GET /v3/account` gives `plan[]` remaining `credits`, `creditsType: sendLimit`, type (free/payAsYouGo/subscription/sms), optional dates. Keep relevant typed entries/time, discard account identity; do not reinterpret as used/day/month without evidence. [Account](https://developers.brevo.com/reference/get-account). `GET /v3/smtp/statistics/aggregatedReport?startDate&endDate` provides requests/delivered, with day timezone undocumented; not a reset-time oracle. [Report](https://developers.brevo.com/reference/get-aggregated-smtp-report).
+- Optional observations need a separately approved operational provider-state schema/retention/inventory and nullable API fields; not part of the initial meter/index migration. Do not put changing observations in secret settings or fabricate a balance in the JSON above.
+- Tests: UTC midnight/month/year/leap-day/31-day boundaries independent of host zone/DST; 79/80/99/100/over-limit and null warnings; limit parser/precedence/error secrecy. Real-Postgres counts across providers, retries, tests/resends, ambiguous/pinned/cancelled rows, exact boundaries, cleanup/erasure reducing the lower bound, realistic EXPLAIN. Rotate to a new account mid-day/month: old sends remain, can exceed new-account usage, and warnings/JSON retain all-account scope with unknown/tracked credential history. API permissions/legacy fields/OpenAPI/client parity. Admin e2e for warnings, unknown Brevo reset/month cap, env-locked/future admin-edited limits and loading/error/off states. Routing regression: meter never moves a pin or bypasses suppression.
+- Future step-2 docs: `docs/contracts/config.md`/`.env.example` for `EMAIL_USAGE_LIMITS`, `docs/api/email.md`, API contract/OpenAPI/client, schema/index maps, admin help/uk/en, CHANGELOG/HANDOFF. API/config/index migration remain implementation red zones; planning approval does not authorize provider writes, deployment or DB secrets.
+
 ## 5. Schema proposal and reversible SQL sketches — not migrations to run
 
 - **Existing provider columns are reused:** `provider_code` already records which provider took the last attempt and, on `sent`, which one accepted the mail (`0007_email.sql:34`); no "sent by" column is needed. Migrations are needed for the ID check and the durable pin in step 1, for suppression/receipt storage in step 1b, and for the route cursor and shared cooldowns in step 2.
@@ -356,3 +457,6 @@ The owner approved the plan with the recommended answers ("да, одобряю,
 | 7 | Minimal design: pin, route cursor, cooldown table; no attempt ledger, no attempt history in the admin. |
 | 8 | New ADR [0056](../adr/0056-email-brevo-suppression-and-fallback.md) written before step 1, in the PR of this approval. |
 
+### Additional owner decision — 2026-11-16
+
+- **9 — Email usage meter:** the owner says "да, пиши план": add the per-provider usage meter to the step-2 plan (section 4.6), with UTC retained accepted-send counts **across all accounts of each provider**, configurable limits and qualified warnings; credential changes are explicitly unknown until tracked, then shown without resetting history. QA/security scope corrections are incorporated in section 4.6. This approves preparing the plan, not DB secrets, automatic quota-driven routing or live/provider/deployment actions. Recommended order: step 1b, then step 2 with the advisory meter; the separate [admin integrations plan](2026-11-16-admin-integrations.md) awaits owner approval.
