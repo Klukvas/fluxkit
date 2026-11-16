@@ -498,4 +498,5 @@ Core, no flag. Self-contained: no other module imports it; it must NOT import th
 - `drizzle/0018_email_provider_routing.sql`, `.down.sql`, `meta/0018_snapshot.json` — additive generated migration/snapshot and rollback refusing active deferred routes.
 - `src/database/email-routing-migration.spec.ts` — real `_test` up/down/up/down, active-route refusal, exact journal deletion and constraint/index checks.
 - `src/test/test-email-pair.ts` — explicit test-only pair with independent acceptance/key stores and authenticated feedback boundaries; never a production provider.
+- `src/test/test-env-gated-email-provider.ts` — TEST ONLY: `envGatedEmailProviderModule(code, keyVariable, secretVariable)`, a provider module that refuses to start without its key variable and exposes a webhook verifier only with its secret variable; `email-fallback-packages.spec.ts` loads it from temporary fixture packages so core specs never need `packages/providers`.
 - `src/privacy/export/personal-data.reader.ts` — includes every configured email provider in processor enumeration. Provider state is non-personal D16 metadata; route metadata is classified with the outbox.
