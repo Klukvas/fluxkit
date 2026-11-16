@@ -74,3 +74,5 @@ Payment, shipping and email provider plugins, one package per provider. Each pro
 - `brevo/src/webhook.spec.ts` — bearer rejection, event shapes/allowlist, tuple stability/difference and secret parser tests; not live evidence.
 - `brevo/src/config.ts` — `readBrevoWebhookSecret`, the one optional bearer-secret accessor.
 - Both plugin `src/index.ts` factories inject their optional verifier beside the transport; blank secret exposes no active webhook. READMEs list subscriptions, header, optional edge allowlist and pending live checks.
+- Managed secrets (ADR 0058): `resend/`, `brevo/`, `monobank/`, `nova-post/` and the test-only `_fake-email/` declare `fluxkit.secrets` in `package.json` (`field`, `purpose`, `env`) and export `validateIntegrationSecret(field, value)` from `src/config.ts` (`_fake-email`: `src/index.ts`), which reuses the same accessors that check the environment value. The API's integration store reads the manifest and asks that rule before it encrypts a pasted value; the plugins still read their keys from the environment only.
+
