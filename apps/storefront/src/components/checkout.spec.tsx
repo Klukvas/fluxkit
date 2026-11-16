@@ -121,6 +121,21 @@ function submitButton(html: string): string {
 }
 
 describe("checkout page: states of the cart", () => {
+  it.each([
+    ["loading", initialCartState],
+    ["error", { ...initialCartState, status: "error" }],
+    ["empty", ready(cartOf([]))],
+    ["ready", ready()],
+  ] as const)("shows the demo info only when enabled in the %s state", (_name, cartState) => {
+    const enabled = render({ cartState, demoNotice: true });
+    expect(enabled).toContain("§demo.checkout");
+    expect(enabled).toMatch(
+      /role="status"[^>]*class="[^"]*border-primary[^>]*>§demo\.checkout<\/div>/,
+    );
+    expect(render({ cartState, demoNotice: false })).not.toContain("§demo.checkout");
+    expect(render({ cartState })).not.toContain("§demo.checkout");
+  });
+
   it("shows a busy skeleton while the cart loads, with one h1", () => {
     const html = render({ cartState: initialCartState });
     expect(html).toContain('aria-busy="true"');

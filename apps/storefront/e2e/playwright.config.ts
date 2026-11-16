@@ -88,6 +88,7 @@ export default defineConfig({
         STOREFRONT_PUBLIC_URL: E2E_ORIGIN,
         STOREFRONT_IMAGE_HOSTS: "",
         STOREFRONT_FORWARD_CLIENT_ADDRESS: "true",
+        STOREFRONT_DEMO_NOTICE: "false",
         NEXT_TELEMETRY_DISABLED: "1",
       },
       // The home page reads the API on the server: this answers 200 only once the API is up too.
@@ -119,6 +120,7 @@ export default defineConfig({
               STOREFRONT_PUBLIC_URL: E2E_ORIGIN,
               STOREFRONT_IMAGE_HOSTS: "",
               STOREFRONT_FORWARD_CLIENT_ADDRESS: "false",
+              STOREFRONT_DEMO_NOTICE: "false",
               NEXT_TELEMETRY_DISABLED: "1",
             },
             url: `http://127.0.0.1:${String(E2E_STOREFRONT_UNFORWARDED_PORT)}/en`,

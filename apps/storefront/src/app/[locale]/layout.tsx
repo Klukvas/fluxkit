@@ -11,6 +11,7 @@ import { shellEnabledFeatures } from "../../features/runtime.server";
 import { fonts } from "../../config/fonts";
 import { themeConfig } from "../../config/theme";
 import { brandIconsMetadata, brandThemeColor } from "../../lib/brand";
+import { demoNoticeEnabled } from "../../lib/demo-notice.server";
 import { fontVariableClasses } from "../../lib/font-classes";
 import { headerSearchEnabled } from "../../lib/search-data.server";
 import { navigationCategories } from "../../lib/store-data.server";
@@ -78,6 +79,7 @@ export default async function LocaleLayout({
   const t = createTranslator(messages, locale);
   const categories = await navigationCategories(locale);
   const searchEnabled = await headerSearchEnabled();
+  const demoNotice = await demoNoticeEnabled();
   const themeMode = await requestThemeMode();
   // The links of the enabled feature slices (none while `GET /store/config` lists no feature, or cannot be read).
   const enabledFeatures = await shellEnabledFeatures();
@@ -101,6 +103,7 @@ export default async function LocaleLayout({
           t={t}
           categories={categories}
           searchEnabled={searchEnabled}
+          demoNotice={demoNotice}
           year={new Date().getFullYear()}
           themeMode={themeMode}
           featureLinks={featureLinks}

@@ -280,6 +280,7 @@ export interface CheckoutPageViewProps {
   exponent: number;
   /** The shop takes payments online: the payment note says so instead of "no payment is taken". */
   onlinePayment?: boolean;
+  demoNotice?: boolean;
   config: CheckoutConfig;
   cartState: CartState;
   checkout: CheckoutState;
@@ -327,6 +328,7 @@ export function CheckoutPageView(props: CheckoutPageViewProps) {
     return (
       <Container className="flex flex-col items-start gap-4 py-8">
         <h1 className={textStyles.pageTitle}>{t("checkout.title")}</h1>
+        {props.demoNotice ? <Alert variant="info">{t("demo.checkout")}</Alert> : null}
         <Alert variant="danger" title={t("checkout.loadError")}>
           {cartState.failure === null ? null : <p>{failureText(t, cartState.failure)}</p>}
         </Alert>
@@ -338,6 +340,7 @@ export function CheckoutPageView(props: CheckoutPageViewProps) {
     return (
       <Container className="flex flex-col gap-4 py-8" aria-busy="true">
         <h1 className={textStyles.pageTitle}>{t("checkout.title")}</h1>
+        {props.demoNotice ? <Alert variant="info">{t("demo.checkout")}</Alert> : null}
         <Spinner label={t("checkout.loading")} />
         <Skeleton className="h-48 w-full" />
       </Container>
@@ -347,6 +350,7 @@ export function CheckoutPageView(props: CheckoutPageViewProps) {
     return (
       <Container className="flex flex-col gap-6 py-8">
         <h1 className={textStyles.pageTitle}>{t("checkout.title")}</h1>
+        {props.demoNotice ? <Alert variant="info">{t("demo.checkout")}</Alert> : null}
         <EmptyState
           title={t("checkout.empty.title")}
           description={t("checkout.empty.description")}
@@ -405,6 +409,7 @@ export function CheckoutPageView(props: CheckoutPageViewProps) {
     <Container className="flex flex-col gap-6 py-8">
       <CheckoutSteps t={t} locale={locale} current="checkout" />
       <h1 className={textStyles.pageTitle}>{t("checkout.title")}</h1>
+      {props.demoNotice ? <Alert variant="info">{t("demo.checkout")}</Alert> : null}
 
       {checkout.insecure ? (
         <Alert variant="danger">{t("checkout.error.insecureContext")}</Alert>
@@ -748,9 +753,11 @@ export function CheckoutPageView(props: CheckoutPageViewProps) {
 export function CheckoutPage({
   exponent,
   onlinePayment = false,
+  demoNotice = false,
 }: {
   exponent: number;
   onlinePayment?: boolean;
+  demoNotice?: boolean;
 }) {
   const { locale, t } = useI18n();
   const client = useStoreClient();
@@ -883,6 +890,7 @@ export function CheckoutPage({
       locale={locale}
       exponent={exponent}
       onlinePayment={onlinePayment}
+      demoNotice={demoNotice}
       config={checkoutConfig}
       cartState={cartState}
       checkout={checkoutState}
