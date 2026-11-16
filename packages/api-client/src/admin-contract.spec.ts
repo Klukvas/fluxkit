@@ -163,6 +163,7 @@ const me: Shape<AdminMe> = {
           "email.manage",
           "payments.refund",
           "privacy.manage",
+          "integrations.manage",
         ],
       },
     },
@@ -812,15 +813,56 @@ const auditEventList: Shape<Admin.AdminAuditEventList> = paginated({
         "privacy.erased",
         "privacy.request_changed",
         "email_suppression.removed",
+        "admin_user.step_up_failed",
+        "integration.secret_changed",
+        "integration.secret_retired",
       ],
     },
     targetKind: {
-      enum: ["customer", "order", "admin_user", "privacy_request", "email_suppression"],
+      enum: [
+        "customer",
+        "order",
+        "admin_user",
+        "privacy_request",
+        "email_suppression",
+        "integration",
+      ],
     },
     targetId: "string",
     detail: { record: { oneOf: ["string", "number", "boolean", { array: "string" }] } },
   },
 });
+// integrations
+const integration: Shape<Admin.AdminIntegration> = {
+  object: {
+    id: "string",
+    kind: { enum: ["email", "payment", "shipping"] },
+    providerCode: "string",
+    secrets: {
+      array: {
+        object: {
+          field: "string",
+          purpose: { enum: ["outbound", "webhook"] },
+          envVariable: "string",
+          state: { enum: ["not_set", "set", "env"] },
+          last4: "null",
+          versionId: { nullable: "string" },
+          generation: { nullable: "integer" },
+          savedAt: { nullable: "string" },
+          keyAvailable: { nullable: "boolean" },
+        },
+      },
+    },
+    updatedAt: "string",
+  },
+};
+const integrationStorage = { enum: ["ready", "disabled"] } as const;
+const integrationList: Shape<Admin.AdminIntegrationList> = {
+  object: { revision: "integer", storage: integrationStorage, items: { array: integration } },
+};
+const integrationDetail: Shape<Admin.AdminIntegrationDetail> = {
+  object: { revision: "integer", storage: integrationStorage, integration },
+};
 const emailMessageId: Shape<AdminEmailMessageId> = { object: { messageId: "string" } };
 const emailTemplateList: Shape<AdminEmailTemplateList> = {
   object: {
@@ -1387,6 +1429,12 @@ const body = {
   sendTestEmail: {
     object: { locale: { optional: "string" } },
   } satisfies Shape<Admin.SendAdminTestEmailBody>,
+  putIntegrationSecret: {
+    object: { expectedRevision: "integer", value: "string", currentPassword: "string" },
+  } satisfies Shape<Admin.PutAdminIntegrationSecretBody>,
+  retireIntegrationSecret: {
+    object: { expectedRevision: "integer", versionId: "string", currentPassword: "string" },
+  } satisfies Shape<Admin.RetireAdminIntegrationSecretBody>,
   createBrand: {
     object: {
       name: localized,
@@ -1687,6 +1735,10 @@ const RESPONSE_SHAPES: { [N in AdminOperationName]: ResponseShapeOf<N> } = {
   sendTestEmail: emailMessageId,
   listEmailMessages: emailMessageList,
   listAuditEvents: auditEventList,
+  listIntegrations: integrationList,
+  getIntegration: integrationDetail,
+  putIntegrationSecret: integrationDetail,
+  retireIntegrationSecret: integrationDetail,
   privacyLookup,
   listPrivacyRequests: paginated(privacyRequest),
   createPrivacyRequest: privacyRequest,
@@ -1827,6 +1879,10 @@ const REQUEST_SHAPES: { [N in AdminOperationName]: RequestShapeOf<N> } = {
   sendTestEmail: body.sendTestEmail,
   listEmailMessages: null,
   listAuditEvents: null,
+  listIntegrations: null,
+  getIntegration: null,
+  putIntegrationSecret: body.putIntegrationSecret,
+  retireIntegrationSecret: body.retireIntegrationSecret,
   privacyLookup: body.privacyLookup,
   listPrivacyRequests: null,
   createPrivacyRequest: body.createPrivacyRequest,
@@ -1944,6 +2000,7 @@ const KNOWN_PERMISSIONS: readonly AdminOperationPermission[] = [
   "email.manage",
   "payments.refund",
   "privacy.manage",
+  "integrations.manage",
   "authenticated",
   "public",
   "denied",

@@ -131,5 +131,6 @@
   "user.notice.unknown.now_active": "The user is stored as active now.",
   "user.notice.unknown.still_deactivated": "The user is still stored as deactivated. Activate again if you still want to.",
   "user.notice.unknown.password_unknown": "The stored user does not show whether the password changed. If the new password does not work, set it again.",
-  "user.notice.unknown.unreadable": "The user could not be read again. Reload the page to see what is stored."
+  "user.notice.unknown.unreadable": "The user could not be read again. Reload the page to see what is stored.",
+  "user.permission.integrations.manage": "Manage integrations: store and remove the API keys of the email, payment and delivery services"
 }

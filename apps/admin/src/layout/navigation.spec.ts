@@ -42,6 +42,7 @@ describe("navigation configuration", () => {
       "search",
       "shipping",
       "email",
+      "integrations",
       "privacy",
       "auditLog",
       "users",

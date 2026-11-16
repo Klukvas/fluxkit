@@ -63,6 +63,7 @@ export const LAZY_FILES = [
   "users",
   "shipping",
   "email",
+  "integrations",
   "payments",
   "privacy",
   "audit",
@@ -116,6 +117,10 @@ export const LAZY_FILE_LOADERS: Record<CoreLazyFile, Record<Locale, FileLoader>>
   email: {
     uk: () => import("./uk/email.json").then((module) => module.default),
     en: () => import("./en/email.json").then((module) => module.default),
+  },
+  integrations: {
+    uk: () => import("./uk/integrations.json").then((module) => module.default),
+    en: () => import("./en/integrations.json").then((module) => module.default),
   },
   payments: {
     uk: () => import("./uk/payments.json").then((module) => module.default),

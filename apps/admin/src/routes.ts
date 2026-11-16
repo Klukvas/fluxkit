@@ -428,6 +428,15 @@ export const ROUTES: readonly AppRoute[] = [
     ),
   ),
   route(
+    "integrations",
+    "listIntegrations",
+    "page.integrations.title",
+    areaPage(
+      () => import("./areas/integrations"),
+      (module) => module.IntegrationsPage,
+    ),
+  ),
+  route(
     "privacy",
     "listPrivacyRequests",
     "page.privacy.title",

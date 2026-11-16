@@ -47,7 +47,7 @@ describe("SideNav", () => {
       const classes = String(link.attributes.class).split(" ");
       expect(classes).toEqual(
         expect.arrayContaining([
-          "min-h-9",
+          "min-h-8",
           "py-1",
           "text-sm",
           "pointer-coarse:min-h-11",

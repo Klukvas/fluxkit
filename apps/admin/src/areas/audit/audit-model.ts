@@ -21,9 +21,17 @@ import { MAX_OFFSET, readEnum, writeQuery } from "../../router/query";
  */
 const ACTION_VERBS = {
   customer: ["deactivated", "activated", "unlocked"],
-  admin_user: ["created", "role_changed", "deactivated", "activated", "password_reset"],
+  admin_user: [
+    "created",
+    "role_changed",
+    "deactivated",
+    "activated",
+    "password_reset",
+    "step_up_failed",
+  ],
   privacy: ["lookup", "exported", "erased", "request_changed"],
   email_suppression: ["removed"],
+  integration: ["secret_changed", "secret_retired"],
 } as const;
 
 type DerivedAction = {
@@ -43,6 +51,7 @@ export const AUDIT_TARGET_KINDS = [
   "admin_user",
   "privacy_request",
   "email_suppression",
+  "integration",
 ] as const satisfies readonly AdminAuditTargetKind[];
 
 /** Events per request ("load more" asks for another page of this size). */

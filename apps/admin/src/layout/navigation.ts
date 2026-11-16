@@ -77,6 +77,7 @@ export const NAVIGATION: readonly NavigationGroupConfig[] = [
     items: [
       { routeId: "shipping", icon: ShippingIcon },
       { routeId: "email", icon: EmailIcon },
+      { routeId: "integrations", icon: ExtensionIcon },
       { routeId: "privacy", icon: PersonalDataIcon },
       { routeId: "auditLog", icon: AuditLogIcon },
       { routeId: "users", icon: AdministratorsIcon },

@@ -56,5 +56,9 @@
   "audit.action.privacy.request_changed": "Privacy request recorded or changed",
   "audit.action.unknown": "Other action",
   "audit.target.email_suppression": "Email suppression",
-  "audit.action.email_suppression.removed": "Email suppression removed"
+  "audit.action.email_suppression.removed": "Email suppression removed",
+  "audit.target.integration": "Integration",
+  "audit.action.admin_user.step_up_failed": "Wrong password on a protected action",
+  "audit.action.integration.secret_changed": "Integration key saved",
+  "audit.action.integration.secret_retired": "Integration key removed"
 }

@@ -56,5 +56,6 @@
   "nav.group.help": "Довідка",
   "page.help.title": "Довідка",
   "page.helpArticle.title": "Стаття довідки",
-  "nav.group.catalogSetup": "Налаштування каталогу"
+  "nav.group.catalogSetup": "Налаштування каталогу",
+  "page.integrations.title": "Інтеграції"
 }

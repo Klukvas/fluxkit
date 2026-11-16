@@ -20,31 +20,33 @@ type ShapeOf<T> = [T] extends [never]
   ? never
   : [T] extends [undefined]
     ? "none"
-    : null extends T
-      ? { nullable: Shape<NonNullable<T>> }
-      : [T] extends [boolean]
-        ? boolean extends T
-          ? "boolean"
-          : { literal: T }
-        : [T] extends [string]
-          ? string extends T
-            ? "string"
-            : { enum: readonly T[] }
-          : [T] extends [number]
-            ? "integer" | "number"
-            : true extends IsUnion<T>
-              ? { oneOf: readonly Distribute<T>[] }
-              : [T] extends [readonly (infer U)[]]
-                ? { array: Shape<U> }
-                : string extends keyof T
-                  ? { record: Shape<T[string]> }
-                  : {
-                      object: {
-                        [K in keyof T]-?: undefined extends T[K]
-                          ? { optional: Shape<Exclude<T[K], undefined>> }
-                          : Shape<T[K]>;
+    : [T] extends [null]
+      ? "null"
+      : null extends T
+        ? { nullable: Shape<NonNullable<T>> }
+        : [T] extends [boolean]
+          ? boolean extends T
+            ? "boolean"
+            : { literal: T }
+          : [T] extends [string]
+            ? string extends T
+              ? "string"
+              : { enum: readonly T[] }
+            : [T] extends [number]
+              ? "integer" | "number"
+              : true extends IsUnion<T>
+                ? { oneOf: readonly Distribute<T>[] }
+                : [T] extends [readonly (infer U)[]]
+                  ? { array: Shape<U> }
+                  : string extends keyof T
+                    ? { record: Shape<T[string]> }
+                    : {
+                        object: {
+                          [K in keyof T]-?: undefined extends T[K]
+                            ? { optional: Shape<Exclude<T[K], undefined>> }
+                            : Shape<T[K]>;
+                        };
                       };
-                    };
 
 /** What the comparator reads: the loose runtime form of any `Shape<T>`. */
 export type ShapeNode =
@@ -55,6 +57,7 @@ export type ShapeNode =
   | "boolean"
   | "any"
   | "never"
+  | "null"
   | { enum: readonly string[] }
   | { literal: boolean }
   | { nullable: ShapeNode }
@@ -116,6 +119,14 @@ export function compareShape(
   at = "$",
 ): string[] {
   const schema = resolve(rawSchema, document);
+  if (shape === "null") {
+    // A field that is always null (a secret's `last4`) is documented as a nullable one-value enum.
+    return schema.nullable === true &&
+      schema.enum?.length === 1 &&
+      (schema.enum as readonly unknown[])[0] === null
+      ? []
+      : [`${at}: openapi is not the null literal`];
+  }
   const isNullableShape = typeof shape === "object" && "nullable" in shape;
   const isNullableSchema = schema.nullable === true;
   if (isNullableShape !== isNullableSchema) {

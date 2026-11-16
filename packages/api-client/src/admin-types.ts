@@ -52,7 +52,8 @@ export type AdminPermission =
   | "shipping.manage"
   | "email.manage"
   | "payments.refund"
-  | "privacy.manage";
+  | "privacy.manage"
+  | "integrations.manage";
 
 export interface AdminLoginBody {
   email: string;
@@ -973,6 +974,68 @@ export interface AdminEmailSuppression {
 
 export type AdminEmailSuppressionList = Paginated<AdminEmailSuppression>;
 
+// ------------------------------------------------------------- integrations
+// ADR 0058; every operation needs `integrations.manage` (owner only). A secret is write-only: no answer carries one.
+
+export type AdminIntegrationKind = "email" | "payment" | "shipping";
+
+/** `env`: set in the server environment (`envVariable`), read-only here. `set`: a value is stored. `not_set`: neither. */
+export type AdminIntegrationSecretState = "not_set" | "set" | "env";
+
+/** `disabled`: the server has no `SECRETS_ENCRYPTION_KEY`, so nothing can be saved. */
+export type AdminIntegrationStorage = "ready" | "disabled";
+
+export interface AdminIntegrationSecret {
+  field: string;
+  purpose: "outbound" | "webhook";
+  /** The server variable that overrides the stored value when it is set. */
+  envVariable: string;
+  state: AdminIntegrationSecretState;
+  /** Always null: no part of a secret is ever returned. */
+  last4: null;
+  /** The stored version, for `retireIntegrationSecret`; null when nothing is stored. */
+  versionId: string | null;
+  generation: number | null;
+  savedAt: string | null;
+  /** False: this server can no longer decrypt the stored value, enter it again. Null when nothing is stored. */
+  keyAvailable: boolean | null;
+}
+
+export interface AdminIntegration {
+  id: string;
+  kind: AdminIntegrationKind;
+  providerCode: string;
+  secrets: AdminIntegrationSecret[];
+  updatedAt: string;
+}
+
+export interface AdminIntegrationList {
+  /** Rises with every integration change; send it back as `expectedRevision`. */
+  revision: number;
+  storage: AdminIntegrationStorage;
+  items: AdminIntegration[];
+}
+
+export interface AdminIntegrationDetail {
+  revision: number;
+  storage: AdminIntegrationStorage;
+  integration: AdminIntegration;
+}
+
+export interface PutAdminIntegrationSecretBody {
+  expectedRevision: number;
+  /** The credential as the provider shows it. Stored encrypted; never returned. */
+  value: string;
+  /** The signed-in owner's current password, asked again for every change. */
+  currentPassword: string;
+}
+
+export interface RetireAdminIntegrationSecretBody {
+  expectedRevision: number;
+  versionId: string;
+  currentPassword: string;
+}
+
 // ---- admin audit log (ADR 0033 decision 9; `users.manage`)
 
 export type AdminAuditAction =
@@ -988,10 +1051,13 @@ export type AdminAuditAction =
   | "privacy.exported"
   | "privacy.erased"
   | "privacy.request_changed"
-  | "email_suppression.removed";
+  | "email_suppression.removed"
+  | "admin_user.step_up_failed"
+  | "integration.secret_changed"
+  | "integration.secret_retired";
 
 export type AdminAuditTargetKind =
-  "customer" | "order" | "admin_user" | "privacy_request" | "email_suppression";
+  "customer" | "order" | "admin_user" | "privacy_request" | "email_suppression" | "integration";
 
 /** What an admin did; codes and ids only, never personal data. */
 export interface AdminAuditEvent {
