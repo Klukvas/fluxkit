@@ -12,6 +12,7 @@ import {
   type StoreClient,
   type StoreResult,
 } from "@fluxkit/api-client";
+import { serverApiFetch } from "./server-api-fetch";
 import { createFreshAnswerCache } from "./fresh-answer-cache";
 import { assertLocalesSupported } from "./locale-check";
 import { SERVER_READ_TIMEOUT_MS } from "./request-timeout";
@@ -171,7 +172,7 @@ export function createStoreData(dependencies: StoreDataDependencies): StoreData 
     const baseUrl = dependencies.baseUrl();
     const client = createStoreClient({
       baseUrl,
-      ...(dependencies.fetch === undefined ? {} : { fetch: dependencies.fetch }),
+      fetch: dependencies.fetch ?? serverApiFetch,
     });
     const options: CallOptions = {
       // A hung API ends here (review M1) and the last good copy or error.tsx takes over, instead of after undici's 300 s.
@@ -256,12 +257,10 @@ export function createStoreData(dependencies: StoreDataDependencies): StoreData 
       ),
     featureRead: (feature, operation, call, read = {}) =>
       run(operation, null, featureTag(feature), read, (_client, options, baseUrl) =>
-        call({ baseUrl, fetch: dependencies.fetch ?? defaultFetch, options }),
+        call({ baseUrl, fetch: dependencies.fetch ?? serverApiFetch, options }),
       ),
   };
 }
-
-const defaultFetch: FetchLike = (url, init) => globalThis.fetch(url, init);
 
 /** Longest cause chain written to a log line (also stops a cycle). */
 const MAX_CAUSE_DEPTH = 5;

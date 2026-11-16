@@ -17,12 +17,22 @@ upstream fluxkit_api {
     zone fluxkit_api 64k;
     server ${FLUXKIT_API_UPSTREAM} resolve;
     keepalive 16;
+    # Close after the request that crosses 10 s: retiring connections end within the 30 s stop grace.
+    # The API additionally answers Connection: close while draining.
+    keepalive_time 10s;
 }
 
 upstream fluxkit_storefront {
+    # One URL goes to one replica, so its per-process caches (ADR 0040/0051) stay warm. Plain hash, not `consistent`:
+    # with `resolve`, the consistent variant gives every address of the one DNS name the same points and spreads a URL
+    # over all replicas (checked with nginx 1.29.8, ADR 0057).
+    hash $request_uri;
     zone fluxkit_storefront 64k;
     server ${FLUXKIT_STOREFRONT_UPSTREAM} resolve;
     keepalive 16;
+    # Close after the request that crosses 10 s, so sustained keep-alive traffic cannot hold Next's drain open.
+    # Retiring connections end well inside the 30 s stop grace (long requests can still exceed it).
+    keepalive_time 10s;
 }
 
 # The container health check, on loopback only (never published). Not an allow/deny location on a public port: nginx
@@ -132,6 +142,7 @@ server {
     # X-Forwarded-For comes from the snippet the API locations use too: the results page passes it on to the API for the
     # search window (STOREFRONT_FORWARD_CLIENT_ADDRESS, ADR 0038), so both paths must give the API the same chain.
     location / {
+        include /etc/nginx/fluxkit/upstream-retry.conf;
         proxy_pass http://fluxkit_storefront;
         proxy_http_version 1.1;
         proxy_set_header Connection "";
