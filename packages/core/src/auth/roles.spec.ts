@@ -25,6 +25,7 @@ describe("role table", () => {
       "email.manage",
       "payments.refund",
       "privacy.manage",
+      "integrations.manage",
     ]);
   });
 
@@ -115,6 +116,7 @@ describe("hasPermission", () => {
       "email.manage",
       "payments.refund",
       "privacy.manage",
+      "integrations.manage",
     ],
     manager: [
       "catalog.read",
@@ -201,6 +203,7 @@ describe("orders and customers permissions (plan 2026-10-17, open question 6)", 
       "email.manage": true,
       "payments.refund": true,
       "privacy.manage": true,
+      "integrations.manage": true,
     },
     manager: {
       "catalog.read": true,
@@ -215,6 +218,7 @@ describe("orders and customers permissions (plan 2026-10-17, open question 6)", 
       "email.manage": true,
       "payments.refund": true,
       "privacy.manage": false,
+      "integrations.manage": false,
     },
     viewer: {
       "catalog.read": true,
@@ -229,12 +233,13 @@ describe("orders and customers permissions (plan 2026-10-17, open question 6)", 
       "email.manage": false,
       "payments.refund": false,
       "privacy.manage": false,
+      "integrations.manage": false,
     },
   } as const;
 
   const personalData = ["orders.read", "orders.write", "customers.read", "customers.write"];
 
-  it("lists exactly the twelve permissions of the matrix", () => {
+  it("lists exactly the thirteen permissions of the matrix", () => {
     expect([...PERMISSIONS].sort()).toEqual(Object.keys(matrix.owner).sort());
   });
 
@@ -267,6 +272,13 @@ describe("orders and customers permissions (plan 2026-10-17, open question 6)", 
     expect(isAdminPermission("privacy.manage")).toBe(true);
   });
 
+  it("gives integrations.manage to the owner only: provider credentials (ADR 0058)", () => {
+    expect(hasPermission("owner", "integrations.manage")).toBe(true);
+    expect(hasPermission("manager", "integrations.manage")).toBe(false);
+    expect(hasPermission("viewer", "integrations.manage")).toBe(false);
+    expect(isAdminPermission("integrations.manage")).toBe(true);
+  });
+
   it("gives payments.refund to the owner and the manager, never to the viewer (ADR 0032 decision 11, owner answer 3)", () => {
     expect(hasPermission("owner", "payments.refund")).toBe(true);
     expect(hasPermission("manager", "payments.refund")).toBe(true);
@@ -290,7 +302,7 @@ describe("orders and customers permissions (plan 2026-10-17, open question 6)", 
       expect(hasPermission("manager", permission), permission).toBe(true);
       expect(hasPermission("owner", permission), permission).toBe(true);
     }
-    expect(permissionsOf("owner")).toHaveLength(12);
+    expect(permissionsOf("owner")).toHaveLength(13);
     expect(permissionsOf("manager")).toHaveLength(10);
   });
 

@@ -34,6 +34,11 @@ import {
   parseEnabledShippingProviders,
   TEST_ONLY_SHIPPING_PROVIDERS,
 } from "./shipping-providers.js";
+import {
+  parseSecretsKeyVariable,
+  secretsKeyPairProblem,
+  type SecretsKeyRing,
+} from "./secrets-key.js";
 import { blankToUndefined, DEFAULT_STOREFRONT_PUBLIC_URL, originUrl } from "./storefront-env.js";
 
 /** Lowercase letters, 2 to 8, optional `-` segments (`uk`, `en`, `en-us`). */
@@ -239,6 +244,67 @@ function describeBaseUrlProblem(value: string): string | undefined {
   return undefined;
 }
 
+interface SecretsKeyVariables {
+  SECRETS_ENCRYPTION_KEY?: string | undefined;
+  SECRETS_ENCRYPTION_KEY_PREVIOUS?: string | undefined;
+}
+
+/** Both master keys are checked at startup even while nothing is stored yet (ADR 0058): a typo must not wait for the first save. */
+function addSecretsKeyIssues(env: SecretsKeyVariables, context: z.RefinementCtx): void {
+  const current =
+    env.SECRETS_ENCRYPTION_KEY === undefined
+      ? undefined
+      : parseSecretsKeyVariable(env.SECRETS_ENCRYPTION_KEY);
+  const previous =
+    env.SECRETS_ENCRYPTION_KEY_PREVIOUS === undefined
+      ? undefined
+      : parseSecretsKeyVariable(env.SECRETS_ENCRYPTION_KEY_PREVIOUS);
+  if (current?.ok === false) {
+    context.addIssue({
+      code: "custom",
+      path: ["SECRETS_ENCRYPTION_KEY"],
+      message: current.problem,
+    });
+  }
+  if (previous?.ok === false) {
+    context.addIssue({
+      code: "custom",
+      path: ["SECRETS_ENCRYPTION_KEY_PREVIOUS"],
+      message: previous.problem,
+    });
+  }
+  if (previous !== undefined && current === undefined) {
+    context.addIssue({
+      code: "custom",
+      path: ["SECRETS_ENCRYPTION_KEY_PREVIOUS"],
+      message: "needs SECRETS_ENCRYPTION_KEY: a previous key without a current one cannot encrypt",
+    });
+  }
+  if (current?.ok === true && previous?.ok === true) {
+    const problem = secretsKeyPairProblem(current.key, previous.key);
+    if (problem !== undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["SECRETS_ENCRYPTION_KEY_PREVIOUS"],
+        message: problem,
+      });
+    }
+  }
+}
+
+/** Runs after validation, so both variables are known to parse. */
+function secretsKeyRingOf(env: SecretsKeyVariables): SecretsKeyRing | null {
+  if (env.SECRETS_ENCRYPTION_KEY === undefined) return null;
+  const current = parseSecretsKeyVariable(env.SECRETS_ENCRYPTION_KEY);
+  if (!current.ok) throw new Error("SECRETS_ENCRYPTION_KEY was not validated");
+  if (env.SECRETS_ENCRYPTION_KEY_PREVIOUS === undefined) {
+    return { current: current.key, previous: null };
+  }
+  const previous = parseSecretsKeyVariable(env.SECRETS_ENCRYPTION_KEY_PREVIOUS);
+  if (!previous.ok) throw new Error("SECRETS_ENCRYPTION_KEY_PREVIOUS was not validated");
+  return { current: current.key, previous: previous.key };
+}
+
 const envSchema = z
   .object({
     DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
@@ -346,6 +412,9 @@ const envSchema = z
     // Catalog search (ADR 0034 decision 9). The MEILI_* values are checked in `superRefine` and only when search is on, so
     // a deployment without search is not affected by them; a message never contains a value (URL or key).
     SEARCH_ENABLED: strictBoolean.default(false),
+    // Blank counts as unset (Compose passes empty strings); the format is checked in `superRefine`, never echoed.
+    SECRETS_ENCRYPTION_KEY: z.preprocess(blankToUndefined, z.string().optional()),
+    SECRETS_ENCRYPTION_KEY_PREVIOUS: z.preprocess(blankToUndefined, z.string().optional()),
     MEILI_URL: z.preprocess(blankToUndefined, z.string().optional()),
     MEILI_API_KEY: z.preprocess(blankToUndefined, z.string().optional()),
     MEILI_INDEX_PREFIX: z.preprocess(blankToUndefined, z.string().optional()),
@@ -362,6 +431,7 @@ const envSchema = z
       });
     }
     const inProduction = (env.NODE_ENV ?? "").trim().toLowerCase() === "production";
+    addSecretsKeyIssues(env, context);
     if (inProduction && env.MEDIA_STORAGE_DRIVER === undefined) {
       context.addIssue({
         code: "custom",
@@ -637,6 +707,11 @@ export interface AppEnv {
    * production; the API refuses to start without it in every environment. Never log it.
    */
   orderTokenSecret: string | undefined;
+  /**
+   * The master keys of stored provider credentials (`SECRETS_ENCRYPTION_KEY`, `SECRETS_ENCRYPTION_KEY_PREVIOUS`; ADR
+   * 0058). `null`: nothing can be stored and credentials come from the environment only. Never log it.
+   */
+  secretsKeyRing: SecretsKeyRing | null;
   /** Unpaid (`awaiting_payment`) orders one guest email or one customer may hold at once (1 to 50); ADR 0024. */
   maxOpenOrders: number;
   /**
@@ -769,6 +844,7 @@ export function loadEnv(source: Record<string, string | undefined>): AppEnv {
       ? {}
       : { orderContactRetentionDays: env.ORDER_CONTACT_RETENTION_DAYS }),
     orderTokenSecret: env.ORDER_TOKEN_SECRET,
+    secretsKeyRing: secretsKeyRingOf(env),
     maxOpenOrders: env.MAX_OPEN_ORDERS,
     trustProxy: env.TRUST_PROXY,
     schedulerEnabled: env.SCHEDULER_ENABLED,

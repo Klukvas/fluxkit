@@ -5,9 +5,12 @@
  * Pure data and rules: nothing here reads the database or changes behaviour.
  */
 
-/** `personal` P, `pseudonymous` Q, `staff` S, `secret_hash` H, `free_text` F (plan "Data inventory"). */
+/**
+ * `personal` P, `pseudonymous` Q, `staff` S, `secret_hash` H, `free_text` F (plan "Data inventory"), `encrypted_secret` E
+ * (ADR 0058: a reversible envelope of a shop credential, never a shopper's data and never exported).
+ */
 export type PersonalDataClass =
-  "personal" | "pseudonymous" | "staff" | "secret_hash" | "free_text" | "none";
+  "personal" | "pseudonymous" | "staff" | "secret_hash" | "encrypted_secret" | "free_text" | "none";
 
 /** `excluded` and `not_applicable` follow the rules of `checkPersonalDataInventory` below: a reason for the first, class `none` only for the second. */
 export type PersonalDataExportAction = "included" | "excluded" | "not_applicable";
@@ -80,6 +83,15 @@ function checkEntry(table: string, column: string, entry: PersonalDataColumnEntr
   }
   if (entry.class === "secret_hash" && entry.export !== "excluded") {
     problems.push(`${where}: a secret hash must never be exported`);
+  }
+  if (entry.class === "encrypted_secret") {
+    if (entry.export !== "excluded") {
+      problems.push(`${where}: an encrypted secret must never be exported`);
+    }
+    // A shop credential belongs to no shopper: an erasure of a data subject never touches it.
+    if (entry.erasure !== "out_of_scope") {
+      problems.push(`${where}: an encrypted secret is outside a subject erasure`);
+    }
   }
   return problems;
 }

@@ -3,6 +3,7 @@ export * from "./cart/index.js";
 export * from "./catalog/index.js";
 export * from "./content/index.js";
 export * from "./email/index.js";
+export * from "./integrations/index.js";
 export * from "./inventory/index.js";
 export * from "./media/index.js";
 export * from "./orders/index.js";
