@@ -498,7 +498,7 @@ request_loop() {
     for path in /store/config /uk "/uk/p/replica-smoke-$sequence"; do
       result=0
       status=$("${CURL[@]}" --max-time 15 -o /dev/null -w '%{http_code}' "${ORIGIN}${path}" 2>>"$WORK/roll-curl.log") || result=$?
-      printf '%s %s %s %s\n' "$path" "$result" "$status" "$(date -u +%H:%M:%S)" >>"$WORK/roll-requests.log"
+      printf '%s %s %s %s\n' "$path" "$result" "$status" "$(date +%s)" >>"$WORK/roll-requests.log"
     done
     sleep 0.2
   done
@@ -524,7 +524,7 @@ assert_roll_traffic() {
   ' "$WORK/roll-requests.log")
   read -r api_ok storefront_ok cold_ok edge_refused bad <<<"$counts"
   if [[ "$bad" != 0 || "$api_ok" == 0 || "$storefront_ok" == 0 || "$cold_ok" == 0 ]]; then
-    # Path, curl exit, HTTP status, UTC time: compare with the deploy script's phase lines above.
+    # Path, curl exit, HTTP status, Unix time: compare with the deploy script's phase lines above.
     echo "--- $1: requests that were not as expected ---" >&2
     awk '$2 != 0 && $2 != 7 && $2 != 35 { print; next } $1 ~ /^\/uk\/p\/replica-smoke-/ { if ($3 != 404) print; next } $3 != 200' "$WORK/roll-requests.log" >&2
     echo "--- curl errors ---" >&2
@@ -536,7 +536,7 @@ assert_roll_traffic() {
   [[ "$allow_edge_refusals" == true || "$edge_refused" == 0 ]] || fail "$1 interrupted the edge ($edge_refused refused connections)"
   # Refusals belong to one edge restart only: all within a few seconds, never spread over the application rollout.
   local refusal_span
-  refusal_span=$(awk '$2 == 7 || $2 == 35 { split($4, t, ":"); x = t[1] * 3600 + t[2] * 60 + t[3]; if (min == "" || x < min) min = x; if (x > max) max = x }
+  refusal_span=$(awk '$2 == 7 || $2 == 35 { if (min == "" || $4 < min) min = $4; if ($4 > max) max = $4 }
     END { print (min == "" ? 0 : max - min) }' "$WORK/roll-requests.log")
   [[ "$refusal_span" -le 10 ]] || fail "$1: refused or cut connections spread over ${refusal_span}s, more than one edge restart"
 
