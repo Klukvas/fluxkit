@@ -54,5 +54,7 @@
   "audit.action.privacy.exported": "Експорт персональних даних",
   "audit.action.privacy.erased": "Стирання персональних даних",
   "audit.action.privacy.request_changed": "Запит щодо даних записано або змінено",
-  "audit.action.unknown": "Інша дія"
+  "audit.action.unknown": "Інша дія",
+  "audit.target.email_suppression": "Блокування пошти",
+  "audit.action.email_suppression.removed": "Блокування пошти знято"
 }

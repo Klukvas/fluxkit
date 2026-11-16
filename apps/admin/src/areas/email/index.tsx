@@ -1,6 +1,7 @@
 import type { LazyFile } from "../../messages";
 import { EmailMessageDetailPage } from "./message-detail-page";
 import { EmailMessagesPage } from "./messages-page";
+import { EmailSuppressionsPage } from "./suppressions-page";
 import { EmailStatusPage } from "./status-page";
 import { EmailTemplatePreviewPage, EmailTemplatesPage } from "./templates-page";
 
@@ -11,6 +12,8 @@ export const MESSAGE_FILES: readonly LazyFile[] = ["email"];
 export { EmailStatusPage };
 /** `/email/messages`: the outbox with filters. */
 export { EmailMessagesPage };
+/** `/email/suppressions`: shared local delivery blocks; addresses masked by default, shown per row on request. */
+export { EmailSuppressionsPage };
 /** `/email/messages/:id`: one mail with its journal, resend and cancel. */
 export { EmailMessageDetailPage };
 /** `/email/templates`: the registered templates. */

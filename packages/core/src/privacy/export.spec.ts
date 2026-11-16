@@ -175,6 +175,7 @@ describe("buildPersonalDataExport (ADR 0033 decision 7)", () => {
       "account",
       "orders",
       "mail",
+      "emailSuppressions",
       "sessions",
       "cart",
       "processors",
@@ -375,3 +376,29 @@ function restoreDates<T>(value: T): T {
   }
   return value;
 }
+
+describe("suppression export allowlist", () => {
+  it("copies metadata only, never keys or a repeated address", () => {
+    const input = facts();
+    const entry = {
+      reason: "blocked",
+      sourceProvider: "resend",
+      firstSeenAt: input.generatedAt,
+      lastSeenAt: input.generatedAt,
+      id: "internal-id",
+      eventKey: "internal-receipt",
+      toAddress: "suppression@example.test",
+    };
+    const exported = buildPersonalDataExport({ ...input, emailSuppressions: [entry] });
+    expect(exported.emailSuppressions).toEqual([
+      {
+        reason: "blocked",
+        sourceProvider: "resend",
+        firstSeenAt: input.generatedAt.toISOString(),
+        lastSeenAt: input.generatedAt.toISOString(),
+      },
+    ]);
+    expect(findForbiddenExportKeys(exported)).toEqual([]);
+    expect(JSON.stringify(exported.emailSuppressions)).not.toContain("suppression@example.test");
+  });
+});

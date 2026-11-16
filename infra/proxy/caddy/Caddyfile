@@ -28,6 +28,15 @@
 		# The edge owns HSTS (the API sends none today; this keeps it one header if it ever does).
 		header_down -Strict-Transport-Security
 		header_down -X-Powered-By
+		# Upstream error responses do not trigger handle_errors themselves. Only email feedback is intercepted.
+		@emailUnavailable status 502 503 504
+		handle_response @emailUnavailable {
+			@emailRetry path /webhooks/email /webhooks/email/*
+			route {
+				error @emailRetry 502
+				copy_response
+			}
+		}
 	}
 }
 
@@ -57,6 +66,27 @@
 			max_size 64KiB
 		}
 		import to_api
+	}
+
+	# Email provider feedback (ADR 0056): exact raw bytes, with the API's 64-KiB body limit.
+	@emailWebhooks path /webhooks/email /webhooks/email/*
+	handle @emailWebhooks {
+		request_body {
+			max_size 64KiB
+		}
+		import to_api
+	}
+
+	# Transport errors and the email-only upstream interception above stay retryable for Brevo.
+	handle_errors 502 503 504 {
+		@emailRetry path /webhooks/email /webhooks/email/*
+		handle @emailRetry {
+			header Retry-After "5"
+			respond 429
+		}
+		handle {
+			respond "" {err.status_code}
+		}
 	}
 
 	# The admin SPA (ADR 0027). Hashed assets: a missing file is a 404, never the HTML, and only an existing file is

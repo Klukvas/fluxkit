@@ -28,3 +28,22 @@ export function parseBrevoEnv(env: Readonly<Record<string, string | undefined>>)
   }
   return Object.freeze({ apiKey: key });
 }
+
+/** Dedicated bearer credential; never reuse the API key. This is the only webhook-secret accessor. */
+export function readBrevoWebhookSecret(
+  env: Readonly<Record<string, string | undefined>>,
+): string | undefined {
+  const secret = env.BREVO_WEBHOOK_SECRET ?? "";
+  if (secret.trim() === "") return undefined;
+  if (secret === env.BREVO_API_KEY) {
+    throw new BrevoConfigError(
+      "BREVO_WEBHOOK_SECRET must differ from BREVO_API_KEY (the values are not shown).",
+    );
+  }
+  if (!/^[A-Za-z0-9_-]{43,1024}$/.test(secret)) {
+    throw new BrevoConfigError(
+      "BREVO_WEBHOOK_SECRET must contain 43 to 1024 URL-safe base64 characters (the value is not shown).",
+    );
+  }
+  return secret;
+}

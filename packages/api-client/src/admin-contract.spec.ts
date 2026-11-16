@@ -686,6 +686,17 @@ const shippingProviderCheck: Shape<AdminShippingProviderCheck> = {
 const emailStatus = {
   enum: ["pending", "sending", "sent", "failed", "unknown", "cancelled"],
 } as const;
+const emailSuppression: Shape<Admin.AdminEmailSuppression> = {
+  object: {
+    id: "string",
+    toAddress: "string",
+    toAddressMasked: "string",
+    reason: { enum: ["hard_bounce", "complaint", "unsubscribe", "blocked"] },
+    sourceProvider: "string",
+    firstSeenAt: "string",
+    lastSeenAt: "string",
+  },
+};
 const emailMailbox: Shape<Admin.AdminEmailMailbox> = {
   object: { address: "string", displayName: { nullable: "string" } },
 };
@@ -763,9 +774,12 @@ const auditEventList: Shape<Admin.AdminAuditEventList> = paginated({
         "privacy.exported",
         "privacy.erased",
         "privacy.request_changed",
+        "email_suppression.removed",
       ],
     },
-    targetKind: { enum: ["customer", "order", "admin_user", "privacy_request"] },
+    targetKind: {
+      enum: ["customer", "order", "admin_user", "privacy_request", "email_suppression"],
+    },
     targetId: "string",
     detail: { record: { oneOf: ["string", "number", "boolean", { array: "string" }] } },
   },
@@ -1184,6 +1198,16 @@ const personalDataExport: Shape<PersonalDataExport> = {
     account: { nullable: exportRecord },
     orders: { array: exportRecord },
     mail: { array: exportRecord },
+    emailSuppressions: {
+      array: {
+        object: {
+          reason: { enum: ["hard_bounce", "complaint", "unsubscribe", "blocked"] },
+          sourceProvider: "string",
+          firstSeenAt: "string",
+          lastSeenAt: "string",
+        },
+      },
+    },
     sessions: { array: exportRecord },
     cart: { nullable: exportRecord },
     processors: {
@@ -1620,6 +1644,8 @@ const RESPONSE_SHAPES: { [N in AdminOperationName]: ResponseShapeOf<N> } = {
   getShippingProviderSettings: shippingProviderSettings,
   putShippingProviderSettings: shippingProviderSettings,
   checkShippingProvider: shippingProviderCheck,
+  listEmailSuppressions: paginated(emailSuppression),
+  removeEmailSuppression: "none",
   getEmailStatus: emailStatusResult,
   sendTestEmail: emailMessageId,
   listEmailMessages: emailMessageList,
@@ -1758,6 +1784,8 @@ const REQUEST_SHAPES: { [N in AdminOperationName]: RequestShapeOf<N> } = {
   getShippingProviderSettings: null,
   putShippingProviderSettings: body.putShippingProviderSettings,
   checkShippingProvider: null,
+  listEmailSuppressions: null,
+  removeEmailSuppression: null,
   getEmailStatus: null,
   sendTestEmail: body.sendTestEmail,
   listEmailMessages: null,

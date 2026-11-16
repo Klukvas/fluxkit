@@ -112,6 +112,19 @@ describe("EmailProviderRegistry", () => {
     ).rejects.toThrow(/must be a static provider implementing EmailProviderPort/);
   });
 
+  it("exposes an optional verifier and rejects a malformed one at startup", async () => {
+    const webhookVerifier = () => ({ ok: true as const, facts: [], ignored: true });
+    const registry = await start([providerModuleOf("alpha", { port: { webhookVerifier } })]);
+    expect(registry.get()?.webhookVerifier).toBe(webhookVerifier);
+    await expect(
+      boot([
+        providerModuleOf("bad", {
+          port: { webhookVerifier: "unsafe" as unknown as EmailProviderPort["webhookVerifier"] },
+        }),
+      ]),
+    ).rejects.toThrow(/must be a static provider implementing EmailProviderPort/);
+  });
+
   it("fails startup when the class code differs from its metadata", async () => {
     await expect(boot([providerModuleOf("one", { metadataCode: "two" })])).rejects.toThrow(
       /its code "one" differs from the code "two"/,

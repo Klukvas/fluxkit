@@ -42,7 +42,8 @@ const SUBJECT_KIND_LIST = "'customer', 'email'";
 const CHANNEL_LIST = "'self_service', 'admin'";
 const REQUEST_STATUS_LIST = "'received', 'in_progress', 'completed', 'rejected'";
 const CLOSED_STATUS_LIST = "'completed', 'rejected'";
-const TARGET_KIND_LIST = "'customer', 'order', 'admin_user', 'privacy_request'";
+const TARGET_KIND_LIST =
+  "'customer', 'order', 'admin_user', 'privacy_request', 'email_suppression'";
 
 export const privacyRequest = pgTable(
   "privacy_request",

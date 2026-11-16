@@ -1,5 +1,6 @@
 import { SPA } from "../support/env.ts";
-import { expect, test } from "../support/fixtures.ts";
+import { expect, test, unique } from "../support/fixtures.ts";
+import { seedEmailSuppression } from "../support/email-suppression-db.ts";
 
 /**
  * The Email area (email plan step 11). The API of this suite runs with `EMAIL_PROVIDER=fake` (the test-only provider: it
@@ -199,4 +200,73 @@ test("email: the test send is limited to 5 an hour: the sixth is explained, noth
   await expect(main.getByText(/Too many test mails/)).toBeVisible();
   // The button works again afterwards (nothing is stuck in a busy state).
   await expect(main.getByRole("button", { name: "Send test email" })).toBeEnabled();
+});
+
+test("email: suppressions toggle addresses and require full-address confirmation without a resend", async ({
+  page,
+  signIn,
+  guard,
+}, testInfo) => {
+  const address = `reserved-${unique(testInfo)}@example.test`;
+  const id = await seedEmailSuppression(address);
+  await signIn("owner");
+  await page
+    .getByRole("navigation", { name: "Admin sections" })
+    .getByRole("link", { name: "Email" })
+    .click();
+  const main = page.getByRole("main");
+  await main
+    .getByRole("navigation", { name: "Email sections" })
+    .getByRole("link", { name: "Suppressions" })
+    .click();
+  await expect(page.getByRole("heading", { level: 1, name: "Suppressions" })).toBeVisible();
+  const table = main.getByRole("table", { name: "Email suppressions" });
+  const row = table.getByRole("row", { name: /r\*\*\*@e\*\*\*\.t\*\*\*/ });
+  await expect(row).toBeVisible();
+  await expect(row).toContainText("Spam complaint");
+  await expect(row).toContainText("resend");
+  await expect(row).toContainText("November 15, 2026");
+  await expect(row).toContainText("November 16, 2026");
+  await expect(main).not.toContainText(address);
+  const writesBefore = guard.writes().length;
+  const show = row.getByRole("button", { name: "Show address for r***@e***.t***" });
+  await expect(show).toHaveAttribute("aria-pressed", "false");
+  await show.press("Enter");
+  await expect(row).toContainText(address);
+  const hide = row.getByRole("button", { name: "Hide address for r***@e***.t***" });
+  await expect(hide).toHaveAttribute("aria-pressed", "true");
+  await hide.press("Space");
+  await expect(row).not.toContainText(address);
+  await expect(show).toHaveAttribute("aria-pressed", "false");
+  expect(guard.writes().length, "show/hide is client-side only").toBe(writesBefore);
+  await row.getByRole("button", { name: "Remove block for r***@e***.t***" }).click();
+  const dialog = page.getByRole("alertdialog", { name: "Remove this email block?" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText(address);
+  await expect(dialog).toContainText("Earlier mail is not resent");
+  await expect(dialog.getByRole("button", { name: "Keep" })).toBeFocused();
+  expect(guard.writes().length, "opening the confirmation writes nothing").toBe(writesBefore);
+  await dialog.getByRole("button", { name: "Keep" }).click();
+  await expect(dialog).toBeHidden();
+  await expect(row).toBeVisible();
+  expect(guard.writes().length, "Keep writes nothing").toBe(writesBefore);
+  await row.getByRole("button", { name: "Remove block for r***@e***.t***" }).click();
+  await expect(dialog).toContainText(address);
+  const removal = page.waitForResponse(
+    (response) =>
+      response.request().method() === "DELETE" &&
+      new URL(response.url()).pathname === `/admin/email/suppressions/${id}`,
+  );
+  await dialog.getByRole("button", { name: "Remove block", exact: true }).click();
+  expect((await removal).status()).toBe(204);
+  await expect(dialog).toBeHidden();
+  await expect(main.getByText("The local block was removed. No mail was resent.")).toBeVisible();
+  await expect(main.getByText("No email suppressions", { exact: true })).toBeVisible();
+  expect(guard.writes().slice(writesBefore)).toEqual([
+    {
+      method: "DELETE",
+      url: expect.stringContaining(`/admin/email/suppressions/${id}`),
+      csrf: "1",
+    },
+  ]);
 });

@@ -29,7 +29,10 @@ function implementsPort(value: unknown): value is EmailProviderPort {
   if (!PORT_METHODS.every((method) => typeof candidate[method] === "function")) {
     return false;
   }
-  return isEmailProviderCapabilities(candidate.capabilities);
+  return (
+    isEmailProviderCapabilities(candidate.capabilities) &&
+    (candidate.webhookVerifier === undefined || typeof candidate.webhookVerifier === "function")
+  );
 }
 
 /**

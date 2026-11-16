@@ -195,3 +195,13 @@ Not contract (internal): the number of days and minutes behind the defaults beyo
 
 - SemVer for the template (`AGENTS.md` section 17). Routes live under `/admin` and `/store` without a version segment; a breaking change to a route means a new major version of the template and a migration guide, not a silent edit.
 - Before the first release the contract may still change; the change is still recorded in `CHANGELOG.md`.
+
+## Email suppression (ADR 0056 step 1b, additive)
+
+| Route | Contract |
+|---|---|
+| `POST /webhooks/email/{provider}` | Authenticated RAW-byte provider feedback (selected Resend/Brevo with secret only), max 64 KiB; no session/CSRF; 204 commit/duplicate/ignored, 400 malformed/stale, 401 auth, 404 disabled, 413 size, 429 transient/rate limit + Retry-After; `docs/api/email.md` |
+| `GET /admin/email/suppressions` | `email.manage`; bounded limit/offset list, full normalized `toAddress` and `toAddressMasked` + reason/source/first/last seen, newest first; UI masked by default with per-row show/hide and full-address removal confirmation; no address query or separate reveal endpoint |
+| `DELETE /admin/email/suppressions/{id}` | `email.manage`, CSRF, UUID; 204 after atomic removal/audit `email_suppression.removed` targeting `email_suppression`; replay receipts kept; no automatic resend |
+
+Sender error `suppressed` is terminal `failed` without a pin, `unknown` with a pin. A failed shared lookup defers without provider I/O. No existing response member is removed.

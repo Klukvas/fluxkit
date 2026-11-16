@@ -5,6 +5,7 @@ import { messagesForArea } from "../../test-helpers";
 import { EMAIL_REFUSAL_RULES } from "./email-errors";
 import { MESSAGE_FILES } from "./index";
 import { ERROR_CODE_REASONS, MESSAGE_STATUSES } from "./email-view";
+import { SUPPRESSION_REASONS } from "./suppressions-view";
 import { SETUP_STEP_KEYS } from "./status-view";
 
 /**
@@ -18,6 +19,13 @@ beforeAll(async () => {
 });
 
 const dynamicKeys = (): string[] => [
+  ...SUPPRESSION_REASONS.map((reason) => `mail.suppressions.reason.${reason}`),
+  "mail.suppressions.notice.removed",
+  "mail.suppressions.notice.unknown",
+  "mail.suppressions.show",
+  "mail.suppressions.hide",
+  "mail.suppressions.showLabel",
+  "mail.suppressions.hideLabel",
   ...MESSAGE_STATUSES.map((status) => `mail.status.${status}`),
   ...ERROR_CODE_REASONS.map((reason) => `mail.code.${reason}`),
   "mail.code.unrecognized",

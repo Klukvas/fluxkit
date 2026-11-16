@@ -1,3 +1,4 @@
+import { EmailSuppressionService } from "../suppression/email-suppression.service.js";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
@@ -685,6 +686,7 @@ describe("order and shipment mails (real Postgres, domain events, the in-repo te
         app.get(LOCALE_CONFIG),
         app.get(CLOCK),
         app.get(EMAIL_SEND_PACER),
+        app.get(EmailSuppressionService),
       );
       await expect(unavailable.attempt(row.id, () => world.clock.now())).rejects.toBeInstanceOf(
         EmailLinkUnavailableError,

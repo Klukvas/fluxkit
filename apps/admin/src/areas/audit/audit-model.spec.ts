@@ -152,6 +152,7 @@ describe("the audit query in the URL", () => {
         "privacy.exported",
         "privacy.lookup",
         "privacy.request_changed",
+        "email_suppression.removed",
       ].sort(),
     );
   });

@@ -13,6 +13,9 @@ One line per user-visible or schema change.
 
 ## Unreleased
 
+- Email webhook resilience: unexpected controller/guard/raw-reader failures and email-only edge upstream 502/503/504 return retryable 429 with five-second Retry-After; ingestion bounds PostgreSQL locks/statements. Brevo refuses reuse of the API key as its webhook secret.
+
+- Email step 1b: migration `0017_email_suppression` adds shared normalized recipient blocks and eight-day webhook receipts; authenticated Resend/Brevo feedback routes, guarded sending, admin suppression list under email.manage with full addresses, masked-by-default UI, per-row show/hide and full-address removal confirmation with audit, verified-address privacy export/erasure and job-10 receipt purge. No fallback routing is enabled.
 - Storefront (additive optional config, minor): runtime `STOREFRONT_DEMO_NOTICE=true` enables a permanent demo strip, a first-visit dialog remembered in browser storage, and a checkout warning, with uk/en FluxLab links. Unset or blank defaults to false for client shops; payment and order behavior is unchanged.
 - Add a removable Brevo transactional email provider (`EMAIL_PROVIDER=brevo`, `BREVO_API_KEY`); Free branding requires a paid plan to remove. Inline idempotency remains unverified: ambiguous mail stops `unknown` without automatic replay; no fallback or webhook/suppression yet.
 - Migration 0016 adds immutable email provider/time pins with conservative legacy backfill and guarded rollback, accepts bounded bracketed provider message IDs separately from error codes, and exposes nullable admin `pinnedProviderCode` with uk/en cancellation warnings. Pinned terminal failures retain `unknown`; optional provider replay windows are consumed by the sender.

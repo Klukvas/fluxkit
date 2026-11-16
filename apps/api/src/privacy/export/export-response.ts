@@ -22,6 +22,14 @@ export const personalDataExportSchema = z
     account: z.record(z.string(), z.unknown()).nullable(),
     orders: z.array(z.record(z.string(), z.unknown())),
     mail: z.array(z.record(z.string(), z.unknown())),
+    emailSuppressions: z.array(
+      z.object({
+        reason: z.enum(["hard_bounce", "complaint", "unsubscribe", "blocked"]),
+        sourceProvider: z.string(),
+        firstSeenAt: z.string().meta({ format: "date-time" }),
+        lastSeenAt: z.string().meta({ format: "date-time" }),
+      }),
+    ),
     sessions: z.array(z.record(z.string(), z.unknown())),
     cart: z.record(z.string(), z.unknown()).nullable(),
     processors: z.array(

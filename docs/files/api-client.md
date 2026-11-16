@@ -16,3 +16,6 @@ Typed clients for the public store API (`createStoreClient`) and the admin API (
 - `src/testing/shape.ts` - test support (`Shape<T>`, `compareShape`; `JsonValue` is the shape `"any"`, a boolean literal such as `ok: true` is `{literal}`); excluded from the build.
 - `src/*.spec.ts` - unit tests (`request`, `response`, `transport`, `client` and `admin-client` with an injected `fetch`), `contract.spec.ts` and `admin-contract.spec.ts` (types and operations versus `docs/api/openapi.json`), and `bundle-boundary.spec.ts` (the admin modules stay out of the store client's import graph; `sideEffects: false`).
 - `tsconfig.build.json` - the build config; leaves out specs and `src/testing`.
+
+- `src/admin-types.ts`, `src/admin-operations.ts`, `src/admin-client.ts` — additive full/masked-address suppression page/list parameters and GET/DELETE methods, removal audit vocabulary, suppression export metadata; full recipient under email.manage, no separate reveal endpoint or automatic write retry.
+- `src/admin-client.spec.ts`, `src/admin-contract.spec.ts` — route/method/query/CSRF and OpenAPI suppression shape parity.
