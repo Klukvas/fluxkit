@@ -34,9 +34,9 @@ describe("EMAIL_PROVIDER", () => {
     expect(loadEnv({ ...base, EMAIL_PROVIDER: " none " }).emailProvider).toBe("none");
   });
 
-  it("accepts exactly none, resend and fake", () => {
-    expect([...EMAIL_PROVIDER_CHOICES]).toEqual(["none", "resend", "fake"]);
-    for (const provider of ["resend", "fake"]) {
+  it("accepts exactly none, resend, brevo and fake", () => {
+    expect([...EMAIL_PROVIDER_CHOICES]).toEqual(["none", "resend", "brevo", "fake"]);
+    for (const provider of ["resend", "brevo", "fake"]) {
       const env = loadEnv({ ...base, EMAIL_PROVIDER: provider, EMAIL_FROM: FROM });
       expect(env.emailProvider).toBe(provider);
     }
@@ -46,7 +46,7 @@ describe("EMAIL_PROVIDER", () => {
     "refuses %j loudly, naming the variable, never the value",
     (value) => {
       const message = messageOf({ ...base, EMAIL_PROVIDER: value, EMAIL_FROM: FROM });
-      expect(message).toMatch(/EMAIL_PROVIDER: must be one of none, resend, fake/);
+      expect(message).toMatch(/EMAIL_PROVIDER: must be one of none, resend, brevo, fake/);
       expect(message).not.toContain(value);
     },
   );

@@ -12,6 +12,9 @@
 One line per user-visible or schema change.
 
 ## Unreleased
+
+- Add a removable Brevo transactional email provider (`EMAIL_PROVIDER=brevo`, `BREVO_API_KEY`); Free branding requires a paid plan to remove. Inline idempotency remains unverified: ambiguous mail stops `unknown` without automatic replay; no fallback or webhook/suppression yet.
+- Migration 0016 adds immutable email provider/time pins with conservative legacy backfill and guarded rollback, accepts bounded bracketed provider message IDs separately from error codes, and exposes nullable admin `pinnedProviderCode` with uk/en cancellation warnings. Pinned terminal failures retain `unknown`; optional provider replay windows are consumed by the sender.
 - Production example: `api` waits for a healthy `redis` before it starts (with `RATE_LIMIT_STORE=redis` the API refuses to start while Redis does not answer, so a release that recreated Redis could fail its start and roll back). No API, schema or variable change.
 - Fixed: scheduler stops starting jobs once its lock connection is lost.
 - Production example: a `redis` service (password `REDIS_PASSWORD`, required; no persistence, internal only), PR 1 of the multi-instance plan; the API does not use it yet. Existing hosts add `REDIS_PASSWORD` to `production.env` before deploying (`docs/deployment.md`).

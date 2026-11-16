@@ -103,6 +103,7 @@ jobs:
             providers-email-fake,
             providers-email-none,
             providers-email-resend,
+            providers-email-brevo,
             providers-payment-fake,
             providers-payment-none,
             providers-payment-monobank,

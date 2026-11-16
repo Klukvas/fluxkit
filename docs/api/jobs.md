@@ -156,3 +156,5 @@ For each due event, oldest first (ADR 0025):
 | `2` | the lock is held by a running scheduler or another command: nothing was run; stderr says so. A tick takes seconds; run it again, or leave it, the scheduler is doing this work |
 
 Use it for a system cron when `SCHEDULER_ENABLED=false`, and to run the jobs by hand. Feature handlers of enabled features (`FEATURES_ENABLED`) are discovered, so their events are delivered by the command too.
+
+- Email replay safety (ADR 0056 step 1): job 9 settles pinned/crashed rows even with `EMAIL_PROVIDER=none`; it never sends them through a different provider. Missing pinned configuration holds with `pinned_provider_unavailable` and rechecks every minute, bounded by the deadline; restoration checks the original safe replay cutoff before a call. Expiry becomes `unknown`. Unpinned pending rows retain the existing off behavior. Provider capability windows and ambiguity precedence apply equally to job and immediate sends.

@@ -28462,6 +28462,11 @@
                             "nullable": true,
                             "type": "string"
                           },
+                          "pinnedProviderCode": {
+                            "nullable": true,
+                            "description": "Provider of an earlier possibly accepted attempt; cancellation cannot recall it.",
+                            "type": "string"
+                          },
                           "lastErrorCode": {
                             "nullable": true,
                             "type": "string"
@@ -28518,6 +28523,7 @@
                           "deadlineAt",
                           "providerCode",
                           "providerMessageId",
+                          "pinnedProviderCode",
                           "lastErrorCode",
                           "resendOf",
                           "createdByAdminId",
@@ -28694,6 +28700,11 @@
                       "nullable": true,
                       "type": "string"
                     },
+                    "pinnedProviderCode": {
+                      "nullable": true,
+                      "description": "Provider of an earlier possibly accepted attempt; cancellation cannot recall it.",
+                      "type": "string"
+                    },
                     "lastErrorCode": {
                       "nullable": true,
                       "type": "string"
@@ -28755,6 +28766,7 @@
                     "deadlineAt",
                     "providerCode",
                     "providerMessageId",
+                    "pinnedProviderCode",
                     "lastErrorCode",
                     "resendOf",
                     "createdByAdminId",
@@ -29053,6 +29065,11 @@
                       "nullable": true,
                       "type": "string"
                     },
+                    "pinnedProviderCode": {
+                      "nullable": true,
+                      "description": "Provider of an earlier possibly accepted attempt; cancellation cannot recall it.",
+                      "type": "string"
+                    },
                     "lastErrorCode": {
                       "nullable": true,
                       "type": "string"
@@ -29109,6 +29126,7 @@
                     "deadlineAt",
                     "providerCode",
                     "providerMessageId",
+                    "pinnedProviderCode",
                     "lastErrorCode",
                     "resendOf",
                     "createdByAdminId",

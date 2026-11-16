@@ -50,6 +50,7 @@ describe("loadEmailProvider", () => {
   it("none does not import a provider that is present", async () => {
     await writeProvider("fake-email", email("fake"), MUST_NOT_IMPORT);
     await writeProvider("resend", email("resend"), MUST_NOT_IMPORT);
+    await writeProvider("brevo", email("brevo"), MUST_NOT_IMPORT);
     expect(await loadEmailProvider({ provider: "none", providersDir: dir })).toEqual([]);
   });
 
@@ -58,6 +59,16 @@ describe("loadEmailProvider", () => {
     await writeProvider("two", email("fake"), MUST_NOT_IMPORT);
     const loaded = await loadEmailProvider({ provider: "resend", providersDir: dir });
     expect(loaded.map((provider) => provider.code)).toEqual(["resend"]);
+  });
+
+  it("loads Brevo without importing the other email plugins", async () => {
+    await writeProvider("brevo", email("brevo"), MODULE);
+    await writeProvider("resend", email("resend"), MUST_NOT_IMPORT);
+    expect(
+      (await loadEmailProvider({ provider: "brevo", providersDir: dir })).map(
+        (entry) => entry.code,
+      ),
+    ).toEqual(["brevo"]);
   });
 
   it("finds a provider by manifest code, regardless of the folder name", async () => {

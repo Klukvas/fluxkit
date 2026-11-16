@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import {
   validateOutgoingEmail,
+  emailRetryDeadline,
   type EmailProviderFailureReason,
   type EmailProviderPort,
   type OutgoingEmail,
@@ -102,10 +103,13 @@ export class EmailSender {
     limits: JobLimits = DEFAULT_JOB_LIMITS,
   ): Promise<EmailAttemptReport> {
     const provider = this.providers.get();
-    if (provider === undefined) {
-      return { kind: "no_provider" };
-    }
-    const claim = await this.changes.claim(id, clock(), provider.code, limits);
+    const claim = await this.changes.claim(
+      id,
+      clock(),
+      provider?.code,
+      limits,
+      provider?.capabilities,
+    );
     if (claim.kind === "skipped") {
       return claim;
     }
@@ -113,6 +117,7 @@ export class EmailSender {
       this.logger.warn(`Email ${id}: deadline passed before it could be sent; ${claim.status}`);
       return claim;
     }
+    if (provider === undefined) return { kind: "no_provider" };
     const message = claim.message;
     const prepared = await this.prepare(message);
     let outcome: EmailAttemptOutcome;
@@ -121,13 +126,13 @@ export class EmailSender {
     if (prepared.kind === "not_renderable") {
       outcome = prepared;
       this.logger.error(
-        `Email ${message.id} (${message.templateKey}) cannot be rendered: ${prepared.code}; failed`,
+        `Email ${message.id} (${message.templateKey}) cannot be rendered: ${prepared.code}; ${message.pinnedAt === null ? "failed" : "unknown"}`,
       );
     } else {
       // Leave enough lease for the provider timeout and the existing record margin.
       const lastStartAt = Math.min(
         message.leaseUntil.getTime() - this.config.tuning.sendTimeoutMs - 5_000,
-        message.deadlineAt.getTime(),
+        emailRetryDeadline(message.deadlineAt, message.pinnedAt, provider.capabilities).getTime(),
       );
       let started = 0;
       const admission = await this.pacer.start(lastStartAt - clock().getTime(), () => {
@@ -153,7 +158,13 @@ export class EmailSender {
         outcome = { kind: "provider_failed", failure };
       }
     }
-    const recorded = await this.changes.record(message, outcome, clock(), limits);
+    const recorded = await this.changes.record(
+      message,
+      outcome,
+      clock(),
+      limits,
+      provider.capabilities,
+    );
     if (recorded.kind === "lost") {
       this.logger.warn(
         `Email ${message.id} (${message.templateKey}) attempt ${String(message.attempts)}: not recorded, the row was claimed again meanwhile`,

@@ -174,7 +174,7 @@ describe("checkEmailProviderContract", () => {
       send: () => Promise.resolve(emailProviderOk({ providerMessageId: "id with spaces" })),
     });
     expect(await violationsOf(textId)).toContain(
-      "send answered a providerMessageId that breaks EMAIL_CODE_PATTERN",
+      "send answered a providerMessageId that breaks the provider message ID rules",
     );
   });
 

@@ -126,6 +126,9 @@ export const emailMessageResponseSchema = z.object({
   deadlineAt: timestampSchema,
   providerCode: z.string().nullable(),
   providerMessageId: z.string().nullable(),
+  pinnedProviderCode: z.string().nullable().meta({
+    description: "Provider of an earlier possibly accepted attempt; cancellation cannot recall it.",
+  }),
   lastErrorCode: z.string().nullable(),
   resendOf: uuidSchema.nullable(),
   createdByAdminId: uuidSchema.nullable(),

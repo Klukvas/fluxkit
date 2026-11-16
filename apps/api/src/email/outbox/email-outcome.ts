@@ -2,6 +2,8 @@ import {
   decideEmailTransition,
   EMAIL_CODE_PATTERN,
   isPastEmailDeadline,
+  emailRetryDeadline,
+  type EmailProviderCapabilities,
   nextEmailAttempt,
   type EmailMessageStatus,
   type EmailProviderFailure,
@@ -38,7 +40,7 @@ function assertAllowed(from: EmailMessageStatus, to: EmailMessageStatus): void {
 
 export type EmailClaimDecision =
   | { readonly to: "sending" }
-  | { readonly to: "failed" | "unknown"; readonly lastErrorCode: typeof DEADLINE_PASSED_CODE };
+  | { readonly to: "failed" | "unknown"; readonly lastErrorCode: string };
 
 /**
  * A due row the claim locked: a `pending` row is claimed (`sending`), and so is a `sending` row whose lease expired (the
@@ -48,6 +50,8 @@ export type EmailClaimDecision =
  */
 export function decideEmailClaim(input: {
   readonly status: EmailMessageStatus;
+  readonly pinnedAt?: Date | null;
+  readonly capabilities?: EmailProviderCapabilities;
   readonly deadlineAt: Date;
   readonly now: Date;
 }): EmailClaimDecision {
@@ -56,9 +60,24 @@ export function decideEmailClaim(input: {
     throw new RangeError(`A ${status} mail is never claimed`);
   }
   if (isPastEmailDeadline(input.now, input.deadlineAt)) {
-    const to = status === "pending" ? "failed" : "unknown";
+    const to = status === "pending" && input.pinnedAt == null ? "failed" : "unknown";
     assertAllowed(status, to);
     return { to, lastErrorCode: DEADLINE_PASSED_CODE };
+  }
+  if (input.pinnedAt != null) {
+    const code =
+      input.capabilities?.idempotencyKeys === false
+        ? "idempotency_unprotected"
+        : isPastEmailDeadline(
+              input.now,
+              emailRetryDeadline(input.deadlineAt, input.pinnedAt, input.capabilities),
+            )
+          ? "idempotency_window_expired"
+          : null;
+    if (code !== null) {
+      assertAllowed(status, "unknown");
+      return { to: "unknown", lastErrorCode: code };
+    }
   }
   assertAllowed(status, "sending");
   return { to: "sending" };
@@ -102,6 +121,8 @@ export function decideEmailRecord(input: {
   readonly deadlineAt: Date;
   readonly now: Date;
   readonly outcome: EmailAttemptOutcome;
+  readonly pinnedAt?: Date | null;
+  readonly capabilities?: EmailProviderCapabilities;
 }): EmailRecordDecision {
   const { outcome } = input;
   switch (outcome.kind) {
@@ -113,23 +134,31 @@ export function decideEmailRecord(input: {
         sentAt: input.now,
         lastErrorCode: null,
       };
-    case "not_renderable":
-      assertAllowed("sending", "failed");
-      return { status: "failed", lastErrorCode: outcome.code };
+    case "not_renderable": {
+      const status = input.pinnedAt == null ? "failed" : "unknown";
+      assertAllowed("sending", status);
+      return { status, lastErrorCode: outcome.code };
+    }
     case "provider_failed": {
       const next = nextEmailAttempt({
         attempts: input.attempts,
         failure: outcome.failure,
         now: input.now,
         deadlineAt: input.deadlineAt,
+        pinnedAt: input.pinnedAt,
+        capabilities: input.capabilities,
       });
       assertAllowed("sending", next.status);
       const code = failureCode(outcome.failure);
       if (next.status === "pending") {
         return { status: "pending", nextAttemptAt: next.nextAttemptAt, lastErrorCode: code };
       }
-      if (next.status === "failed" && next.cause === "deadline_passed") {
-        return { status: "failed", lastErrorCode: DEADLINE_PASSED_CODE };
+      if (
+        next.cause === "deadline_passed" ||
+        next.cause === "idempotency_window_expired" ||
+        next.cause === "idempotency_unprotected"
+      ) {
+        return { status: next.status, lastErrorCode: next.cause };
       }
       return { status: next.status, lastErrorCode: code };
     }

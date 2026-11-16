@@ -65,6 +65,7 @@ function message(overrides: Partial<AdminEmailMessage> = {}): AdminEmailMessage 
     deadlineAt: "2026-10-27T10:00:00.000Z",
     providerCode: "resend",
     providerMessageId: "pm-1",
+    pinnedProviderCode: null,
     lastErrorCode: null,
     resendOf: null,
     createdByAdminId: null,
@@ -373,6 +374,18 @@ describe("the message detail", () => {
     );
     expect(sending).toContain("§mail.detail.leaseUntil");
     expect(sending).not.toContain("§mail.detail.nextAttempt");
+  });
+
+  it("shows the durable provider pin on an open message", () => {
+    const html = renderInRouter(
+      <MessageFacts
+        t={sentinel}
+        uiLocale="en"
+        message={detail({ status: "pending", pinnedProviderCode: "brevo" })}
+      />,
+    );
+    expect(html).toContain("§mail.detail.pinnedProviderCode");
+    expect(html).toContain("brevo");
   });
 
   it("links the order, the customer and the original of a resend", () => {

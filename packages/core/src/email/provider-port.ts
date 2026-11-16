@@ -135,6 +135,8 @@ export function emailProviderFailure(
 export interface EmailProviderCapabilities {
   /** Whether the service deduplicates by `idempotencyKey` (Resend: yes, 24 h, R4). */
   readonly idempotencyKeys: boolean;
+  /** Safe replay lifetime from the first possibly accepted attempt. Absent retains the existing deadline policy. */
+  readonly idempotencyWindowSeconds?: number;
   /** Most recipients of one request the service accepts; the API always sends one (v1). */
   readonly maxRecipients: number;
 }
@@ -159,7 +161,7 @@ export interface EmailSendOptions {
 }
 
 export interface EmailSent {
-  /** The service's id of the accepted mail (`EMAIL_CODE_PATTERN`; Resend answers a UUID). */
+  /** The service's id of the accepted mail (validated by `isEmailProviderMessageId`; preserved verbatim). */
   readonly providerMessageId: string;
 }
 
@@ -176,4 +178,19 @@ export interface EmailProviderPort {
     options: EmailSendOptions,
     signal: ProviderAbortSignal,
   ): Promise<EmailProviderResult<EmailSent>>;
+}
+
+/** Shared startup/contract validation; a window must leave room for the five-minute safety margin. */
+export function isEmailProviderCapabilities(value: unknown): value is EmailProviderCapabilities {
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    typeof candidate.idempotencyKeys === "boolean" &&
+    Number.isSafeInteger(candidate.maxRecipients) &&
+    (candidate.maxRecipients as number) >= 1 &&
+    (candidate.idempotencyWindowSeconds === undefined ||
+      (Number.isSafeInteger(candidate.idempotencyWindowSeconds) &&
+        (candidate.idempotencyWindowSeconds as number) > 300 &&
+        (candidate.idempotencyWindowSeconds as number) <= Number.MAX_SAFE_INTEGER / 1000))
+  );
 }

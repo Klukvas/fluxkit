@@ -45,6 +45,7 @@ const VERIFICATION_LIFETIME_MINUTES = 48 * 60;
 const TEMPLATE_KEY_PATTERN = "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$";
 const LOCALE_PATTERN = "^[a-z]{2,8}(-[a-z]{2,8})*$";
 const PROVIDER_CODE_PATTERN = "^[a-z][a-z0-9_]{0,63}$";
+const MESSAGE_ID_PATTERN = "^<[A-Za-z0-9_.:+-]+@[A-Za-z0-9.-]+>$";
 const CODE_PATTERN = "^[A-Za-z0-9_.:-]{1,64}$";
 const SHA256_HEX_PATTERN = "^[0-9a-f]{64}$";
 // validateEmailAddress in its normalized (lower-case) output: a dot-atom local part of RFC 5322 `atext`, then at least
@@ -108,6 +109,8 @@ export const emailMessage = pgTable(
     // Codes only: a provider's message text can echo an address.
     providerCode: text("provider_code"),
     providerMessageId: text("provider_message_id"),
+    pinnedProviderCode: text("pinned_provider_code"),
+    pinnedAt: timestamp("pinned_at", { withTimezone: true }),
     lastErrorCode: text("last_error_code"),
     resendOf: uuid("resend_of"),
     // The admin who made a resend or a test send.
@@ -205,7 +208,15 @@ export const emailMessage = pgTable(
     ),
     check(
       "email_message_provider_message_id_check",
-      sql`${t.providerMessageId} IS NULL OR ${t.providerMessageId} ~ ${sql.raw(`'${CODE_PATTERN}'`)}`,
+      sql`${t.providerMessageId} IS NULL OR (char_length(${t.providerMessageId}) BETWEEN 1 AND 255 AND (${t.providerMessageId} ~ ${sql.raw(`'${CODE_PATTERN}'`)} OR ${t.providerMessageId} ~ ${sql.raw(`'${MESSAGE_ID_PATTERN}'`)}))`,
+    ),
+    check(
+      "email_message_pinned_provider_code_check",
+      sql`${t.pinnedProviderCode} IS NULL OR ${t.pinnedProviderCode} ~ ${sql.raw(`'${PROVIDER_CODE_PATTERN}'`)}`,
+    ),
+    check(
+      "email_message_pin_check",
+      sql`(${t.pinnedProviderCode} IS NULL) = (${t.pinnedAt} IS NULL)`,
     ),
     check(
       "email_message_last_error_code_check",

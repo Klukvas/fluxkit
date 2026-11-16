@@ -1,8 +1,14 @@
 import type { ProviderAbortSignal } from "../shipping/provider-port.js";
-import { EMAIL_CODE_PATTERN, EMAIL_LIMITS, EMAIL_PROVIDER_CODE_PATTERN } from "./limits.js";
+import {
+  EMAIL_CODE_PATTERN,
+  EMAIL_LIMITS,
+  EMAIL_PROVIDER_CODE_PATTERN,
+  isEmailProviderMessageId,
+} from "./limits.js";
 import { validateOutgoingEmail } from "./outgoing.js";
 import {
   EMAIL_PROVIDER_FAILURE_REASONS,
+  isEmailProviderCapabilities,
   EMAIL_QUOTA_PERIODS,
   type EmailProviderPort,
   type EmailProviderResult,
@@ -109,6 +115,9 @@ export async function checkEmailProviderContract(
   if (!(Number.isSafeInteger(maxRecipients) && (maxRecipients as number) >= 1)) {
     violations.push("capability maxRecipients is not a whole number of at least 1");
   }
+  if (!isEmailProviderCapabilities(provider.capabilities)) {
+    violations.push("invalid email provider capabilities");
+  }
   if (validateOutgoingEmail(scenario.message, KEY_A).length > 0) {
     violations.push(
       "the scenario's message does not pass validateOutgoingEmail (fix the scenario)",
@@ -129,11 +138,10 @@ export async function checkEmailProviderContract(
       continue;
     }
     const value = sent.value as { providerMessageId?: unknown } | null;
-    if (
-      typeof value?.providerMessageId !== "string" ||
-      !EMAIL_CODE_PATTERN.test(value.providerMessageId)
-    ) {
-      violations.push("send answered a providerMessageId that breaks EMAIL_CODE_PATTERN");
+    if (!isEmailProviderMessageId(value?.providerMessageId)) {
+      violations.push(
+        "send answered a providerMessageId that breaks the provider message ID rules",
+      );
     }
     const requests = scenario.observed().slice(before);
     if (requests.length !== 1) {

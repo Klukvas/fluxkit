@@ -32,6 +32,8 @@ export interface EmailRow {
   lease_until: Date | null;
   deadline_at: Date;
   provider_code: string | null;
+  pinned_provider_code: string | null;
+  pinned_at: Date | null;
   provider_message_id: string | null;
   last_error_code: string | null;
   created_at: Date;

@@ -6,7 +6,7 @@
  */
 
 /** The values `EMAIL_PROVIDER` accepts. `none` (the default) loads no provider. */
-export const EMAIL_PROVIDER_CHOICES = Object.freeze(["none", "resend", "fake"] as const);
+export const EMAIL_PROVIDER_CHOICES = Object.freeze(["none", "resend", "brevo", "fake"] as const);
 
 export type EmailProviderChoice = (typeof EMAIL_PROVIDER_CHOICES)[number];
 

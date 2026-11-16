@@ -139,7 +139,7 @@ for (const group of ["providers", "features"]) {
 ') || fail "could not check @nestjs/common in the API image's packages"
 [[ "$NEST_RESOLUTION" != *unresolved* && "$NEST_RESOLUTION" != *other-copy* ]] ||
   fail "a package in the API image does not resolve the API's @nestjs/common: $NEST_RESOLUTION"
-[[ "$NEST_RESOLUTION" == *"nest providers/nova-post"* && "$NEST_RESOLUTION" == *"nest features/blog"* ]] ||
+[[ "$NEST_RESOLUTION" == *"nest providers/nova-post"* && "$NEST_RESOLUTION" == *"nest providers/brevo"* && "$NEST_RESOLUTION" == *"nest features/blog"* ]] ||
   fail "the Nest check found no provider or feature packages in the API image: $NEST_RESOLUTION"
 pass "every provider and feature package resolves the API's @nestjs/common ($(tr '\n' ' ' <<<"$NEST_RESOLUTION"))"
 

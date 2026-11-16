@@ -50,7 +50,7 @@ Purposes and legal bases are proposals taken from the plan. TODO(fluxkit): legal
 | `customer_session` | `expires_at` | pseudonymous (Q) | D3 | excluded | cascade | Derived from the created time and the configured limits. |
 | `domain_event` | `id`, `type`, `created_at`, `dispatched_at`, `attempts`, `last_error_code` | none | D17 | not_applicable | not_applicable |  |
 | `domain_event` | `aggregate_id`, `payload` | pseudonymous (Q) | D17 | excluded | keep | Ids only, by rule (docs/contracts/events.md); deleted by job 4 seven days after dispatch. |
-| `email_message` | `id`, `template_version`, `attempts`, `next_attempt_at`, `lease_until`, `deadline_at`, `provider_code`, `last_error_code`, `resend_of`, `updated_at` | none | D16 | not_applicable | not_applicable |  |
+| `email_message` | `id`, `template_version`, `attempts`, `next_attempt_at`, `lease_until`, `deadline_at`, `provider_code`, `pinned_provider_code`, `pinned_at`, `last_error_code`, `resend_of`, `updated_at` | none | D16 | not_applicable | not_applicable |  |
 | `email_message` | `to_address` | personal (P) | D16 | excluded | delete_row | The account email is exported once; the mail export lists template key, status and times only. |
 | `email_message` | `variables` | personal (P) | D16 | excluded | delete_row | Order lines, totals and a tracking number for rendering; no rendered body is stored. |
 | `email_message` | `template_key`, `locale`, `recipient_kind`, `status`, `created_at`, `sent_at` | pseudonymous (Q) | D16 | included | delete_row |  |

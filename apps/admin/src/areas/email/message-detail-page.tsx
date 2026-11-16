@@ -157,7 +157,9 @@ function MessageDetail({ id }: { id: string }) {
         tone="danger"
         busy={busy}
         title={t("mail.cancel.title")}
-        description={t("mail.cancel.body")}
+        description={t(
+          message?.pinnedProviderCode == null ? "mail.cancel.body" : "mail.cancel.bodyPinned",
+        )}
         confirmLabel={busy ? t("mail.dialog.sending") : t("mail.cancel.confirm")}
         cancelLabel={t("mail.dialog.keep")}
         onClose={close}

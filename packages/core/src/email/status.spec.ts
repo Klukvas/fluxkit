@@ -29,6 +29,7 @@ const EXPECTED: [EmailMessageStatus | null, EmailMessageStatus, EmailMessageActo
   ["sending", "unknown", ["system"]],
   // The claim finds a pending row past its deadline: failed deadline_passed.
   ["pending", "failed", ["system"]],
+  ["pending", "unknown", ["system"]],
   // Admin cancel, only from pending.
   ["pending", "cancelled", ["admin"]],
 ];

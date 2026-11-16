@@ -59,6 +59,7 @@ Secrets (generate, store in a password manager, back up with the database where 
 | `ORDER_TOKEN_SECRET` | `openssl rand -base64 48` | At least 32 characters. Changing it breaks the links of unpaid guest orders and every emailed reset or verification link (ADR 0023, 0031): keep it with the database backup |
 | `MONOBANK_TOKEN` | Monobank business cabinet | Only with `PAYMENT_PROVIDERS_ENABLED=monobank`; never logged |
 | `RESEND_API_KEY` | Resend dashboard (sending-only key) | Only with `EMAIL_PROVIDER=resend` |
+| `BREVO_API_KEY` | Brevo API key (not SMTP credential) | Only with `EMAIL_PROVIDER=brevo` |
 | `NOVA_POST_API_KEY` | Nova Post business cabinet | Only with `SHIPPING_PROVIDERS_ENABLED=nova_post` |
 | `ADMIN_PASSWORD` | the owner's choice, 12 to 128 characters | Not in the file: given once to the create-admin command (below) |
 
@@ -336,3 +337,9 @@ With `RATE_LIMIT_STORE=redis`, job 9 and immediate mail attempts reserve slots o
 The safety margin trades throughput for spacing: measurements at a configured 8/s give about 94.7% of the rate at 1 ms Redis RTT (the slot lateness tolerance costs about 5%), 7.30/s at 6 ms, 6.62/s at 20 ms and 5.52/s at 50 ms. Redis RTT lowers throughput, never raises it above the configured rate while shared pacing is active. Keep Redis on the same host or a low-latency network.
 
 Admission waits are bounded by the earlier of the mail's deadline and lease expiry minus the provider timeout and a 5-second margin. A refused slot returns the claim to the outbox without spending an attempt, rescheduled one second later (capped at the deadline). Lease time guarantees ownership while waiting; time is checked immediately before the provider call, with no admission database read. Guarded recording/deferral detects a newer claim. Shared reservations pad spacing for observed Redis reply time separately from the 5 ms timer allowance: increased reply latency or a stale timer reacquires within the remaining budget. Steady Redis latency continues sending conservatively below the configured maximum; repeated lateness can defer sends. Monitor outbox age as well as provider throughput. Memory mode keeps single-process pacing with the same lease/deadline protections. The 50-waiter immediate cap remains per process. PR 4's replica/media/edge changes are still required before scaling. See ADR 0055.
+
+## Brevo email (ADR 0056 step 1)
+
+Select `EMAIL_PROVIDER=brevo` and provide `BREVO_API_KEY`, the verified `EMAIL_FROM` and `STOREFRONT_PUBLIC_URL` through the runtime env file (the production Compose API uses `env_file`; no key is baked into images). See [plugin setup and live checks](../packages/providers/brevo/README.md). Brevo Free adds "Sent with Brevo" to every mail; removing it requires a paid Brevo plan. Accepted overflow can queue and arrive after Fluxkit's deadline.
+
+Stop all old mail senders before migration 0016/backfill and start only the new version afterwards. Open attempted rows without `provider_code` require operator reconciliation first. Preserve pins on config changes; missing pinned providers hold until deadline, then `unknown`. Brevo ambiguity currently ends `unknown` immediately because inline deduplication is not live-verified. Manual resend can duplicate earlier mail. Down migration refuses active pins or new-format IDs; do not delete evidence to force a rollback. No fallback/suppression is enabled by step 1. Owner live-send, DPA and production cutover checks remain pending.

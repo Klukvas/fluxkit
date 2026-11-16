@@ -34,6 +34,19 @@ describe("callEmailProvider", () => {
     expect(outcome).toEqual({ kind: "ok", providerMessageId: "id-1" });
   });
 
+  it("preserves bracketed provider IDs verbatim and rejects hostile/oversized IDs", async () => {
+    const id = "<ABC.123:+D@SMTP-relay.example>";
+    expect(await call(() => Promise.resolve(emailProviderOk({ providerMessageId: id })))).toEqual({
+      kind: "ok",
+      providerMessageId: id,
+    });
+    for (const bad of ["<a@b>\n", "<a@b>,<c@d>", `<${"a".repeat(252)}@b>`]) {
+      expect(
+        await call(() => Promise.resolve(emailProviderOk({ providerMessageId: bad }))),
+      ).toEqual({ kind: "threw", errorName: "MalformedProviderResult" });
+    }
+  });
+
   it("keeps a typed failure with its retry-after and quota period", async () => {
     const outcome = await call(() =>
       Promise.resolve(

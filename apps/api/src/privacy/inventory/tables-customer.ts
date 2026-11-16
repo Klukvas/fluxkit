@@ -119,6 +119,8 @@ export const customerTables: Inventory = {
       "lease_until",
       "deadline_at",
       "provider_code",
+      "pinned_provider_code",
+      "pinned_at",
       "last_error_code",
       "resend_of",
       "updated_at",

@@ -35,6 +35,7 @@ export function toEmailMessageResponse(row: EmailMessageRow): EmailMessageRespon
     deadlineAt: row.deadlineAt.toISOString(),
     providerCode: row.providerCode,
     providerMessageId: row.providerMessageId,
+    pinnedProviderCode: row.pinnedProviderCode,
     lastErrorCode: row.lastErrorCode,
     resendOf: row.resendOf,
     createdByAdminId: row.createdByAdminId,

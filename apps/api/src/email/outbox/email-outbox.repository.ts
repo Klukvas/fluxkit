@@ -14,6 +14,8 @@ export type EmailMessageUpdate = Partial<
     | "attempts"
     | "nextAttemptAt"
     | "leaseUntil"
+    | "pinnedProviderCode"
+    | "pinnedAt"
     | "providerCode"
     | "providerMessageId"
     | "lastErrorCode"
@@ -73,6 +75,7 @@ export class EmailOutboxRepository {
     now: Date,
     after: EmailDueCursor | undefined,
     limit: number,
+    pinnedOnly = false,
   ): Promise<DueEmail[]> {
     const rows = await db
       .select({
@@ -83,6 +86,9 @@ export class EmailOutboxRepository {
       .where(
         and(
           dueCondition(now),
+          pinnedOnly
+            ? sql`(${emailMessage.pinnedProviderCode} is not null or ${emailMessage.status} = 'sending')`
+            : undefined,
           after === undefined
             ? undefined
             : sql`(${emailMessage.nextAttemptAt}, ${emailMessage.id}) > (${after.time}::timestamptz, ${after.id}::uuid)`,
