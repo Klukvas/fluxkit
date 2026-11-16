@@ -242,7 +242,51 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
   // Step 7: the checkout attempt and the guest order token (plan, "Guest order token", "Checkout idempotency").
   const code = (text: string) => text.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, "");
 
-  it("uses browser storage only for the checkout attempt, the payment attempt, the payment hand-off and the checkout draft (sessionStorage), never localStorage or cookies", () => {
+  // Approved demo notice: only these literal calls in this file may use localStorage; identifiers could be shadowed.
+  const demoDialogPath = join("components", "demo-notice-dialog.tsx");
+  function withoutDemoStorage(path: string, text: string): string {
+    if (path !== demoDialogPath) return text;
+    return text
+      .replace(/\bwindow\.localStorage\.getItem\("fluxkit_demo_notice_seen"\)/g, "")
+      .replace(/\bwindow\.localStorage\.setItem\("fluxkit_demo_notice_seen", "true"\)/g, "");
+  }
+
+  const allowedDemoStorageCalls = [
+    'window.localStorage.getItem("fluxkit_demo_notice_seen")',
+    'window.localStorage.setItem("fluxkit_demo_notice_seen", "true")',
+  ];
+  it.each(allowedDemoStorageCalls)("allows the literal demo call in its own file: %s", (call) => {
+    expect(withoutDemoStorage(demoDialogPath, call)).not.toMatch(/localStorage/);
+  });
+
+  it.each([
+    'window.localStorage.getItem("another_key")',
+    'window.localStorage.setItem("another_key", "true")',
+    'window.localStorage.setItem("fluxkit_demo_notice_seen", "false")',
+    'window.localStorage.setItem("fluxkit_demo_notice_seen", shopperData)',
+    'window.localStorage.removeItem("fluxkit_demo_notice_seen")',
+    "window.localStorage.clear()",
+    'const SEEN_KEY = "fluxkit_demo_notice_seen"; window.localStorage.getItem(SEEN_KEY)',
+    'const SEEN_KEY = "fluxkit_demo_notice_seen"; window.localStorage.setItem(SEEN_KEY, "true")',
+    'const fluxkit_demo_notice_seen = "other"; window.localStorage.getItem(fluxkit_demo_notice_seen)',
+  ])("rejects other demo keys, values and storage operations: %s", (text) => {
+    expect(withoutDemoStorage(demoDialogPath, text)).toMatch(/localStorage/);
+  });
+
+  it.each(allowedDemoStorageCalls)("rejects the allowed demo call in another file: %s", (call) => {
+    expect(withoutDemoStorage(join("components", "another-dialog.tsx"), call)).toMatch(
+      /localStorage/,
+    );
+  });
+
+  it.each([
+    'const SEEN_KEY = "fluxkit_demo_notice_seen"; function read(SEEN_KEY: string) { return window.localStorage.getItem(SEEN_KEY); }',
+    'const SEEN_KEY = "fluxkit_demo_notice_seen"; function write() { const SEEN_KEY = "other"; window.localStorage.setItem(SEEN_KEY, "true"); }',
+  ])("rejects a shadowing parameter or variable at a demo storage call: %s", (text) => {
+    expect(withoutDemoStorage(demoDialogPath, text)).toMatch(/localStorage/);
+  });
+
+  it("uses sessionStorage only for checkout/payment attempts, hand-off and draft; localStorage only for the demo seen key; no other cookies", () => {
     const storage = sources.filter((file) => /\bsessionStorage\b/.test(code(file.text)));
     // Each of these three islands makes its storage once, through the probing helper, in the browser; the checkout draft
     // (review SQ-05) is reached only through `browserCheckoutDraftStorage` of `lib/checkout-draft.ts`.
@@ -262,7 +306,9 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
       );
     }
     for (const file of sources) {
-      expect(code(file.text), file.path).not.toMatch(/\b(localStorage|indexedDB)\b/);
+      const text = code(file.text);
+      const checked = withoutDemoStorage(file.path, text);
+      expect(checked, file.path).not.toMatch(/\b(localStorage|indexedDB)\b/);
       // The theme switch writes the theme preference cookie only (guarded by the cookie test at the top of this file).
       if (file.path === join("components", "theme-switch.tsx")) continue;
       expect(code(file.text), file.path).not.toMatch(/document\.cookie/);

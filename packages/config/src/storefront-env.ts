@@ -83,6 +83,14 @@ const storefrontEnvSchema = z
         })
         .optional(),
     ),
+    STOREFRONT_DEMO_NOTICE: z.preprocess(
+      blankToUndefined,
+      z
+        .enum(["true", "false"], {
+          error: "must be exactly true or false (or unset, which means false)",
+        })
+        .optional(),
+    ),
     NODE_ENV: z.string().optional(),
   })
   .superRefine((env, context) => {
@@ -110,6 +118,8 @@ export interface StorefrontEnv {
    * through the edge proxy alone, which sets or replaces that header.
    */
   forwardClientAddress: boolean;
+  /** Public demo deployment only: show the demo strip, first-visit dialog and checkout note. Off by default. */
+  demoNotice: boolean;
 }
 
 /**
@@ -131,5 +141,6 @@ export function loadStorefrontEnv(source: Record<string, string | undefined>): S
     storefrontPublicUrl: env.STOREFRONT_PUBLIC_URL ?? DEFAULT_STOREFRONT_PUBLIC_URL,
     imageHosts: env.STOREFRONT_IMAGE_HOSTS ?? [],
     forwardClientAddress: env.STOREFRONT_FORWARD_CLIENT_ADDRESS === "true",
+    demoNotice: env.STOREFRONT_DEMO_NOTICE === "true",
   };
 }

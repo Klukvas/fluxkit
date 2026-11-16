@@ -13,6 +13,8 @@ import { SessionNotices } from "./session-notices";
 import { SessionProvider } from "./session-provider";
 import { SiteFooter } from "./site-footer";
 import { SiteHeader, type NavigationCategory } from "./site-header";
+import { DemoNotice } from "./demo-notice";
+import { DemoNoticeDialog } from "./demo-notice-dialog";
 
 /** The links of the enabled feature slices, by place (`featureNavigation` of `features/registry.ts`). */
 export interface FeatureLinks {
@@ -32,6 +34,7 @@ export function SiteShell({
   t,
   categories,
   searchEnabled,
+  demoNotice = false,
   year,
   themeMode,
   featureLinks = NO_FEATURE_LINKS,
@@ -44,6 +47,8 @@ export function SiteShell({
   categories: readonly NavigationCategory[] | null;
   /** `search` of the store config: false means no search box in the header. */
   searchEnabled: boolean;
+  /** Runtime deployment mode; off for client shops. */
+  demoNotice?: boolean;
   year: number;
   /** The theme `<html data-theme>` was rendered with; the header's and the footer's switches start from it. */
   themeMode: ThemeMode;
@@ -60,6 +65,7 @@ export function SiteShell({
             <SignInNavigation locale={locale}>
               <RouteFocus />
               <SkipLink targetId={MAIN_CONTENT_ID}>{t("skip.content")}</SkipLink>
+              {demoNotice ? <DemoNotice locale={locale} t={t} /> : null}
               <SiteHeader
                 locale={locale}
                 t={t}
@@ -73,6 +79,7 @@ export function SiteShell({
                 {children}
               </main>
               {modal}
+              {demoNotice ? <DemoNoticeDialog /> : null}
               <SiteFooter
                 locale={locale}
                 t={t}

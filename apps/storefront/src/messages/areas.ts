@@ -51,6 +51,7 @@ export const MESSAGE_NAMESPACES = {
   error: { area: "shell", client: true },
   notFound: { area: "shell", client: true },
   seo: { area: "shell", client: true },
+  demo: { area: "shell", client: true },
   // Design batch A (plan 2026-11-03-storefront-design-a.md): the account pages' breadcrumbs, the trust bar and the funnel
   // steps are rendered by client islands (account layout, product page, cart, checkout, order pages).
   breadcrumbs: { area: "shell", client: true },
