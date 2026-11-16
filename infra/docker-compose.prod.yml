@@ -127,6 +127,9 @@ services:
 
   api:
     <<: *hardening
+    labels:
+      # Written by the deploy script; empty with manual Compose, so the next deploy rolls this service.
+      com.fluxkit.release-digest: ${FLUXKIT_RELEASE_DIGEST:-}
     deploy:
       replicas: ${FLUXKIT_API_REPLICAS:-1}
     # Let HTTP requests drain before the scheduler, database and Redis close, before Docker sends SIGKILL.
@@ -150,6 +153,9 @@ services:
 
   storefront:
     <<: *hardening
+    labels:
+      # Written by the deploy script; empty with manual Compose, so the next deploy rolls this service.
+      com.fluxkit.release-digest: ${FLUXKIT_RELEASE_DIGEST:-}
     deploy:
       replicas: ${FLUXKIT_STOREFRONT_REPLICAS:-1}
     # Give Next time to finish requests in flight before Docker sends SIGKILL.

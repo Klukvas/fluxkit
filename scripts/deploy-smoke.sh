@@ -498,7 +498,7 @@ request_loop() {
     for path in /store/config /uk "/uk/p/replica-smoke-$sequence"; do
       result=0
       status=$("${CURL[@]}" --max-time 15 -o /dev/null -w '%{http_code}' "${ORIGIN}${path}" 2>>"$WORK/roll-curl.log") || result=$?
-      printf '%s %s %s\n' "$path" "$result" "$status" >>"$WORK/roll-requests.log"
+      printf '%s %s %s %s\n' "$path" "$result" "$status" "$(date -u +%H:%M:%S)" >>"$WORK/roll-requests.log"
     done
     sleep 0.2
   done
@@ -522,7 +522,16 @@ assert_roll_traffic() {
     END { print api+0, storefront+0, cold+0, refused+0, bad+0 }
   ' "$WORK/roll-requests.log")
   read -r api_ok storefront_ok cold_ok edge_refused bad <<<"$counts"
-  [[ "$bad" == 0 && "$api_ok" -gt 0 && "$storefront_ok" -gt 0 && "$cold_ok" -gt 0 ]] || fail "$1 traffic: api/storefront/cold/refused/bad = $counts"
+  if [[ "$bad" != 0 || "$api_ok" == 0 || "$storefront_ok" == 0 || "$cold_ok" == 0 ]]; then
+    # Path, curl exit, HTTP status, UTC time: compare with the deploy script's phase lines above.
+    echo "--- $1: requests that were not as expected ---" >&2
+    awk '$2 != 0 && $2 != 7 { print; next } $1 ~ /^\/uk\/p\/replica-smoke-/ { if ($3 != 404) print; next } $3 != 200' "$WORK/roll-requests.log" >&2
+    echo "--- curl errors ---" >&2
+    tail -20 "$WORK/roll-curl.log" >&2 || true
+    echo "--- edge errors and 5xx ---" >&2
+    compose logs --no-color edge 2>&1 | grep -E '\[error\]|" 5[0-9][0-9] ' | tail -30 >&2 || true
+    fail "$1 traffic: api/storefront/cold/refused/bad = $counts"
+  fi
   [[ "$allow_edge_refusals" == true || "$edge_refused" == 0 ]] || fail "$1 interrupted the edge ($edge_refused refused connections)"
   pass "$1 traffic: $api_ok API 200s, $storefront_ok storefront 200s, $cold_ok cold product 404s, $edge_refused edge connection refusals, zero 5xx or other curl failures"
 }

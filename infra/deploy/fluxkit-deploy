@@ -27,15 +27,29 @@ PRUNE_COMMAND=${FLUXKIT_DEPLOY_PRUNE:-/usr/local/sbin/fluxkit-prune-images}
 LOCK_FILE=${FLUXKIT_DEPLOY_LOCK:-/run/lock/fluxkit-deploy.lock}
 # Test-only: FLUXKIT_DEPLOY_SKIP_PULL=1 uses locally built/tagged smoke images. Never set on the host.
 WAIT_SECONDS=300
+MIGRATE_WAIT_SECONDS=600
 
 log() { echo "fluxkit deploy: $*"; }
 fail() { echo "fluxkit deploy: $*" >&2; exit 1; }
 
+release_digest() {
+  # Hash ordered file contents, not paths: rollback restores the exact .pre-deploy bytes. Never print env contents.
+  local file
+  for file in "$1/infra/docker-compose.prod.yml" "$ENV_FILE" "$MEILI_ENV_FILE"; do
+    sha256sum < "$file" || return 1
+  done | sha256sum | cut -d ' ' -f 1
+}
+
 compose() {
   local release_dir=$1
   shift
-  FLUXKIT_ENV_FILE="$ENV_FILE" FLUXKIT_MEILI_ENV_FILE="$MEILI_ENV_FILE" \
-    docker compose --env-file "$ENV_FILE" -f "$release_dir/infra/docker-compose.prod.yml" "$@"
+  local digest
+  digest=$(release_digest "$release_dir") || return 1
+  set -- docker compose --env-file "$ENV_FILE" -f "$release_dir/infra/docker-compose.prod.yml" "$@"
+  if [ -n "${COMPOSE_TIMEOUT_SECONDS:-}" ]; then
+    set -- timeout --kill-after=10s "$COMPOSE_TIMEOUT_SECONDS" "$@"
+  fi
+  FLUXKIT_RELEASE_DIGEST="$digest" FLUXKIT_ENV_FILE="$ENV_FILE" FLUXKIT_MEILI_ENV_FILE="$MEILI_ENV_FILE" "$@"
 }
 
 env_value() { sed -n "s/^$1=//p" "$ENV_FILE"; }
@@ -77,19 +91,28 @@ wait_healthy() {
 }
 
 roll_service() {
-  local release=$1 service=$2 count=$3 old_ids old_count=0 expected_hash id actual_hash
+  local release=$1 service=$2 count=$3 old_ids='' old_count=0 expected_digest id actual_digest running
   local unchanged=true new_ids='' all_ids start_ok step new_count
-  old_ids=$(compose "$release" ps --status running -q "$service" | tr '\n' ' ') || return 1
-  expected_hash=$(compose "$release" config --hash "$service") || return 1
-  expected_hash=${expected_hash##* }
-  [ -n "$expected_hash" ] || return 1
+  all_ids=$(compose "$release" ps -a -q "$service" | tr '\n' ' ') || return 1
+  for id in $all_ids; do
+    running=$(docker inspect -f '{{.State.Running}}' "$id") || return 1
+    if [ "$running" = true ]; then
+      old_ids="$old_ids $id"
+    else
+      # A stopped container serves nothing; leaving it lets Compose restart it instead of creating a replacement.
+      log "$service: removing non-running container $id before staging"
+      docker rm "$id" >/dev/null || return 1
+    fi
+  done
+  expected_digest=$(release_digest "$release") || return 1
+  [ -n "$expected_digest" ] || return 1
   for id in $old_ids; do
     old_count=$((old_count + 1))
-    actual_hash=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.config-hash"}}' "$id") || return 1
-    [ "$actual_hash" = "$expected_hash" ] || unchanged=false
+    actual_digest=$(docker inspect -f '{{index .Config.Labels "com.fluxkit.release-digest"}}' "$id") || return 1
+    [ "$actual_digest" = "$expected_digest" ] || unchanged=false
   done
   if [ "$unchanged" = true ] && [ "$old_count" -eq "$count" ]; then
-    log "$service: $count replicas already use this configuration"
+    log "$service: $count replicas already use this release digest"
     return 0
   fi
 
@@ -110,6 +133,11 @@ roll_service() {
             # Newest first: if this stage fails, withdraw its unready address before healthy staged replicas.
             *) new_ids="$id $new_ids" ;;
           esac
+          actual_digest=$(docker inspect -f '{{index .Config.Labels "com.fluxkit.release-digest"}}' "$id") || start_ok=false
+          if [ "$actual_digest" != "$expected_digest" ]; then
+            log "$service: replacement $id has the wrong release digest"
+            start_ok=false
+          fi
           ;;
       esac
     done
@@ -119,7 +147,7 @@ roll_service() {
       return 1
     fi
   done
-  # Both edges cache Docker DNS for 10 seconds. Let them discover the healthy new addresses before removing any old one.
+  # nginx caches Docker DNS for 10 seconds (Caddy refreshes sooner). Discover new addresses before removing any old one.
   log "$service: replacements healthy; waiting for edge DNS refresh"
   sleep 11
   log "$service: draining and removing $old_count old replicas"
@@ -128,16 +156,25 @@ roll_service() {
 }
 
 start_release() {
-  local release=$1 api_count=$2 storefront_count=$3
+  local release=$1 api_count=$2 storefront_count=$3 migrate_status=0
   log "starting infrastructure"
   compose "$release" up -d --wait --wait-timeout "$WAIT_SECONDS" --no-build postgres meilisearch redis || return 1
   log "running migrations to completion"
   # Foreground completion, including the exit code: an unhealthy or failed migration never starts new API replicas.
-  compose "$release" up --no-build --no-deps --force-recreate --exit-code-from migrate migrate || return 1
+  COMPOSE_TIMEOUT_SECONDS="$MIGRATE_WAIT_SECONDS" compose "$release" up --no-build --no-deps --force-recreate --exit-code-from migrate migrate || migrate_status=$?
+  if [ "$migrate_status" -ne 0 ]; then
+    if [ "$migrate_status" -eq 124 ] || [ "$migrate_status" -eq 137 ]; then
+      log "migrations exceeded ${MIGRATE_WAIT_SECONDS}s; killing and removing migrate"
+      # Postgres rolls back an interrupted migration transaction; a non-transactional migration file needs the backup.
+      compose "$release" kill migrate || true
+      compose "$release" rm -f migrate || true
+    fi
+    return 1
+  fi
   roll_service "$release" api "$api_count" || return 1
   roll_service "$release" storefront "$storefront_count" || return 1
   log "starting edge and remaining services"
-  # The replicas' hashes already match; the completed migration is not rerun. Only changed remaining services recreate.
+  # Application configuration already matches. Compose restarts the exited migrate container (nothing pending), then edge/rest.
   compose "$release" up -d --wait --wait-timeout "$WAIT_SECONDS" --no-build || return 1
 }
 
@@ -204,7 +241,8 @@ log "release $tag did not become healthy; starting $previous_tag again" >&2
 compose "$release_dir" logs --tail 50 migrate api >&2 || true
 cp -p "$ENV_FILE.pre-deploy" "$ENV_FILE"
 ln -sfn "$previous_release" "$FLUXKIT_ROOT/current"
-# Roll back through the same hash check: unchanged old replicas are never recreated. If an earlier service already
+# Roll back through the same release-digest check, recomputed with the byte-identical restored .pre-deploy env file.
+# Unchanged old replicas are never recreated. If an earlier service already
 # rolled successfully, replace it with healthy previous-release replicas before draining it. Migrations cannot be undone.
 start_release "$previous_release" "$api_replicas" "$storefront_replicas" ||
   fail "the previous release $previous_tag did not start either; if $tag ran a migration, restore the backup (docs/deployment.md, \"Updates and migrations\")"

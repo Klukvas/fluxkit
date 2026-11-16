@@ -17,6 +17,9 @@ upstream fluxkit_api {
     zone fluxkit_api 64k;
     server ${FLUXKIT_API_UPSTREAM} resolve;
     keepalive 16;
+    # Close after the request that crosses 10 s: retiring connections end within the 30 s stop grace.
+    # The API additionally answers Connection: close while draining.
+    keepalive_time 10s;
 }
 
 upstream fluxkit_storefront {
@@ -27,6 +30,9 @@ upstream fluxkit_storefront {
     zone fluxkit_storefront 64k;
     server ${FLUXKIT_STOREFRONT_UPSTREAM} resolve;
     keepalive 16;
+    # Close after the request that crosses 10 s, so sustained keep-alive traffic cannot hold Next's drain open.
+    # Retiring connections end well inside the 30 s stop grace (long requests can still exceed it).
+    keepalive_time 10s;
 }
 
 # The container health check, on loopback only (never published). Not an allow/deny location on a public port: nginx

@@ -291,6 +291,30 @@ describe("Caddy edge: the payment webhook handle", () => {
   });
 });
 
+describe("edge: replica retirement (ADR 0057)", () => {
+  it.each(["fluxkit_api", "fluxkit_storefront"])(
+    "nginx: %s limits busy keep-alive connection lifetime inside the stop grace",
+    (name) => {
+      const text = withoutComments(nginxTemplate);
+      const start = text.indexOf(`upstream ${name} {`);
+      expect(start).toBeGreaterThan(-1);
+      const upstream = blockAt(text, text.indexOf("{", start)).body;
+      expect(directives(upstream, "keepalive_time")).toEqual(["10s"]);
+    },
+  );
+
+  it("Caddy: both dynamic pools refresh within the retry window without passive failure exclusion", () => {
+    const text = withoutComments(caddyfile);
+    const pools = [...text.matchAll(/dynamic a [^\n]+ \{/g)].map(
+      (match) => blockAt(text, match.index + match[0].length - 1).body,
+    );
+    expect(pools).toHaveLength(2);
+    for (const pool of pools) expect(pool).toMatch(/^\s*refresh 1s\s*$/m);
+    expect(text).toMatch(/^\s*lb_try_duration 5s\s*$/m);
+    expect(text).not.toMatch(/^\s*fail_duration\s/m);
+  });
+});
+
 describe("edge: one X-Forwarded-For rule for the API and the storefront (search UI review F2, ADR 0038)", () => {
   // The results page forwards the header the edge set on the PAGE request (STOREFRONT_FORWARD_CLIENT_ADDRESS), so the
   // storefront location must treat it exactly like the API locations: a CDN switch (append and TRUST_PROXY=2) that
