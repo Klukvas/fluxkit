@@ -170,6 +170,7 @@ describe("the downloaded file", () => {
     account: null,
     orders: [],
     mail: [],
+    emailSuppressions: [],
     sessions: [],
     cart: null,
     processors: [],

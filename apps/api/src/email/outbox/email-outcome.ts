@@ -86,6 +86,8 @@ export function decideEmailClaim(input: {
 /** How one attempt ended, from the sender's side. */
 export type EmailAttemptOutcome =
   | { readonly kind: "sent"; readonly providerMessageId: string }
+  /** Shared recipient block; this attempt never reaches a provider. Earlier acceptance still takes precedence. */
+  | { readonly kind: "suppressed" }
   /** A typed failure, or a timeout or thrown error mapped to `unavailable` (it may have sent). */
   | { readonly kind: "provider_failed"; readonly failure: EmailProviderFailure }
   | { readonly kind: "not_renderable"; readonly code: NotRenderableCode };
@@ -126,6 +128,11 @@ export function decideEmailRecord(input: {
 }): EmailRecordDecision {
   const { outcome } = input;
   switch (outcome.kind) {
+    case "suppressed": {
+      const status = input.pinnedAt == null ? "failed" : "unknown";
+      assertAllowed("sending", status);
+      return { status, lastErrorCode: "suppressed" };
+    }
     case "sent":
       assertAllowed("sending", "sent");
       return {

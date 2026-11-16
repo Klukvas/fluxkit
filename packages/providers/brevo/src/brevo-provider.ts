@@ -1,4 +1,4 @@
-import { Inject, Injectable, SetMetadata } from "@nestjs/common";
+import { Inject, Injectable, Optional, SetMetadata } from "@nestjs/common";
 import {
   EMAIL_LIMITS,
   EMAIL_PROVIDER_METADATA,
@@ -12,6 +12,7 @@ import {
   type EmailSent,
   type OutgoingEmail,
   type ProviderAbortSignal,
+  type EmailWebhookVerifier,
 } from "@fluxkit/core";
 import { mapBrevoAnswer } from "./answer-map.js";
 import { BrevoHttp, type BrevoExchange } from "./http.js";
@@ -27,6 +28,7 @@ export const BREVO_PROVIDER_CODE = "brevo";
 export const BREVO_HTTP = Symbol("BREVO_HTTP");
 /** Nest token of the logger. */
 export const BREVO_LOGGER = Symbol("BREVO_LOGGER");
+export const BREVO_WEBHOOK_VERIFIER = Symbol("BREVO_WEBHOOK_VERIFIER");
 
 export interface BrevoLogger {
   warn(message: string): void;
@@ -54,6 +56,7 @@ export class BrevoEmailProvider implements EmailProviderPort {
   constructor(
     @Inject(BREVO_HTTP) private readonly http: BrevoHttp,
     @Inject(BREVO_LOGGER) private readonly logger: BrevoLogger,
+    @Optional() @Inject(BREVO_WEBHOOK_VERIFIER) readonly webhookVerifier?: EmailWebhookVerifier,
   ) {}
 
   async send(

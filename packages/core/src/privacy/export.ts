@@ -193,6 +193,13 @@ export interface ExportMailFacts {
   readonly sentAt: Date | null;
 }
 
+export interface ExportEmailSuppressionFacts {
+  readonly reason: string;
+  readonly sourceProvider: string;
+  readonly firstSeenAt: Date;
+  readonly lastSeenAt: Date;
+}
+
 export interface ExportSessionFacts {
   readonly createdAt: Date;
   readonly lastSeenAt: Date;
@@ -219,6 +226,7 @@ export interface PersonalDataExportFacts {
   readonly account: ExportAccountFacts | null;
   readonly orders: readonly ExportOrderFacts[];
   readonly mail: readonly ExportMailFacts[];
+  readonly emailSuppressions?: readonly ExportEmailSuppressionFacts[];
   readonly sessions: readonly ExportSessionFacts[];
   readonly cart: ExportCartFacts | null;
   readonly processors: readonly ExportProcessorFacts[];
@@ -398,6 +406,12 @@ export function buildPersonalDataExport(facts: PersonalDataExportFacts) {
       status: mail.status,
       createdAt: iso(mail.createdAt),
       sentAt: isoOrNull(mail.sentAt),
+    })),
+    emailSuppressions: (facts.emailSuppressions ?? []).map((entry) => ({
+      reason: entry.reason,
+      sourceProvider: entry.sourceProvider,
+      firstSeenAt: iso(entry.firstSeenAt),
+      lastSeenAt: iso(entry.lastSeenAt),
     })),
     sessions: facts.sessions.map((session) => ({
       createdAt: iso(session.createdAt),

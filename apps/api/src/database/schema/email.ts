@@ -6,6 +6,7 @@ import {
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   unique,
@@ -299,5 +300,61 @@ export const customerAuthToken = pgTable(
     uniqueIndex("customer_auth_token_customer_id_purpose_unused_key")
       .on(t.customerId, t.purpose)
       .where(sql`${t.usedAt} IS NULL`),
+  ],
+);
+
+/** Shared recipient safety state; no customer FK may bypass verified-address erasure scope. */
+export const emailSuppression = pgTable(
+  "email_suppression",
+  {
+    id: id(),
+    toAddress: text("to_address").notNull(),
+    reason: text("reason").notNull(),
+    sourceProvider: text("source_provider").notNull(),
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [
+    unique("email_suppression_to_address_key").on(t.toAddress),
+    check(
+      "email_suppression_to_address_check",
+      sql`char_length(${t.toAddress}) <= ${sql.raw(`${EMAIL_MAX_LENGTH}`)} AND ${t.toAddress} ~ ${sql.raw(`'${ADDRESS_PATTERN}'`)} AND char_length(split_part(${t.toAddress}, '@', 1)) <= ${sql.raw(`${LOCAL_PART_MAX_LENGTH}`)} AND ${t.toAddress} !~ ${sql.raw(`'${NUMERIC_TOP_LEVEL_PATTERN}'`)}`,
+    ),
+    check(
+      "email_suppression_reason_check",
+      sql`${t.reason} IN ('hard_bounce', 'complaint', 'unsubscribe', 'blocked')`,
+    ),
+    check(
+      "email_suppression_source_provider_check",
+      sql`${t.sourceProvider} ~ ${sql.raw(`'${PROVIDER_CODE_PATTERN}'`)}`,
+    ),
+    check("email_suppression_seen_check", sql`${t.firstSeenAt} <= ${t.lastSeenAt}`),
+    index("email_suppression_last_seen_at_idx").on(t.lastSeenAt.desc(), t.id),
+  ],
+);
+
+/** Eight-day retry receipts, retained after manual removal; no payload or vendor prose. */
+export const emailWebhookReceipt = pgTable(
+  "email_webhook_receipt",
+  {
+    providerCode: text("provider_code").notNull(),
+    eventKey: text("event_key").notNull(),
+    toAddress: text("to_address").notNull(),
+    eventAt: timestamp("event_at", { withTimezone: true }).notNull(),
+    receivedAt: timestamp("received_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [
+    primaryKey({ name: "email_webhook_receipt_pkey", columns: [t.providerCode, t.eventKey] }),
+    check(
+      "email_webhook_receipt_provider_code_check",
+      sql`${t.providerCode} ~ ${sql.raw(`'${PROVIDER_CODE_PATTERN}'`)}`,
+    ),
+    check("email_webhook_receipt_event_key_check", sql`${t.eventKey} ~ '^[A-Za-z0-9_.:-]{1,255}$'`),
+    check(
+      "email_webhook_receipt_to_address_check",
+      sql`char_length(${t.toAddress}) <= ${sql.raw(`${EMAIL_MAX_LENGTH}`)} AND ${t.toAddress} ~ ${sql.raw(`'${ADDRESS_PATTERN}'`)} AND char_length(split_part(${t.toAddress}, '@', 1)) <= ${sql.raw(`${LOCAL_PART_MAX_LENGTH}`)} AND ${t.toAddress} !~ ${sql.raw(`'${NUMERIC_TOP_LEVEL_PATTERN}'`)}`,
+    ),
+    index("email_webhook_receipt_received_at_idx").on(t.receivedAt),
+    index("email_webhook_receipt_to_address_idx").on(t.toAddress),
   ],
 );

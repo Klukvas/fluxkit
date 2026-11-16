@@ -240,6 +240,17 @@ request POST /webhooks/payments/monobank -H 'Content-Type: application/json' --d
 expect_status 413 "70 kB webhook body"
 pass "/webhooks/payments refuses a body above 64k at the edge"
 
+# Email feedback uses its own raw-byte route/limit; no provider credentials are enabled in this smoke run.
+for provider in resend brevo; do
+  request POST "/webhooks/email/$provider" -H 'Content-Type: application/json' --data '{}'
+  expect_status 404 "POST /webhooks/email/$provider"
+  [[ "$(header content-type)" == application/problem+json* ]] || fail "/webhooks/email did not reach the API"
+  request POST "/webhooks/email/$provider" -H 'Content-Type: application/json' --data-binary "@$WORK/big.json"
+  expect_status 413 "70 kB email webhook body"
+done
+pass "/webhooks/email/* -> API and refuses bodies above 64 KiB"
+
+
 for path in /docs /docs-json /health; do
   request GET "$path"
   expect_status 404 "GET $path"
@@ -427,5 +438,19 @@ compose up -d --no-build --no-deps --force-recreate --wait --wait-timeout 120 ap
 request GET /store/config
 expect_status 200 "GET /store/config after recreating the api"
 pass "the edge reaches a recreated api container"
+
+# An unavailable API must ask email providers to retry; payment and other upstream errors retain their status.
+compose stop api >/dev/null
+for provider in resend brevo; do
+  request POST "/webhooks/email/$provider" -H 'Content-Type: application/json' --data '{}'
+  expect_status 429 "unavailable API: email webhook"
+  [[ "$(header retry-after)" == "5" ]] || fail "email outage response lacks bounded Retry-After"
+done
+request POST /webhooks/payments/monobank -H 'Content-Type: application/json' --data '{}'
+expect_status 502 "unavailable API: payment webhook"
+request GET /store/config
+expect_status 502 "unavailable API: store config"
+pass "API outage: only email feedback maps to 429 with Retry-After"
+compose up -d --no-build --no-deps --wait --wait-timeout 120 api >/dev/null
 
 echo "deploy smoke test passed"

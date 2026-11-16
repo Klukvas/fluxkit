@@ -39,3 +39,5 @@ The template names no host, CDN or backup provider. Fill these in.
 ## Related
 
 `docs/privacy/README.md` section 6 (the operator's short list), `docs/privacy/ropa-template.md`, `docs/dependencies.md` (service records).
+
+- Email suppression feedback (ADR 0056 step 1b): the selected Resend/Brevo processor returns normalized recipient/event/reason/time facts through its authenticated webhook; the app persists only the D16 suppression/receipt fields in the inventory. No request forwards these facts to a second provider. Brevo bearer auth is not a body signature. Remote retention/erasure, terms/DPA/transfers, historical-block reconciliation and live subscription verification remain owner tasks; see each plugin README and `docs/deployment.md`.

@@ -1,4 +1,10 @@
-import { EMAIL_MESSAGE_STATUSES, emailRetentionDays, type EmailMessageStatus } from "@fluxkit/core";
+import { sql } from "drizzle-orm";
+import {
+  EMAIL_WEBHOOK_RECEIPT_TTL_MS,
+  EMAIL_MESSAGE_STATUSES,
+  emailRetentionDays,
+  type EmailMessageStatus,
+} from "@fluxkit/core";
 import type { Database } from "../database/database.module.js";
 import type { EmailOutboxRepository, EmailPurgeGroup } from "../email/outbox/index.js";
 import { DEFAULT_CLEANUP_LIMITS, drainInBatches, type BatchLimits } from "./batches.js";
@@ -36,6 +42,8 @@ export interface PurgeEmailMessagesResult {
   deleted: number;
   /** Expired customer auth tokens deleted. */
   tokensDeleted: number;
+  /** Expired webhook replay receipts deleted. */
+  receiptsDeleted: number;
   truncated: boolean;
 }
 
@@ -69,9 +77,28 @@ export async function purgeEmailMessages(
     limits,
     budget,
   );
+  const receiptCutoff = new Date(now.getTime() - EMAIL_WEBHOOK_RECEIPT_TTL_MS);
+  const receipts = await drainInBatches(
+    async (batchSize) => {
+      const removed = await deps.database.execute(sql`
+      with expired as (
+        select provider_code, event_key from email_webhook_receipt
+        where received_at < ${receiptCutoff}
+        order by received_at, provider_code, event_key
+        limit ${batchSize} for update skip locked
+      )
+      delete from email_webhook_receipt r using expired e
+      where r.provider_code = e.provider_code and r.event_key = e.event_key
+      returning r.event_key`);
+      return removed.rows.length;
+    },
+    limits,
+    budget,
+  );
   return {
     deleted: messages.total,
     tokensDeleted: tokens.total,
-    truncated: messages.truncated || tokens.truncated,
+    receiptsDeleted: receipts.total,
+    truncated: messages.truncated || tokens.truncated || receipts.truncated,
   };
 }

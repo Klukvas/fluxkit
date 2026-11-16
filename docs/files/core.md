@@ -250,3 +250,8 @@ Pure rules for personal data (privacy plan step 3): no I/O; the clock and the ra
 - `src/search/listing-document.spec.ts` — v4 grouping keys, type-local contexts, corrupt coverage, settings allowlist and listing sort ties; `indexing.spec.ts` covers `stale_build` for a missing/incompatible recorded rebuild key.
 
 - Email replay safety (ADR 0056 step 1): `src/email/limits.ts` exports `isEmailProviderMessageId` (legacy code or one bracketed ID, maximum 255, verbatim; error codes unchanged); `provider-port.ts` validates optional `idempotencyWindowSeconds`; `retry.ts` exports `emailRetryDeadline` and applies pinned/unsupported/window terminal precedence. `status.ts` permits system `pending -> unknown`. `provider-message-id.spec.ts` and `pinned-retry.spec.ts` cover hostile IDs, capability validation, restart/late-first-send cutoffs and legacy schedules. No provider name belongs in the policy.
+
+- `src/email/webhook.ts` — optional provider webhook-fact/verifier contract, reason/key bounds, seven-day/five-minute event policy and eight-day receipt TTL; pure, no plugin imports or I/O.
+- `src/email/webhook.spec.ts` — fact validation, allowlists and exact event-age boundaries.
+- `src/email/provider-port.ts` — optional authenticated `webhookVerifier` exposed through existing provider discovery.
+- `src/privacy/export.ts`, `src/privacy/audit.ts` — additive suppression metadata export and IDs-only suppression removal audit vocabulary; excludes addresses/internal receipt keys from suppression exports.

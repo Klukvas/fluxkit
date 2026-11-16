@@ -23,6 +23,7 @@ const ACTION_VERBS = {
   customer: ["deactivated", "activated", "unlocked"],
   admin_user: ["created", "role_changed", "deactivated", "activated", "password_reset"],
   privacy: ["lookup", "exported", "erased", "request_changed"],
+  email_suppression: ["removed"],
 } as const;
 
 type DerivedAction = {
@@ -41,6 +42,7 @@ export const AUDIT_TARGET_KINDS = [
   "order",
   "admin_user",
   "privacy_request",
+  "email_suppression",
 ] as const satisfies readonly AdminAuditTargetKind[];
 
 /** Events per request ("load more" asks for another page of this size). */

@@ -24,7 +24,19 @@ Only documented allowlisted `code` values survive; free-form `message` is discar
 
 An `unavailable` attempt or reclaimed lease permanently pins the row to that provider and original claim time. With current Brevo capabilities it ends `unknown`, **without automatic replay**. After authorized B2 verification, declare `idempotencyKeys=true` and `idempotencyWindowSeconds=1800`: pinned retries then stop strictly before `min(deadline_at, pinned_at + 30 minutes - 5 minutes)`. A restart never resets the pin/window. Unpinned safe refusals retain ADR 0031 backoff. Later rejection/render failure/deadline cannot disprove earlier acceptance, so a terminal pinned outcome is `unknown`; only authoritative success is `sent`. Cancellation stops local retries and cannot recall earlier mail; manual resend can duplicate it.
 
-No suppression/webhook or fallback is implemented here (plan steps 1b and 2). Changing configuration never unpins mail. A missing pinned provider holds the row with `pinned_provider_unavailable` and rechecks configuration every minute, bounded by the deadline. Restoring the same provider retries the same UUID only before its original safe cutoff; expiry becomes `unknown`. While the provider is absent its replay window is unknown; restored capabilities enforce it before any call.
+The plugin supplies an optional suppression webhook verifier; core owns suppression and receipt storage (step 1b). Fallback remains outside this step. Changing configuration never unpins mail. A missing pinned provider holds the row with `pinned_provider_unavailable` and rechecks configuration every minute, bounded by the deadline. Restoring the same provider retries the same UUID only before its original safe cutoff; expiry becomes `unknown`. While the provider is absent its replay window is unknown; restored capabilities enforce it before any call.
+
+## Suppression webhook
+
+Set a dedicated `BREVO_WEBHOOK_SECRET` through the runtime environment: 43–1024 characters from `[A-Za-z0-9_-]`, generated with at least 32 random bytes. Blank disables the route; invalid nonblank values or a secret equal to `BREVO_API_KEY` fail startup without printing either value. `readBrevoWebhookSecret` is its single accessor; restart after rotation. Do not reuse `BREVO_API_KEY`, use URL credentials or put the token in a query string.
+
+With `EMAIL_PROVIDER=brevo` and the secret configured, subscribe an HTTPS endpoint `/webhooks/email/brevo` to transactional `hardBounce`, `spam`, `unsubscribed` and `blocked`; configure webhook `auth` as `{type:"bearer", token:<dedicated token>}`. The expected header is `Authorization: Bearer <token>`. The plugin compares SHA-256 digests of bounded header values in constant time before JSON parsing. There is no documented body signature: a leaked token or compromised TLS terminator can forge payloads. Optional edge IP allowlisting, using current official webhook ranges and correct trusted-proxy settings, supplements the bearer token.
+
+One JSON object per delivery is accepted. Actual payload `event` spellings `hard_bounce`, `spam`, `unsubscribed`, `blocked` map to `hard_bounce`, `complaint`, `unsubscribe`, `blocked`; soft bounces, delivered/opened/clicked and all other events are ignored. `email` is normalized through the shared validator; `ts_event` is UTC integer seconds. The receipt key is `v1:` plus SHA-256 of the validated tuple `(id, message-id, normalized email, event, ts_event)`. `id` is a webhook ID, never a unique event key on its own. Raw payloads and vendor text are not stored.
+
+Core enforces at most 7 days old / 5 minutes future, then commits receipts and shared suppression before `204`; transient local failures use retryable `429`. Receipts expire after 8 days, independently of outbox retention. Manual block removal keeps receipts and sends nothing automatically. Configure and test the subscription and reconcile historical remote blocks before production fallback; never remove remote blocks to improve delivery rates.
+
+TODO(fluxkit): not live-verified — exact bearer-header emission, subscriptions and payload event spellings/shapes, tuple stability, timestamps/retries, single-object delivery versus batching, and historical-block reconciliation. Local authenticated fixtures prove none of these remote behaviours.
 
 ## Live-check list
 
@@ -37,7 +49,7 @@ Every item is **TODO(fluxkit): not live-verified**; no key or live send was used
 - B7: sender/domain/account activation, reply-to, delivery to two mailbox services with SPF/DKIM/DMARC results.
 - B8: current entity/terms/DPA, subprocessor locations/transfers and content/log retention. Documented EU database hosting does not establish EU-only processing.
 - B9: tag/event visibility and reconciliation limits; absence from logs is not proof of non-send.
-- Later step 1b: webhook bearer authentication, subscriptions/event shapes, stable tuple/timestamps/retries and historical-block reconciliation before fallback.
+- Step 1b: webhook bearer-header emission, subscriptions/event shapes, stable tuple/timestamps/retries, single-object delivery versus batching, and historical-block reconciliation before fallback.
 
 Live sends require a separate owner key and explicit recipient/send authorization. Do not call the real API from automated tests.
 
@@ -45,6 +57,6 @@ Live sends require a separate owner key and explicit recipient/send authorizatio
 
 `pnpm --filter @fluxkit/provider-brevo test` runs the core contract, local HTTP recorder/model, request shapes, duplicates/TTL/lost responses, transport, hostile values, config/module and secret-redaction suites. Every file installs a guard that rejects external fetches; no-network wiring is checked separately. Matrix mode: `pnpm feature-matrix providers-email-brevo` (real services required).
 
-Before deleting the package, stop old senders and reconcile/drain pinned Brevo rows; do not clear pins or resend through another provider. Select `none` or another provider, remove `BREVO_API_KEY`, delete `packages/providers/brevo`, and relink the workspace. No plugin-owned table/migration exists; core migration 0016 keeps the evidence. Its down script refuses active pins or new-format IDs rather than deleting/truncating them.
+Before deleting the package, stop old senders and reconcile/drain pinned Brevo rows; do not clear pins or resend through another provider. Select `none` or another provider, remove `BREVO_API_KEY` and `BREVO_WEBHOOK_SECRET`, disable the remote subscription, delete `packages/providers/brevo`, and relink the workspace. No plugin-owned table/migration exists; core migration 0016 keeps the pin evidence and the shared suppression/receipts remain core data. Its down script refuses active pins or new-format IDs rather than deleting/truncating them.
 
 References: [approved plan](../../../docs/plans/2026-11-15-brevo-email-failover.md), [ADR 0056](../../../docs/adr/0056-email-brevo-suppression-and-fallback.md), [send](https://developers.brevo.com/reference/send-transac-email), [idempotency](https://developers.brevo.com/docs/heterogenous-versions-batch-emails), [errors](https://developers.brevo.com/docs/how-it-works).

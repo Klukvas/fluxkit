@@ -1,15 +1,19 @@
 import { Logger, Module } from "@nestjs/common";
-import { parseResendEnv } from "./config.js";
+import { parseResendEnv, readResendWebhookSecret } from "./config.js";
+import { createResendWebhookVerifier } from "./webhook.js";
+import type { EmailWebhookVerifier } from "@fluxkit/core";
 import { ResendHttp } from "./http.js";
 import {
   RESEND_HTTP,
   RESEND_LOGGER,
+  RESEND_WEBHOOK_VERIFIER,
   ResendEmailProvider,
   type ResendLogger,
 } from "./resend-provider.js";
 
 export {
   parseResendEnv,
+  readResendWebhookSecret,
   RESEND_API_ORIGIN,
   RESEND_SEND_PATH,
   RESEND_USER_AGENT,
@@ -32,6 +36,7 @@ export {
 } from "./http.js";
 export { RESEND_CATEGORY_TAG, resendBodyOf, type ResendEmailBody } from "./request.js";
 export { RESEND_PROVIDER_CODE, ResendEmailProvider, type ResendLogger } from "./resend-provider.js";
+export { createResendWebhookVerifier } from "./webhook.js";
 
 /**
  * Entry point read by the API's email provider loader (named export `providerModule`, ADR 0031 decision 4). Mounted only
@@ -48,6 +53,13 @@ export { RESEND_PROVIDER_CODE, ResendEmailProvider, type ResendLogger } from "./
     {
       provide: RESEND_HTTP,
       useFactory: (): ResendHttp => new ResendHttp({ apiKey: parseResendEnv(process.env).apiKey }),
+    },
+    {
+      provide: RESEND_WEBHOOK_VERIFIER,
+      useFactory: (): EmailWebhookVerifier | undefined => {
+        const secret = readResendWebhookSecret(process.env);
+        return secret === undefined ? undefined : createResendWebhookVerifier(secret);
+      },
     },
     ResendEmailProvider,
   ],

@@ -80,17 +80,22 @@ function sameState(expected: MigrationState, applied: MigrationState): boolean {
  * behind. When the state differs, everything in the `public` and `drizzle` schemas is dropped (a feature table and its
  * foreign keys to core tables go with `CASCADE`, its migrations table with the `drizzle` schema), then the core
  * migrations and the given features' are applied. Refuses databases whose name does not end in `_test`. A spec that passes
+ * Migration rollback specs use `reset: true` to own a clean schema, including guarded safety/audit state. A spec that passes
  * features calls `ensureMigrated()` again in its `afterAll`: the schema specs drop core tables by name, without `CASCADE`,
  * and a feature table's foreign key to a core table would block them.
  */
 export async function ensureMigrated(
   features: readonly TestFeatureMigrations[] = [],
+  options: { reset?: boolean } = {},
 ): Promise<void> {
   const pool = new pg.Pool({ connectionString: requireTestDatabaseUrl() });
   const client = await pool.connect();
   try {
     await client.query("select pg_advisory_lock($1)", [SCHEMA_LOCK_KEY]);
-    if (sameState(await expectedState(features), await appliedState(client))) {
+    if (
+      options.reset !== true &&
+      sameState(await expectedState(features), await appliedState(client))
+    ) {
       return;
     }
     await client.query('drop schema if exists "drizzle" cascade');

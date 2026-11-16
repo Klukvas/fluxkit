@@ -924,6 +924,21 @@ export interface AdminEmailMessageDetail extends AdminEmailMessage {
 
 export type AdminEmailMessageList = Paginated<AdminEmailMessage>;
 
+export type AdminEmailSuppressionReason = "hard_bounce" | "complaint" | "unsubscribe" | "blocked";
+
+/** Shared delivery block; email.manage exposes the full recipient, masked by default in the UI. */
+export interface AdminEmailSuppression {
+  id: string;
+  toAddress: string;
+  toAddressMasked: string;
+  reason: AdminEmailSuppressionReason;
+  sourceProvider: string;
+  firstSeenAt: string;
+  lastSeenAt: string;
+}
+
+export type AdminEmailSuppressionList = Paginated<AdminEmailSuppression>;
+
 // ---- admin audit log (ADR 0033 decision 9; `users.manage`)
 
 export type AdminAuditAction =
@@ -938,9 +953,11 @@ export type AdminAuditAction =
   | "privacy.lookup"
   | "privacy.exported"
   | "privacy.erased"
-  | "privacy.request_changed";
+  | "privacy.request_changed"
+  | "email_suppression.removed";
 
-export type AdminAuditTargetKind = "customer" | "order" | "admin_user" | "privacy_request";
+export type AdminAuditTargetKind =
+  "customer" | "order" | "admin_user" | "privacy_request" | "email_suppression";
 
 /** What an admin did; codes and ids only, never personal data. */
 export interface AdminAuditEvent {

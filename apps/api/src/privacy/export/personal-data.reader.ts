@@ -6,6 +6,7 @@ import {
   type ExportAddressFacts,
   type ExportCartFacts,
   type ExportMailFacts,
+  type ExportEmailSuppressionFacts,
   type ExportOrderFacts,
   type ExportProcessorFacts,
   type ExportSessionFacts,
@@ -19,6 +20,7 @@ import {
   customer,
   customerSession,
   emailMessage,
+  emailSuppression,
   orderAdjustment,
   orderItem,
   orderShipping,
@@ -316,6 +318,23 @@ export class PersonalDataReader {
       .where(subjectMailCondition(subject.scope))
       .orderBy(asc(emailMessage.createdAt), asc(emailMessage.id));
     return rows;
+  }
+
+  /** A global address block belongs only to an address-verified subject (ADR 0035). */
+  async suppressionFacts(
+    db: DbExecutor,
+    subject: ResolvedSubject,
+  ): Promise<ExportEmailSuppressionFacts[]> {
+    if (subject.scope.guestEmail === null) return [];
+    return db
+      .select({
+        reason: emailSuppression.reason,
+        sourceProvider: emailSuppression.sourceProvider,
+        firstSeenAt: emailSuppression.firstSeenAt,
+        lastSeenAt: emailSuppression.lastSeenAt,
+      })
+      .from(emailSuppression)
+      .where(eq(emailSuppression.toAddress, subject.scope.guestEmail));
   }
 
   async countMail(db: DbExecutor, subject: ResolvedSubject): Promise<number> {

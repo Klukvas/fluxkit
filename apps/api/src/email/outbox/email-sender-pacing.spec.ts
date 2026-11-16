@@ -126,17 +126,22 @@ describe("sender pacing admission (real Postgres, fake clock)", () => {
   });
 
   it("does no admission read and admits another send while the result database call hangs", async () => {
+    const read = vi.spyOn(world.database, "select");
+    const readsBeforeSlot: number[] = [];
     install(100, async (ms) => {
+      readsBeforeSlot.push(read.mock.calls.length);
       world.clock.set(new Date(world.clock.now().getTime() + ms));
+    });
+    const providerSend = world.provider().send.bind(world.provider());
+    vi.spyOn(world.provider(), "send").mockImplementation((...args) => {
+      expect(read.mock.calls.length).toBe(readsBeforeSlot.shift());
+      return providerSend(...args);
     });
     const ids = [await world.enqueued(), await world.enqueued()];
     const firstId = ids[0];
     const secondId = ids[1];
     if (firstId === undefined || secondId === undefined) throw new Error("Missing test mails");
-    // Claims and result updates use short transactions. A former pre-send read used the database directly.
-    const read = vi.spyOn(world.database, "select").mockImplementation(() => {
-      throw new Error("unexpected_admission_read");
-    });
+    // The shared suppression lookup precedes pacing. No additional read occurs between the slot and provider call.
     const record = world.changes.record.bind(world.changes);
     let entered: () => void = () => undefined;
     const recording = new Promise<void>((resolve) => {
@@ -156,7 +161,7 @@ describe("sender pacing admission (real Postgres, fake clock)", () => {
       await recording;
       expect((await world.attempt(secondId)).kind).toBe("sent");
       expect(world.provider().calls).toHaveLength(2);
-      expect(read).not.toHaveBeenCalled();
+      expect(read).toHaveBeenCalledTimes(2);
     } finally {
       release();
       await first;

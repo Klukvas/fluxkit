@@ -44,6 +44,7 @@ export const PATHS = {
   shippingProviderDetail: "/shipping/providers/:code",
   email: "/email",
   emailMessages: "/email/messages",
+  emailSuppressions: "/email/suppressions",
   emailMessageDetail: "/email/messages/:id",
   emailTemplates: "/email/templates",
   emailTemplatePreview: "/email/templates/:key",

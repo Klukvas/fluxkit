@@ -21,6 +21,7 @@ import { DEFAULT_PRICING_CONFIG, type PricingConfig } from "./common/pricing-con
 import { DatabaseModule } from "./database/database.module.js";
 import type { LoadedFeature } from "./features/feature-loader.js";
 import { FeaturesModule } from "./features/features.module.js";
+import { EmailSuppressionModule } from "./email/suppression/email-suppression.module.js";
 import { EmailAdminModule } from "./email/admin/index.js";
 import { EmailHandlersModule } from "./email/handlers/index.js";
 import {
@@ -162,6 +163,7 @@ export class AppModule {
         PaymentRegistryModule.register(options.paymentProviders ?? []),
         PaymentsModule.register(options.payments ?? DEFAULT_PAYMENTS_CONFIG),
         EmailRegistryModule.register(options.emailProviders ?? []),
+        EmailSuppressionModule,
         EmailOutboxModule.register(
           options.emailDelivery ?? DISABLED_EMAIL_DELIVERY,
           (options.emailProviders ?? []).length > 0,

@@ -8,6 +8,7 @@ import { EMAIL_WRITE_OPERATIONS, canManageEmail } from "./email-permissions";
 const EMAIL_ROUTE_IDS = [
   "email",
   "emailMessages",
+  "emailSuppressions",
   "emailMessageDetail",
   "emailTemplates",
   "emailTemplatePreview",
@@ -51,7 +52,12 @@ describe("the Email area per role", () => {
 
   it("needs email.manage for every write and for nothing less", () => {
     expect([...EMAIL_WRITE_OPERATIONS].sort()).toEqual(
-      ["cancelEmailMessage", "resendEmailMessage", "sendTestEmail"].sort(),
+      [
+        "cancelEmailMessage",
+        "resendEmailMessage",
+        "sendTestEmail",
+        "removeEmailSuppression",
+      ].sort(),
     );
     expect(canManageEmail(["email.manage"])).toBe(true);
     expect(canManageEmail(["shipping.manage", "orders.write", "users.manage"])).toBe(false);
