@@ -1,6 +1,6 @@
 # Several API and storefront instances
 
-- Status: APPROVED by the owner on 2026-11-14 (all four decisions of section 8 as proposed: Redis for the limits and the email pacer, storefront caches per process with URL hashing at the edge, `RATE_LIMIT_STORE`, per-process fallback with an error log while Redis is down, HMAC key derived from `ORDER_TOKEN_SECRET` with its own label). Four PRs as in section 7; not started.
+- Status: APPROVED by the owner on 2026-11-14 (all four decisions of section 8 as proposed: Redis for the limits and the email pacer, storefront caches per process with URL hashing at the edge, `RATE_LIMIT_STORE`, per-process fallback with an error log while Redis is down, HMAC key derived from `ORDER_TOKEN_SECRET` with its own label). Four PRs as in section 7: PR 1 to 3 merged (303, 316, 319); PR 4 designed in section 9 (2026-11-16).
 - Source: `docs/HANDOFF.md` section 2 item 6. Related: ADR 0040 (storefront shared catalog lists), ADR 0051 (product detail answer cache), ADR 0009/0010/0016/0031/0036 (in-memory windows, "single process, Redis later"), ADR 0018/0021/0025 (scheduler).
 - Coordination: the `launch-blockers` session is changing `apps/api/src/rate-limit/` (catalog windows, `TRUST_PROXY`). Code of this plan starts only after that PR is merged; the plan is written against its interface.
 
@@ -82,3 +82,36 @@ Multi-host (object storage for media, Redis outside the host) is a separate late
 2. Approve the new variable `RATE_LIMIT_STORE` (config contract) and Redis in the production example.
 3. Redis down at runtime: fall back to per-process limits (proposed) or fail closed for the auth windows.
 4. HMAC key derived from `ORDER_TOKEN_SECRET` (proposed) or a dedicated secret variable.
+
+## 9. PR 4 design (2026-11-16)
+
+Written when PR 4 started; everything below stays inside the approved plan (sections 5.4, 5.5 and 7.4). What PR 4 adds beyond the
+plan text is marked "new": each is needed for "a deploy no longer drops requests" and is recorded in a new ADR.
+
+- **Replicas in the example**: `deploy.replicas` of `api` and `storefront` from `FLUXKIT_API_REPLICAS` and
+  `FLUXKIT_STOREFRONT_REPLICAS` (default 1; `infra/production.env.example`). The `media` named volume is already mounted by every
+  `api` replica (one host). `stop_grace_period` long enough for a drain.
+- **Guard (new)**: the deploy script refuses more than one `api` replica unless `RATE_LIMIT_STORE=redis` (otherwise every limit is
+  N times larger).
+- **Edge**: nginx `hash $request_uri consistent` on the storefront upstream; the API upstream stays round robin. Both keep
+  `resolve`. A short `proxy_connect_timeout` and explicit `proxy_next_upstream` so a replica that is stopping (connection refused,
+  or its address gone) costs one quick retry on the other replica, never a `502`. Caddy: `dynamic a` upstreams with
+  `lb_policy uri_hash` (storefront) and retries (`lb_try_duration`), so it also sees every replica.
+- **Rolling replacement (host script)**: `infra/deploy/fluxkit-deploy` starts the infrastructure services and `migrate` as today,
+  then for `api` and then `storefront`: start the new replicas next to the old ones (`up --no-recreate --scale`), wait until each
+  new container is healthy, then stop and remove the old ones; a service whose containers already run the new configuration
+  is left alone. The edge and the rest follow with the usual `up --wait`. When a new replica does not become healthy, the new
+  containers are removed and the old ones keep serving; the env file and `current` go back as today. The installed copy on the
+  host (`/usr/local/sbin/fluxkit-deploy`) has to be reinstalled once (owner action); the old copy still works, with downtime.
+- **API drain (new)**: on `SIGTERM` the API stops accepting connections and finishes the requests in flight before the scheduler,
+  database and Redis close (today Nest closes them first and the HTTP server last).
+- **Storefront retry (new)**: a server-side `GET` to the API that fails before any answer (connection refused or reset) is
+  retried once, so a stopping API replica that Docker DNS still lists does not become an error page. Never for other methods.
+- **Edge restart**: the edge is one container and is recreated by every release (its image tag changes). Connections are refused
+  for about a second while nginx restarts; documented, not solved here (a second edge or a host load balancer is a later step).
+- **Tests**: `deploy-smoke` runs `api` and `storefront` with 2 replicas and `RATE_LIMIT_STORE=redis`: the login window is shared
+  through the edge, an upload is visible from both `api` replicas, the real `fluxkit-deploy` rolls a new release while a request
+  loop runs (no `5xx`; only refused connections during the edge restart), and a release whose API never becomes healthy leaves
+  the old replicas serving. Unit or integration specs for the API drain and the storefront retry.
+- **Not in PR 4**: switching the test server to 2 replicas (owner action after reinstalling the script and checking memory:
+  1 GB limit per `api` and per `storefront` replica), several hosts, object storage for media.
