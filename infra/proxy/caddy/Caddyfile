@@ -1,7 +1,7 @@
 # Fluxkit edge proxy, Caddy 2 alternative to the nginx edge of infra/docker-compose.prod.yml (docs/deployment.md).
 # Same routing and headers as infra/proxy/nginx; Caddy obtains and renews the certificate itself (ACME, ports 80 and 443).
 # Checked with `caddy validate` (caddy:2.10-alpine) and, before the replica changes, a run against the built admin SPA;
-# `uri_hash` over `dynamic a` was checked to pin each URL to one of three backends. The full stack smoke test runs nginx only.
+# With replicas it spreads requests round robin (no URL pinning, see the storefront handle). The full stack smoke test runs nginx only.
 #
 # Environment (read when Caddy loads this file):
 #   FLUXKIT_DOMAIN              the shop host name
@@ -105,7 +105,10 @@
 				refresh 1s
 				versions ipv4
 			}
-			lb_policy uri_hash
+			# Round robin, not uri_hash: Caddy keeps no failure state for dynamic upstreams between retries, so a hash would
+			# pick a draining or not yet ready replica (still in DNS) on every retry; round robin moves to the next one.
+			# URL pinning for the per-process caches is a feature of the nginx edge only (ADR 0057).
+			lb_policy round_robin
 			import replica_retries
 			header_down -Strict-Transport-Security
 			header_down -X-Powered-By

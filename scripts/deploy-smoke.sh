@@ -510,10 +510,11 @@ touch "$WORK/stop-requests"
 wait "$REQUEST_PID"
 REQUEST_PID=
 assert_roll_traffic() {
-  # curl 7 is allowed only for the single edge's restart; cold missing products must answer 404, never 5xx.
+  # curl 7 (refused) and 35 (TLS handshake cut off while nginx quits) are the single edge's restart: no HTTP request was
+  # sent. Cold missing products must answer 404, never 5xx.
   local allow_edge_refusals=$2 counts api_ok storefront_ok cold_ok edge_refused bad
   counts=$(awk '
-    $2 == 7 { refused++; next }
+    $2 == 7 || $2 == 35 { refused++; next }
     $2 != 0 { bad++; next }
     $1 ~ /^\/uk\/p\/replica-smoke-/ { if ($3 == 404) cold++; else bad++; next }
     $3 != 200 { bad++; next }
@@ -525,7 +526,7 @@ assert_roll_traffic() {
   if [[ "$bad" != 0 || "$api_ok" == 0 || "$storefront_ok" == 0 || "$cold_ok" == 0 ]]; then
     # Path, curl exit, HTTP status, UTC time: compare with the deploy script's phase lines above.
     echo "--- $1: requests that were not as expected ---" >&2
-    awk '$2 != 0 && $2 != 7 { print; next } $1 ~ /^\/uk\/p\/replica-smoke-/ { if ($3 != 404) print; next } $3 != 200' "$WORK/roll-requests.log" >&2
+    awk '$2 != 0 && $2 != 7 && $2 != 35 { print; next } $1 ~ /^\/uk\/p\/replica-smoke-/ { if ($3 != 404) print; next } $3 != 200' "$WORK/roll-requests.log" >&2
     echo "--- curl errors ---" >&2
     tail -20 "$WORK/roll-curl.log" >&2 || true
     echo "--- edge errors and 5xx ---" >&2
@@ -533,7 +534,13 @@ assert_roll_traffic() {
     fail "$1 traffic: api/storefront/cold/refused/bad = $counts"
   fi
   [[ "$allow_edge_refusals" == true || "$edge_refused" == 0 ]] || fail "$1 interrupted the edge ($edge_refused refused connections)"
-  pass "$1 traffic: $api_ok API 200s, $storefront_ok storefront 200s, $cold_ok cold product 404s, $edge_refused edge connection refusals, zero 5xx or other curl failures"
+  # Refusals belong to one edge restart only: all within a few seconds, never spread over the application rollout.
+  local refusal_span
+  refusal_span=$(awk '$2 == 7 || $2 == 35 { split($4, t, ":"); x = t[1] * 3600 + t[2] * 60 + t[3]; if (min == "" || x < min) min = x; if (x > max) max = x }
+    END { print (min == "" ? 0 : max - min) }' "$WORK/roll-requests.log")
+  [[ "$refusal_span" -le 10 ]] || fail "$1: refused or cut connections spread over ${refusal_span}s, more than one edge restart"
+
+  pass "$1 traffic: $api_ok API 200s, $storefront_ok storefront 200s, $cold_ok cold product 404s, $edge_refused refused or cut connections (edge restart), zero 5xx or other curl failures"
 }
 assert_roll_traffic "successful release" true
 assert_replicas api "$NEXT_TAG"

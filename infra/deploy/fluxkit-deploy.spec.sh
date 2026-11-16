@@ -94,6 +94,13 @@ stopped=false
 wrong_digest_id=''
 
 release_digest() { echo new-digest; }
+# Release directories: one whose Compose file declares the digest label, one from before the label existed.
+releases=$(mktemp -d)
+trap 'rm -rf "$releases"' EXIT
+mkdir -p "$releases/labelled/infra" "$releases/legacy/infra"
+printf 'labels:\n  com.fluxkit.release-digest: x\n' > "$releases/labelled/infra/docker-compose.prod.yml"
+printf 'services: {}\n' > "$releases/legacy/infra/docker-compose.prod.yml"
+legacy=false
 
 compose() {
   case "$2" in
@@ -119,7 +126,10 @@ docker() {
   case "$1" in
     inspect)
       if [[ "$3" == *release-digest* ]]; then
-        if [[ "$4" == new* && "$4" != "$wrong_digest_id" || "$matching" == true ]]; then
+        if [[ "$legacy" == true ]]; then
+          # Rolling back to a release without the label: its old replicas and its replacements carry an empty label.
+          if [[ "$4" == old* && "$matching" != true ]]; then echo new-digest; else echo ''; fi
+        elif [[ "$4" == new* && "$4" != "$wrong_digest_id" || "$matching" == true ]]; then
           echo new-digest
         else
           echo old-digest
@@ -141,7 +151,7 @@ docker() {
 }
 sleep() { events="$events wait$1"; }
 
-if ! roll_service /unused api 2; then fail "healthy replacement failed"; fi
+if ! roll_service "$releases/labelled" api 2; then fail "healthy replacement failed"; fi
 [[ "$events" == ' start1 start2 wait11 stop-old1 rm-old1 wait11 stop-old2 rm-old2 wait11' ]] ||
   fail "successful rollout order: $events"
 echo 'ok   sequential starts, health before old retirement, DNS waits between removals'
@@ -149,7 +159,7 @@ echo 'ok   sequential starts, health before old retirement, DNS waits between re
 stage=0
 events=''
 fail_second=true
-if roll_service /unused api 2; then fail "unhealthy second replacement succeeded"; fi
+if roll_service "$releases/labelled" api 2; then fail "unhealthy second replacement succeeded"; fi
 [[ "$events" == ' start1 start2 stop-new2 rm-new2 wait11 stop-new1 rm-new1 wait11' ]] ||
   fail "failed rollout must withdraw newest first with DNS waits and preserve both old IDs: $events"
 echo 'ok   second replacement failure removes newest first, DNS waits between removals, old replicas untouched'
@@ -157,7 +167,7 @@ echo 'ok   second replacement failure removes newest first, DNS waits between re
 stage=0
 events=''
 matching=true
-if ! roll_service /unused api 2; then fail "matching service failed"; fi
+if ! roll_service "$releases/labelled" api 2; then fail "matching service failed"; fi
 [[ -z "$events" ]] || fail "matching release digest and count should skip: $events"
 echo 'ok   matching release digest and replica count skip replacement'
 
@@ -166,7 +176,7 @@ events=''
 matching=false
 fail_second=false
 stopped=true
-if ! roll_service /unused api 2; then fail "replacement with a stopped container failed"; fi
+if ! roll_service "$releases/labelled" api 2; then fail "replacement with a stopped container failed"; fi
 [[ "$events" == ' rm-stopped1 start1 start2 wait11 stop-old1 rm-old1 wait11 stop-old2 rm-old2 wait11' ]] ||
   fail "stopped container must be removed before staging: $events"
 echo 'ok   pre-existing stopped container removed before Compose can reuse it'
@@ -174,7 +184,7 @@ echo 'ok   pre-existing stopped container removed before Compose can reuse it'
 stage=0
 events=''
 wrong_digest_id=new1
-if roll_service /unused api 2; then fail "wrong-digest replacement succeeded"; fi
+if roll_service "$releases/labelled" api 2; then fail "wrong-digest replacement succeeded"; fi
 [[ "$events" == ' start1 stop-new1 rm-new1 wait11' ]] ||
   fail "wrong-digest stage must remove only new containers and preserve old ones: $events"
 echo 'ok   healthy replacement with the wrong release digest fails staging and preserves old replicas'
@@ -182,7 +192,20 @@ echo 'ok   healthy replacement with the wrong release digest fails staging and p
 stage=0
 events=''
 wrong_digest_id=new2
-if roll_service /unused api 2; then fail "wrong-digest second replacement succeeded"; fi
+if roll_service "$releases/labelled" api 2; then fail "wrong-digest second replacement succeeded"; fi
 [[ "$events" == ' start1 start2 stop-new2 rm-new2 wait11 stop-new1 rm-new1 wait11' ]] ||
   fail "second-stage digest mismatch must withdraw newest first and preserve old containers: $events"
 echo 'ok   every staging step checks the release digest before retiring any old replica'
+
+stage=0
+events=''
+wrong_digest_id=''
+legacy=true
+matching=true
+if ! roll_service "$releases/legacy" api 2; then fail "untouched replicas of a legacy release failed"; fi
+[[ -z "$events" ]] || fail "rollback to a release without the label must keep its untouched replicas: $events"
+matching=false
+if ! roll_service "$releases/legacy" api 2; then fail "rollback of a rolled service to a legacy release failed"; fi
+[[ "$events" == ' start1 start2 wait11 stop-old1 rm-old1 wait11 stop-old2 rm-old2 wait11' ]] ||
+  fail "a rolled service must return to the legacy release through its unlabelled replacements: $events"
+echo 'ok   rollback to a release from before the digest label keeps its replicas and accepts its unlabelled replacements'

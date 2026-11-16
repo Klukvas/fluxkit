@@ -104,8 +104,14 @@ roll_service() {
       docker rm "$id" >/dev/null || return 1
     fi
   done
-  expected_digest=$(release_digest "$release") || return 1
-  [ -n "$expected_digest" ] || return 1
+  # A release from before this script wrote the label (its Compose file does not declare it) creates containers with an
+  # empty label: expect that, so a rollback to it keeps its untouched replicas and accepts its replacements.
+  if grep -q 'com.fluxkit.release-digest' "$release/infra/docker-compose.prod.yml"; then
+    expected_digest=$(release_digest "$release") || return 1
+    [ -n "$expected_digest" ] || return 1
+  else
+    expected_digest=''
+  fi
   for id in $old_ids; do
     old_count=$((old_count + 1))
     actual_digest=$(docker inspect -f '{{index .Config.Labels "com.fluxkit.release-digest"}}' "$id") || return 1
