@@ -21,6 +21,8 @@ const dynamicKeys = (): string[] => [
   ...MESSAGE_STATUSES.map((status) => `mail.status.${status}`),
   ...ERROR_CODE_REASONS.map((reason) => `mail.code.${reason}`),
   "mail.code.unrecognized",
+  "mail.cancel.bodyPinned",
+  "mail.detail.pinnedProviderCode",
   ...EMAIL_REFUSAL_RULES.map((rule) => `mail.refusal.${rule}`),
   "mail.refusal.rateLimited",
   "mail.refusal.rateLimitedWait",

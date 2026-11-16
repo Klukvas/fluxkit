@@ -22,7 +22,7 @@ export const EMAIL_LOCALE_PATTERN = /^[a-z]{2,8}(-[a-z]{2,8})*$/;
 
 /**
  * A provider or outcome code (`EmailProviderResult.providerCodes`, `email_message.provider_code`,
- * `provider_message_id`, `last_error_code`): short, no spaces, so a provider's message text (which can echo an address)
+ * `last_error_code`): short, no spaces, so a provider's message text (which can echo an address)
  * never fits. ADR 0031 decision 5, the same pattern as `domain_event`.
  */
 export const EMAIL_CODE_PATTERN = /^[A-Za-z0-9_.:-]{1,64}$/;
@@ -68,3 +68,17 @@ export const EMAIL_DEADLINE_HOURS = 12;
 
 /** Latest send of an auth mail (reset, verification) after it was created, also capped by its token's expiry. */
 export const AUTH_EMAIL_DEADLINE_MINUTES = 60;
+
+/** Provider references are opaque: preserve a legacy code or a single bracketed message ID verbatim. */
+export const EMAIL_PROVIDER_MESSAGE_ID_PATTERN =
+  /^(?:[A-Za-z0-9_.:-]{1,64}|<[A-Za-z0-9_.:+-]+@[A-Za-z0-9.-]+>)$/;
+export const EMAIL_PROVIDER_MESSAGE_ID_MAX_LENGTH = 255;
+
+export function isEmailProviderMessageId(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length <= EMAIL_PROVIDER_MESSAGE_ID_MAX_LENGTH &&
+    EMAIL_PROVIDER_MESSAGE_ID_PATTERN.test(value) &&
+    !/[\r\n]/.test(value)
+  );
+}

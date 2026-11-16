@@ -57,6 +57,7 @@ export const EMAIL_MESSAGE_TRANSITIONS: readonly EmailTransitionRule[] = Object.
   rule("sending", "failed", ["system"]),
   rule("sending", "unknown", ["system"]),
   rule("pending", "failed", ["system"]),
+  rule("pending", "unknown", ["system"]),
   rule("pending", "cancelled", ["admin"]),
 ]);
 

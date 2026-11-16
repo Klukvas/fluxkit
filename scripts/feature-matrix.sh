@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Feature and provider matrix (AGENTS.md section 18).
-# Usage: scripts/feature-matrix.sh on|off|deleted|providers-on|providers-off|providers-deleted|providers-nova-post|providers-email-fake|providers-email-none|providers-email-resend|providers-payment-fake|providers-payment-none|providers-payment-monobank|search-on|search-off
+# Usage: scripts/feature-matrix.sh on|off|deleted|providers-on|providers-off|providers-deleted|providers-nova-post|providers-email-fake|providers-email-none|providers-email-resend|providers-email-brevo|providers-payment-fake|providers-payment-none|providers-payment-monobank|search-on|search-off
 #   on      build, migrate and start the API with FEATURES_ENABLED=example,blog: expect /health, /example/ping, the blog's
 #           table and migrations table, `features` ["blog","example"] in GET /store/config, the blog's store routes (200, an
 #           unknown post 404) and its admin routes with their permissions (every one 401 signed out, where an unknown /admin
@@ -18,7 +18,7 @@
 # and so no new public contract.
 #   providers-on      build, start the API with SHIPPING_PROVIDERS_ENABLED=fake, expect the log line to name fake
 #   providers-off     build, start the API with no providers, expect "none" and no mention of fake
-#   providers-deleted remove packages/providers/_fake, _fake-email, _fake-payment, nova-post, resend and monobank, reinstall,
+#   providers-deleted remove packages/providers/_fake, _fake-email, _fake-payment, nova-post, resend, brevo and monobank, reinstall,
 #                     then lint, typecheck, boundaries and tests must pass, and an API told to load fake or nova_post
 #                     (shipping), or started with EMAIL_PROVIDER=fake or EMAIL_PROVIDER=resend, or with
 #                     PAYMENT_PROVIDERS_ENABLED=fake or PAYMENT_PROVIDERS_ENABLED=monobank, must refuse to start, loudly
@@ -33,6 +33,7 @@
 #   providers-email-none start the API without EMAIL_PROVIDER (none), expect "none", emailDelivery false and no mention of fake
 #   providers-email-fake start the API with EMAIL_PROVIDER=fake (and EMAIL_FROM, STOREFRONT_PUBLIC_URL), expect "fake" and
 #                     emailDelivery true
+#   providers-email-brevo same startup/no-network checks as Resend, with BREVO_API_KEY.
 #   providers-email-resend build; an API with EMAIL_PROVIDER=resend and no RESEND_API_KEY must refuse to start naming the
 #                     variable; with an invented key it must start, report resend and emailDelivery true, never print the
 #                     key, and send nothing to Resend at startup: the API runs with a preloaded fetch wrapper that logs and
@@ -65,7 +66,7 @@
 #                The key and the prefix's indexes are deleted at the end.
 set -euo pipefail
 
-mode="${1:?usage: scripts/feature-matrix.sh on|off|deleted|providers-on|providers-off|providers-deleted|providers-nova-post|providers-email-fake|providers-email-none|providers-email-resend|providers-payment-fake|providers-payment-none|providers-payment-monobank|search-on|search-off}"
+mode="${1:?usage: scripts/feature-matrix.sh on|off|deleted|providers-on|providers-off|providers-deleted|providers-nova-post|providers-email-fake|providers-email-none|providers-email-resend|providers-email-brevo|providers-payment-fake|providers-payment-none|providers-payment-monobank|search-on|search-off}"
 : "${DATABASE_URL:?DATABASE_URL must be set}"
 port="${MATRIX_PORT:-3999}"
 # The API refuses to start without it (ADR 0023); this one is throwaway and only lives in the process started below.
@@ -321,7 +322,7 @@ case "$mode" in
     ;;
   providers-deleted)
     [ "${CI:-}" = "true" ] || { echo "refusing to delete files outside CI (set CI=true on a throwaway copy)" >&2; exit 1; }
-    rm -rf packages/providers/_fake packages/providers/_fake-email packages/providers/_fake-payment packages/providers/nova-post packages/providers/resend packages/providers/monobank
+    rm -rf packages/providers/_fake packages/providers/_fake-email packages/providers/_fake-payment packages/providers/nova-post packages/providers/resend packages/providers/brevo packages/providers/monobank
     pnpm install --no-frozen-lockfile
     pnpm lint
     pnpm typecheck
@@ -338,7 +339,7 @@ case "$mode" in
         || { echo "expected a loud startup error naming the missing provider $code" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
     done
     # The same for the email providers: the one EMAIL_PROVIDER names is gone.
-    for code in fake resend; do
+    for code in fake resend brevo; do
       if EMAIL_PROVIDER="$code" EMAIL_FROM="Fluxkit Demo Shop <shop@mail.example>" STOREFRONT_PUBLIC_URL=http://127.0.0.1:3001 \
         RESEND_API_KEY=re_matrix_invented_key_0000000000 PORT="$port" \
         timeout 60 node apps/api/dist/main.js > /tmp/fluxkit-matrix-api.log 2>&1; then
@@ -462,6 +463,51 @@ GUARD
       || { echo "the fetch wrapper was not loaded into the API" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
     ! grep -F "matrix-guard: refused" /tmp/fluxkit-matrix-api.log \
       || { echo "the API sent a request to Resend at startup" >&2; exit 1; }
+    rm -rf "$guard_dir"
+    ;;
+  providers-email-brevo)
+    pnpm build
+    # Without the key: a loud refusal that names the variable, before anything listens.
+    if env -u BREVO_API_KEY EMAIL_PROVIDER=brevo EMAIL_FROM="Fluxkit Demo Shop <shop@mail.example>" \
+      STOREFRONT_PUBLIC_URL=http://127.0.0.1:3001 PORT="$port" \
+      timeout 60 node apps/api/dist/main.js > /tmp/fluxkit-matrix-api.log 2>&1; then
+      echo "the API started with EMAIL_PROVIDER=brevo and no BREVO_API_KEY" >&2
+      exit 1
+    fi
+    grep -F "BREVO_API_KEY is required when EMAIL_PROVIDER=brevo" /tmp/fluxkit-matrix-api.log \
+      || { echo "expected a startup error naming BREVO_API_KEY" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
+    # With an invented key: it starts, reports brevo, never prints the key. No call is made at startup: a preloaded
+    # wrapper of fetch (the plugin's only way to the network) logs and refuses any request to a Brevo host.
+    guard_dir="$(mktemp -d)"
+    cat > "$guard_dir/no-brevo.mjs" <<'GUARD'
+const realFetch = globalThis.fetch;
+globalThis.fetch = (input, init) => {
+  const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  const host = new URL(url).hostname;
+  if (host === "brevo.com" || host.endsWith(".brevo.com")) {
+    console.log(`matrix-guard: refused a request to ${host}`);
+    return Promise.reject(new TypeError("matrix-guard: no Brevo request at startup"));
+  }
+  return realFetch(input, init);
+};
+console.log("matrix-guard: active");
+GUARD
+    invented_key="matrix_invented_$(date +%s)_0000000000"
+    BREVO_API_KEY="$invented_key" EMAIL_FROM="Fluxkit Demo Shop <shop@mail.example>" \
+      STOREFRONT_PUBLIC_URL=http://127.0.0.1:3001 MATRIX_NODE_IMPORT="$guard_dir/no-brevo.mjs" run_api "" "" "brevo"
+    # Give anything started in the background at boot (the scheduler's first tick) a moment to run.
+    sleep 3
+    grep -F "Email provider loaded: brevo" /tmp/fluxkit-matrix-api.log \
+      || { echo "expected the email registry to report brevo" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
+    config="$(curl -fsS "http://127.0.0.1:${port}/store/config")"
+    echo "store/config -> $config"
+    echo "$config" | grep -q '"emailDelivery":true' || { echo "expected emailDelivery true with brevo loaded" >&2; exit 1; }
+    ! grep -qF "$invented_key" /tmp/fluxkit-matrix-api.log \
+      || { echo "the API log contains the Brevo key" >&2; exit 1; }
+    grep -F "matrix-guard: active" /tmp/fluxkit-matrix-api.log \
+      || { echo "the fetch wrapper was not loaded into the API" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
+    ! grep -F "matrix-guard: refused" /tmp/fluxkit-matrix-api.log \
+      || { echo "the API sent a request to Brevo at startup" >&2; exit 1; }
     rm -rf "$guard_dir"
     ;;
   providers-payment-none)

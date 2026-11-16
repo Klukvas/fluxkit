@@ -729,6 +729,7 @@ const emailMessage: Shape<AdminEmailMessage> = {
     deadlineAt: "string",
     providerCode: { nullable: "string" },
     providerMessageId: { nullable: "string" },
+    pinnedProviderCode: { nullable: "string" },
     lastErrorCode: { nullable: "string" },
     resendOf: { nullable: "string" },
     createdByAdminId: { nullable: "string" },

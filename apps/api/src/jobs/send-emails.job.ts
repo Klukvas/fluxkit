@@ -73,7 +73,7 @@ function tickClock(now: Date): () => Date {
  * outside any transaction (paced to `sendsPerSecond` per process together with the immediate attempts), record. A mail
  * whose claim or record fails is reported in `failures` and stays due or leased. A provider answer that concerns every
  * mail (`rate_limited`, `quota_exceeded`, `misconfigured`) stops the run; the mails not tried keep their place. The time
- * budget is checked before each page and each mail. With no provider loaded nothing is claimed, and a warning is logged
+ * budget is checked before each page and each mail. With no provider loaded only pinned or crashed attempts are settled without a send; a warning is logged
  * once per process when mails wait.
  */
 export async function sendEmails(
@@ -100,7 +100,6 @@ export async function sendEmails(
   if (deps.sender.provider() === undefined) {
     result.waitingWithoutProvider = await deps.outbox.countOpen(deps.database);
     deps.sender.warnWaitingWithoutProvider(result.waitingWithoutProvider);
-    return result;
   }
   const clock = options.clock ?? tickClock(now);
   let cursor: EmailDueCursor | undefined;
@@ -109,7 +108,13 @@ export async function sendEmails(
       result.truncated = true;
       return result;
     }
-    const due = await deps.outbox.listDue(deps.database, now, cursor, limits.batchSize);
+    const due = await deps.outbox.listDue(
+      deps.database,
+      now,
+      cursor,
+      limits.batchSize,
+      deps.sender.provider() === undefined,
+    );
     for (const [index, mail] of due.entries()) {
       if (index > 0 && options.budget?.exhausted() === true) {
         result.truncated = true;

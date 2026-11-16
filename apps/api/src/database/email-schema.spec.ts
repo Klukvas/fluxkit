@@ -13,6 +13,7 @@ import {
   EMAIL_MAX_LENGTH,
   EMAIL_MESSAGE_STATUSES,
   EMAIL_PROVIDER_CODE_PATTERN,
+  isEmailProviderMessageId,
   EMAIL_RECIPIENT_KINDS,
   EMAIL_RETENTION_DAYS,
   EMAIL_TEMPLATE_KEYS,
@@ -678,7 +679,40 @@ describe("email schema (migration 0007, real Postgres)", () => {
       await expectAccepted(() => createMessage(inStatus("cancelled", { attempts: 0 })));
     });
 
-    it("keeps provider codes, provider message ids and error codes to codes (no message text)", async () => {
+    it("requires a complete, code-safe provider/time pin", async () => {
+      await expectAccepted(() =>
+        createMessage({ pinned_provider_code: "brevo", pinned_at: at(0) }),
+      );
+      await expectViolation(
+        () => createMessage({ pinned_provider_code: "brevo" }),
+        CHECK_VIOLATION,
+        "email_message_pin_check",
+      );
+      await expectViolation(
+        () => createMessage({ pinned_at: at(0) }),
+        CHECK_VIOLATION,
+        "email_message_pin_check",
+      );
+      await expectViolation(
+        () => createMessage({ pinned_provider_code: "Brevo", pinned_at: at(0) }),
+        CHECK_VIOLATION,
+        "email_message_pinned_provider_code_check",
+      );
+    });
+
+    it("keeps provider references separate from error codes", async () => {
+      for (const id of [
+        "<Ab.C:+D@SMTP.example>",
+        "<a@b>\n",
+        "<a@b>,<c@d>",
+        `<${"a".repeat(251)}@b>`,
+        `<${"a".repeat(252)}@b>`,
+      ]) {
+        const work = () => createMessage(inStatus("sent", { provider_message_id: id }));
+        if (isEmailProviderMessageId(id)) await expectAccepted(work);
+        else
+          await expectViolation(work, CHECK_VIOLATION, "email_message_provider_message_id_check");
+      }
       await expectBoundaries(
         (code) => createMessage(inStatus("sending", { provider_code: code })),
         "email_message_provider_code_check",
@@ -688,8 +722,23 @@ describe("email schema (migration 0007, real Postgres)", () => {
       await expectBoundaries(
         (id) => createMessage(inStatus("sent", { provider_message_id: id })),
         "email_message_provider_message_id_check",
-        [randomUUID(), "msg_1.2:3-x", "x".repeat(64)],
-        ["", "x".repeat(65), "has space", "a/b", "Лист"],
+        [
+          randomUUID(),
+          "msg_1.2:3-x",
+          "x".repeat(64),
+          "<Ab.C:+D@SMTP.example>",
+          `<${"a".repeat(251)}@b>`,
+        ],
+        [
+          "",
+          "x".repeat(65),
+          "has space",
+          "a/b",
+          "Лист",
+          "<a@b>\n",
+          "<a@b>,<c@d>",
+          `<${"a".repeat(252)}@b>`,
+        ],
       );
       await expectBoundaries(
         (code) => createMessage(inStatus("failed", { last_error_code: code })),

@@ -177,6 +177,25 @@ describe("decideEmailRecord (what the record step writes after an attempt)", () 
     });
   });
 
+  it("records a pinned conflict without replacing it with unverified protection", () => {
+    expect(
+      decideEmailRecord({
+        ...base,
+        pinnedAt: base.now,
+        capabilities: { idempotencyKeys: false, maxRecipients: 1 },
+        outcome: {
+          kind: "provider_failed",
+          failure: emailProviderFailure("idempotency_conflict", {
+            providerCodes: ["duplicate_parameter", "400"],
+          }),
+        },
+      }),
+    ).toEqual({
+      status: "unknown",
+      lastErrorCode: "idempotency_conflict:duplicate_parameter",
+    });
+  });
+
   it("fails a mail that could not be rendered with the render code, without a retry", () => {
     for (const code of [
       "template_unavailable",
@@ -218,5 +237,55 @@ describe("failureCode (last_error_code of a provider failure)", () => {
     const code = failureCode(emailProviderFailure("rejected", { providerCodes: [long] }));
     expect(code).toBe("rejected");
     expect(EMAIL_CODE_PATTERN.test(code)).toBe(true);
+  });
+});
+
+describe("pinned outcome precedence", () => {
+  const pinned = {
+    attempts: 2,
+    now: NOW,
+    deadlineAt: DEADLINE,
+    pinnedAt: later(-10),
+    capabilities: { idempotencyKeys: true, maxRecipients: 1 },
+  };
+  it("keeps rejection, render failure and pending deadline unknown", () => {
+    expect(
+      decideEmailRecord({
+        ...pinned,
+        outcome: { kind: "provider_failed", failure: emailProviderFailure("rejected") },
+      }),
+    ).toEqual({ status: "unknown", lastErrorCode: "rejected" });
+    expect(
+      decideEmailRecord({ ...pinned, outcome: { kind: "not_renderable", code: "render_failed" } }),
+    ).toEqual({ status: "unknown", lastErrorCode: "render_failed" });
+    expect(decideEmailClaim({ ...pinned, status: "pending", deadlineAt: NOW })).toEqual({
+      to: "unknown",
+      lastErrorCode: "deadline_passed",
+    });
+  });
+  it("accepts authoritative success despite an earlier ambiguous attempt", () => {
+    expect(
+      decideEmailRecord({
+        ...pinned,
+        outcome: { kind: "sent", providerMessageId: "<Accepted@SMTP.example>" },
+      }),
+    ).toMatchObject({ status: "sent", providerMessageId: "<Accepted@SMTP.example>" });
+  });
+  it("stops at the window boundary and when replay protection is absent", () => {
+    expect(
+      decideEmailClaim({
+        ...pinned,
+        status: "pending",
+        pinnedAt: later(-25),
+        capabilities: { idempotencyKeys: true, maxRecipients: 1, idempotencyWindowSeconds: 1800 },
+      }),
+    ).toEqual({ to: "unknown", lastErrorCode: "idempotency_window_expired" });
+    expect(
+      decideEmailClaim({
+        ...pinned,
+        status: "sending",
+        capabilities: { idempotencyKeys: false, maxRecipients: 1 },
+      }),
+    ).toEqual({ to: "unknown", lastErrorCode: "idempotency_unprotected" });
   });
 });

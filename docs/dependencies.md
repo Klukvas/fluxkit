@@ -205,3 +205,9 @@ Approved by the owner on 2026-11-02 (plan `docs/plans/2026-11-02-storefront-ui-p
 - Notice handling: OFL text stays next to the font; `scripts/third-party-notices.mjs` embeds the full text in `pnpm notices` output for client delivery.
 - Alternatives considered: system stack (kept as fallback); Fontsource npm package (a new dependency); Google Fonts CDN (blocked by CSP and introduces a third-party request).
 - No npm dependency added. `scripts/check-licenses.mjs` scans npm packages through `pnpm licenses list`, so `scripts/license-policy.json` does not need a font exception.
+
+### Brevo email service
+
+- `https://api.brevo.com/v3/smtp/email`, enabled only by `EMAIL_PROVIDER=brevo` (`BREVO_API_KEY`): external HTTPS service, Node fetch, no SDK/npm dependency or shipped third-party code. Plugin uses only the same already pinned Nest/reflect-metadata/rxjs/zod dependencies as Resend; no new third-party lockfile resolution.
+- Sends one address, sender/reply-to, rendered subject/HTML/text, category tag and opaque message UUID (including order data/bearer links when present). See [processors](privacy/processors.md). Current terms/DPA/entity, locations/transfers, subprocessor and content/log retention require owner/legal review; EU database hosting does not settle processing scope.
+- Free mail carries "Sent with Brevo" (removal needs a paid plan); remote queues and exact inline deduplication/quota responses are not live-verified. [Plugin/live checks](../packages/providers/brevo/README.md), ADR 0056.

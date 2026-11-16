@@ -2,7 +2,9 @@ import { Inject, Injectable } from "@nestjs/common";
 import {
   decideEmailTransition,
   EMAIL_LEASE_SECONDS,
+  emailRetryDeadline,
   type EmailMessageActor,
+  type EmailProviderCapabilities,
   type EmailMessageStatus,
   type EmailRecipientKind,
 } from "@fluxkit/core";
@@ -21,6 +23,9 @@ import {
   type NewEmailMessageRow,
 } from "./email-outbox.repository.js";
 
+/** Configuration may recover between job passes; holding a pin must not postpone every retry to expiry. */
+const PINNED_PROVIDER_RECHECK_MS = 60_000;
+
 /** A new mail as the writer stores it; `status`, `attempts` and the lease are the writer's. */
 export type NewEmailMessage = Omit<
   NewEmailMessageRow,
@@ -28,6 +33,8 @@ export type NewEmailMessage = Omit<
   | "status"
   | "attempts"
   | "leaseUntil"
+  | "pinnedProviderCode"
+  | "pinnedAt"
   | "providerCode"
   | "providerMessageId"
   | "lastErrorCode"
@@ -49,6 +56,9 @@ export interface ClaimedEmailMessage {
   readonly attempts: number;
   readonly deadlineAt: Date;
   readonly leaseUntil: Date;
+  readonly providerCode?: string | null;
+  readonly pinnedProviderCode: string | null;
+  readonly pinnedAt: Date | null;
 }
 
 export type EmailClaimResult =
@@ -100,6 +110,9 @@ function claimedOf(row: EmailMessageRow): ClaimedEmailMessage {
     attempts: row.attempts,
     deadlineAt: row.deadlineAt,
     leaseUntil: row.leaseUntil,
+    providerCode: row.providerCode,
+    pinnedProviderCode: row.pinnedProviderCode,
+    pinnedAt: row.pinnedAt,
   });
 }
 
@@ -139,8 +152,9 @@ export class EmailMessageChanges {
   claim(
     id: string,
     now: Date,
-    providerCode: string,
+    providerCode: string | undefined,
     limits: JobLimits = DEFAULT_JOB_LIMITS,
+    capabilities?: EmailProviderCapabilities,
   ): Promise<EmailClaimResult> {
     return withJobTransaction(
       this.database,
@@ -149,14 +163,54 @@ export class EmailMessageChanges {
         if (row === undefined) {
           return { kind: "skipped" };
         }
+        // A crashed attempt may have reached its provider. Persist its original claim time before any replay.
+        const pin =
+          row.pinnedProviderCode === null && row.status === "sending"
+            ? {
+                pinnedProviderCode: row.providerCode,
+                pinnedAt: new Date((row.leaseUntil as Date).getTime() - EMAIL_LEASE_SECONDS * 1000),
+              }
+            : { pinnedProviderCode: row.pinnedProviderCode, pinnedAt: row.pinnedAt };
+        if (row.status === "sending" && pin.pinnedProviderCode === null) {
+          throw new Error("An expired email attempt has no provider code");
+        }
+        const providerMissing =
+          pin.pinnedProviderCode !== null && pin.pinnedProviderCode !== providerCode;
         const decision = decideEmailClaim({
           status: row.status as EmailMessageStatus,
           deadlineAt: row.deadlineAt,
+          pinnedAt: pin.pinnedAt,
+          capabilities: providerMissing ? undefined : capabilities,
           now,
         });
+        if (decision.to === "sending" && (providerMissing || providerCode === undefined)) {
+          if (pin.pinnedProviderCode !== null) {
+            // Recheck configuration without changing the pin. An absent provider has no known replay window;
+            // its restored capabilities will enforce the original cutoff before any call can start.
+            await this.outbox.update(tx, id, {
+              ...pin,
+              status: "pending",
+              leaseUntil: null,
+              nextAttemptAt: new Date(
+                Math.min(
+                  now.getTime() + PINNED_PROVIDER_RECHECK_MS,
+                  emailRetryDeadline(
+                    row.deadlineAt,
+                    pin.pinnedAt,
+                    providerMissing ? undefined : capabilities,
+                  ).getTime(),
+                ),
+              ),
+              lastErrorCode: "pinned_provider_unavailable",
+              updatedAt: now,
+            });
+          }
+          return { kind: "skipped" };
+        }
         if (decision.to === "sending") {
           const leaseUntil = new Date(now.getTime() + EMAIL_LEASE_SECONDS * 1000);
           const claimed = await this.outbox.update(tx, id, {
+            ...pin,
             status: "sending",
             attempts: row.attempts + 1,
             leaseUntil,
@@ -168,6 +222,7 @@ export class EmailMessageChanges {
           return { kind: "claimed", message: claimedOf(claimed) };
         }
         await this.outbox.update(tx, id, {
+          ...pin,
           status: decision.to,
           leaseUntil: null,
           lastErrorCode: decision.lastErrorCode,
@@ -248,27 +303,48 @@ export class EmailMessageChanges {
    * under the row lock (`decideEmailRecord`: sent, back to pending with the next attempt, failed or unknown).
    */
   record(
-    claimed: Pick<ClaimedEmailMessage, "id" | "attempts">,
+    claimed: Pick<ClaimedEmailMessage, "id" | "attempts"> &
+      Partial<Pick<ClaimedEmailMessage, "leaseUntil" | "providerCode">>,
     outcome: EmailAttemptOutcome,
     now: Date,
     limits: JobLimits = DEFAULT_JOB_LIMITS,
+    capabilities?: EmailProviderCapabilities,
   ): Promise<EmailRecordResult> {
     return withJobTransaction(
       this.database,
       async (tx): Promise<EmailRecordResult> => {
         const row = await this.outbox.lock(tx, claimed.id);
-        if (row === undefined || row.status !== "sending" || row.attempts !== claimed.attempts) {
+        if (
+          row === undefined ||
+          row.status !== "sending" ||
+          row.attempts !== claimed.attempts ||
+          (claimed.leaseUntil !== undefined &&
+            row.leaseUntil?.getTime() !== claimed.leaseUntil.getTime()) ||
+          (claimed.providerCode !== undefined && row.providerCode !== claimed.providerCode)
+        ) {
           return { kind: "lost" };
         }
+        const pin =
+          row.pinnedProviderCode === null &&
+          outcome.kind === "provider_failed" &&
+          outcome.failure.reason === "unavailable"
+            ? {
+                pinnedProviderCode: row.providerCode,
+                pinnedAt: new Date((row.leaseUntil as Date).getTime() - EMAIL_LEASE_SECONDS * 1000),
+              }
+            : { pinnedProviderCode: row.pinnedProviderCode, pinnedAt: row.pinnedAt };
         const decision = decideEmailRecord({
           attempts: row.attempts,
           deadlineAt: row.deadlineAt,
           now,
           outcome,
+          pinnedAt: pin.pinnedAt,
+          capabilities,
         });
         switch (decision.status) {
           case "sent":
             await this.outbox.update(tx, row.id, {
+              ...pin,
               status: "sent",
               providerMessageId: decision.providerMessageId,
               sentAt: decision.sentAt,
@@ -279,6 +355,7 @@ export class EmailMessageChanges {
             break;
           case "pending":
             await this.outbox.update(tx, row.id, {
+              ...pin,
               status: "pending",
               nextAttemptAt: decision.nextAttemptAt,
               leaseUntil: null,
@@ -289,6 +366,7 @@ export class EmailMessageChanges {
           case "failed":
           case "unknown":
             await this.outbox.update(tx, row.id, {
+              ...pin,
               status: decision.status,
               leaseUntil: null,
               lastErrorCode: decision.lastErrorCode,

@@ -1,5 +1,9 @@
 import { AUTH_EMAIL_DEADLINE_MINUTES, EMAIL_DEADLINE_HOURS } from "./limits.js";
-import { EMAIL_PROVIDER_FAILURE_REASONS, type EmailProviderFailure } from "./provider-port.js";
+import {
+  EMAIL_PROVIDER_FAILURE_REASONS,
+  type EmailProviderFailure,
+  type EmailProviderCapabilities,
+} from "./provider-port.js";
 
 /*
  * When a failed send is tried again, and until when a mail may be sent at all (ADR 0031 decisions 6 and 7). Pure: the
@@ -30,12 +34,22 @@ export interface EmailAttemptInput {
   readonly failure: Pick<EmailProviderFailure, "reason" | "retryAfterSeconds" | "quotaPeriod">;
   readonly now: Date;
   readonly deadlineAt: Date;
+  readonly pinnedAt?: Date | null;
+  readonly capabilities?: EmailProviderCapabilities;
 }
 
 export type EmailAttemptDecision =
   | { readonly status: "pending"; readonly nextAttemptAt: Date }
   | { readonly status: "failed"; readonly cause: "rejected" | "deadline_passed" }
-  | { readonly status: "unknown"; readonly cause: "idempotency_conflict" };
+  | {
+      readonly status: "unknown";
+      readonly cause:
+        | "idempotency_conflict"
+        | "rejected"
+        | "deadline_passed"
+        | "idempotency_unprotected"
+        | "idempotency_window_expired";
+    };
 
 function timeOf(value: Date, name: string): number {
   const time = value instanceof Date ? value.getTime() : Number.NaN;
@@ -78,7 +92,12 @@ export function nextEmailAttempt(input: EmailAttemptInput): EmailAttemptDecision
     throw new RangeError("attempts must be a whole number of at least 1");
   }
   const nowMs = timeOf(input.now, "now");
-  const deadlineMs = timeOf(input.deadlineAt, "deadlineAt");
+  const pinned = input.pinnedAt != null;
+  const deadlineMs = emailRetryDeadline(
+    input.deadlineAt,
+    input.pinnedAt,
+    input.capabilities,
+  ).getTime();
   if (!EMAIL_PROVIDER_FAILURE_REASONS.includes(failure.reason)) {
     throw new RangeError(`Unknown email provider failure reason: ${String(failure.reason)}`);
   }
@@ -86,13 +105,23 @@ export function nextEmailAttempt(input: EmailAttemptInput): EmailAttemptDecision
   if (retryAfter !== undefined && !(Number.isSafeInteger(retryAfter) && retryAfter >= 0)) {
     throw new RangeError("retryAfterSeconds must be a non-negative whole number of seconds");
   }
+  if (
+    pinned &&
+    input.capabilities?.idempotencyKeys === false &&
+    failure.reason !== "idempotency_conflict"
+  ) {
+    return { status: "unknown", cause: "idempotency_unprotected" };
+  }
   // A relative wait is never shorter than one second (a `retry-after: 0` must not spin).
   const retryAfterMs = Math.max((retryAfter ?? 0) * SECOND_MS, MIN_DELAY_MS);
 
   let atMs: number;
   switch (failure.reason) {
     case "rejected":
-      return Object.freeze({ status: "failed" as const, cause: "rejected" as const });
+      return Object.freeze({
+        status: pinned ? ("unknown" as const) : ("failed" as const),
+        cause: "rejected" as const,
+      });
     case "idempotency_conflict":
       return Object.freeze({ status: "unknown" as const, cause: "idempotency_conflict" as const });
     case "unavailable":
@@ -113,7 +142,15 @@ export function nextEmailAttempt(input: EmailAttemptInput): EmailAttemptDecision
       break;
   }
   if (atMs >= deadlineMs) {
-    return Object.freeze({ status: "failed" as const, cause: "deadline_passed" as const });
+    return pinned
+      ? {
+          status: "unknown",
+          cause:
+            deadlineMs < input.deadlineAt.getTime()
+              ? "idempotency_window_expired"
+              : "deadline_passed",
+        }
+      : { status: "failed", cause: "deadline_passed" };
   }
   return Object.freeze({ status: "pending" as const, nextAttemptAt: new Date(atMs) });
 }
@@ -138,4 +175,21 @@ export function emailDeadlineAt(input: {
 /** Whether a send may no longer start: at or after the deadline (a send starts strictly before it). */
 export function isPastEmailDeadline(now: Date, deadlineAt: Date): boolean {
   return timeOf(now, "now") >= timeOf(deadlineAt, "deadlineAt");
+}
+
+/** Only possible acceptance consumes a provider's deduplication window; safe refusals retain ADR 0031's schedule. */
+export function emailRetryDeadline(
+  deadlineAt: Date,
+  pinnedAt?: Date | null,
+  capabilities?: EmailProviderCapabilities,
+): Date {
+  const deadline = timeOf(deadlineAt, "deadlineAt");
+  if (pinnedAt == null || capabilities?.idempotencyWindowSeconds === undefined)
+    return new Date(deadline);
+  return new Date(
+    Math.min(
+      deadline,
+      timeOf(pinnedAt, "pinnedAt") + (capabilities.idempotencyWindowSeconds - 300) * SECOND_MS,
+    ),
+  );
 }

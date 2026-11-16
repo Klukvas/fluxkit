@@ -3,6 +3,7 @@ import { DiscoveryService } from "@nestjs/core";
 import {
   EMAIL_PROVIDER_METADATA,
   emailProviderMetadata,
+  isEmailProviderCapabilities,
   type EmailProviderPort,
 } from "@fluxkit/core";
 
@@ -28,15 +29,7 @@ function implementsPort(value: unknown): value is EmailProviderPort {
   if (!PORT_METHODS.every((method) => typeof candidate[method] === "function")) {
     return false;
   }
-  const capabilities = candidate.capabilities as Record<string, unknown> | null | undefined;
-  return (
-    typeof capabilities === "object" &&
-    capabilities !== null &&
-    typeof capabilities.idempotencyKeys === "boolean" &&
-    typeof capabilities.maxRecipients === "number" &&
-    Number.isSafeInteger(capabilities.maxRecipients) &&
-    capabilities.maxRecipients >= 1
-  );
+  return isEmailProviderCapabilities(candidate.capabilities);
 }
 
 /**

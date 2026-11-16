@@ -1,5 +1,5 @@
 import {
-  EMAIL_CODE_PATTERN,
+  isEmailProviderMessageId,
   emailProviderFailure,
   type EmailProviderFailure,
   type EmailProviderPort,
@@ -69,7 +69,7 @@ export async function callEmailProvider(
     }
     if (result.ok) {
       const id = result.value?.providerMessageId;
-      return typeof id === "string" && EMAIL_CODE_PATTERN.test(id)
+      return isEmailProviderMessageId(id)
         ? { kind: "ok", providerMessageId: id }
         : { kind: "threw", errorName: "MalformedProviderResult" };
     }

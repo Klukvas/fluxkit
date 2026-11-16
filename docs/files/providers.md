@@ -57,3 +57,12 @@ Payment, shipping and email provider plugins, one package per provider. Each pro
   - `src/resend-provider.ts` - `ResendEmailProvider` (implements `EmailProviderPort`: local validation as `not_sent`, one request, the mapping, one warning per failure with codes only). Must NOT repeat a request or log an address, subject, body or the key.
   - `src/test-support/` - TEST ONLY (excluded from the build): `stub-resend.ts` (a local Resend stand-in on 127.0.0.1 with invented data: records every request, models idempotency, refuses unknown body members, echoes addresses and key fragments in its error texts on purpose), `fixtures.ts` (an invented message, `providerOn`, signals), `no-network.ts` (the Vitest setup file that refuses and reports any request to another host).
   - `src/*.spec.ts` - request shape, status mapping and `retry-after`, idempotency, transport (size cap, aborts, network, endpoint), hostile values, secrets, configuration, the module, the contract check, the stub's strictness, the no-network guard and its wiring, a static check of the sources (they disappear with the package).
+
+- `brevo/` — `@fluxkit/provider-brevo`, removable email plugin (`EMAIL_PROVIDER=brevo`, `BREVO_API_KEY`, ADR 0056 step 1); no core/app static imports and no SDK.
+  - `src/config.ts` — bounded header-safe key parser and fixed production endpoint; errors name the variable only.
+  - `src/http.ts` — one POST, no redirects, caller abort, 64 KiB streamed response cap; no startup request or retry.
+  - `src/request.ts` — one recipient and inline parts/reply-to/category; only the opaque UUID in JSON idempotency headers.
+  - `src/answer-map.ts` — allowlisted Brevo codes, verbatim message ID validation, ambiguity before error mapping; no provider text or assumed quota reset.
+  - `src/brevo-provider.ts`, `src/index.ts` — port/Nest discovery wiring; idempotency false pending live verification.
+  - `src/test-support/`, `src/*.spec.ts` — loopback-only stub with 30-minute dedupe/lost-response models, core contract and transport/config/request/hostile/secret/no-network checks; cannot establish live behaviour.
+  - `README.md` — setup, Free branding/paid removal, pin/window/unknown safety, mapping, removal and all live-check TODOs.

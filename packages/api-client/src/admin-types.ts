@@ -903,6 +903,7 @@ export interface AdminEmailMessage {
   deadlineAt: string;
   providerCode: string | null;
   providerMessageId: string | null;
+  pinnedProviderCode: string | null;
   lastErrorCode: string | null;
   resendOf: string | null;
   createdByAdminId: string | null;

@@ -268,6 +268,16 @@ export function MessageFacts({
         ),
     },
     {
+      id: "pinnedProvider",
+      term: t("mail.detail.pinnedProviderCode"),
+      description:
+        message.pinnedProviderCode === null ? (
+          none
+        ) : (
+          <span className="break-all font-mono">{message.pinnedProviderCode}</span>
+        ),
+    },
+    {
       id: "providerId",
       term: t("mail.detail.providerMessageId"),
       description:
