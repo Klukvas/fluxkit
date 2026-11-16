@@ -497,6 +497,16 @@ request GET /store/config
 expect_status 502 "unavailable API: store config"
 pass "API outage: only email feedback maps to 429 with Retry-After"
 compose up -d --no-build --no-deps --wait --wait-timeout 120 api >/dev/null
+# nginx marked both api replicas failed during the outage (fail_timeout 10 s): wait until it routes again, so the rollout
+# traffic below measures the rollout, not the end of this outage.
+EDGE_STATUS=000
+for _ in $(seq 1 30); do
+  request GET /store/config
+  EDGE_STATUS=$STATUS
+  [[ "$EDGE_STATUS" == "200" ]] && break
+  sleep 1
+done
+[[ "$EDGE_STATUS" == "200" ]] || fail "the edge did not route to the restarted api ($EDGE_STATUS)"
 
 # --- real host deployment: new image tags, same locally built images; no registry, backup or prune ---
 command -v flock >/dev/null || fail "the host deploy check needs flock (the deploy host is Linux)"
