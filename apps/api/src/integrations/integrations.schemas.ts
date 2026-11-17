@@ -7,6 +7,8 @@ import { z } from "zod";
 import { timestampSchema, uuidSchema } from "../common/openapi-formats.js";
 
 export const INTEGRATION_SECRET_STATES = ["not_set", "set", "env"] as const;
+/** States a listed secret can be in. `retired` is omitted: a retired version has no envelope and is not listed. */
+export const LISTED_CREDENTIAL_STATES = ["candidate", "active", "draining", "revoked"] as const;
 export const INTEGRATION_STORAGE_STATES = ["ready", "disabled"] as const;
 
 const CURRENT_PASSWORD_MAX_LENGTH = 1024;
@@ -68,6 +70,10 @@ export const integrationSecretSchema = z.object({
   keyAvailable: z.boolean().nullable().meta({
     description:
       "Whether this server holds the master key that sealed the stored value; false means it must be entered again. Null when nothing is stored.",
+  }),
+  versionState: z.enum(LISTED_CREDENTIAL_STATES).nullable().meta({
+    description:
+      "`candidate`: saved, not used. `active`: new mail uses it. `draining`: turned off, mail already bound to it can finish. `revoked`: unusable. Null when nothing is stored.",
   }),
 });
 

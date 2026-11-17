@@ -13,7 +13,7 @@ import {
   secretProblemErrors,
   type SecretFormField,
 } from "./integrations-errors";
-import { labelText, type SecretAction } from "./integrations-list-view";
+import { labelText, PASSWORD_ONLY_ACTIONS, type SecretAction } from "./integrations-list-view";
 import { providerLabel, secretFieldLabel } from "./integrations-view";
 import {
   SECRET_PASSWORD_INPUT_ID,
@@ -26,11 +26,13 @@ import { secretHolder, useSecretValues } from "./use-secret-values";
 export interface SecretDialogTarget {
   action: SecretAction;
   integration: AdminIntegration;
-  secret: AdminIntegrationSecret;
+  /** Null for turning a provider on or off: those actions name the provider, not one field. */
+  secret: AdminIntegrationSecret | null;
 }
 
 /** How a dialog ended when it did not simply stay open with an error. */
-export type SecretDialogResult = "saved" | "removed" | "stale" | "unknown";
+export type SecretDialogResult =
+  "saved" | "removed" | "turnedOn" | "turnedOff" | "revoked" | "stale" | "unknown";
 
 type SecretValuesState = Record<SecretFormField, string>;
 const BLANK: SecretValuesState = { value: "", currentPassword: "" };
@@ -70,7 +72,7 @@ export function SecretDialog({
   const [flight] = useState(createSingleFlight);
   const formErrorRef = useRef<HTMLDivElement>(null);
   const focusAfterCommit = useFocusAfterCommit();
-  const isRemoval = target.action === "remove";
+  const passwordOnly = (PASSWORD_ONLY_ACTIONS as readonly string[]).includes(target.action);
 
   function show(next: ShownErrors) {
     setErrors(next);
@@ -78,7 +80,7 @@ export function SecretDialog({
     else {
       const first = SECRET_FORM_FIELDS.find((field) => next.fields[field] !== undefined);
       // After a request both inputs are empty again; the first one is where the owner starts over.
-      focusAfterCommit(INPUT_IDS[first ?? (isRemoval ? "currentPassword" : "value")]);
+      focusAfterCommit(INPUT_IDS[first ?? (passwordOnly ? "currentPassword" : "value")]);
     }
   }
 
@@ -89,25 +91,35 @@ export function SecretDialog({
   }
 
   function send(taken: SecretValuesState) {
-    const { integration, secret } = target;
-    if (isRemoval) {
-      return adminClient.retireIntegrationSecret(integration.id, {
+    const { integration, secret, action } = target;
+    const password = taken.currentPassword;
+    if (action === "remove" || action === "revoke") {
+      const body = {
         expectedRevision: revision,
-        versionId: secret.versionId ?? "",
-        currentPassword: taken.currentPassword,
-      });
+        versionId: secret?.versionId ?? "",
+        currentPassword: password,
+      };
+      return action === "remove"
+        ? adminClient.retireIntegrationSecret(integration.id, body)
+        : adminClient.revokeIntegrationSecret(integration.id, body);
     }
-    return adminClient.putIntegrationSecret(integration.id, secret.field, {
+    if (action === "turnOn" || action === "turnOff") {
+      const body = { expectedRevision: revision, currentPassword: password };
+      return action === "turnOn"
+        ? adminClient.activateIntegration(integration.id, body)
+        : adminClient.disableIntegration(integration.id, body);
+    }
+    return adminClient.putIntegrationSecret(integration.id, secret?.field ?? "", {
       expectedRevision: revision,
       value: taken.value.trim(),
-      currentPassword: taken.currentPassword,
+      currentPassword: password,
     });
   }
 
   async function submit() {
     if (flight.pending()) return;
     const local = localSecretErrors(
-      isRemoval ? { currentPassword: secrets.values.currentPassword } : secrets.values,
+      passwordOnly ? { currentPassword: secrets.values.currentPassword } : secrets.values,
     );
     if (Object.keys(local).length > 0) {
       show({ fields: local, form: [] });
@@ -120,8 +132,19 @@ export function SecretDialog({
     try {
       const outcome = await running;
       if (outcome.kind === "aborted") return;
-      if (outcome.kind === "ok") onDone(isRemoval ? "removed" : "saved");
-      else if (outcome.kind === "unknown") onDone("unknown");
+      if (outcome.kind === "ok") {
+        onDone(
+          target.action === "remove"
+            ? "removed"
+            : target.action === "turnOn"
+              ? "turnedOn"
+              : target.action === "turnOff"
+                ? "turnedOff"
+                : target.action === "revoke"
+                  ? "revoked"
+                  : "saved",
+        );
+      } else if (outcome.kind === "unknown") onDone("unknown");
       else {
         const mapped = secretProblemErrors(outcome.status, outcome.problem, outcome.retryAfter);
         if (mapped.stale) onDone("stale");
@@ -136,7 +159,7 @@ export function SecretDialog({
     <SecretDialogView
       t={t}
       action={target.action}
-      field={labelText(t, secretFieldLabel(target.secret.field))}
+      field={target.secret === null ? "" : labelText(t, secretFieldLabel(target.secret.field))}
       provider={labelText(t, providerLabel(target.integration.providerCode))}
       values={secrets.values}
       fieldErrors={errors.fields}

@@ -26,6 +26,12 @@ export const INTEGRATION_REFUSAL_RULES = [
   REVISION_STALE_RULE,
   "integration_unavailable",
   "integration_version_not_retirable",
+  "integration_runtime_not_ready",
+  "integration_sender_required",
+  "integration_route_unset",
+  "integration_not_activatable",
+  "integration_not_enabled",
+  "integration_version_not_revocable",
   "step_up_unavailable",
 ] as const;
 

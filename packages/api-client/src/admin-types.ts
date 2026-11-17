@@ -1005,6 +1005,11 @@ export interface AdminIntegrationSecret {
   savedAt: string | null;
   /** False: this server can no longer decrypt the stored value, enter it again. Null when nothing is stored. */
   keyAvailable: boolean | null;
+  /**
+   * `candidate`: saved, not used. `active`: new mail uses it. `draining`: turned off, bound mail can finish.
+   * `revoked`: unusable. Null when nothing is stored.
+   */
+  versionState: "candidate" | "active" | "draining" | "revoked" | null;
 }
 
 export interface AdminIntegration {

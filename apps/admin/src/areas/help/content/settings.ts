@@ -135,8 +135,8 @@ export const SETTINGS_ARTICLES: readonly HelpArticle[] = [
       {
         kind: "warning",
         text: {
-          uk: "Збережений ключ лишається вимкненим, доки його не ввімкнуть. Цей екран його зберігає і не вмикає. Оплата та доставка й далі працюють із ключами, заданими на сервері.",
-          en: "A saved key stays off until it is activated. This screen stores it and does not turn it on. Payment and delivery still use the keys set on the server.",
+          uk: "Для пошти збережений ключ вмикають з цього екрана. Він працює лише коли сервер сам не обирає поштовий сервіс. Вимкнення зупиняє нові листи; ті, що вже в дорозі, можуть дійти. Оплата та доставка й далі працюють із ключами, заданими на сервері.",
+          en: "For email, turn a saved key on from this screen. It is used only when the server is not already choosing the email provider. Turning it off stops new mail; mail already on its way can finish. Payment and delivery still use the keys set on the server.",
         },
       },
       { kind: "screen", route: "integrations" },
