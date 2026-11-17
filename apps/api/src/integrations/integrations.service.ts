@@ -580,6 +580,13 @@ export class IntegrationsService {
           generation: saved?.generation ?? null,
           savedAt: saved?.savedAt.toISOString() ?? null,
           keyAvailable: saved === undefined ? null : this.cipher.hasKey(saved.keyId),
+          versionState:
+            saved?.state === "candidate" ||
+            saved?.state === "active" ||
+            saved?.state === "draining" ||
+            saved?.state === "revoked"
+              ? saved.state
+              : null,
         };
       }),
     };

@@ -44,7 +44,7 @@ export function IntegrationsPage() {
   function open(
     action: SecretAction,
     integration: AdminIntegration,
-    secret: AdminIntegrationSecret,
+    secret: AdminIntegrationSecret | null,
   ) {
     if (!canManage || resource.refreshing) return;
     setNotice(null);

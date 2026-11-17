@@ -725,6 +725,7 @@ describe("integrations (ADR 0058)", () => {
         generation: 1,
         savedAt: "2026-11-16T10:00:00.000Z",
         keyAvailable: true,
+        versionState: "candidate",
       },
     ],
     updatedAt: "2026-11-16T10:00:00.000Z",

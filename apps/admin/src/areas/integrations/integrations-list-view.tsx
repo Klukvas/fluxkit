@@ -11,6 +11,7 @@ import { ResourceFallback, type ResourceFallbackState } from "../../views/status
 import {
   groupByKind,
   providerLabel,
+  providerRuntime,
   secretFieldLabel,
   secretView,
   type Label,
@@ -23,7 +24,10 @@ export const STORAGE_KEY_VARIABLE = "SECRETS_ENCRYPTION_KEY";
 const focusClass =
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 
-export type SecretAction = "enter" | "replace" | "remove";
+export type SecretAction = "enter" | "replace" | "remove" | "turnOn" | "turnOff" | "revoke";
+
+/** Actions that ask for the password and no key. */
+export const PASSWORD_ONLY_ACTIONS = ["remove", "turnOn", "turnOff", "revoke"] as const;
 
 export type IntegrationsState =
   | { status: "ready"; data: AdminIntegrationList }
@@ -132,6 +136,16 @@ function SecretRow({
               {t("intg.action.remove")}
             </Button>
           )}
+          {view.revocableVersionId === null ? null : (
+            <Button
+              variant="secondary"
+              disabled={busy}
+              aria-label={t("intg.action.revokeLabel", names)}
+              onClick={() => onAction("revoke")}
+            >
+              {t("intg.action.revoke")}
+            </Button>
+          )}
         </div>
       ) : null}
     </li>
@@ -153,11 +167,12 @@ function ProviderCard({
   storage: AdminIntegrationStorage;
   canManage: boolean;
   busy: boolean;
-  onAction: (action: SecretAction, secret: AdminIntegrationSecret) => void;
+  onAction: (action: SecretAction, secret: AdminIntegrationSecret | null) => void;
 }) {
   const headingId = `intg-provider-${integration.id}`;
   const name = labelText(t, providerLabel(integration.providerCode));
   const guide = providerGuide(integration.providerCode);
+  const runtime = providerRuntime(integration, storage);
   const isUntouched = integration.secrets.every((secret) => secret.state === "not_set");
   return (
     <section
@@ -168,6 +183,29 @@ function ProviderCard({
         {name}
       </h3>
       {guide === null ? null : <Guide t={t} guide={guide} open={isUntouched} />}
+      {canManage && (runtime.turnOn || runtime.turnOff) ? (
+        <div className="flex flex-wrap gap-2">
+          {runtime.turnOn ? (
+            <Button
+              disabled={busy}
+              aria-label={t("intg.action.turnOnLabel", { provider: name })}
+              onClick={() => onAction("turnOn", null)}
+            >
+              {t("intg.action.turnOn")}
+            </Button>
+          ) : null}
+          {runtime.turnOff ? (
+            <Button
+              variant="secondary"
+              disabled={busy}
+              aria-label={t("intg.action.turnOffLabel", { provider: name })}
+              onClick={() => onAction("turnOff", null)}
+            >
+              {t("intg.action.turnOff")}
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
       <ul className="flex flex-col gap-3">
         {integration.secrets.map((secret) => (
           <SecretRow
@@ -189,7 +227,7 @@ function ProviderCard({
 }
 
 /**
- * The Integrations screen: what a saved key is today (stored, not used), whether the server can store one at all, then the
+ * The Integrations screen: whether a saved email key is in use, whether the server can store one at all, then the
  * installed providers by kind. Props in, markup out; no secret ever reaches it.
  */
 export function IntegrationsListView({
@@ -211,7 +249,7 @@ export function IntegrationsListView({
   onAction: (
     action: SecretAction,
     integration: AdminIntegration,
-    secret: AdminIntegrationSecret,
+    secret: AdminIntegrationSecret | null,
   ) => void;
 }) {
   if (state.status !== "ready") return <ResourceFallback t={t} state={state} onRetry={onRetry} />;

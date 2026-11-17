@@ -854,6 +854,7 @@ const integration: Shape<Admin.AdminIntegration> = {
           generation: { nullable: "integer" },
           savedAt: { nullable: "string" },
           keyAvailable: { nullable: "boolean" },
+          versionState: { nullable: { enum: ["candidate", "active", "draining", "revoked"] } },
         },
       },
     },

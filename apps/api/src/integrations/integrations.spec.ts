@@ -33,6 +33,7 @@ interface SecretView {
   generation: number | null;
   savedAt: string | null;
   keyAvailable: boolean | null;
+  versionState: "candidate" | "active" | "draining" | "revoked" | null;
 }
 interface IntegrationView {
   id: string;
@@ -222,6 +223,7 @@ describe("admin integrations (real Postgres and Redis, session sign-in)", () => 
         generation: null,
         savedAt: null,
         keyAvailable: null,
+        versionState: null,
       });
       expect(secretOf(testmail, "webhook_secret").state).toBe("env");
       // A blank variable is no override.
@@ -310,7 +312,13 @@ describe("admin integrations (real Postgres and Redis, session sign-in)", () => 
       expect(result.body.revision).toBe(before.revision + 1);
       expect(after.revision).toBe(before.revision + 1);
       const view = secretOf(result.body.integration, "api_key");
-      expect(view).toMatchObject({ state: "set", last4: null, generation: 1, keyAvailable: true });
+      expect(view).toMatchObject({
+        state: "set",
+        last4: null,
+        generation: 1,
+        keyAvailable: true,
+        versionState: "candidate",
+      });
       expect(view.versionId).toMatch(/^[0-9a-f-]{36}$/);
       expect(view.savedAt).not.toBeNull();
       for (const text of [JSON.stringify(result.body), JSON.stringify(after), logged.join("")]) {

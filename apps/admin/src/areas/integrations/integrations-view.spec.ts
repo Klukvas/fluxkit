@@ -1,6 +1,12 @@
 import type { AdminIntegration, AdminIntegrationSecret } from "@fluxkit/api-client";
 import { describe, expect, it } from "vitest";
-import { groupByKind, providerLabel, secretFieldLabel, secretView } from "./integrations-view";
+import {
+  groupByKind,
+  providerLabel,
+  providerRuntime,
+  secretFieldLabel,
+  secretView,
+} from "./integrations-view";
 
 const VERSION = "33333333-3333-4333-8333-333333333333";
 
@@ -15,6 +21,7 @@ function secret(overrides: Partial<AdminIntegrationSecret> = {}): AdminIntegrati
     generation: null,
     savedAt: null,
     keyAvailable: null,
+    versionState: null,
     ...overrides,
   };
 }
@@ -36,7 +43,8 @@ const stored = {
   generation: 2,
   savedAt: "2026-11-16T11:00:00.000Z",
   keyAvailable: true,
-} as const;
+  versionState: "candidate" as const,
+};
 
 describe("labels", () => {
   it("translates the providers and fields the template ships and shows any other code as it is", () => {
@@ -82,6 +90,7 @@ describe("secretView", () => {
       needsReentry: false,
       enter: { mode: "enter", disabled: false },
       removableVersionId: null,
+      revocableVersionId: null,
     });
   });
 
@@ -129,5 +138,50 @@ describe("secretView", () => {
 
   it("names the server variable only while the server value is in force", () => {
     expect(secretView(secret({ state: "set", ...stored }), "ready").envVariable).toBeNull();
+  });
+
+  it("an active version is in use and can be revoked, not removed", () => {
+    expect(
+      secretView(secret({ state: "set", ...stored, versionState: "active" }), "ready"),
+    ).toMatchObject({
+      statusKey: "intg.state.active",
+      tone: "success",
+      removableVersionId: null,
+      revocableVersionId: VERSION,
+    });
+  });
+
+  it("a draining version can be revoked and is not offered for removal", () => {
+    expect(
+      secretView(secret({ state: "set", ...stored, versionState: "draining" }), "ready"),
+    ).toMatchObject({
+      removableVersionId: null,
+      revocableVersionId: VERSION,
+      statusKey: "intg.state.draining",
+    });
+  });
+});
+
+describe("providerRuntime", () => {
+  it("offers turn on only for an email provider whose outbound key is a candidate", () => {
+    const email = integration({
+      secrets: [secret({ state: "set", ...stored })],
+    });
+    expect(providerRuntime(email, "ready")).toEqual({ turnOn: true, turnOff: false });
+    expect(providerRuntime(email, "disabled")).toEqual({ turnOn: false, turnOff: false });
+    expect(providerRuntime({ ...email, enabled: true }, "ready")).toEqual({
+      turnOn: false,
+      turnOff: true,
+    });
+    expect(providerRuntime({ ...email, kind: "payment" }, "ready")).toEqual({
+      turnOn: false,
+      turnOff: false,
+    });
+    expect(
+      providerRuntime(
+        integration({ secrets: [secret({ state: "set", ...stored, versionState: "draining" })] }),
+        "ready",
+      ).turnOn,
+    ).toBe(false);
   });
 });

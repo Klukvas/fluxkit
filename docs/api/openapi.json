@@ -30190,6 +30190,12 @@
                                   "nullable": true,
                                   "description": "Whether this server holds the master key that sealed the stored value; false means it must be entered again. Null when nothing is stored.",
                                   "type": "boolean"
+                                },
+                                "versionState": {
+                                  "nullable": true,
+                                  "description": "`candidate`: saved, not used. `active`: new mail uses it. `draining`: turned off, mail already bound to it can finish. `revoked`: unusable. Null when nothing is stored.",
+                                  "type": "string",
+                                  "enum": ["candidate", "active", "draining", "revoked"]
                                 }
                               },
                               "required": [
@@ -30201,7 +30207,8 @@
                                 "versionId",
                                 "generation",
                                 "savedAt",
-                                "keyAvailable"
+                                "keyAvailable",
+                                "versionState"
                               ],
                               "additionalProperties": false
                             }
@@ -30367,6 +30374,12 @@
                                 "nullable": true,
                                 "description": "Whether this server holds the master key that sealed the stored value; false means it must be entered again. Null when nothing is stored.",
                                 "type": "boolean"
+                              },
+                              "versionState": {
+                                "nullable": true,
+                                "description": "`candidate`: saved, not used. `active`: new mail uses it. `draining`: turned off, mail already bound to it can finish. `revoked`: unusable. Null when nothing is stored.",
+                                "type": "string",
+                                "enum": ["candidate", "active", "draining", "revoked"]
                               }
                             },
                             "required": [
@@ -30378,7 +30391,8 @@
                               "versionId",
                               "generation",
                               "savedAt",
-                              "keyAvailable"
+                              "keyAvailable",
+                              "versionState"
                             ],
                             "additionalProperties": false
                           }
@@ -30613,6 +30627,12 @@
                                 "nullable": true,
                                 "description": "Whether this server holds the master key that sealed the stored value; false means it must be entered again. Null when nothing is stored.",
                                 "type": "boolean"
+                              },
+                              "versionState": {
+                                "nullable": true,
+                                "description": "`candidate`: saved, not used. `active`: new mail uses it. `draining`: turned off, mail already bound to it can finish. `revoked`: unusable. Null when nothing is stored.",
+                                "type": "string",
+                                "enum": ["candidate", "active", "draining", "revoked"]
                               }
                             },
                             "required": [
@@ -30624,7 +30644,8 @@
                               "versionId",
                               "generation",
                               "savedAt",
-                              "keyAvailable"
+                              "keyAvailable",
+                              "versionState"
                             ],
                             "additionalProperties": false
                           }
@@ -30876,6 +30897,12 @@
                                 "nullable": true,
                                 "description": "Whether this server holds the master key that sealed the stored value; false means it must be entered again. Null when nothing is stored.",
                                 "type": "boolean"
+                              },
+                              "versionState": {
+                                "nullable": true,
+                                "description": "`candidate`: saved, not used. `active`: new mail uses it. `draining`: turned off, mail already bound to it can finish. `revoked`: unusable. Null when nothing is stored.",
+                                "type": "string",
+                                "enum": ["candidate", "active", "draining", "revoked"]
                               }
                             },
                             "required": [
@@ -30887,7 +30914,8 @@
                               "versionId",
                               "generation",
                               "savedAt",
-                              "keyAvailable"
+                              "keyAvailable",
+                              "versionState"
                             ],
                             "additionalProperties": false
                           }
@@ -31134,6 +31162,12 @@
                                 "nullable": true,
                                 "description": "Whether this server holds the master key that sealed the stored value; false means it must be entered again. Null when nothing is stored.",
                                 "type": "boolean"
+                              },
+                              "versionState": {
+                                "nullable": true,
+                                "description": "`candidate`: saved, not used. `active`: new mail uses it. `draining`: turned off, mail already bound to it can finish. `revoked`: unusable. Null when nothing is stored.",
+                                "type": "string",
+                                "enum": ["candidate", "active", "draining", "revoked"]
                               }
                             },
                             "required": [
@@ -31145,7 +31179,8 @@
                               "versionId",
                               "generation",
                               "savedAt",
-                              "keyAvailable"
+                              "keyAvailable",
+                              "versionState"
                             ],
                             "additionalProperties": false
                           }
@@ -31392,6 +31427,12 @@
                                 "nullable": true,
                                 "description": "Whether this server holds the master key that sealed the stored value; false means it must be entered again. Null when nothing is stored.",
                                 "type": "boolean"
+                              },
+                              "versionState": {
+                                "nullable": true,
+                                "description": "`candidate`: saved, not used. `active`: new mail uses it. `draining`: turned off, mail already bound to it can finish. `revoked`: unusable. Null when nothing is stored.",
+                                "type": "string",
+                                "enum": ["candidate", "active", "draining", "revoked"]
                               }
                             },
                             "required": [
@@ -31403,7 +31444,8 @@
                               "versionId",
                               "generation",
                               "savedAt",
-                              "keyAvailable"
+                              "keyAvailable",
+                              "versionState"
                             ],
                             "additionalProperties": false
                           }
@@ -31655,6 +31697,12 @@
                                 "nullable": true,
                                 "description": "Whether this server holds the master key that sealed the stored value; false means it must be entered again. Null when nothing is stored.",
                                 "type": "boolean"
+                              },
+                              "versionState": {
+                                "nullable": true,
+                                "description": "`candidate`: saved, not used. `active`: new mail uses it. `draining`: turned off, mail already bound to it can finish. `revoked`: unusable. Null when nothing is stored.",
+                                "type": "string",
+                                "enum": ["candidate", "active", "draining", "revoked"]
                               }
                             },
                             "required": [
@@ -31666,7 +31714,8 @@
                               "versionId",
                               "generation",
                               "savedAt",
-                              "keyAvailable"
+                              "keyAvailable",
+                              "versionState"
                             ],
                             "additionalProperties": false
                           }
