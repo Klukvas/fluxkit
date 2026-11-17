@@ -122,6 +122,7 @@ export const customerTables: Inventory = {
       "route_provider_code",
       "pinned_provider_code",
       "pinned_at",
+      "integration_credential_version_id",
       "last_error_code",
       "resend_of",
       "updated_at",

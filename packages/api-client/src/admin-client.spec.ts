@@ -713,6 +713,7 @@ describe("integrations (ADR 0058)", () => {
     id: ID,
     kind: "email",
     providerCode: "resend",
+    enabled: false,
     secrets: [
       {
         field: "api_key",

@@ -112,7 +112,8 @@ export class StoreService {
   ) {}
 
   /** What the storefront needs to format money and pick a language; nothing else (no thresholds, no internals). */
-  getConfig(): StoreConfig {
+  async getConfig(): Promise<StoreConfig> {
+    await this.email.prepare?.();
     return {
       currency: this.pricing.shopCurrency,
       currencyExponent: exponentOf(this.pricing.shopCurrency),

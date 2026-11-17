@@ -11,8 +11,8 @@ import { EmailOutbox } from "../../email/outbox/index.js";
 export class EmailDeliveryGuard implements CanActivate {
   constructor(@Inject(EmailOutbox) private readonly outbox: EmailOutbox) {}
 
-  canActivate(): boolean {
-    if (!this.outbox.enabled()) {
+  async canActivate(): Promise<boolean> {
+    if (!(await this.outbox.enabled())) {
       throw new NotFoundException();
     }
     return true;

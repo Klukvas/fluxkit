@@ -77,6 +77,8 @@ export interface AppModuleOptions {
   payments?: PaymentsConfig;
   /** The loaded email provider package (`EMAIL_PROVIDER`): zero or one; defaults to none (`EMAIL_PROVIDER=none`). */
   emailProviders?: LoadedEmailProvider[];
+  /** `EMAIL_PROVIDER` is absent: boot loads no package and an activated stored credential may send. */
+  emailRouteDelegated?: boolean;
   /** `EMAIL_FROM`, `EMAIL_REPLY_TO`, `STOREFRONT_PUBLIC_URL` and the sender tuning; defaults to none of them (no provider). */
   emailDelivery?: EmailDeliveryConfig;
   locale: LocaleConfig;
@@ -169,7 +171,10 @@ export class AppModule {
         ShipmentsModule,
         PaymentRegistryModule.register(options.paymentProviders ?? []),
         PaymentsModule.register(options.payments ?? DEFAULT_PAYMENTS_CONFIG),
-        EmailRegistryModule.register(options.emailProviders ?? []),
+        EmailRegistryModule.register(
+          options.emailProviders ?? [],
+          options.emailRouteDelegated ?? false,
+        ),
         EmailSuppressionModule,
         EmailOutboxModule.register(
           options.emailDelivery ?? DISABLED_EMAIL_DELIVERY,

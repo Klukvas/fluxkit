@@ -428,6 +428,31 @@ export const ADMIN_OPERATIONS = {
     "integrations.manage",
     { body: "json" },
   ),
+  activateIntegration: operation(
+    "POST",
+    "/admin/integrations/{id}/activate",
+    [200],
+    "integrations.manage",
+    {
+      body: "json",
+    },
+  ),
+  disableIntegration: operation(
+    "POST",
+    "/admin/integrations/{id}/disable",
+    [200],
+    "integrations.manage",
+    {
+      body: "json",
+    },
+  ),
+  revokeIntegrationSecret: operation(
+    "POST",
+    "/admin/integrations/{id}/revoke-secret",
+    [200],
+    "integrations.manage",
+    { body: "json" },
+  ),
   createCategory: operation("POST", "/admin/categories", [201], "catalog.write", { body: "json" }),
   listCategories: operation("GET", "/admin/categories", [200], "catalog.read", {
     query: ["parentId", "limit", "offset"],

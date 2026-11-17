@@ -60,5 +60,8 @@
   "audit.target.integration": "Інтеграція",
   "audit.action.admin_user.step_up_failed": "Неправильний пароль під час захищеної дії",
   "audit.action.integration.secret_changed": "Ключ інтеграції збережено",
-  "audit.action.integration.secret_retired": "Ключ інтеграції вилучено"
+  "audit.action.integration.secret_retired": "Ключ інтеграції вилучено",
+  "audit.action.integration.activated": "Інтеграцію ввімкнено",
+  "audit.action.integration.disabled": "Інтеграцію вимкнено",
+  "audit.action.integration.revoked": "Ключ інтеграції відкликано"
 }

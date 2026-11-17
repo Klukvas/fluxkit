@@ -156,6 +156,9 @@ describe("the audit query in the URL", () => {
         "admin_user.step_up_failed",
         "integration.secret_changed",
         "integration.secret_retired",
+        "integration.activated",
+        "integration.disabled",
+        "integration.revoked",
       ].sort(),
     );
   });

@@ -37,6 +37,7 @@ export {
 } from "./http.js";
 export { RESEND_CATEGORY_TAG, resendBodyOf, type ResendEmailBody } from "./request.js";
 export { RESEND_PROVIDER_CODE, ResendEmailProvider, type ResendLogger } from "./resend-provider.js";
+export { createOutboundClient } from "./outbound-client.js";
 export { createResendWebhookVerifier } from "./webhook.js";
 
 /**

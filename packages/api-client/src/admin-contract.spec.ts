@@ -816,6 +816,9 @@ const auditEventList: Shape<Admin.AdminAuditEventList> = paginated({
         "admin_user.step_up_failed",
         "integration.secret_changed",
         "integration.secret_retired",
+        "integration.activated",
+        "integration.disabled",
+        "integration.revoked",
       ],
     },
     targetKind: {
@@ -838,6 +841,7 @@ const integration: Shape<Admin.AdminIntegration> = {
     id: "string",
     kind: { enum: ["email", "payment", "shipping"] },
     providerCode: "string",
+    enabled: "boolean",
     secrets: {
       array: {
         object: {
@@ -1444,6 +1448,15 @@ const body = {
   retireIntegrationSecret: {
     object: { expectedRevision: "integer", versionId: "string", currentPassword: "string" },
   } satisfies Shape<Admin.RetireAdminIntegrationSecretBody>,
+  activateIntegration: {
+    object: { expectedRevision: "integer", currentPassword: "string" },
+  } satisfies Shape<Admin.AdminIntegrationChangeBody>,
+  disableIntegration: {
+    object: { expectedRevision: "integer", currentPassword: "string" },
+  } satisfies Shape<Admin.AdminIntegrationChangeBody>,
+  revokeIntegrationSecret: {
+    object: { expectedRevision: "integer", versionId: "string", currentPassword: "string" },
+  } satisfies Shape<Admin.RetireAdminIntegrationSecretBody>,
   createBrand: {
     object: {
       name: localized,
@@ -1748,6 +1761,9 @@ const RESPONSE_SHAPES: { [N in AdminOperationName]: ResponseShapeOf<N> } = {
   getIntegration: integrationDetail,
   putIntegrationSecret: integrationDetail,
   retireIntegrationSecret: integrationDetail,
+  activateIntegration: integrationDetail,
+  disableIntegration: integrationDetail,
+  revokeIntegrationSecret: integrationDetail,
   privacyLookup,
   listPrivacyRequests: paginated(privacyRequest),
   createPrivacyRequest: privacyRequest,
@@ -1892,6 +1908,9 @@ const REQUEST_SHAPES: { [N in AdminOperationName]: RequestShapeOf<N> } = {
   getIntegration: null,
   putIntegrationSecret: body.putIntegrationSecret,
   retireIntegrationSecret: body.retireIntegrationSecret,
+  activateIntegration: body.activateIntegration,
+  disableIntegration: body.disableIntegration,
+  revokeIntegrationSecret: body.revokeIntegrationSecret,
   privacyLookup: body.privacyLookup,
   listPrivacyRequests: null,
   createPrivacyRequest: body.createPrivacyRequest,

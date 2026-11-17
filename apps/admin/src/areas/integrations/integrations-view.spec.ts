@@ -24,6 +24,7 @@ function integration(overrides: Partial<AdminIntegration> = {}): AdminIntegratio
     id: "11111111-1111-4111-8111-111111111111",
     kind: "email",
     providerCode: "resend",
+    enabled: false,
     secrets: [secret()],
     updatedAt: "2026-11-16T10:00:00.000Z",
     ...overrides,

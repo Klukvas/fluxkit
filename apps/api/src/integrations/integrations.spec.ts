@@ -811,6 +811,34 @@ describe("admin integrations (real Postgres and Redis, session sign-in)", () => 
       }
     });
   });
+
+  it("refuses to activate while EMAIL_PROVIDER is selected, and refuses payment", async () => {
+    const session = await signIn();
+    const testmail = await integrationOf(session, "testmail");
+    const payment = await integrationOf(session, "testpay");
+    const { revision } = await listOf(session);
+    const email = await session.call<ProblemBody>(
+      "POST",
+      `/admin/integrations/${testmail.id}/activate`,
+      {
+        expectedRevision: revision,
+        currentPassword: PASSWORD,
+      },
+    );
+    expect(email.status).toBe(409);
+    expect(email.body.rule).toBe("integration_env_override");
+    const online = await session.call<ProblemBody>(
+      "POST",
+      `/admin/integrations/${payment.id}/activate`,
+      { expectedRevision: revision, currentPassword: PASSWORD },
+    );
+    expect(online.status).toBe(409);
+    expect(online.body.rule).toBe("integration_runtime_not_ready");
+    const audits = await db.execute(
+      sql`select 1 from admin_audit_event where admin_user_id = ${session.user.id}::uuid and action = 'admin_user.step_up_failed'`,
+    );
+    expect(audits.rows).toEqual([]);
+  });
 });
 
 describe("admin integrations without Redis", () => {

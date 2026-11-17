@@ -37,6 +37,7 @@ export {
 } from "./http.js";
 export { brevoBodyOf, type BrevoEmailBody } from "./request.js";
 export { BREVO_PROVIDER_CODE, BrevoEmailProvider, type BrevoLogger } from "./brevo-provider.js";
+export { createOutboundClient } from "./outbound-client.js";
 export { createBrevoWebhookVerifier } from "./webhook.js";
 
 /**

@@ -13,6 +13,8 @@ describe("InstalledIntegrations", () => {
     providersDir: fixture.dir,
     isProduction: false,
     environment: {},
+    emailRouteDelegated: false,
+    emailFromAddress: null,
     ...overrides,
   });
 

@@ -128,6 +128,8 @@ export interface StartAppOptions {
   integrationProvidersDir?: string;
   /** The environment the integration store checks for overrides; defaults to an empty one. */
   integrationEnvironment?: Readonly<Record<string, string | undefined>>;
+  /** `EMAIL_PROVIDER` is absent: an activated stored credential may send. Defaults to the env-selected provider. */
+  emailRouteDelegated?: boolean;
 }
 
 export async function startApp(options: StartAppOptions = {}): Promise<RunningApp> {
@@ -151,6 +153,7 @@ export async function startApp(options: StartAppOptions = {}): Promise<RunningAp
       orderGuestAccessDays: options.orderGuestAccessDays,
       orderTokenSecret: options.orderTokenSecret ?? TEST_ORDER_TOKEN_SECRET,
       secretsKeyRing: options.secretsKeyRing ?? null,
+      emailProviderDelegated: options.emailRouteDelegated ?? false,
       emailFrom: options.emailFrom === null ? undefined : (options.emailFrom ?? TEST_EMAIL_FROM),
       emailReplyTo: options.emailReplyTo ?? undefined,
       storefrontPublicUrl:

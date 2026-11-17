@@ -68,7 +68,7 @@ export class OrderMailHandler implements DomainEventHandler {
     }
     const type = event.type as HandledEventType;
     const templateKey = MAIL_OF_EVENT[type];
-    if (!this.outbox.enabled()) {
+    if (!(await this.outbox.enabled())) {
       this.logger.debug(`${type} ${event.id}: no mail (email_disabled)`);
       return;
     }

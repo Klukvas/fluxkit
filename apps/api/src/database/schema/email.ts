@@ -15,6 +15,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { adminUser } from "./admin-auth.js";
 import { customer } from "./customers.js";
+import { integrationCredentialVersion } from "./integrations.js";
 import { salesOrder } from "./orders.js";
 
 /**
@@ -113,6 +114,8 @@ export const emailMessage = pgTable(
     routeProviderCode: text("route_provider_code"),
     pinnedProviderCode: text("pinned_provider_code"),
     pinnedAt: timestamp("pinned_at", { withTimezone: true }),
+    // The credential version this mail is bound to (ADR 0058). Null while the provider key comes from the environment.
+    integrationCredentialVersionId: uuid("integration_credential_version_id"),
     lastErrorCode: text("last_error_code"),
     resendOf: uuid("resend_of"),
     // The admin who made a resend or a test send.
@@ -139,6 +142,11 @@ export const emailMessage = pgTable(
       foreignColumns: [adminUser.id],
     }).onDelete("set null"),
     // A purged original leaves its resends in place.
+    foreignKey({
+      name: "email_message_integration_credential_version_id_fkey",
+      columns: [t.integrationCredentialVersionId],
+      foreignColumns: [integrationCredentialVersion.id],
+    }).onDelete("restrict"),
     foreignKey({
       name: "email_message_resend_of_fkey",
       columns: [t.resendOf],

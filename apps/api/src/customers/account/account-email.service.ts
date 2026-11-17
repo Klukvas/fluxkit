@@ -285,7 +285,7 @@ export class AccountEmailService {
     email: string,
     locale: string,
   ): Promise<{ code: ResetRequestOutcome; messageId?: string }> {
-    if (!this.tokens.enabled()) {
+    if (!(await this.tokens.enabled())) {
       // The route is off without a provider (EmailDeliveryGuard); a caller of the service gets nothing written.
       return { code: "disabled" };
     }

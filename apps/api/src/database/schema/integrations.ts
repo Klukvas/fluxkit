@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   bigint,
+  boolean,
   check,
   customType,
   foreignKey,
@@ -68,6 +69,9 @@ export const integration = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     kind: text("kind").notNull(),
     providerCode: text("provider_code").notNull(),
+    // False until an owner activates a stored credential. The pointer names the outbound version new work uses.
+    enabled: boolean("enabled").notNull().default(false),
+    activeOutboundVersionId: uuid("active_outbound_version_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     updatedBy: uuid("updated_by"),
@@ -83,6 +87,11 @@ export const integration = pgTable(
     check(
       "integration_provider_code_check",
       sql`${t.providerCode} ~ ${sql.raw(`'${PROVIDER_CODE_PATTERN}'`)}`,
+    ),
+    // Enabled means a version is selected. Disabled may still point at a draining version for work already admitted.
+    check(
+      "integration_enabled_pointer_check",
+      sql`${t.enabled} = false OR ${t.activeOutboundVersionId} IS NOT NULL`,
     ),
   ],
 );

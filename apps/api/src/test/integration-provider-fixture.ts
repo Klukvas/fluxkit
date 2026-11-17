@@ -29,6 +29,23 @@ export function validateIntegrationSecret(field, value) {
   if (rule === undefined) return "Unknown secret field.";
   return rule.test(value) ? undefined : "Must be the test prefix and 12 to 64 letters or digits (the value is not shown).";
 }
+const sent = [];
+export function createOutboundClient(secrets) {
+  if (validateIntegrationSecret("api_key", secrets.api_key) !== undefined) {
+    throw new Error("The stored outbound secret is not valid.");
+  }
+  return {
+    code: "testmail",
+    capabilities: Object.freeze({ idempotencyKeys: true, maxRecipients: 1 }),
+    async send(_message, options) {
+      sent.push(options.idempotencyKey);
+      return { ok: true, value: { providerMessageId: "fixture-" + String(sent.length) } };
+    },
+  };
+}
+export function sentMessageIds() {
+  return sent.slice();
+}
 `;
 
 async function writePackage(

@@ -661,6 +661,11 @@ export interface AppEnv {
    * provider package the API loads; ordered fallbacks are additive. `fake` is test-only and refused in production.
    */
   emailProvider: EmailProviderChoice;
+  /**
+   * True only when `EMAIL_PROVIDER` is absent. A present value, including blank, keeps today's selection (blank means
+   * off). Absent delegates the choice to an activated stored credential; boot still loads no provider package.
+   */
+  emailProviderDelegated: boolean;
   /** Ordered fallback codes; empty preserves single-provider/off behaviour. */
   emailFallbackProviders: string[];
   /** Advisory caps only; missing providers use defaults. */
@@ -820,6 +825,7 @@ export function loadEnv(source: Record<string, string | undefined>): AppEnv {
     enabledShippingProviders: parseEnabledShippingProviders(env.SHIPPING_PROVIDERS_ENABLED),
     enabledPaymentProviders: enabledPaymentProviders(env.PAYMENT_PROVIDERS_ENABLED),
     emailProvider: env.EMAIL_PROVIDER ?? DEFAULT_EMAIL_PROVIDER,
+    emailProviderDelegated: source.EMAIL_PROVIDER === undefined,
     ...emailRoutingValues(
       env.EMAIL_PROVIDER ?? DEFAULT_EMAIL_PROVIDER,
       env.EMAIL_FALLBACK_PROVIDERS,

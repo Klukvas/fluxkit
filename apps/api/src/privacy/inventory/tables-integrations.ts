@@ -10,7 +10,16 @@ export const integrationTables: Inventory = {
   integration_revision: none("D26", "id", "revision", "updated_at"),
 
   integration: {
-    ...none("D26", "id", "kind", "provider_code", "created_at", "updated_at"),
+    ...none(
+      "D26",
+      "id",
+      "kind",
+      "provider_code",
+      "enabled",
+      "active_outbound_version_id",
+      "created_at",
+      "updated_at",
+    ),
     updated_by: classified("staff", "D26", "excluded", "set_null", ACTOR_REASON),
   },
 

@@ -43,6 +43,12 @@ export const retireIntegrationSecretSchema = z.strictObject({
 });
 export type RetireIntegrationSecretBody = z.infer<typeof retireIntegrationSecretSchema>;
 
+export const integrationMutationSchema = z.strictObject({
+  expectedRevision,
+  currentPassword,
+});
+export type IntegrationMutationBody = z.infer<typeof integrationMutationSchema>;
+
 export const integrationSecretSchema = z.object({
   field: z.string(),
   purpose: z.enum(INTEGRATION_SECRET_PURPOSES),
@@ -69,6 +75,10 @@ export const integrationSchema = z.object({
   id: uuidSchema,
   kind: z.enum(INTEGRATION_KINDS),
   providerCode: z.string(),
+  enabled: z.boolean().meta({
+    description:
+      "True when new mail uses the stored outbound credential. Payment and shipping stay false until their safety checks exist.",
+  }),
   secrets: z.array(integrationSecretSchema),
   updatedAt: timestampSchema,
 });
