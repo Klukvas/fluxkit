@@ -139,6 +139,9 @@ const INTEGRATIONS_ROUTES = [
   "GET /admin/integrations/:id",
   "PUT /admin/integrations/:id/secrets/:field",
   "POST /admin/integrations/:id/retire-secret",
+  "POST /admin/integrations/:id/activate",
+  "POST /admin/integrations/:id/disable",
+  "POST /admin/integrations/:id/revoke-secret",
 ];
 
 /** The one route under /admin/products that needs an order permission: it links the orders that hold a variant's units. */

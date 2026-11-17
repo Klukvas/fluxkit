@@ -257,6 +257,9 @@ export const emailMessage = pgTable(
     index("email_message_admin_user_id_idx").on(t.adminUserId),
     index("email_message_resend_of_idx").on(t.resendOf),
     index("email_message_created_by_admin_id_idx").on(t.createdByAdminId),
+    index("email_message_integration_credential_version_id_idx").on(
+      t.integrationCredentialVersionId,
+    ),
   ],
 );
 

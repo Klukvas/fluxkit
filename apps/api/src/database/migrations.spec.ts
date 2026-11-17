@@ -402,6 +402,13 @@ describe("migrations", () => {
 
   async function dropEverything(): Promise<void> {
     await pool.query('drop schema if exists "drizzle" cascade');
+    // 0020 points email_message and integration at a credential version. Drop those links first: the tables form a cycle.
+    await pool.query(
+      'alter table if exists "email_message" drop constraint if exists "email_message_integration_credential_version_id_fkey"',
+    );
+    await pool.query(
+      'alter table if exists "integration" drop constraint if exists "integration_active_outbound_version_id_fkey"',
+    );
     for (const name of [...integrationTables].reverse()) {
       await pool.query(`drop table if exists "${name}"`);
     }

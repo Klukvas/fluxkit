@@ -16,6 +16,7 @@ END $$;
 DROP TRIGGER IF EXISTS "integration_outbound_version_same_row" ON "integration";
 DROP FUNCTION IF EXISTS "integration_outbound_version_same_row"();
 ALTER TABLE "email_message" DROP CONSTRAINT "email_message_integration_credential_version_id_fkey";
+DROP INDEX "email_message_integration_credential_version_id_idx";
 ALTER TABLE "integration" DROP CONSTRAINT "integration_active_outbound_version_id_fkey";
 ALTER TABLE "integration" DROP CONSTRAINT "integration_enabled_pointer_check";
 ALTER TABLE "email_message" DROP COLUMN "integration_credential_version_id";
