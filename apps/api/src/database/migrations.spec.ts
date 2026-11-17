@@ -536,7 +536,8 @@ describe("migrations", () => {
     const legacyRows = async () =>
       (
         await pool.query(
-          `select to_jsonb(t) - 'pinned_provider_code' - 'pinned_at' - 'route_provider_code' as row
+          `select to_jsonb(t) - 'pinned_provider_code' - 'pinned_at' - 'route_provider_code'
+             - 'integration_credential_version_id' as row
            from email_message t where id = any($1) order by id`,
           [ids],
         )
@@ -610,6 +611,18 @@ describe("migrations", () => {
         ).toEqual([
           { pinned_provider_code: null, pinned_at: null },
           { pinned_provider_code: null, pinned_at: null },
+        ]);
+        expect(
+          (
+            await pool.query(
+              "select integration_credential_version_id from email_message where id = any($1) order by id",
+              [ids],
+            )
+          ).rows,
+        ).toEqual([
+          { integration_credential_version_id: null },
+          { integration_credential_version_id: null },
+          { integration_credential_version_id: null },
         ]);
         const beforeDownRefusal = await legacyRows();
         await rejectDown("email_pin_rollback_incompatible");
@@ -1749,7 +1762,7 @@ describe("migrations", () => {
         `select
            (select coalesce(jsonb_agg(to_jsonb(t) - 'contact_erased_at' order by t.id), '[]') from "sales_order" t) as orders,
            (select coalesce(jsonb_agg(to_jsonb(t) order by t.id), '[]') from "order_status_change" t) as changes,
-           (select coalesce(jsonb_agg(to_jsonb(t) - 'pinned_at' - 'pinned_provider_code' - 'route_provider_code' order by t.id), '[]') from "email_message" t) as mails,
+           (select coalesce(jsonb_agg(to_jsonb(t) - 'pinned_at' - 'pinned_provider_code' - 'route_provider_code' - 'integration_credential_version_id' order by t.id), '[]') from "email_message" t) as mails,
            (select coalesce(jsonb_agg(to_jsonb(t) order by t.id), '[]') from "admin_user" t) as admins`,
       );
       return result.rows[0];
@@ -1764,8 +1777,14 @@ describe("migrations", () => {
     expect(await existingPaymentTables()).toEqual([...paymentTables]);
     expect(await ordersSnapshot()).toEqual(before);
     expect(
-      (await pool.query("select pinned_at, pinned_provider_code from email_message")).rows,
-    ).toEqual([{ pinned_at: null, pinned_provider_code: null }]);
+      (
+        await pool.query(
+          "select pinned_at, pinned_provider_code, integration_credential_version_id from email_message",
+        )
+      ).rows,
+    ).toEqual([
+      { pinned_at: null, pinned_provider_code: null, integration_credential_version_id: null },
+    ]);
 
     // Use the new tables against the old orders: a live attempt, a succeeded one with a journal row and a refund.
     await pool.query(
