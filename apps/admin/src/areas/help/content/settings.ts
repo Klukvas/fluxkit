@@ -116,8 +116,8 @@ export const SETTINGS_ARTICLES: readonly HelpArticle[] = [
     topic: "settings",
     title: { uk: "Інтеграції та ключі сервісів", en: "Integrations and service keys" },
     summary: {
-      uk: "Де ввести ключі API сервісів пошти, оплати та доставки, як вони зберігаються і чому ще не використовуються.",
-      en: "Where to enter the API keys of the email, payment and delivery services, how they are stored and why they are not used yet.",
+      uk: "Де ввести ключі API сервісів пошти, оплати та доставки, як вони зберігаються і коли починають працювати.",
+      en: "Where to enter the API keys of the email, payment and delivery services, how they are stored and when they start working.",
     },
     keywords: {
       uk: ["ключ", "токен", "інтеграція", "вебхук", "секрет", "api"],
@@ -135,8 +135,8 @@ export const SETTINGS_ARTICLES: readonly HelpArticle[] = [
       {
         kind: "warning",
         text: {
-          uk: "Збережений ключ поки що не використовується. Сервіси й далі працюють із ключами, заданими на сервері; перехід на збережені ключі з’явиться в одному з наступних оновлень.",
-          en: "A saved key is not used yet. The services keep working with the keys set on the server; switching to saved keys comes in a later update.",
+          uk: "Збережений ключ лишається вимкненим, доки його не ввімкнуть. Цей екран його зберігає і не вмикає. Оплата та доставка й далі працюють із ключами, заданими на сервері.",
+          en: "A saved key stays off until it is activated. This screen stores it and does not turn it on. Payment and delivery still use the keys set on the server.",
         },
       },
       { kind: "screen", route: "integrations" },

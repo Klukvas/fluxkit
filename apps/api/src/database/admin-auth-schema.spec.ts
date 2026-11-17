@@ -39,6 +39,13 @@ describe("admin auth schema (real Postgres)", () => {
 
   async function dropEverything(): Promise<void> {
     await pool.query('drop schema if exists "drizzle" cascade');
+    // 0020 points email_message and integration at a credential version. Drop those links first: the tables form a cycle.
+    await pool.query(
+      'alter table if exists "email_message" drop constraint if exists "email_message_integration_credential_version_id_fkey"',
+    );
+    await pool.query(
+      'alter table if exists "integration" drop constraint if exists "integration_active_outbound_version_id_fkey"',
+    );
     // Reverse dependency order, no CASCADE (same reasoning as migrations.spec.ts).
     for (const name of [
       "integration_secret",

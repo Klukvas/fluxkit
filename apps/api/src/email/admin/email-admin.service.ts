@@ -91,6 +91,7 @@ export class EmailAdminService {
   ) {}
 
   async status(): Promise<EmailStatusResponse> {
+    await this.providers.prepare?.();
     const asOf = this.clock.now();
     const since = new Date(asOf.getTime() - STATUS_WINDOW_HOURS * HOUR_MS);
     return this.database.transaction(
@@ -135,6 +136,7 @@ export class EmailAdminService {
 
   /** Sends `admin.test` to the CALLER's own address only: the body has no recipient (ADR 0031 decision 15). */
   async sendTest(admin: AdminPrincipal, body: SendTestEmailBody): Promise<EmailMessageIdResponse> {
+    await this.providers.prepare?.();
     const provider = this.providers.get();
     if (provider === undefined) {
       throw NOT_CONFIGURED();
@@ -228,6 +230,7 @@ export class EmailAdminService {
       if (original === undefined) {
         throw notFound("Email message");
       }
+      await this.providers.prepare?.();
       if (!this.providers.deliveryEnabled()) {
         throw NOT_CONFIGURED();
       }

@@ -11,6 +11,10 @@ export interface IntegrationsConfig {
   readonly isProduction: boolean;
   /** The process environment as read at start: only whether a declared variable is set is ever looked at. */
   readonly environment: Readonly<Record<string, string | undefined>>;
+  /** True when `EMAIL_PROVIDER` is absent, so an activated stored credential may send. */
+  readonly emailRouteDelegated: boolean;
+  /** The effective `EMAIL_FROM` address. Email cannot be activated without one. */
+  readonly emailFromAddress: string | null;
 }
 
 /** A caller without an environment (the OpenAPI export, the commands): nothing installed is offered, nothing is stored. */
@@ -19,4 +23,6 @@ export const DISABLED_INTEGRATIONS_CONFIG: IntegrationsConfig = Object.freeze({
   providersDir: "",
   isProduction: false,
   environment: Object.freeze({}),
+  emailRouteDelegated: false,
+  emailFromAddress: null,
 });

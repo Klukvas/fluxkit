@@ -21,6 +21,9 @@ export const ADMIN_AUDIT_ACTIONS = Object.freeze([
   "admin_user.step_up_failed",
   "integration.secret_changed",
   "integration.secret_retired",
+  "integration.activated",
+  "integration.disabled",
+  "integration.revoked",
 ] as const);
 
 export type AdminAuditAction = (typeof ADMIN_AUDIT_ACTIONS)[number];

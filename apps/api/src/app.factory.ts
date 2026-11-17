@@ -73,6 +73,7 @@ export type CreateAppEnv = Pick<AppEnv, "databaseUrl" | "enabledFeatures" | "fea
       AppEnv,
       | "defaultLocale"
       | "emailProvider"
+      | "emailProviderDelegated"
       | "emailFallbackProviders"
       | "emailUsageLimits"
       | "emailFrom"
@@ -181,6 +182,8 @@ function integrationsConfigOf(env: CreateAppEnv, options: CreateAppOptions): Int
     providersDir: options.integrationProvidersDir ?? DEFAULT_SHIPPING_PROVIDERS_DIR,
     isProduction: (environment["NODE_ENV"] ?? "").trim().toLowerCase() === "production",
     environment,
+    emailRouteDelegated: env.emailProviderDelegated ?? false,
+    emailFromAddress: env.emailFrom?.address ?? null,
   };
 }
 
@@ -202,11 +205,14 @@ export async function createApp(
     enabled: env.enabledPaymentProviders ?? [],
     providersDir: options.paymentProvidersDir ?? DEFAULT_PAYMENT_PROVIDERS_DIR,
   });
-  const emailProviders = await loadEmailProvider({
-    provider: env.emailProvider ?? "none",
-    fallbacks: env.emailFallbackProviders ?? [],
-    providersDir: options.emailProvidersDir ?? DEFAULT_EMAIL_PROVIDERS_DIR,
-  });
+  const emailDelegated = env.emailProviderDelegated ?? false;
+  const emailProviders = emailDelegated
+    ? []
+    : await loadEmailProvider({
+        provider: env.emailProvider ?? "none",
+        fallbacks: env.emailFallbackProviders ?? [],
+        providersDir: options.emailProvidersDir ?? DEFAULT_EMAIL_PROVIDERS_DIR,
+      });
   const app = await NestFactory.create<NestExpressApplication>(
     AppModule.register({
       databaseUrl: env.databaseUrl,
@@ -220,6 +226,7 @@ export async function createApp(
           options.paymentCallTimeoutMs ?? DEFAULT_PAYMENTS_CONFIG.providerTimeoutMs,
       },
       emailProviders: [...emailProviders, ...(options.extraEmailProviders ?? [])],
+      emailRouteDelegated: emailDelegated,
       emailDelivery: {
         from: env.emailFrom ?? null,
         usageLimits: env.emailUsageLimits ?? {},

@@ -18,7 +18,7 @@ export class StoreConfigController {
   })
   @ApiZodResponse(200, storeConfigSchema, "The public store settings.")
   @ApiProblemResponses(429)
-  get(): StoreConfig {
+  get(): Promise<StoreConfig> {
     return this.store.getConfig();
   }
 }

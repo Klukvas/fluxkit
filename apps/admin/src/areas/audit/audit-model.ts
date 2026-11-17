@@ -31,7 +31,7 @@ const ACTION_VERBS = {
   ],
   privacy: ["lookup", "exported", "erased", "request_changed"],
   email_suppression: ["removed"],
-  integration: ["secret_changed", "secret_retired"],
+  integration: ["secret_changed", "secret_retired", "activated", "disabled", "revoked"],
 } as const;
 
 type DerivedAction = {

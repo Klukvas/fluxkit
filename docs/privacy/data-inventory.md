@@ -50,7 +50,7 @@ Purposes and legal bases are proposals taken from the plan. TODO(fluxkit): legal
 | `customer_session` | `expires_at` | pseudonymous (Q) | D3 | excluded | cascade | Derived from the created time and the configured limits. |
 | `domain_event` | `id`, `type`, `created_at`, `dispatched_at`, `attempts`, `last_error_code` | none | D17 | not_applicable | not_applicable |  |
 | `domain_event` | `aggregate_id`, `payload` | pseudonymous (Q) | D17 | excluded | keep | Ids only, by rule (docs/contracts/events.md); deleted by job 4 seven days after dispatch. |
-| `email_message` | `id`, `template_version`, `attempts`, `next_attempt_at`, `lease_until`, `deadline_at`, `provider_code`, `route_provider_code`, `pinned_provider_code`, `pinned_at`, `last_error_code`, `resend_of`, `updated_at` | none | D16 | not_applicable | not_applicable |  |
+| `email_message` | `id`, `template_version`, `attempts`, `next_attempt_at`, `lease_until`, `deadline_at`, `provider_code`, `route_provider_code`, `pinned_provider_code`, `pinned_at`, `integration_credential_version_id`, `last_error_code`, `resend_of`, `updated_at` | none | D16 | not_applicable | not_applicable |  |
 | `email_message` | `to_address` | personal (P) | D16 | excluded | delete_row | The account email is exported once; the mail export lists template key, status and times only. |
 | `email_message` | `variables` | personal (P) | D16 | excluded | delete_row | Order lines, totals and a tracking number for rendering; no rendered body is stored. |
 | `email_message` | `template_key`, `locale`, `recipient_kind`, `status`, `created_at`, `sent_at` | pseudonymous (Q) | D16 | included | delete_row |  |
@@ -63,7 +63,7 @@ Purposes and legal bases are proposals taken from the plan. TODO(fluxkit): legal
 | `email_webhook_receipt` | `provider_code`, `event_key`, `event_at`, `received_at` | pseudonymous (Q) | D16 | excluded | delete_row | Internal retry receipt; expires eight days after receipt or on verified-address erasure. Never exported. |
 | `email_webhook_receipt` | `to_address` | personal (P) | D16 | excluded | delete_row | Normalized address for scoped erasure; job 10 deletes receipts after eight days. No repeated address in export. |
 | `health_check` | all 2 columns | none | D24 | not_applicable | not_applicable | |
-| `integration` | `id`, `kind`, `provider_code`, `created_at`, `updated_at` | none | D26 | not_applicable | not_applicable |  |
+| `integration` | `id`, `kind`, `provider_code`, `enabled`, `active_outbound_version_id`, `created_at`, `updated_at` | none | D26 | not_applicable | not_applicable |  |
 | `integration` | `updated_by` | staff (S) | D26 | excluded | set_null | Admin actor id; admin ids are not exported. |
 | `integration_credential_version` | `id`, `integration_id`, `generation`, `purpose`, `state`, `created_at`, `retired_at`, `revoked_at` | none | D26 | not_applicable | not_applicable |  |
 | `integration_credential_version` | `created_by` | staff (S) | D26 | excluded | set_null | Admin actor id; admin ids are not exported. |

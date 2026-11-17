@@ -1011,6 +1011,8 @@ export interface AdminIntegration {
   id: string;
   kind: AdminIntegrationKind;
   providerCode: string;
+  /** True when new mail uses the stored outbound credential. */
+  enabled: boolean;
   secrets: AdminIntegrationSecret[];
   updatedAt: string;
 }
@@ -1042,6 +1044,11 @@ export interface RetireAdminIntegrationSecretBody {
   currentPassword: string;
 }
 
+export interface AdminIntegrationChangeBody {
+  expectedRevision: number;
+  currentPassword: string;
+}
+
 // ---- admin audit log (ADR 0033 decision 9; `users.manage`)
 
 export type AdminAuditAction =
@@ -1060,7 +1067,10 @@ export type AdminAuditAction =
   | "email_suppression.removed"
   | "admin_user.step_up_failed"
   | "integration.secret_changed"
-  | "integration.secret_retired";
+  | "integration.secret_retired"
+  | "integration.activated"
+  | "integration.disabled"
+  | "integration.revoked";
 
 export type AdminAuditTargetKind =
   "customer" | "order" | "admin_user" | "privacy_request" | "email_suppression" | "integration";

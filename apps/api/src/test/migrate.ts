@@ -109,7 +109,7 @@ export async function ensureMigrated(
     }
     // Dropping a table does not drop the sequence of 0010 (its column default only uses it).
     await client.query('drop sequence if exists "public"."search_sync_seq"');
-    // Dropping a table does not drop the trigger functions of migrations 0003, 0004, 0006, 0008, 0009 and 0011; leaving one would make the migration fail.
+    // Dropping a table does not drop the trigger functions of migrations 0003, 0004, 0006, 0008, 0009, 0011 and 0020; leaving one would make the migration fail.
     for (const name of [
       "append_only_refuse_truncate",
       "admin_audit_event_append_only",
@@ -120,6 +120,7 @@ export async function ensureMigrated(
       "order_status_change_append_only",
       "order_shipping_immutable",
       "shipment_status_change_append_only",
+      "integration_outbound_version_same_row",
     ]) {
       await client.query(`drop function if exists "public".${client.escapeIdentifier(name)}()`);
     }

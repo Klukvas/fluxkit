@@ -23,6 +23,8 @@ import {
   IntegrationUnavailableError,
   type InstalledIntegration,
 } from "./installed-integrations.js";
+import { INTEGRATIONS_CONFIG, type IntegrationsConfig } from "./integrations.config.js";
+import { IntegrationRuntime } from "./integration-runtime.js";
 import {
   IntegrationsRepository,
   type IntegrationRow,
@@ -31,6 +33,7 @@ import {
 import type {
   IntegrationDetailResponse,
   IntegrationListResponse,
+  IntegrationMutationBody,
   IntegrationResponse,
   PutIntegrationSecretBody,
   RetireIntegrationSecretBody,
@@ -46,6 +49,12 @@ export const INTEGRATION_RULES = Object.freeze({
   revisionStale: "integration_revision_stale",
   unavailable: "integration_unavailable",
   notRetirable: "integration_version_not_retirable",
+  notRevocable: "integration_version_not_revocable",
+  runtimeNotReady: "integration_runtime_not_ready",
+  senderRequired: "integration_sender_required",
+  routeUnset: "integration_route_unset",
+  notActivatable: "integration_not_activatable",
+  notEnabled: "integration_not_enabled",
 });
 
 interface ResolvedIntegration {
@@ -77,6 +86,8 @@ export class IntegrationsService {
     @Inject(SecretCipher) private readonly cipher: SecretCipher,
     @Inject(AdminStepUpService) private readonly stepUp: AdminStepUpService,
     @Inject(AdminAuditWriter) private readonly audit: AdminAuditWriter,
+    @Inject(INTEGRATIONS_CONFIG) private readonly config: IntegrationsConfig,
+    @Inject(IntegrationRuntime) private readonly runtime: IntegrationRuntime,
   ) {}
 
   async list(): Promise<IntegrationListResponse> {
@@ -142,6 +153,7 @@ export class IntegrationsService {
     await withTransaction(this.db, (transaction) =>
       this.writeCandidate(transaction, resolved, declaration, body, verified),
     );
+    this.runtime.drop();
     return this.get(id);
   }
 
@@ -184,6 +196,147 @@ export class IntegrationsService {
         },
       });
     });
+    this.runtime.drop();
+    return this.get(id);
+  }
+
+  async activate(
+    actor: IntegrationActor,
+    id: string,
+    body: IntegrationMutationBody,
+  ): Promise<IntegrationDetailResponse> {
+    const resolved = await this.resolve(id);
+    await this.assertActivatable(resolved);
+    await this.assertRevisionFresh(body.expectedRevision);
+    const verified = await this.stepUp.verify({
+      principal: actor.principal,
+      currentPassword: body.currentPassword,
+      clientAddress: actor.clientAddress,
+      operation: "integration.activated",
+    });
+    await withTransaction(this.db, (transaction) =>
+      this.writeActivation(transaction, resolved, body, verified),
+    );
+    this.runtime.drop();
+    return this.get(id);
+  }
+
+  async disable(
+    actor: IntegrationActor,
+    id: string,
+    body: IntegrationMutationBody,
+  ): Promise<IntegrationDetailResponse> {
+    const resolved = await this.resolve(id);
+    if (!resolved.row.enabled) throw notActive();
+    await this.assertRevisionFresh(body.expectedRevision);
+    const verified = await this.stepUp.verify({
+      principal: actor.principal,
+      currentPassword: body.currentPassword,
+      clientAddress: actor.clientAddress,
+      operation: "integration.disabled",
+    });
+    await withTransaction(this.db, async (transaction) => {
+      const now = this.clock.now();
+      await this.stepUp.assertStillValid(transaction, verified, PERMISSION);
+      await this.advanceRevision(transaction, body.expectedRevision, now);
+      const locked = await this.repository.findByIdForUpdate(resolved.row.id, transaction);
+      if (locked === undefined || !locked.enabled || locked.activeOutboundVersionId === null) {
+        throw notActive();
+      }
+      const current = await this.repository.findVersionForUpdate(
+        transaction,
+        locked.activeOutboundVersionId,
+      );
+      if (current?.state === "active") {
+        await this.repository.setCredentialState(transaction, current.id, "draining", now);
+      }
+      await this.repository.setOutboundPointer(
+        transaction,
+        locked.id,
+        { enabled: false, versionId: locked.activeOutboundVersionId },
+        verified.userId,
+        now,
+      );
+      await this.audit.record(transaction, verified.userId, {
+        action: "integration.disabled",
+        targetKind: "integration",
+        targetId: locked.id,
+        detail: {
+          kind: locked.kind,
+          provider: locked.providerCode,
+          version: locked.activeOutboundVersionId,
+        },
+      });
+    });
+    this.runtime.drop();
+    return this.get(id);
+  }
+
+  async revokeSecret(
+    actor: IntegrationActor,
+    id: string,
+    body: RetireIntegrationSecretBody,
+  ): Promise<IntegrationDetailResponse> {
+    const resolved = await this.resolve(id);
+    const version = await this.repository.findVersion(body.versionId);
+    if (version === undefined || version.integrationId !== resolved.row.id) {
+      throw notFound("Integration credential version");
+    }
+    if (
+      version.state !== "candidate" &&
+      version.state !== "active" &&
+      version.state !== "draining"
+    ) {
+      throw notRevocable();
+    }
+    await this.assertRevisionFresh(body.expectedRevision);
+    const verified = await this.stepUp.verify({
+      principal: actor.principal,
+      currentPassword: body.currentPassword,
+      clientAddress: actor.clientAddress,
+      operation: "integration.revoked",
+    });
+    await withTransaction(this.db, async (transaction) => {
+      const now = this.clock.now();
+      await this.stepUp.assertStillValid(transaction, verified, PERMISSION);
+      await this.advanceRevision(transaction, body.expectedRevision, now);
+      const locked = await this.repository.findByIdForUpdate(resolved.row.id, transaction);
+      const current = await this.repository.findVersionForUpdate(transaction, version.id);
+      if (
+        locked === undefined ||
+        current === undefined ||
+        (current.state !== "candidate" &&
+          current.state !== "active" &&
+          current.state !== "draining")
+      ) {
+        throw notRevocable();
+      }
+      await this.repository.setCredentialState(transaction, current.id, "revoked", now);
+      if (locked.activeOutboundVersionId === current.id) {
+        await this.repository.setOutboundPointer(
+          transaction,
+          locked.id,
+          { enabled: false, versionId: null },
+          verified.userId,
+          now,
+        );
+      } else {
+        await this.repository.touch(transaction, locked.id, verified.userId, now);
+      }
+      await this.audit.record(transaction, verified.userId, {
+        action: "integration.revoked",
+        targetKind: "integration",
+        targetId: locked.id,
+        detail: {
+          kind: locked.kind,
+          provider: locked.providerCode,
+          purpose: current.purpose,
+          generation: current.generation,
+          version: current.id,
+        },
+      });
+    });
+    this.runtime.drop();
     return this.get(id);
   }
 
@@ -246,6 +399,103 @@ export class IntegrationsService {
         generation,
         version: versionId,
         replaced: replaced !== undefined,
+      },
+    });
+  }
+
+  private async assertActivatable(resolved: ResolvedIntegration): Promise<void> {
+    const { row, installed } = resolved;
+    if (row.kind !== "email") throw runtimeNotReady();
+    if (!this.config.emailRouteDelegated) {
+      throw ruleViolation(
+        "EMAIL_PROVIDER is set on the server, so a stored credential cannot be activated.",
+        INTEGRATION_RULES.envOverride,
+      );
+    }
+    if (!this.cipher.isEnabled) {
+      throw ruleViolation(
+        "Credentials cannot be stored: SECRETS_ENCRYPTION_KEY is not set on the server.",
+        INTEGRATION_RULES.storageDisabled,
+      );
+    }
+    const outbound = installed.secrets.filter((entry) => entry.purpose === "outbound");
+    if (outbound.some((entry) => this.installed.isSetInEnvironment(entry))) {
+      throw ruleViolation(
+        "This credential is set on the server and cannot be changed here.",
+        INTEGRATION_RULES.envOverride,
+      );
+    }
+    if (this.config.emailFromAddress === null) throw senderRequired();
+    const candidate = await this.repository.findCandidateForUpdate(this.db, row.id, "outbound");
+    if (candidate === undefined) throw notActivatable();
+    const fields = await this.repository.secretFields(this.db, candidate.id);
+    if (!outbound.every((entry) => fields.includes(entry.field))) throw notActivatable();
+    const enabled = await this.repository.lockEnabled(this.db, "email");
+    if (enabled.some((entry) => entry.id !== row.id)) throw routeUnset();
+  }
+
+  private async writeActivation(
+    transaction: DbExecutor,
+    resolved: ResolvedIntegration,
+    body: IntegrationMutationBody,
+    verified: VerifiedStepUp,
+  ): Promise<void> {
+    const now = this.clock.now();
+    await this.stepUp.assertStillValid(transaction, verified, PERMISSION);
+    await this.advanceRevision(transaction, body.expectedRevision, now);
+    const locked = await this.repository.findByIdForUpdate(resolved.row.id, transaction);
+    if (locked === undefined || locked.kind !== "email") throw runtimeNotReady();
+    const outbound = resolved.installed.secrets.filter((entry) => entry.purpose === "outbound");
+    if (
+      !this.config.emailRouteDelegated ||
+      outbound.some((entry) => this.installed.isSetInEnvironment(entry))
+    ) {
+      throw ruleViolation(
+        "EMAIL_PROVIDER is set on the server, so a stored credential cannot be activated.",
+        INTEGRATION_RULES.envOverride,
+      );
+    }
+    if (this.config.emailFromAddress === null) throw senderRequired();
+    const enabled = await this.repository.lockEnabled(transaction, "email");
+    if (enabled.some((entry) => entry.id !== locked.id)) throw routeUnset();
+    const candidate = await this.repository.findCandidateForUpdate(
+      transaction,
+      locked.id,
+      "outbound",
+    );
+    if (candidate === undefined) throw notActivatable();
+    const fields = await this.repository.secretFields(transaction, candidate.id);
+    if (!outbound.every((entry) => fields.includes(entry.field))) throw notActivatable();
+    if (
+      locked.activeOutboundVersionId !== null &&
+      locked.activeOutboundVersionId !== candidate.id
+    ) {
+      const previous = await this.repository.findVersionForUpdate(
+        transaction,
+        locked.activeOutboundVersionId,
+      );
+      if (previous?.state === "active") {
+        await this.repository.setCredentialState(transaction, previous.id, "draining", now);
+      }
+    }
+    await this.repository.setCredentialState(transaction, candidate.id, "active", now);
+    await this.repository.setOutboundPointer(
+      transaction,
+      locked.id,
+      { enabled: true, versionId: candidate.id },
+      verified.userId,
+      now,
+    );
+    await this.audit.record(transaction, verified.userId, {
+      action: "integration.activated",
+      targetKind: "integration",
+      targetId: locked.id,
+      detail: {
+        kind: locked.kind,
+        provider: locked.providerCode,
+        purpose: candidate.purpose,
+        generation: candidate.generation,
+        version: candidate.id,
       },
     });
   }
@@ -313,6 +563,7 @@ export class IntegrationsService {
       id: row.id,
       kind: installed.kind,
       providerCode: row.providerCode,
+      enabled: row.enabled,
       updatedAt: row.updatedAt.toISOString(),
       secrets: installed.secrets.map((declaration) => {
         const saved = stored.find(
@@ -339,6 +590,45 @@ function revisionStale(): ProblemException {
   return ruleViolation(
     "The integration settings changed since you opened them. Reload and try again.",
     INTEGRATION_RULES.revisionStale,
+  );
+}
+
+function runtimeNotReady(): ProblemException {
+  return ruleViolation(
+    "This provider cannot be activated until its safety checks exist.",
+    INTEGRATION_RULES.runtimeNotReady,
+  );
+}
+
+function senderRequired(): ProblemException {
+  return ruleViolation(
+    "Email cannot be activated until EMAIL_FROM is set on the server.",
+    INTEGRATION_RULES.senderRequired,
+  );
+}
+
+function routeUnset(): ProblemException {
+  return ruleViolation(
+    "Another email provider is already on. Turn it off before activating this one.",
+    INTEGRATION_RULES.routeUnset,
+  );
+}
+
+function notActivatable(): ProblemException {
+  return ruleViolation(
+    "Save the outbound credential before activating this provider.",
+    INTEGRATION_RULES.notActivatable,
+  );
+}
+
+function notActive(): ProblemException {
+  return invalidTransition("This integration is already off.", INTEGRATION_RULES.notEnabled);
+}
+
+function notRevocable(): ProblemException {
+  return invalidTransition(
+    "This credential version can no longer be revoked.",
+    INTEGRATION_RULES.notRevocable,
   );
 }
 

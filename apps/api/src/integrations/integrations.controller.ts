@@ -12,10 +12,12 @@ import { INTEGRATIONS_ADMIN_PERMISSIONS } from "./integrations.permissions.js";
 import {
   integrationDetailResponseSchema,
   integrationListResponseSchema,
+  integrationMutationSchema,
   putIntegrationSecretSchema,
   retireIntegrationSecretSchema,
   type IntegrationDetailResponse,
   type IntegrationListResponse,
+  type IntegrationMutationBody,
   type PutIntegrationSecretBody,
   type RetireIntegrationSecretBody,
 } from "./integrations.schemas.js";
@@ -45,8 +47,9 @@ function actorOf(principal: AdminPrincipal, request: Request): IntegrationActor 
 }
 
 /**
- * Thin HTTP layer of the integration store. Every route needs `integrations.manage` (owner only); the two changes also
- * ask for the owner's current password. No route returns a secret or makes a call to a provider.
+ * Thin HTTP layer of the integration store. Every route needs `integrations.manage` (owner only); every change also
+ * asks for the owner's current password. No route returns a secret. Activating email is the only change that makes a
+ * stored key usable, and only when `EMAIL_PROVIDER` is absent.
  */
 @AdminController("integrations", INTEGRATIONS_ADMIN_PERMISSIONS)
 export class IntegrationsController {
@@ -76,7 +79,7 @@ export class IntegrationsController {
   @ApiOperation({
     summary: "Store a provider credential",
     description:
-      "Encrypts the value and stores it as a new candidate version, replacing an earlier candidate of the same credential. The value is never returned and, in this release, not yet used at runtime: providers still read the server environment. Asks for the owner's current password (wrong: `403`, `rule: current_password_incorrect`); limited per admin and per address, and answers `503` when the shared limits are unavailable. `409` rules: `integration_env_override`, `integration_storage_disabled`, `integration_revision_stale`, `integration_unavailable`.",
+      "Encrypts the value and stores it as a new candidate version, replacing an earlier candidate of the same credential. The value is never returned. It is used only after `activate`, and only when `EMAIL_PROVIDER` is absent. Asks for the owner's current password (wrong: `403`, `rule: current_password_incorrect`); limited per admin and per address, and answers `503` when the shared limits are unavailable. `409` rules: `integration_env_override`, `integration_storage_disabled`, `integration_revision_stale`, `integration_unavailable`.",
   })
   @ApiParam(ID_PARAM)
   @ApiParam(FIELD_PARAM)
@@ -111,5 +114,65 @@ export class IntegrationsController {
     @Req() request: Request,
   ): Promise<IntegrationDetailResponse> {
     return this.integrations.retireSecret(actorOf(admin, request), id, body);
+  }
+
+  @Post(":id/activate")
+  @HttpCode(200)
+  @ApiOperation({
+    summary: "Activate a stored email credential",
+    description:
+      "Makes the stored outbound credential the one new mail uses, when `EMAIL_PROVIDER` is absent and `EMAIL_FROM` is set. Payment and shipping answer 409 `integration_runtime_not_ready`. Asks for the owner's current password. Other 409 rules: `integration_env_override`, `integration_storage_disabled`, `integration_sender_required`, `integration_route_unset`, `integration_not_activatable`, `integration_revision_stale`.",
+  })
+  @ApiParam(ID_PARAM)
+  @ApiZodBody(integrationMutationSchema)
+  @ApiZodResponse(200, integrationDetailResponseSchema, "The integration after activation.")
+  @ApiProblemResponses(400, 403, 404, 409, 429, 503)
+  activate(
+    @Param("id", idParam) id: string,
+    @Body(new ZodValidationPipe(integrationMutationSchema)) body: IntegrationMutationBody,
+    @CurrentAdmin() admin: AdminPrincipal,
+    @Req() request: Request,
+  ): Promise<IntegrationDetailResponse> {
+    return this.integrations.activate(actorOf(admin, request), id, body);
+  }
+
+  @Post(":id/disable")
+  @HttpCode(200)
+  @ApiOperation({
+    summary: "Stop admitting new work for a stored credential",
+    description:
+      "Turns the integration off. Mail already bound to the version may finish; a revoked version may not. The pointer stays so that work can be recognized. Asks for the owner's current password. `409`: `integration_not_enabled`, `integration_revision_stale`.",
+  })
+  @ApiParam(ID_PARAM)
+  @ApiZodBody(integrationMutationSchema)
+  @ApiZodResponse(200, integrationDetailResponseSchema, "The integration after it was turned off.")
+  @ApiProblemResponses(400, 403, 404, 409, 429, 503)
+  disable(
+    @Param("id", idParam) id: string,
+    @Body(new ZodValidationPipe(integrationMutationSchema)) body: IntegrationMutationBody,
+    @CurrentAdmin() admin: AdminPrincipal,
+    @Req() request: Request,
+  ): Promise<IntegrationDetailResponse> {
+    return this.integrations.disable(actorOf(admin, request), id, body);
+  }
+
+  @Post(":id/revoke-secret")
+  @HttpCode(200)
+  @ApiOperation({
+    summary: "Revoke a stored credential version",
+    description:
+      "Marks the version revoked. It can never be activated again, and a mail bound to it is not sent. If it was the selected version, the integration is turned off. The envelope is kept. Asks for the owner's current password. `409`: `integration_version_not_revocable`, `integration_revision_stale`.",
+  })
+  @ApiParam(ID_PARAM)
+  @ApiZodBody(retireIntegrationSecretSchema)
+  @ApiZodResponse(200, integrationDetailResponseSchema, "The integration after the revocation.")
+  @ApiProblemResponses(400, 403, 404, 409, 429, 503)
+  revokeSecret(
+    @Param("id", idParam) id: string,
+    @Body(new ZodValidationPipe(retireIntegrationSecretSchema)) body: RetireIntegrationSecretBody,
+    @CurrentAdmin() admin: AdminPrincipal,
+    @Req() request: Request,
+  ): Promise<IntegrationDetailResponse> {
+    return this.integrations.revokeSecret(actorOf(admin, request), id, body);
   }
 }

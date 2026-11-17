@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger, type OnApplicationBootstrap } from "@nestjs/common";
+import { Inject, Injectable, Logger, Optional, type OnApplicationBootstrap } from "@nestjs/common";
 import { DiscoveryService } from "@nestjs/core";
 import {
   EMAIL_PROVIDER_METADATA,
@@ -9,6 +9,15 @@ import {
 
 /** Injection token: the ordered loaded provider codes; string/null remain compatible with single-provider callers. */
 export const LOADED_EMAIL_PROVIDER_CODE = Symbol("fluxkit:loaded-email-provider-code");
+
+/** True when `EMAIL_PROVIDER` is absent and an activated stored credential may send. */
+export const EMAIL_ROUTE_DELEGATED = Symbol("fluxkit:email-route-delegated");
+
+/** The stored-credential resolver. Provided by the integrations module; absent means env mode only. */
+export interface ManagedEmailSource {
+  emailProvider(now?: number): Promise<EmailProviderPort | undefined>;
+}
+export const MANAGED_EMAIL_SOURCE = Symbol("fluxkit:managed-email-source");
 
 /** Every method of `EmailProviderPort` the API calls; a marked class that lacks one stops the startup. */
 const PORT_METHODS = ["send"] as const satisfies readonly (keyof EmailProviderPort)[];
@@ -21,6 +30,11 @@ export interface EmailProviderSource {
   list?(): readonly EmailProviderPort[];
   /** Whether a provider is configured (`emailDelivery` of `GET /store/config` and `GET /admin/config`). */
   deliveryEnabled(): boolean;
+  /**
+   * Refreshes the delegated credential, if this process is allowed to use one. Callers that read `get` or
+   * `deliveryEnabled` await this first. Env mode is unchanged.
+   */
+  prepare?(): Promise<void>;
 }
 
 function implementsPort(value: unknown): value is EmailProviderPort {
@@ -42,12 +56,25 @@ function implementsPort(value: unknown): value is EmailProviderPort {
 export class EmailProviderRegistry implements OnApplicationBootstrap, EmailProviderSource {
   private readonly logger = new Logger(EmailProviderRegistry.name);
   private providers: readonly EmailProviderPort[] = [];
+  private managed: EmailProviderPort | undefined;
 
   constructor(
     @Inject(DiscoveryService) private readonly discovery: DiscoveryService,
     @Inject(LOADED_EMAIL_PROVIDER_CODE)
     private readonly expectedCode: string | null | readonly string[],
+    @Optional()
+    @Inject(EMAIL_ROUTE_DELEGATED)
+    private readonly delegated = false,
+    @Optional()
+    @Inject(MANAGED_EMAIL_SOURCE)
+    private readonly runtime?: ManagedEmailSource,
   ) {}
+
+  /** Loads the stored email credential when the route is delegated. No provider package is imported otherwise. */
+  async prepare(): Promise<void> {
+    if (!this.delegated || this.runtime === undefined) return;
+    this.managed = await this.runtime.emailProvider();
+  }
 
   onApplicationBootstrap(): void {
     this.discover();
@@ -125,16 +152,24 @@ export class EmailProviderRegistry implements OnApplicationBootstrap, EmailProvi
   }
 
   get(code?: string): EmailProviderPort | undefined {
+    if (this.delegated) {
+      if (this.managed === undefined) return undefined;
+      return code === undefined || this.managed.code === code ? this.managed : undefined;
+    }
     return code === undefined
       ? this.providers[0]
       : this.providers.find((provider) => provider.code === code);
   }
 
   list(): readonly EmailProviderPort[] {
-    return [...this.providers];
+    return this.delegated
+      ? this.managed === undefined
+        ? []
+        : [this.managed]
+      : [...this.providers];
   }
 
   deliveryEnabled(): boolean {
-    return this.providers.length > 0;
+    return this.delegated ? this.managed !== undefined : this.providers.length > 0;
   }
 }

@@ -54,6 +54,7 @@ import type {
   CreateAdminShippingMethodBody,
   PutAdminIntegrationSecretBody,
   PutAdminShippingProviderSettingsBody,
+  AdminIntegrationChangeBody,
   RetireAdminIntegrationSecretBody,
   SendAdminTestEmailBody,
   UpdateAdminShippingMethodBody,
@@ -491,6 +492,28 @@ export interface AdminClient {
     body: RetireAdminIntegrationSecretBody,
     options?: CallOptions,
   ): Result<AdminIntegrationDetail>;
+  /**
+   * Uses the stored email credential when `EMAIL_PROVIDER` is absent. `409 rule_violation`
+   * `integration_runtime_not_ready` for payment and shipping, `integration_env_override`,
+   * `integration_sender_required`, `integration_route_unset`, `integration_not_activatable`.
+   */
+  activateIntegration(
+    id: string,
+    body: AdminIntegrationChangeBody,
+    options?: CallOptions,
+  ): Result<AdminIntegrationDetail>;
+  /** `409 invalid_transition` `integration_not_enabled` when it is already off. */
+  disableIntegration(
+    id: string,
+    body: AdminIntegrationChangeBody,
+    options?: CallOptions,
+  ): Result<AdminIntegrationDetail>;
+  /** `409 invalid_transition` `integration_version_not_revocable`. */
+  revokeIntegrationSecret(
+    id: string,
+    body: RetireAdminIntegrationSecretBody,
+    options?: CallOptions,
+  ): Result<AdminIntegrationDetail>;
 
   // brands
   createBrand(body: CreateAdminBrandBody, options?: CallOptions): Result<AdminBrand>;
@@ -852,6 +875,12 @@ export function createAdminClient(options: AdminClientOptions): AdminClient {
       call("putIntegrationSecret", { pathParams: { id, field }, body, options: opts }),
     retireIntegrationSecret: (id, body, opts) =>
       call("retireIntegrationSecret", { pathParams: { id }, body, options: opts }),
+    activateIntegration: (id, body, opts) =>
+      call("activateIntegration", { pathParams: { id }, body, options: opts }),
+    disableIntegration: (id, body, opts) =>
+      call("disableIntegration", { pathParams: { id }, body, options: opts }),
+    revokeIntegrationSecret: (id, body, opts) =>
+      call("revokeIntegrationSecret", { pathParams: { id }, body, options: opts }),
 
     createBrand: (body, opts) => call("createBrand", { body, options: opts }),
     listBrands: (opts) => call("listBrands", { options: opts }),

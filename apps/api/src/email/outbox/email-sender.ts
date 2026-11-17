@@ -115,6 +115,7 @@ export class EmailSender {
     limits: JobLimits = DEFAULT_JOB_LIMITS,
     remainingMs?: () => number,
   ): Promise<EmailAttemptReport> {
+    await this.providers.prepare?.();
     const primary = this.providers.get();
     const chain = this.providers.list?.() ?? (primary === undefined ? [] : [primary]);
     let excluded: readonly string[] = [];
@@ -279,6 +280,7 @@ export class EmailSender {
    * pacing; when too many immediate attempts already wait for it, the mail is left to job 9 (`deferred`).
    */
   async sendNow(id: string): Promise<EmailAttemptReport> {
+    await this.providers.prepare?.();
     if (this.providers.get() === undefined) {
       return { kind: "no_provider" };
     }

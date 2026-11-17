@@ -36,7 +36,8 @@ export class AdminConfigController {
       "Locales, shop currency, supported currencies, stock threshold, upload limits, enabled features and whether mail, online payment and catalog search are configured, for the admin UI",
   })
   @ApiZodResponse(200, adminConfigResponseSchema, "The shop settings.")
-  get(): AdminConfigResponse {
+  async get(): Promise<AdminConfigResponse> {
+    await this.email.prepare();
     return {
       defaultLocale: this.locale.defaultLocale,
       locales: [...this.locale.locales],

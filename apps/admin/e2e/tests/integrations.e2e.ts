@@ -14,7 +14,7 @@ import { expect, test, unique } from "../support/fixtures.ts";
  */
 
 const PROVIDER = "Test provider (fake)";
-const INACTIVE_NOTICE = "Saved keys are not used yet";
+const INACTIVE_NOTICE = "Saved keys stay off until activated";
 
 interface SecretView {
   field: string;
@@ -128,7 +128,7 @@ test("the owner stores, replaces nothing by accident and removes a provider key;
   await expect(main.getByRole("heading", { level: 1, name: "Integrations" })).toBeVisible();
   await expect(main.getByText(INACTIVE_NOTICE, { exact: true })).toBeVisible();
   await expect(
-    main.getByText(/the services keep working with the keys set on the server/),
+    main.getByText(/Payment and delivery still use the keys set on the server/),
   ).toBeVisible();
   await expect(main.getByText("Keys cannot be saved on this server")).toHaveCount(0);
 
@@ -179,7 +179,9 @@ test("the owner stores, replaces nothing by accident and removes a provider key;
   await passwordInput.fill(account.password);
   await dialog.getByRole("button", { name: "Save", exact: true }).click();
   await expect(dialog).toBeHidden();
-  await expect(main.getByText("The key is saved. It is not used yet.")).toBeVisible();
+  await expect(
+    main.getByText("The key is saved. It stays off until it is activated."),
+  ).toBeVisible();
   await expect(apiKey.getByText("Saved, not active yet", { exact: true })).toBeVisible();
   await expect(apiKey).toContainText(/Saved \w/);
   await expect(apiKey.getByRole("button", { name: /^Replace the saved key/ })).toBeVisible();

@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type {
   IntegrationCredentialState,
   IntegrationKind,
@@ -8,6 +8,7 @@ import type {
 import type { DbExecutor } from "../common/transaction.js";
 import { DRIZZLE, type Database } from "../database/database.module.js";
 import {
+  emailMessage,
   integration,
   integrationCredentialVersion,
   integrationRevision,
@@ -30,8 +31,13 @@ export interface StoredSecretSummary {
 }
 
 const REVISION_ROW_ID = 1;
-/** The states a version is in while its envelope still exists and may be used or activated. */
-const CURRENT_STATES: readonly IntegrationCredentialState[] = ["candidate", "active"];
+/** Envelopes that still exist. A candidate is listed before an active one so retire keeps working. */
+const VISIBLE_STATES: readonly IntegrationCredentialState[] = [
+  "candidate",
+  "active",
+  "draining",
+  "revoked",
+];
 
 /** Persistence of the integration store (ADR 0058). The service owns the order of locks and the transactions. */
 @Injectable()
@@ -123,8 +129,11 @@ export class IntegrationsRepository {
       .where(
         and(
           inArray(integrationCredentialVersion.integrationId, [...integrationIds]),
-          inArray(integrationCredentialVersion.state, [...CURRENT_STATES]),
+          inArray(integrationCredentialVersion.state, [...VISIBLE_STATES]),
         ),
+      )
+      .orderBy(
+        sql`case ${integrationCredentialVersion.state} when 'candidate' then 0 when 'active' then 1 when 'draining' then 2 else 3 end`,
       );
   }
 
@@ -219,6 +228,120 @@ export class IntegrationsRepository {
       tag: secret.sealed.tag,
       createdAt: version.createdAt,
     });
+  }
+
+  async lockEnabled(transaction: DbExecutor, kind: IntegrationKind): Promise<IntegrationRow[]> {
+    return transaction
+      .select()
+      .from(integration)
+      .where(and(eq(integration.kind, kind), eq(integration.enabled, true)))
+      .for("update");
+  }
+
+  async secretFields(transaction: DbExecutor, versionId: string): Promise<string[]> {
+    const rows = await transaction
+      .select({ field: integrationSecret.field })
+      .from(integrationSecret)
+      .where(eq(integrationSecret.versionId, versionId));
+    return rows.map((row) => row.field);
+  }
+
+  async secretEnvelopes(
+    versionId: string,
+    executor: DbExecutor = this.db,
+  ): Promise<
+    {
+      id: string;
+      field: string;
+      keyId: string;
+      nonce: Buffer;
+      ciphertext: Buffer;
+      tag: Buffer;
+    }[]
+  > {
+    return executor
+      .select({
+        id: integrationSecret.id,
+        field: integrationSecret.field,
+        keyId: integrationSecret.keyId,
+        nonce: integrationSecret.nonce,
+        ciphertext: integrationSecret.ciphertext,
+        tag: integrationSecret.tag,
+      })
+      .from(integrationSecret)
+      .where(eq(integrationSecret.versionId, versionId));
+  }
+
+  async setCredentialState(
+    transaction: DbExecutor,
+    versionId: string,
+    state: "active" | "draining" | "revoked",
+    now: Date,
+  ): Promise<void> {
+    await transaction
+      .update(integrationCredentialVersion)
+      .set({
+        state,
+        retiredAt: null,
+        revokedAt: state === "revoked" ? now : null,
+      })
+      .where(eq(integrationCredentialVersion.id, versionId));
+  }
+
+  async setOutboundPointer(
+    transaction: DbExecutor,
+    integrationId: string,
+    pointer: { enabled: boolean; versionId: string | null },
+    actor: string,
+    now: Date,
+  ): Promise<void> {
+    await transaction
+      .update(integration)
+      .set({
+        enabled: pointer.enabled,
+        activeOutboundVersionId: pointer.versionId,
+        updatedAt: now,
+        updatedBy: sql`(select "id" from "admin_user" where "id" = ${actor}::uuid)`,
+      })
+      .where(eq(integration.id, integrationId));
+  }
+
+  /** The version this mail is already bound to, or null. */
+  async emailBinding(
+    transaction: DbExecutor,
+    messageId: string,
+  ): Promise<string | null | undefined> {
+    const [row] = await transaction
+      .select({ versionId: emailMessage.integrationCredentialVersionId })
+      .from(emailMessage)
+      .where(eq(emailMessage.id, messageId));
+    return row === undefined ? undefined : row.versionId;
+  }
+
+  async bindEmail(transaction: DbExecutor, messageId: string, versionId: string): Promise<void> {
+    const updated = await transaction
+      .update(emailMessage)
+      .set({ integrationCredentialVersionId: versionId })
+      .where(
+        and(eq(emailMessage.id, messageId), isNull(emailMessage.integrationCredentialVersionId)),
+      )
+      .returning({ id: emailMessage.id });
+    if (updated.length === 0) {
+      throw new Error("email_credential_bind_lost");
+    }
+  }
+
+  /** Drops a binding only when this version still owns it and the send provably did not leave. */
+  async releaseEmail(transaction: DbExecutor, messageId: string, versionId: string): Promise<void> {
+    await transaction
+      .update(emailMessage)
+      .set({ integrationCredentialVersionId: null })
+      .where(
+        and(
+          eq(emailMessage.id, messageId),
+          eq(emailMessage.integrationCredentialVersionId, versionId),
+        ),
+      );
   }
 
   async touch(

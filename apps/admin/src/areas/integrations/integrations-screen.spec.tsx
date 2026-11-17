@@ -42,6 +42,7 @@ const resend: AdminIntegration = {
   id: "11111111-1111-4111-8111-111111111111",
   kind: "email",
   providerCode: "resend",
+  enabled: false,
   secrets: [
     secret({
       state: "set",
@@ -63,6 +64,7 @@ const monobank: AdminIntegration = {
   id: "22222222-2222-4222-8222-222222222222",
   kind: "payment",
   providerCode: "monobank",
+  enabled: false,
   secrets: [secret({ field: "token", envVariable: "MONOBANK_TOKEN" })],
   updatedAt: "2026-11-16T10:00:00.000Z",
 };
@@ -70,6 +72,7 @@ const unknown: AdminIntegration = {
   id: "44444444-4444-4444-8444-444444444444",
   kind: "shipping",
   providerCode: "acme_ship",
+  enabled: false,
   secrets: [secret({ field: "merchant_code", envVariable: "ACME_SHIP_MERCHANT_CODE" })],
   updatedAt: "2026-11-16T10:00:00.000Z",
 };

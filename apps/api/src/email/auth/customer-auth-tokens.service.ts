@@ -63,8 +63,8 @@ export class CustomerAuthTokens {
     @Inject(EMAIL_DELIVERY_CONFIG) private readonly config: EmailDeliveryConfig,
   ) {}
 
-  /** Whether tokens can be mailed at all (`EMAIL_PROVIDER` is not `none`). */
-  enabled(): boolean {
+  /** Whether tokens can be mailed at all (`EMAIL_PROVIDER` is not `none`, or a stored credential is activated). */
+  enabled(): Promise<boolean> {
     return this.outbox.enabled();
   }
 
@@ -83,7 +83,7 @@ export class CustomerAuthTokens {
       readonly now: Date;
     },
   ): Promise<IssueAuthTokenResult> {
-    if (!this.outbox.enabled()) {
+    if (!(await this.outbox.enabled())) {
       return { status: "disabled" };
     }
     if (!validateEmailAddress(input.recipient.email).ok) {

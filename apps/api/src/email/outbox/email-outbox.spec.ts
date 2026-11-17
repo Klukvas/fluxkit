@@ -247,7 +247,7 @@ describe("email outbox with EMAIL_PROVIDER=none", () => {
     const running = await startApp({ storefrontPublicUrl: null, emailFrom: null });
     try {
       const outbox = running.app.get(EmailOutbox);
-      expect(outbox.enabled()).toBe(false);
+      expect(await outbox.enabled()).toBe(false);
       const result = await withTransaction(world.database, (tx) =>
         outbox.enqueue(tx, {
           templateKey: "admin.test",

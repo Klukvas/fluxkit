@@ -47,6 +47,17 @@ export class FakeEmailProviderModule {}
 
 export const providerModule = FakeEmailProviderModule;
 
+/**
+ * One fake client for a stored credential version (ADR 0058). The key is checked and then not used: the fake never
+ * calls a network. Tests read what it accepted from the instance.
+ */
+export function createOutboundClient(secrets: { readonly api_key: string }): FakeEmailProvider {
+  if (validateIntegrationSecret("api_key", secrets.api_key) !== undefined) {
+    throw new Error("The stored outbound secret is not valid.");
+  }
+  return new FakeEmailProvider({ captureFile: parseFakeEmailCaptureFile(process.env) });
+}
+
 const FAKE_SECRET_PATTERNS: Readonly<Record<string, RegExp>> = {
   api_key: /^fake_[A-Za-z0-9]{8,64}$/,
   webhook_secret: /^fakewh_[A-Za-z0-9]{8,64}$/,

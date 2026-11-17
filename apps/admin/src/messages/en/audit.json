@@ -60,5 +60,8 @@
   "audit.target.integration": "Integration",
   "audit.action.admin_user.step_up_failed": "Wrong password on a protected action",
   "audit.action.integration.secret_changed": "Integration key saved",
-  "audit.action.integration.secret_retired": "Integration key removed"
+  "audit.action.integration.secret_retired": "Integration key removed",
+  "audit.action.integration.activated": "Integration activated",
+  "audit.action.integration.disabled": "Integration turned off",
+  "audit.action.integration.revoked": "Integration key revoked"
 }

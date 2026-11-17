@@ -31,6 +31,7 @@ describe("no network in tests, and only api.brevo.com in the plugin", () => {
         "config.ts",
         "http.ts",
         "index.ts",
+        "outbound-client.ts",
         "request.ts",
         "brevo-provider.ts",
         "webhook.ts",

@@ -69,12 +69,14 @@ export class EmailOutbox {
     @Inject(EmailMessageChanges) private readonly changes: EmailMessageChanges,
   ) {}
 
-  /** Whether mail can be sent at all (`EMAIL_PROVIDER` is not `none`). */
-  enabled(): boolean {
+  /** Whether mail can be sent at all (`EMAIL_PROVIDER` is not `none`, or a stored credential is activated). */
+  async enabled(): Promise<boolean> {
+    await this.providers.prepare?.();
     return this.providers.deliveryEnabled();
   }
 
   async enqueue(tx: Transaction, input: EnqueueEmailInput): Promise<EnqueueEmailResult> {
+    await this.providers.prepare?.();
     if (!this.providers.deliveryEnabled()) {
       return { status: "disabled" };
     }
