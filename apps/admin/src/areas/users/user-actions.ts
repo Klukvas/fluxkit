@@ -47,14 +47,55 @@ function patchable(user: AdminUser): { role: AdminRole; isActive: boolean } {
   return { role: user.role, isActive: user.isActive };
 }
 
+/**
+ * The actor's own password goes with the request only when there is one to send (`""` is nothing) and the patch changes
+ * something: an empty patch is never sent, so it carries nothing either.
+ */
+function withStepUp(patch: UpdateAdminUserBody, currentPassword?: string): UpdateAdminUserBody {
+  const nothingToSend = Object.keys(patch).length === 0;
+  return nothingToSend || currentPassword === undefined || currentPassword === ""
+    ? patch
+    : { ...patch, currentPassword };
+}
+
 /** `PATCH /admin/users/{id}` for a role change: `{role}` when it differs, `{}` (send nothing) when it does not. */
-export function rolePatch(user: AdminUser, role: AdminRole): UpdateAdminUserBody {
-  return diffForPatch(patchable(user), { role });
+export function rolePatch(
+  user: AdminUser,
+  role: AdminRole,
+  currentPassword?: string,
+): UpdateAdminUserBody {
+  return withStepUp(diffForPatch(patchable(user), { role }), currentPassword);
 }
 
 /** `PATCH /admin/users/{id}` for the activity: `{isActive}` when it differs, `{}` otherwise. */
-export function activityPatch(user: AdminUser, isActive: boolean): UpdateAdminUserBody {
-  return diffForPatch(patchable(user), { isActive });
+export function activityPatch(
+  user: AdminUser,
+  isActive: boolean,
+  currentPassword?: string,
+): UpdateAdminUserBody {
+  return withStepUp(diffForPatch(patchable(user), { isActive }), currentPassword);
+}
+
+/**
+ * Which actions ask the signed-in admin for their OWN password again (`docs/api/auth.md`, ADR 0058): the results that
+ * would otherwise let a stolen owner session mint an owner account or a password it knows. A HINT like the actions
+ * themselves: the API decides on the locked user and refuses with `owner_step_up_required` when the answer moved.
+ */
+export function needsOwnerStepUp(
+  action: UserAction,
+  user: { role: AdminRole; isActive: boolean },
+  nextRole?: AdminRole,
+): boolean {
+  switch (action) {
+    case "changeRole":
+      return nextRole === "owner" && user.role !== "owner";
+    case "activate":
+      return user.role === "owner";
+    case "resetPassword":
+      return user.role === "owner";
+    case "deactivate":
+      return false;
+  }
 }
 
 export interface Confirmation {
@@ -63,28 +104,39 @@ export interface Confirmation {
   tone: "default" | "danger";
   /** The owner acts on their own account: an extra explicit tick is required before the confirm button works. */
   selfCheck: boolean;
+  /** The dialog asks for the actor's current password and sends it with the request. */
+  stepUp: boolean;
 }
 
 /**
  * The plan's confirmation list: role changes, deactivating an admin user (ends their sessions) and password resets (end
- * all sessions of that user). Activating needs none. Changing one's OWN role or activity also needs an explicit tick.
+ * all sessions of that user). Activating needs none, unless it reactivates an owner, which needs the password re-entry
+ * and therefore a dialog to type it in. Changing one's OWN role or activity also needs an explicit tick.
  */
-export function confirmationOf(action: UserAction, self: boolean): Confirmation {
+export function confirmationOf(action: UserAction, self: boolean, stepUp = false): Confirmation {
   switch (action) {
     case "changeRole":
-      return { ask: true, tone: "default", selfCheck: self };
+      return { ask: true, tone: "default", selfCheck: self, stepUp };
     case "deactivate":
-      return { ask: true, tone: "danger", selfCheck: self };
+      return { ask: true, tone: "danger", selfCheck: self, stepUp };
     case "resetPassword":
-      return { ask: true, tone: "danger", selfCheck: false };
+      return { ask: true, tone: "danger", selfCheck: false, stepUp };
     case "activate":
-      return { ask: false, tone: "default", selfCheck: false };
+      return { ask: stepUp, tone: "default", selfCheck: false, stepUp };
   }
 }
 
-/** Whether the confirm button may send: always, unless the extra tick is required and missing. */
-export function mayConfirm(confirmation: Confirmation, selfTicked: boolean): boolean {
-  return !confirmation.selfCheck || selfTicked;
+/**
+ * Whether the confirm button may send: not while a required tick is missing, and not while a required password field is
+ * empty (an empty one would spend one of the five attempts the API allows per 15 minutes for nothing).
+ */
+export function mayConfirm(
+  confirmation: Confirmation,
+  selfTicked: boolean,
+  stepUpPassword = "",
+): boolean {
+  if (confirmation.selfCheck && !selfTicked) return false;
+  return !confirmation.stepUp || stepUpPassword !== "";
 }
 
 export type SelfConsequence = "losesUsersArea" | "signedOutCannotSignIn" | "signedOutSignInAgain";
@@ -112,18 +164,26 @@ export function selfConsequence(
   }
 }
 
-const LAST_OWNER_RULES = ["last_owner_cannot_be_demoted", "last_owner_cannot_be_deactivated"];
+/** The `rule` of a 403 that means "the password was wrong", not "the role may not do this" (ADR 0058). */
+export const PASSWORD_INCORRECT_RULE = "current_password_incorrect";
+
+/** The refusals this area explains itself: each `rule` with the problem `code` it belongs to. */
+const OWN_RULES: Readonly<Record<string, string | undefined>> = Object.freeze({
+  last_owner_cannot_be_demoted: "rule_violation",
+  last_owner_cannot_be_deactivated: "rule_violation",
+  owner_step_up_required: "rule_violation",
+  step_up_unavailable: "service_unavailable",
+});
 
 /**
- * A refusal of a user action: the two last-owner rules get the area's own explanation (what to do instead); everything
- * else goes through the shell's problem map. The API's English `detail` is never shown.
+ * A refusal of a user action: the last-owner rules and the password re-entry get the area's own explanation (what to do
+ * instead); everything else goes through the shell's problem map. The API's English `detail` is never shown.
  */
 export function describeUserRefusal(status: number, problem: ProblemLike): MessageDescriptor {
-  if (
-    problem.code === "rule_violation" &&
-    problem.rule !== undefined &&
-    LAST_OWNER_RULES.includes(problem.rule)
-  ) {
+  if (status === 403 && problem.rule === PASSWORD_INCORRECT_RULE) {
+    return { key: `user.refusal.${PASSWORD_INCORRECT_RULE}` };
+  }
+  if (problem.rule !== undefined && OWN_RULES[problem.rule] === problem.code) {
     return { key: `user.refusal.${problem.rule}` };
   }
   return describeProblem(status, problem);

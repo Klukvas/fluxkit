@@ -43,6 +43,21 @@ describe("users area source guards", () => {
     }
   });
 
+  it("asks for the current password where the API does, and holds it only in the dialog that asks", () => {
+    // The dialog that asks is the only place the typed password lives, and it leaves with the one request.
+    const parts = code(source("user-parts.tsx"));
+    expect(parts).toMatch(/useState\(""\)/);
+    expect(parts).toMatch(/autoComplete="current-password"/);
+    expect(parts).toMatch(/setCurrentPassword\(""\);\s*onConfirm\(typed\);/);
+    expect(parts).toMatch(/if \(!open\) setCurrentPassword\(""\);/);
+    // The create form asks for it only for a new owner, and the page clears both passwords after every answer.
+    const createView = code(source("user-create-view.tsx"));
+    expect(createView).toMatch(/createNeedsStepUp\(values\) \?/);
+    expect(createView).toMatch(/autoComplete="current-password"/);
+    const createPage = code(source("user-create-page.tsx"));
+    expect(createPage).toMatch(/password: "", currentPassword: ""/);
+  });
+
   it("sends every write once through the single flight and runWrite, never after a timer, in a loop or again", () => {
     const create = code(source("user-create-page.tsx"));
     expect(create).toContain("flight.run(() => runWrite(() => adminClient.createUser(body)))");
@@ -74,12 +89,16 @@ describe("users area source guards", () => {
     expect(page).not.toMatch(/optimistic|setUser\(/i);
   });
 
-  it("asks for a confirmation before a role change, a deactivation and a reset; acts at once only for activate", () => {
+  it("asks for a confirmation before a role change, a deactivation and a reset; acts at once only for an activate that needs no password", () => {
     const page = code(source("user-detail-page.tsx"));
     const onAction = between(page, "function onAction", "function closeDialog");
     expect(onAction).toMatch(/action === "changeRole"\) \{\s*setDialog\(/);
     expect(onAction).toMatch(/action === "deactivate"\) \{\s*setDialog\(/);
-    expect(onAction).toMatch(/!confirmationOf\(action, self\)\.ask\) \{\s*perform\(action\);/);
+    // Activating an owner needs the password re-entry (ADR 0058), so it opens its dialog; otherwise it acts at once.
+    expect(onAction).toMatch(
+      /confirmationOf\(action, self, stepUpFor\(action\)\)\.ask\) \{\s*setDialog\(\{ action: "activate"/,
+    );
+    expect(onAction).toMatch(/\} else \{\s*perform\(action\);\s*\}/);
     // `perform` is reached from a confirmed dialog, or from `onAction` for an action that needs no confirmation.
     expect(page.match(/\bperform\(/g)?.length).toBe(4);
     const confirm = between(page, "function confirmDialog", "const common");
@@ -88,7 +107,7 @@ describe("users area source guards", () => {
     const submit = between(reset, "function onSubmit", "async function confirm");
     expect(submit).toContain("setConfirming(true);");
     expect(submit).not.toMatch(/\bsend\(/);
-    expect(reset).toMatch(/onConfirm=\{\(\) => void confirm\(\)\}/);
+    expect(reset).toMatch(/onConfirm=\{\(currentPassword\) => void confirm\(currentPassword\)\}/);
     expect(reset.match(/\bsend\(/g)?.length).toBe(1);
   });
 
@@ -100,20 +119,21 @@ describe("users area source guards", () => {
     expect(page).toMatch(/actions\.includes\("resetPassword"\)\s*\?\s*send\("resetPassword"/);
   });
 
-  it("keeps the typed password inside its form: not in the detail page's state, cleared after every answer", () => {
+  it("keeps the typed passwords out of the detail page: neither the new one nor the re-entered one is its state", () => {
     const detail = code(source("user-detail-page.tsx"));
     expect(detail).not.toMatch(/useState[^;]*[Pp]assword/);
-    expect(detail.match(/newPassword/g)?.length).toBe(2);
-    expect(detail).toMatch(
-      /\(newPassword\) =>[\s\S]{0,200}resetUserPassword\(current\.id, \{ newPassword \}\)/,
-    );
+    // The new password never appears here at all: the reset form owns it and sends the whole body.
+    expect(detail).not.toMatch(/newPassword/);
+    expect(detail).toMatch(/\(body\) =>[\s\S]{0,200}resetUserPassword\(current\.id, body\)/);
+    // The re-entered password only passes through: from the dialog into one request, never into a variable here.
+    expect(detail).not.toMatch(/setCurrentPassword|currentPassword =/);
     const create = code(source("user-create-page.tsx"));
     const afterAnswer = between(
       create,
       'if (outcome.kind === "aborted") return;',
       'if (outcome.kind === "ok")',
     );
-    expect(afterAnswer).toContain("clearPassword();");
+    expect(afterAnswer).toContain("clearPasswords();");
     const reset = code(source("user-reset-form.tsx"));
     const confirmBody = between(reset, "async function confirm", "return (");
     expect(confirmBody.indexOf("clear();")).toBeGreaterThan(

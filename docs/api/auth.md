@@ -34,12 +34,45 @@ All routes need `users.manage` (owner only); a manager or viewer gets `403 forbi
 | Endpoint | Auth | Purpose | Request | Response | Errors |
 |---|---|---|---|---|---|
 | `GET /admin/users` | `users.manage` | List users ordered by email | `?limit` (1 to 100, default 50), `?offset` | `200 {items, total, limit, offset}` | `400` |
-| `POST /admin/users` | `users.manage` | Create a user | `{email, role, password}` (strict; role is `owner`, `manager` or `viewer`; email format and password policy from core) | `201` user, `Location: /admin/users/{id}` | `400` (unknown role, invalid email, password policy under `password`, unknown field); `409 conflict` with `field: "email"` for a duplicate (any case) |
+| `POST /admin/users` | `users.manage` | Create a user | `{email, role, password, currentPassword?}` (strict; role is `owner`, `manager` or `viewer`; email format and password policy from core; `currentPassword` required for a new owner, see "Owner operations") | `201` user, `Location: /admin/users/{id}` | `400` (unknown role, invalid email, password policy under `password`, unknown field, missing `currentPassword`); `403`, `429`, `503` of the password re-entry; `409 conflict` with `field: "email"` for a duplicate (any case) |
 | `GET /admin/users/{id}` | `users.manage` | One user | none | `200` user | `400` malformed id; `404` |
-| `PATCH /admin/users/{id}` | `users.manage` | Change role and/or activity; deactivating ends all sessions of the user; a role change applies to the next request | `{role?, isActive?}` (strict: any other field, including email or hash, is `400 unknown_field`) | `200` user | `400`; `404`; `409 rule_violation` with `rule` `last_owner_cannot_be_demoted` or `last_owner_cannot_be_deactivated` |
-| `POST /admin/users/{id}/reset-password` | `users.manage` | Set a new password for a user (an owner for themselves too); clears the lockout and ends ALL sessions of that user | `{newPassword}` (strict; policy checked against the user's email) | `204` | `400` (policy errors under `newPassword`); `404` |
+| `PATCH /admin/users/{id}` | `users.manage` | Change role and/or activity; deactivating ends all sessions of the user; a role change applies to the next request | `{role?, isActive?, currentPassword?}` (strict: any other field, including email or hash, is `400 unknown_field`; `currentPassword` required to promote somebody to owner or to reactivate an inactive owner) | `200` user | `400`; `403`, `429`, `503` of the password re-entry; `404`; `409 rule_violation` with `rule` `last_owner_cannot_be_demoted`, `last_owner_cannot_be_deactivated` or `owner_step_up_required` |
+| `POST /admin/users/{id}/reset-password` | `users.manage` | Set a new password for a user (an owner for themselves too); clears the lockout and ends ALL sessions of that user | `{newPassword, currentPassword?}` (strict; policy checked against the user's email; `currentPassword` required when the target is an owner, the actor themselves included) | `204` | `400` (policy errors under `newPassword`, missing `currentPassword`); `403`, `429`, `503` of the password re-entry; `404`; `409 rule_violation` with `rule` `owner_step_up_required` |
 
 Audit (privacy plan step 5): create, a real role change, the deactivation of an active user and a password reset each record an event in the same transaction (`admin_user.created`, `admin_user.role_changed`, `admin_user.deactivated`, `admin_user.password_reset`; `docs/api/audit.md`). Activating an inactive user records `admin_user.activated`; `pnpm admin:create` records `admin_user.created` with no actor and `detail.source` `cli`; `pnpm admin:unlock` records none.
 
 - **Last owner**: at least one active owner always remains. The rule runs inside a transaction that holds one database lock for all owner changes (`pg_advisory_xact_lock`), so two simultaneous requests cannot demote or deactivate the last two owners between them.
 - **No self-service escalation**: nobody below owner can reach these routes, including for their own account.
+
+### Owner operations: the actor's current password (ADR 0058)
+
+Three results would otherwise let a stolen owner session mint an owner account, or a password it knows, and pass the
+password re-entry of `/admin/integrations` with it. Each of them asks for the SIGNED-IN admin's own password in
+`currentPassword`:
+
+| Operation | When |
+|---|---|
+| `POST /admin/users` | the new `role` is `owner` |
+| `PATCH /admin/users/{id}` | the change promotes a non-owner to owner, or reactivates an inactive owner (`isActive` false to true while the resulting role is `owner`). One request that does both asks once |
+| `POST /admin/users/{id}/reset-password` | the target's role is `owner`, active or not, the signed-in admin themselves included |
+
+Everything else needs no `currentPassword` and no Redis: creating or editing a manager or viewer, demoting or
+deactivating an owner, reactivating a non-owner, and resetting a non-owner's password.
+
+- **Missing** when it is required: `400 validation_failed` with `errors[].path` `currentPassword` and code `required`,
+  answered before the shared limits and before any hashing, so it neither spends an attempt nor counts as a failed login.
+- **Wrong** (or the account was locked, deactivated or demoted meanwhile): `403 forbidden` with
+  `rule: current_password_incorrect`. It counts toward the account lockout like a failed login (5 in 15 minutes lock the
+  account) and leaves an `admin_user.step_up_failed` audit event with the operation code, which survives the refused
+  change. Nothing is written.
+- **Limits** (shared with the integration changes, Redis, ADR 0058): 5 attempts per admin per 15 minutes, successful ones
+  included, and 20 per client address. Over the limit: `429 too_many_requests` with `Retry-After`, before any hashing.
+- **Redis unavailable or not configured**: `503 service_unavailable` with `rule: step_up_unavailable` and `Retry-After`,
+  and only for an operation that needs the re-entry; nothing is written.
+- **Checked twice**: the password is verified outside the write transaction, then the transaction locks the user row and
+  decides again on the locked values. When the locked result needs a re-entry this request did not make (somebody was
+  promoted or demoted in between), the answer is `409 rule_violation` with `rule: owner_step_up_required` and nothing is
+  written. The actor's own account is re-checked under its row lock too (active, unlocked, still `users.manage`, same
+  password hash, live session), so a stale check cannot be used after the actor lost the permission.
+- The last-owner rule, the session revocations (a reset still ends every session of the target, the actor's own included
+  when they reset themselves; deactivating still ends the target's) and the audit events are unchanged.

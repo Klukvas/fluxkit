@@ -86,8 +86,26 @@ export class AdminApi {
     await json(await this.context.delete(path, { headers: CSRF }), status);
   }
 
-  async createUser(email: string, role: Role, password: string): Promise<AdminUser> {
-    return this.post<AdminUser>("/admin/users", { email, role, password }, 201);
+  /**
+   * Creates an admin user. An OWNER also needs the signed-in admin's own password (ADR 0058, `docs/api/auth.md`), and
+   * that attempt counts against their five password re-entries per 15 minutes.
+   */
+  async createUser(
+    email: string,
+    role: Role,
+    password: string,
+    currentPassword?: string,
+  ): Promise<AdminUser> {
+    return this.post<AdminUser>(
+      "/admin/users",
+      {
+        email,
+        role,
+        password,
+        ...(currentPassword === undefined ? {} : { currentPassword }),
+      },
+      201,
+    );
   }
 
   /** The users list, every page (the e2e database holds a few dozen at most). */

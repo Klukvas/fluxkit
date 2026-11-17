@@ -1,3 +1,4 @@
+import type { ResetAdminUserPasswordBody } from "@fluxkit/api-client";
 import { Alert, Button, type Translator } from "@fluxkit/ui";
 import { useEffect, useRef, useState, type FormEvent, type Ref } from "react";
 import type { MessageDescriptor } from "../../lib/problem-messages";
@@ -84,14 +85,17 @@ export function ResetPasswordFormView({
 
 /**
  * The password reset of one user (`POST /admin/users/{id}/reset-password`). This component alone holds the typed new
- * password: it is never lifted to the page, the URL, storage or a log, and it is cleared after every answer. The page
- * sends (`send`: single flight, `runWrite`, never retried) and reloads the user; this form only learns the outcome.
+ * password: it is never lifted to the page, the URL, storage or a log, and it is cleared after every answer. The
+ * actor's own password (`stepUp`, an owner target) is typed in the confirmation and goes straight into the request.
+ * The page sends (`send`: single flight, `runWrite`, never retried) and reloads the user; this form only learns the
+ * outcome.
  */
 export function ResetPasswordSection({
   t,
   email,
   self,
   busy,
+  stepUp,
   send,
   onDirtyChange,
 }: {
@@ -100,8 +104,10 @@ export function ResetPasswordSection({
   email: string;
   self: boolean;
   busy: boolean;
+  /** The target is an owner, so the API asks for the signed-in admin's current password (ADR 0058). */
+  stepUp: boolean;
   /** Sends the reset once; `null` when another write of the page is running (nothing was sent). */
-  send: (newPassword: string) => Promise<WriteOutcome<undefined> | null>;
+  send: (body: ResetAdminUserPasswordBody) => Promise<WriteOutcome<undefined> | null>;
   onDirtyChange: (dirty: boolean) => void;
 }) {
   const [value, setValue] = useState("");
@@ -135,8 +141,11 @@ export function ResetPasswordSection({
     setConfirming(true);
   }
 
-  async function confirm() {
-    const outcome = await send(value);
+  async function confirm(currentPassword: string | null) {
+    const outcome = await send({
+      newPassword: value,
+      ...(currentPassword === null || currentPassword === "" ? {} : { currentPassword }),
+    });
     if (outcome === null || outcome.kind === "aborted") return;
     setConfirming(false);
     // Whatever the answer, the typed password leaves the form.
@@ -185,8 +194,9 @@ export function ResetPasswordSection({
         self={self}
         selfTicked={false}
         refusal={null}
+        stepUp={stepUp}
         onSelfTick={() => undefined}
-        onConfirm={() => void confirm()}
+        onConfirm={(currentPassword) => void confirm(currentPassword)}
         onClose={() => {
           if (!busy) setConfirming(false);
         }}

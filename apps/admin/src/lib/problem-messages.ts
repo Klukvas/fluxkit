@@ -63,6 +63,10 @@ export const KNOWN_REASON_CODES = [
   "same_as_current",
   "last_owner_cannot_be_demoted",
   "last_owner_cannot_be_deactivated",
+  // the password re-entry of the owner operations and of the integrations (ADR 0058)
+  "current_password_incorrect",
+  "owner_step_up_required",
+  "step_up_unavailable",
   // catalog
   "title_invalid",
   "slug_missing",

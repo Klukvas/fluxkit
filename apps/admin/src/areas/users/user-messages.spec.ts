@@ -27,9 +27,14 @@ const BUILT_KEYS = [
   ...["losesUsersArea", "signedOutCannotSignIn", "signedOutSignInAgain"].map(
     (consequence) => `user.self.${consequence}`,
   ),
-  ...["last_owner_cannot_be_demoted", "last_owner_cannot_be_deactivated"].map(
-    (rule) => `user.refusal.${rule}`,
-  ),
+  ...[
+    "last_owner_cannot_be_demoted",
+    "last_owner_cannot_be_deactivated",
+    // the password re-entry of the owner operations (ADR 0058)
+    "current_password_incorrect",
+    "owner_step_up_required",
+    "step_up_unavailable",
+  ].map((rule) => `user.refusal.${rule}`),
   ...["found", "absent", "notChecked", "unreadable"].map((kind) => `user.create.unknown.${kind}`),
 ];
 

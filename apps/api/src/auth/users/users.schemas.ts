@@ -9,11 +9,26 @@ import { MAX_CREDENTIAL_LENGTH } from "../auth.schemas.js";
 
 const credentialText = z.string().max(MAX_CREDENTIAL_LENGTH);
 
+/**
+ * The signed-in admin's own password, asked again for the three results that would otherwise hand an attacker with a
+ * stolen owner session a password they know (ADR 0058, plan `2026-11-16-admin-integrations` section 8): a new owner, a
+ * promotion to owner or the reactivation of an inactive owner, and the reset of an owner's password. Optional in the
+ * schema because the other changes of the same endpoints need none; `UsersService` decides and refuses a missing one.
+ * writeOnly, no example, no default: the document must never suggest that a password can be read back.
+ */
+const currentPassword = z.string().min(1).max(MAX_CREDENTIAL_LENGTH).meta({
+  writeOnly: true,
+  format: "password",
+  description:
+    "The signed-in admin's current password. Required when the result is an owner account: creating an owner, promoting or reactivating one, or resetting an owner's password (their own included).",
+});
+
 /** `POST /admin/users`. The role must be one of the fixed roles of core. */
 export const createUserSchema = z.strictObject({
   email: credentialText,
   role: z.enum(ROLES),
   password: credentialText,
+  currentPassword: currentPassword.optional(),
 });
 
 /**
@@ -23,11 +38,13 @@ export const createUserSchema = z.strictObject({
 export const updateUserSchema = z.strictObject({
   role: z.enum(ROLES).optional(),
   isActive: z.boolean().optional(),
+  currentPassword: currentPassword.optional(),
 });
 
 /** `POST /admin/users/:id/reset-password`. */
 export const resetPasswordSchema = z.strictObject({
   newPassword: credentialText,
+  currentPassword: currentPassword.optional(),
 });
 
 export const listUsersQuerySchema = paginationQuerySchema;

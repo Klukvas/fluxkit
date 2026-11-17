@@ -2,6 +2,7 @@ import type { AdminRole, CreateAdminUserBody, ProblemDetails } from "@fluxkit/ap
 import { fieldErrorsFromProblem, type FormErrors } from "../../lib/form-errors";
 import type { MessageDescriptor } from "../../lib/problem-messages";
 import { passwordProblems } from "./password-policy";
+import { describeUserRefusal, PASSWORD_INCORRECT_RULE } from "./user-actions";
 
 /**
  * The create and reset-password form models (pure). The values live only in the form component's own state while it is
@@ -11,22 +12,36 @@ import { passwordProblems } from "./password-policy";
 /** `EMAIL_MAX_LENGTH` of core (the API trims and lower-cases, then checks the format). */
 export const EMAIL_MAX_LENGTH = 254;
 
-export type CreateField = "email" | "role" | "password";
+export const CREATE_FIELDS = ["email", "role", "password", "currentPassword"] as const;
+export type CreateField = (typeof CREATE_FIELDS)[number];
 
 export interface CreateUserValues {
   email: string;
   role: AdminRole;
   password: string;
+  /** The signed-in admin's own password, asked for (and sent) only when the new role is `owner` (ADR 0058). */
+  currentPassword: string;
 }
 
 /** The least powerful role is preselected; the owner chooses another on purpose. */
-export const EMPTY_CREATE_VALUES: CreateUserValues = { email: "", role: "viewer", password: "" };
+export const EMPTY_CREATE_VALUES: CreateUserValues = {
+  email: "",
+  role: "viewer",
+  password: "",
+  currentPassword: "",
+};
+
+/** A new owner is the one role the API asks for the actor's own password for. */
+export function createNeedsStepUp(values: Pick<CreateUserValues, "role">): boolean {
+  return values.role === "owner";
+}
 
 /** Whether leaving would discard typed input (the unsaved-changes guard). */
 export function isCreateDirty(values: CreateUserValues): boolean {
   return (
     values.email !== EMPTY_CREATE_VALUES.email ||
     values.password !== EMPTY_CREATE_VALUES.password ||
+    values.currentPassword !== EMPTY_CREATE_VALUES.currentPassword ||
     values.role !== EMPTY_CREATE_VALUES.role
   );
 }
@@ -49,15 +64,32 @@ export function createFormErrors(
   else if (email.length > EMAIL_MAX_LENGTH) errors.email = { key: "errors.reason.too_long" };
   const password = policyError(values.password, values.email);
   if (password !== undefined) errors.password = password;
+  // An empty re-entry would spend one of the five attempts the API allows per 15 minutes for nothing.
+  if (createNeedsStepUp(values) && values.currentPassword === "") {
+    errors.currentPassword = { key: "user.stepUp.required" };
+  }
   return errors;
 }
 
-/** `POST /admin/users`: exactly email (trimmed; the API lower-cases), role and password. */
+/**
+ * `POST /admin/users`: exactly email (trimmed; the API lower-cases), role and password, plus the actor's own password
+ * when (and only when) the new role is `owner`. A manager or viewer create sends three fields, as it always did.
+ */
 export function createBody(values: CreateUserValues): CreateAdminUserBody {
-  return { email: values.email.trim(), role: values.role, password: values.password };
+  return {
+    email: values.email.trim(),
+    role: values.role,
+    password: values.password,
+    ...(createNeedsStepUp(values) && values.currentPassword !== ""
+      ? { currentPassword: values.currentPassword }
+      : {}),
+  };
 }
 
-/** A `409 conflict` on `email` (another user has it, in any case) goes on the email field; the rest as usual. */
+/**
+ * A `409 conflict` on `email` (another user has it, in any case) goes on the email field, a wrong current password on
+ * that field, and a refusal without `errors[]` gets the area's own words (`describeUserRefusal`); the rest as usual.
+ */
 export function createErrorsFromProblem(
   status: number,
   problem: ProblemDetails,
@@ -65,7 +97,16 @@ export function createErrorsFromProblem(
   if (status === 409 && problem.code === "conflict" && problem.field === "email") {
     return { fields: { email: { key: "user.create.emailTaken" } }, other: [] };
   }
-  return fieldErrorsFromProblem(problem, ["email", "role", "password"], status);
+  if (status === 403 && problem.rule === PASSWORD_INCORRECT_RULE) {
+    return {
+      fields: { currentPassword: { key: `user.refusal.${PASSWORD_INCORRECT_RULE}` } },
+      other: [],
+    };
+  }
+  if ((problem.errors ?? []).length === 0) {
+    return { fields: {}, other: [describeUserRefusal(status, problem)] };
+  }
+  return fieldErrorsFromProblem(problem, CREATE_FIELDS, status);
 }
 
 export type ResetField = "newPassword";
@@ -79,11 +120,23 @@ export function resetFormErrors(
   return error === undefined ? {} : { newPassword: error };
 }
 
+/**
+ * The refusal of a reset. The form has no field for the actor's own password (it is typed in the confirmation), so a
+ * problem about it, and every refusal without `errors[]` (a wrong password, the step-up rules), goes to the summary
+ * with the area's own words.
+ */
 export function resetErrorsFromProblem(
   status: number,
   problem: ProblemDetails,
 ): FormErrors<ResetField> {
-  return fieldErrorsFromProblem(problem, ["newPassword"], status);
+  const paths = (problem.errors ?? []).map((error) => error.path);
+  if (paths.length === 0) {
+    return { fields: {}, other: [describeUserRefusal(status, problem)] };
+  }
+  const mapped = fieldErrorsFromProblem(problem, ["newPassword"], status);
+  return paths.includes("currentPassword")
+    ? { fields: mapped.fields, other: [{ key: "user.stepUp.required" }] }
+    : mapped;
 }
 
 /** Two emails as the API stores and compares them (trimmed, lower case). */

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { AdminRole } from "@fluxkit/core";
 import { eq } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -12,6 +13,7 @@ import {
 } from "../../test/admin-user-fixtures.js";
 import { startApp, type RunningApp } from "../../test/app.js";
 import { login, loginCookie } from "../../test/auth-http.js";
+import { requireEnv } from "../../test/env.js";
 import { FakeClock } from "../../test/fake-clock.js";
 import { http, type HttpResult } from "../../test/http.js";
 import { ensureMigrated } from "../../test/migrate.js";
@@ -76,7 +78,14 @@ describe("/admin/users (owner only)", () => {
 
   beforeAll(async () => {
     await ensureMigrated();
-    running = await startApp({ adminAuthenticator: "production-default", clock });
+    running = await startApp({
+      adminAuthenticator: "production-default",
+      clock,
+      // Promoting to owner and resetting an owner's password ask for the actor's current password, which needs the
+      // shared strict limits (ADR 0058). The limits of this file's few attempts live in its own Redis namespace.
+      redisUrl: requireEnv("REDIS_URL"),
+      rateLimitKeyPrefix: `users_${randomUUID()}`,
+    });
     db = running.app.get<Database>(DRIZZLE);
     // The last-owner rule counts ALL active owners of the database. This file runs alone against a `_test` database
     // (ensureMigrated refuses any other), so it starts from an empty user table.
@@ -436,8 +445,9 @@ describe("/admin/users (owner only)", () => {
         const other = await newUser("viewer");
         const promoted = await call<UserBody>("PATCH", `/admin/users/${other.id}`, owner.cookie, {
           role: "owner",
+          currentPassword: PASSWORD,
         });
-        expect(promoted.status).toBe(200);
+        expect(promoted.status, JSON.stringify(promoted.body)).toBe(200);
       });
     });
 
@@ -506,8 +516,9 @@ describe("/admin/users (owner only)", () => {
       const owner = await signedIn("owner");
       const result = await call("POST", `/admin/users/${owner.id}/reset-password`, owner.cookie, {
         newPassword: NEW_PASSWORD,
+        currentPassword: PASSWORD,
       });
-      expect(result.status).toBe(204);
+      expect(result.status, JSON.stringify(result.body)).toBe(204);
       expect((await call("GET", "/admin/auth/me", owner.cookie)).status).toBe(401);
     });
 
@@ -539,7 +550,7 @@ describe("/admin/users (owner only)", () => {
     it.each([
       ["no body", undefined],
       ["an empty object", {}],
-      ["an unknown field", { newPassword: NEW_PASSWORD, currentPassword: PASSWORD }],
+      ["an unknown field", { newPassword: NEW_PASSWORD, confirm: true }],
       ["a number", { newPassword: 123456789012 }],
     ])("answers 400 for %s", async (_name, body) => {
       const owner = await signedIn("owner");

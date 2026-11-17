@@ -15,7 +15,12 @@ import { offeredUserActions } from "./user-actions";
 import { CreateUnknownView, CreateUserFormView, CreatedPanel } from "./user-create-view";
 import { UserNoticeView, type UserNotice } from "./user-detail-page";
 import { UserDetailView } from "./user-detail-view";
-import { DeactivateDialog, ResetPasswordDialog, RoleChangeDialog } from "./user-dialogs";
+import {
+  ActivateDialog,
+  DeactivateDialog,
+  ResetPasswordDialog,
+  RoleChangeDialog,
+} from "./user-dialogs";
 import { EMPTY_CREATE_VALUES, type CreateUserValues } from "./user-form";
 import { UserListView, UserResultsView, type UserListState } from "./user-list-view";
 import { StatusLine } from "./user-parts";
@@ -89,6 +94,7 @@ function createForm(
       onEmailChange={noop}
       onRoleChange={noop}
       onPasswordChange={noop}
+      onCurrentPasswordChange={noop}
       onTogglePassword={noop}
       onGeneratePassword={noop}
       onSubmit={noop}
@@ -127,6 +133,7 @@ const dialogProps = {
   email: "anna@example.com",
   selfTicked: false,
   refusal: null,
+  stepUp: false,
   onSelfTick: noop,
   onConfirm: noop,
   onClose: noop,
@@ -283,11 +290,33 @@ describe("create user form", () => {
     expect(html.match(/§user\.permission\.orders\.read/g)).toHaveLength(2);
   });
 
+  it("asks for the actor's own password only while the chosen role is owner (ADR 0058)", () => {
+    expect(createForm(sentinel, EMPTY_CREATE_VALUES)).not.toMatch(/name="currentPassword"/);
+    const owning = createForm(sentinel, { ...EMPTY_CREATE_VALUES, role: "owner" });
+    expect(leftoverText(owning)).toBe("");
+    expect(owning).toContain("§user.stepUp.createHint");
+    const field = /<input[^>]*name="currentPassword"[^>]*>/.exec(owning)?.[0] ?? "";
+    expect(field).toContain('type="password"');
+    expect(field).toContain('autoComplete="current-password"');
+    expect(field).toContain('maxLength="1024"');
+    const refused = createForm(
+      sentinel,
+      { ...EMPTY_CREATE_VALUES, role: "owner" },
+      {},
+      { currentPassword: { key: "user.stepUp.required" } },
+    );
+    expect(refused).toContain("§user.stepUp.required");
+    expect(/<input[^>]*name="currentPassword"[^>]*>/.exec(refused)?.[0]).toContain(
+      'aria-invalid="true"',
+    );
+  });
+
   it("gives live policy feedback in words, and says a generated password is shown once", () => {
     const short = createForm(sentinel, { ...EMPTY_CREATE_VALUES, password: "abc" });
     expect(short).toContain("§user.password.notMet");
     expect(short).toContain("§user.password.ruleLength");
     const good = createForm(sentinel, {
+      ...EMPTY_CREATE_VALUES,
       email: "anna@example.com",
       role: "viewer",
       password: "a".repeat(12),
@@ -487,6 +516,54 @@ describe("the confirmations", () => {
     expect(own).toContain("§user.self.signedOutSignInAgain");
   });
 
+  it("asks for the actor's own password where the API does, and sends nothing while it is empty (ADR 0058)", () => {
+    const promote = renderInRouter(
+      <RoleChangeDialog
+        t={sentinel}
+        {...dialogProps}
+        stepUp
+        self={false}
+        from="manager"
+        to="owner"
+      />,
+    );
+    expect(leftoverText(promote)).toBe("");
+    expect(promote).toContain("§user.stepUp.label");
+    expect(promote).toContain("§user.stepUp.promote");
+    const field = /<input[^>]*name="currentPassword"[^>]*>/.exec(promote)?.[0] ?? "";
+    expect(field).toContain('type="password"');
+    expect(field).toContain('autoComplete="current-password"');
+    expect(field).toContain('spellCheck="false"');
+    expect(field).toContain('maxLength="1024"');
+    expect(field).toContain('value=""');
+    // Empty: the confirm button cannot spend one of the five attempts the API allows per 15 minutes.
+    const confirm = (html: string) =>
+      buttons(html).find((button) => button.includes("§user.roleDialog.submit")) ?? "";
+    expect(isDisabled(confirm(promote))).toBe(true);
+
+    const activate = renderInRouter(<ActivateDialog t={sentinel} {...dialogProps} stepUp self />);
+    expect(leftoverText(activate)).toBe("");
+    expect(activate).toContain("§user.stepUp.activate");
+    expect(activate).toMatch(/<input[^>]*name="currentPassword"/);
+    const reset = renderInRouter(<ResetPasswordDialog t={sentinel} {...dialogProps} stepUp self />);
+    expect(reset).toContain("§user.stepUp.reset");
+    expect(reset).toMatch(/<input[^>]*name="currentPassword"/);
+  });
+
+  it("asks for no password where the API does not: a demotion, a deactivation, a non-owner reset", () => {
+    for (const html of [
+      renderInRouter(
+        <RoleChangeDialog t={sentinel} {...dialogProps} self={false} from="owner" to="manager" />,
+      ),
+      renderInRouter(<DeactivateDialog t={sentinel} {...dialogProps} self={false} />),
+      renderInRouter(<ResetPasswordDialog t={sentinel} {...dialogProps} self={false} />),
+      renderInRouter(<ActivateDialog t={sentinel} {...dialogProps} self={false} />),
+    ]) {
+      expect(html).not.toMatch(/name="currentPassword"/);
+      expect(html).not.toContain("§user.stepUp.");
+    }
+  });
+
   it("explains a refusal inside the dialog and turns both buttons off while sending", () => {
     const refused = renderInRouter(
       <RoleChangeDialog
@@ -622,6 +699,15 @@ describe("with the real messages", () => {
       );
       expect(renderInRouter(<ResetPasswordDialog t={t} {...dialogProps} self />)).toContain(
         escapeHtml(t("user.self.signedOutSignInAgain")),
+      );
+      expect(
+        renderInRouter(<ResetPasswordDialog t={t} {...dialogProps} stepUp self={false} />),
+      ).toContain(escapeHtml(t("user.stepUp.label")));
+      expect(
+        renderInRouter(<ActivateDialog t={t} {...dialogProps} stepUp self={false} />),
+      ).toContain(escapeHtml(t("user.activateDialog.body", { email: dialogProps.email })));
+      expect(createForm(t, { ...EMPTY_CREATE_VALUES, role: "owner" })).toContain(
+        escapeHtml(t("user.stepUp.createHint")),
       );
       expect(
         renderInRouter(
