@@ -8,7 +8,7 @@ import {
   StatusBadge,
   type Translator,
 } from "@fluxkit/ui";
-import { useId, type ReactNode, type Ref } from "react";
+import { useEffect, useId, useState, type ReactNode, type Ref } from "react";
 import { Link } from "react-router";
 import type { MessageDescriptor } from "../../lib/problem-messages";
 import { mayConfirm, type Confirmation } from "./user-actions";
@@ -25,6 +25,9 @@ import {
 import { standaloneLinkClass } from "../../views/links";
 
 /** Presentational helpers of the users area: props in, markup out, every word from the translator. */
+
+/** The API's bound for the re-entered password (`MAX_CREDENTIAL_LENGTH`), so a longer paste is cut, not sent. */
+export const CURRENT_PASSWORD_MAX_LENGTH = 1024;
 
 export const focusClass =
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
@@ -251,6 +254,10 @@ export function NewPasswordField({
  * The confirmation of a user action: an alert dialog with the consequences spelled out, cancel first (the safe choice,
  * focused), and for an owner acting on their own account an explicit tick before the confirm button works. A refusal
  * (for example the last-owner rule) is explained inside the dialog. Escape and the buttons do nothing while sending.
+ *
+ * An owner operation (ADR 0058) also asks for the signed-in admin's own password. That password lives in THIS
+ * component's state and nowhere else: it is handed to `onConfirm` for the one request and wiped at the same moment, and
+ * it is wiped again whenever the dialog closes (cancel, Escape, a finished write) or the page unmounts it.
  */
 export function UserConfirmDialog({
   t,
@@ -277,14 +284,30 @@ export function UserConfirmDialog({
   refusal: MessageDescriptor | null;
   confirmLabel: string;
   onSelfTick: (ticked: boolean) => void;
-  onConfirm: () => void;
+  /** Gets the typed current password when this confirmation asks for one, `null` when it does not. */
+  onConfirm: (currentPassword: string | null) => void;
   onClose: () => void;
   /** The consequences, as paragraphs. */
   children: ReactNode;
 }) {
-  const allowed = mayConfirm(confirmation, selfTicked);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const allowed = mayConfirm(confirmation, selfTicked, currentPassword);
   // Every confirmation stays in the page while closed: each tick needs its own id for its label.
   const selfCheckId = useId();
+  const passwordId = useId();
+  useEffect(() => {
+    if (!open) setCurrentPassword("");
+  }, [open]);
+  useEffect(() => () => setCurrentPassword(""), []);
+
+  function confirm() {
+    if (!allowed || busy) return;
+    const typed = confirmation.stepUp ? currentPassword : null;
+    // Whatever the answer is, the typed password leaves this dialog with the request.
+    setCurrentPassword("");
+    onConfirm(typed);
+  }
+
   return (
     <Dialog
       open={open}
@@ -308,7 +331,7 @@ export function UserConfirmDialog({
             variant={confirmation.tone === "danger" ? "danger" : "primary"}
             disabled={busy || !allowed}
             aria-busy={busy || undefined}
-            onClick={onConfirm}
+            onClick={confirm}
           >
             {busy ? t("user.dialog.sending") : confirmLabel}
           </Button>
@@ -317,6 +340,30 @@ export function UserConfirmDialog({
     >
       <div className="flex flex-col gap-3">
         {children}
+        {confirmation.stepUp ? (
+          <Field
+            id={passwordId}
+            label={t("user.stepUp.label")}
+            hint={t("user.stepUp.hint")}
+            required
+          >
+            {(control) => (
+              <Input
+                {...control}
+                type="password"
+                name="currentPassword"
+                autoComplete="current-password"
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck={false}
+                maxLength={CURRENT_PASSWORD_MAX_LENGTH}
+                value={currentPassword}
+                disabled={busy}
+                onChange={(event) => setCurrentPassword(event.target.value)}
+              />
+            )}
+          </Field>
+        ) : null}
         {confirmation.selfCheck ? (
           <label
             htmlFor={selfCheckId}

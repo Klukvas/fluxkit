@@ -94,15 +94,21 @@ export interface CreateAdminUserBody {
   email: string;
   role: AdminRole;
   password: string;
+  /** The signed-in admin's own password. Required when the new role is `owner` (ADR 0058). */
+  currentPassword?: string;
 }
 
 export interface UpdateAdminUserBody {
   role?: AdminRole;
   isActive?: boolean;
+  /** Required when the change promotes somebody to owner or reactivates an inactive owner (ADR 0058). */
+  currentPassword?: string;
 }
 
 export interface ResetAdminUserPasswordBody {
   newPassword: string;
+  /** Required when the target is an owner, the signed-in admin themselves included (ADR 0058). */
+  currentPassword?: string;
 }
 
 // ------------------------------------------------------------------- config

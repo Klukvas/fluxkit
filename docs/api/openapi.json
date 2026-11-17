@@ -541,6 +541,7 @@
         "x-fluxkit-permission": "users.manage"
       },
       "post": {
+        "description": "Creating an OWNER needs the actor's current password (ADR 0058). Asks for the signed-in admin's `currentPassword` (`400` on `currentPassword` when it is missing, `403` with `rule: current_password_incorrect` when it is wrong, `429` when the five attempts per 15 minutes are spent, `503` with `rule: step_up_unavailable` while the shared limits cannot be reached).",
         "operationId": "UsersController_create",
         "parameters": [
           {
@@ -572,6 +573,14 @@
                   "password": {
                     "type": "string",
                     "maxLength": 1024
+                  },
+                  "currentPassword": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024,
+                    "writeOnly": true,
+                    "format": "password",
+                    "description": "The signed-in admin's current password. Required when the result is an owner account: creating an owner, promoting or reactivating one, or resetting an owner's password (their own included)."
                   }
                 },
                 "required": ["email", "role", "password"],
@@ -673,8 +682,28 @@
               }
             }
           },
+          "429": {
+            "description": "Too many requests: try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable: a transient failure, try again after the number of seconds in the Retry-After header.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -813,7 +842,7 @@
         "x-fluxkit-permission": "users.manage"
       },
       "patch": {
-        "description": "Deactivating ends all sessions of the user. The last active owner cannot be demoted or deactivated (409 `rule_violation`).",
+        "description": "Deactivating ends all sessions of the user. The last active owner cannot be demoted or deactivated (409 `rule_violation`). Promoting a non-owner to owner and reactivating an inactive owner need the actor's current password (ADR 0058); when the locked user makes that true only after the request was sent, the answer is `409 rule_violation` with `rule: owner_step_up_required` and nothing changes. Asks for the signed-in admin's `currentPassword` (`400` on `currentPassword` when it is missing, `403` with `rule: current_password_incorrect` when it is wrong, `429` when the five attempts per 15 minutes are spent, `503` with `rule: step_up_unavailable` while the shared limits cannot be reached).",
         "operationId": "UsersController_update",
         "parameters": [
           {
@@ -850,6 +879,14 @@
                   },
                   "isActive": {
                     "type": "boolean"
+                  },
+                  "currentPassword": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024,
+                    "writeOnly": true,
+                    "format": "password",
+                    "description": "The signed-in admin's current password. Required when the result is an owner account: creating an owner, promoting or reactivating one, or resetting an owner's password (their own included)."
                   }
                 },
                 "additionalProperties": false
@@ -960,8 +997,28 @@
               }
             }
           },
+          "429": {
+            "description": "Too many requests: try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable: a transient failure, try again after the number of seconds in the Retry-After header.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -978,7 +1035,7 @@
     },
     "/admin/users/{id}/reset-password": {
       "post": {
-        "description": "Clears the lockout and ends all sessions of that user.",
+        "description": "Clears the lockout and ends all sessions of that user. An OWNER target, the actor themselves included, needs the actor's current password (ADR 0058); when the locked user is an owner only after the request was sent, the answer is `409 rule_violation` with `rule: owner_step_up_required` and the password stays. Asks for the signed-in admin's `currentPassword` (`400` on `currentPassword` when it is missing, `403` with `rule: current_password_incorrect` when it is wrong, `429` when the five attempts per 15 minutes are spent, `503` with `rule: step_up_unavailable` while the shared limits cannot be reached).",
         "operationId": "UsersController_resetPassword",
         "parameters": [
           {
@@ -1012,6 +1069,14 @@
                   "newPassword": {
                     "type": "string",
                     "maxLength": 1024
+                  },
+                  "currentPassword": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024,
+                    "writeOnly": true,
+                    "format": "password",
+                    "description": "The signed-in admin's current password. Required when the result is an owner account: creating an owner, promoting or reactivating one, or resetting an owner's password (their own included)."
                   }
                 },
                 "required": ["newPassword"],
@@ -1064,8 +1129,38 @@
               }
             }
           },
+          "409": {
+            "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable: a transient failure, try again after the number of seconds in the Retry-After header.",
             "content": {
               "application/problem+json": {
                 "schema": {

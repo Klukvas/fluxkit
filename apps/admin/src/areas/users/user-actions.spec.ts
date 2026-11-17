@@ -8,6 +8,7 @@ import {
   confirmationOf,
   describeUserRefusal,
   mayConfirm,
+  needsOwnerStepUp,
   offeredUserActions,
   rolePatch,
   selfConsequence,
@@ -87,6 +88,38 @@ describe("the PATCH bodies", () => {
     const keys = Object.keys({ ...rolePatch(user(), "owner"), ...activityPatch(user(), false) });
     expect(keys.sort()).toEqual(["isActive", "role"]);
   });
+
+  it("carry the actor's own password only when one was typed", () => {
+    expect(rolePatch(user(), "owner", "my-password")).toEqual({
+      role: "owner",
+      currentPassword: "my-password",
+    });
+    expect(activityPatch(user({ isActive: false }), true, "my-password")).toEqual({
+      isActive: true,
+      currentPassword: "my-password",
+    });
+    expect(rolePatch(user(), "owner", "")).toEqual({ role: "owner" });
+    expect(rolePatch(user(), "owner", undefined)).toEqual({ role: "owner" });
+    // Nothing changed, so nothing is sent: not even the password.
+    expect(rolePatch(user({ role: "owner" }), "owner", "my-password")).toEqual({});
+  });
+});
+
+describe("which actions ask the signed-in admin for their own password (ADR 0058)", () => {
+  it("asks when the result is an owner: a promotion, the reactivation of an owner, an owner's reset", () => {
+    expect(needsOwnerStepUp("changeRole", user({ role: "manager" }), "owner")).toBe(true);
+    expect(needsOwnerStepUp("activate", user({ role: "owner", isActive: false }))).toBe(true);
+    expect(needsOwnerStepUp("resetPassword", user({ role: "owner" }))).toBe(true);
+  });
+
+  it("does not ask for a demotion, a deactivation, an owner saved as owner or any non-owner", () => {
+    expect(needsOwnerStepUp("changeRole", user({ role: "owner" }), "manager")).toBe(false);
+    expect(needsOwnerStepUp("changeRole", user({ role: "owner" }), "owner")).toBe(false);
+    expect(needsOwnerStepUp("changeRole", user({ role: "manager" }), "viewer")).toBe(false);
+    expect(needsOwnerStepUp("deactivate", user({ role: "owner" }))).toBe(false);
+    expect(needsOwnerStepUp("activate", user({ role: "manager", isActive: false }))).toBe(false);
+    expect(needsOwnerStepUp("resetPassword", user({ role: "manager" }))).toBe(false);
+  });
 });
 
 describe("confirmations", () => {
@@ -95,22 +128,43 @@ describe("confirmations", () => {
       ask: true,
       tone: "default",
       selfCheck: false,
+      stepUp: false,
     });
     expect(confirmationOf("deactivate", false)).toEqual({
       ask: true,
       tone: "danger",
       selfCheck: false,
+      stepUp: false,
     });
     expect(confirmationOf("resetPassword", false)).toEqual({
       ask: true,
       tone: "danger",
       selfCheck: false,
+      stepUp: false,
     });
     expect(confirmationOf("activate", false)).toEqual({
       ask: false,
       tone: "default",
       selfCheck: false,
+      stepUp: false,
     });
+  });
+
+  it("asks before activating when that needs the password re-entry, and never sends an empty one", () => {
+    expect(confirmationOf("activate", false, true)).toEqual({
+      ask: true,
+      tone: "default",
+      selfCheck: false,
+      stepUp: true,
+    });
+    const withStepUp = confirmationOf("resetPassword", false, true);
+    expect(mayConfirm(withStepUp, false, "")).toBe(false);
+    expect(mayConfirm(withStepUp, false, "my-password")).toBe(true);
+    // A tick that is required stays required, whatever is typed.
+    const both = confirmationOf("changeRole", true, true);
+    expect(mayConfirm(both, false, "my-password")).toBe(false);
+    expect(mayConfirm(both, true, "my-password")).toBe(true);
+    expect(mayConfirm(both, true, "")).toBe(false);
   });
 
   it("asks the owner for an extra explicit tick when changing their OWN role or activity", () => {
@@ -152,6 +206,22 @@ describe("refusals", () => {
         key: `user.refusal.${decision.reason}`,
       });
     }
+  });
+
+  it("explains the password re-entry in the area's words (ADR 0058)", () => {
+    expect(
+      describeUserRefusal(403, { code: "forbidden", rule: "current_password_incorrect" }),
+    ).toEqual({ key: "user.refusal.current_password_incorrect" });
+    expect(
+      describeUserRefusal(409, { code: "rule_violation", rule: "owner_step_up_required" }),
+    ).toEqual({ key: "user.refusal.owner_step_up_required" });
+    expect(
+      describeUserRefusal(503, { code: "service_unavailable", rule: "step_up_unavailable" }),
+    ).toEqual({ key: "user.refusal.step_up_unavailable" });
+    // The same rule under another code is not this area's case: the shell explains it.
+    expect(
+      describeUserRefusal(409, { code: "rule_violation", rule: "step_up_unavailable" }),
+    ).toEqual({ key: "errors.reason.step_up_unavailable" });
   });
 
   it("leaves every other refusal to the shell's problem map (the API's text is never shown)", () => {

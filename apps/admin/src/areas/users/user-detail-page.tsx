@@ -17,12 +17,13 @@ import {
   activityPatch,
   confirmationOf,
   describeUserRefusal,
+  needsOwnerStepUp,
   offeredUserActions,
   rolePatch,
   stateAfterUnknown,
   type UserAction,
 } from "./user-actions";
-import { DeactivateDialog, RoleChangeDialog } from "./user-dialogs";
+import { ActivateDialog, DeactivateDialog, RoleChangeDialog } from "./user-dialogs";
 import { UserDetailView } from "./user-detail-view";
 import { DescriptorText, StatusLine } from "./user-parts";
 import { ResetPasswordSection } from "./user-reset-form";
@@ -103,7 +104,8 @@ type DialogState =
       selfTicked: boolean;
       refusal: MessageDescriptor | null;
     }
-  | { action: "deactivate"; selfTicked: boolean; refusal: MessageDescriptor | null };
+  | { action: "deactivate"; selfTicked: boolean; refusal: MessageDescriptor | null }
+  | { action: "activate"; selfTicked: boolean; refusal: MessageDescriptor | null };
 
 function UserDetail({ userId }: { userId: string }) {
   const { t, locale } = useI18n();
@@ -218,15 +220,25 @@ function UserDetail({ userId }: { userId: string }) {
     return outcome;
   }
 
-  function perform(action: UserAction, role: AdminRole = selectedRole) {
+  /** Whether this action, on the user as last read, asks for the signed-in admin's own password (ADR 0058). */
+  function stepUpFor(action: UserAction, role: AdminRole = selectedRole): boolean {
+    return needsOwnerStepUp(action, current, action === "changeRole" ? role : undefined);
+  }
+
+  function perform(
+    action: UserAction,
+    role: AdminRole = selectedRole,
+    currentPassword: string | null = null,
+  ) {
     // The controls are only rendered for what the session may do; this keeps a stale click from sending anything else.
     if (!actions.includes(action)) return;
+    const stepUp = currentPassword ?? undefined;
     if (action === "changeRole") {
-      const patch = rolePatch(current, role);
+      const patch = rolePatch(current, role, stepUp);
       if (patch.role === undefined) return;
       void send(action, () => adminClient.updateUser(current.id, patch), patch.role);
     } else if (action === "deactivate" || action === "activate") {
-      const patch = activityPatch(current, action === "activate");
+      const patch = activityPatch(current, action === "activate", stepUp);
       if (patch.isActive === undefined) return;
       void send(action, () => adminClient.updateUser(current.id, patch));
     }
@@ -238,7 +250,10 @@ function UserDetail({ userId }: { userId: string }) {
       setDialog({ action, role: selectedRole, selfTicked: false, refusal: null });
     } else if (action === "deactivate") {
       setDialog({ action, selfTicked: false, refusal: null });
-    } else if (!confirmationOf(action, self).ask) {
+    } else if (confirmationOf(action, self, stepUpFor(action)).ask) {
+      // Activating an owner: the dialog exists to collect the password.
+      setDialog({ action: "activate", selfTicked: false, refusal: null });
+    } else {
       perform(action);
     }
   }
@@ -247,11 +262,11 @@ function UserDetail({ userId }: { userId: string }) {
     if (!busy) setDialog(null);
   }
 
-  function confirmDialog() {
+  function confirmDialog(currentPassword: string | null) {
     if (dialog === null) return;
     if (confirmationOf(dialog.action, self).selfCheck && !dialog.selfTicked) return;
-    if (dialog.action === "changeRole") perform(dialog.action, dialog.role);
-    else perform(dialog.action);
+    if (dialog.action === "changeRole") perform(dialog.action, dialog.role, currentPassword);
+    else perform(dialog.action, selectedRole, currentPassword);
   }
 
   const common = {
@@ -285,11 +300,10 @@ function UserDetail({ userId }: { userId: string }) {
             email={current.email}
             self={self}
             busy={busy || resource.refreshing}
-            send={(newPassword) =>
+            stepUp={stepUpFor("resetPassword")}
+            send={(body) =>
               actions.includes("resetPassword")
-                ? send("resetPassword", () =>
-                    adminClient.resetUserPassword(current.id, { newPassword }),
-                  )
+                ? send("resetPassword", () => adminClient.resetUserPassword(current.id, body))
                 : Promise.resolve(null)
             }
             onDirtyChange={onResetDirty}
@@ -303,12 +317,24 @@ function UserDetail({ userId }: { userId: string }) {
         to={dialog?.action === "changeRole" ? dialog.role : selectedRole}
         selfTicked={dialog?.selfTicked ?? false}
         refusal={dialog?.action === "changeRole" ? dialog.refusal : null}
+        stepUp={stepUpFor(
+          "changeRole",
+          dialog?.action === "changeRole" ? dialog.role : selectedRole,
+        )}
       />
       <DeactivateDialog
         {...common}
         open={dialog?.action === "deactivate"}
         selfTicked={dialog?.selfTicked ?? false}
         refusal={dialog?.action === "deactivate" ? dialog.refusal : null}
+        stepUp={stepUpFor("deactivate")}
+      />
+      <ActivateDialog
+        {...common}
+        open={dialog?.action === "activate"}
+        selfTicked={dialog?.selfTicked ?? false}
+        refusal={dialog?.action === "activate" ? dialog.refusal : null}
+        stepUp={stepUpFor("activate")}
       />
       <UnsavedChangesDialog blocker={blocker} />
     </>

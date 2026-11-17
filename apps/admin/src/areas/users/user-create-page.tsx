@@ -27,11 +27,12 @@ import {
 } from "./user-form";
 import { LOOKUP_PAGE_SIZE, findUserByEmail, type LookupResult } from "./user-lookup";
 
-const FIELD_ORDER: readonly CreateField[] = ["email", "role", "password"];
+const FIELD_ORDER: readonly CreateField[] = ["email", "role", "password", "currentPassword"];
 const FIELD_IDS: Record<CreateField, string> = {
   email: "user-email",
   role: "user-role-viewer",
   password: "user-password",
+  currentPassword: "user-current-password",
 };
 
 /**
@@ -67,8 +68,9 @@ export function UserCreatePage() {
     if (unknown !== null) unknownRef.current?.focus();
   }, [unknown]);
 
-  function clearPassword() {
-    setValues((current) => ({ ...current, password: "" }));
+  /** Both passwords leave the form after every answer: each is typed (or generated) again for another attempt. */
+  function clearPasswords() {
+    setValues((current) => ({ ...current, password: "", currentPassword: "" }));
     setPasswordVisible(false);
     setPasswordGenerated(false);
   }
@@ -109,8 +111,8 @@ export function UserCreatePage() {
     setUnknown(null);
     const outcome = await running.finally(() => setBusy(false));
     if (outcome.kind === "aborted") return;
-    // Whatever the answer, the password leaves the form: it is typed again (or generated) for another attempt.
-    clearPassword();
+    // Whatever the answer, the typed passwords leave the form.
+    clearPasswords();
     if (outcome.kind === "ok") {
       setFieldErrors({});
       setSummary([]);
@@ -157,11 +159,21 @@ export function UserCreatePage() {
         passwordVisible={passwordVisible}
         passwordGenerated={passwordGenerated}
         onEmailChange={(email) => setValues((current) => ({ ...current, email }))}
-        onRoleChange={(role) => setValues((current) => ({ ...current, role }))}
+        onRoleChange={(role) =>
+          // Leaving the owner role takes the re-entered password with it: it would not be sent anyway.
+          setValues((current) => ({
+            ...current,
+            role,
+            ...(role === "owner" ? {} : { currentPassword: "" }),
+          }))
+        }
         onPasswordChange={(password) => {
           setValues((current) => ({ ...current, password }));
           setPasswordGenerated(false);
         }}
+        onCurrentPasswordChange={(currentPassword) =>
+          setValues((current) => ({ ...current, currentPassword }))
+        }
         onTogglePassword={() => setPasswordVisible((visible) => !visible)}
         onGeneratePassword={() => {
           setValues((current) => ({ ...current, password: generatePassword() }));

@@ -1,14 +1,16 @@
 import type { APIRequestContext, Locator, Page, Response } from "@playwright/test";
 import { randomBytes } from "node:crypto";
 import { AdminApi, CSRF } from "../support/api.ts";
-import { ADMIN_E2E_ORIGIN, SPA, clientMarker } from "../support/env.ts";
+import { ADMIN_E2E_ORIGIN, OWNER_PASSWORD, SPA, clientMarker } from "../support/env.ts";
 import { expect, test, unique } from "../support/fixtures.ts";
 
 /**
  * The Integrations area (ADR 0058, slice 1). Every scenario signs in as an owner of its own: the API allows five password
  * re-entries per admin in 15 minutes (failed ones included), so a scenario that shared the suite's owner would spend the
- * budget of the others and of its own retry. No scenario asks for a password more than four times. The integrations
- * themselves are shared (one fake email provider), so every scenario first removes a key an earlier one left stored.
+ * budget of the others and of its own retry. No scenario asks for a password more than four times. Creating that own
+ * owner spends ONE re-entry of the suite's owner (ADR 0058 covers the owner operations too), so the three scenarios
+ * here use three of their five; a full retry of all three would exhaust it. The integrations themselves are shared
+ * (one fake email provider), so every scenario first removes a key an earlier one left stored.
  */
 
 const PROVIDER = "Test provider (fake)";
@@ -45,7 +47,8 @@ async function createOwner(owner: AdminApi, suffix: string): Promise<OwnOwner> {
     email: `e2e-integrations-${suffix}@example.com`,
     password: `e2e-${randomBytes(12).toString("hex")}-Pw`,
   };
-  await owner.createUser(account.email, "owner", account.password);
+  // Creating an owner asks the suite's owner for their own password (ADR 0058).
+  await owner.createUser(account.email, "owner", account.password, OWNER_PASSWORD);
   return account;
 }
 

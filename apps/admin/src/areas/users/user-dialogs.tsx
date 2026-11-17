@@ -19,8 +19,10 @@ interface CommonProps {
   self: boolean;
   selfTicked: boolean;
   refusal: MessageDescriptor | null;
+  /** This action makes an owner account, so it asks for the actor's current password too (ADR 0058). */
+  stepUp: boolean;
   onSelfTick: (ticked: boolean) => void;
-  onConfirm: () => void;
+  onConfirm: (currentPassword: string | null) => void;
   onClose: () => void;
 }
 
@@ -37,7 +39,7 @@ export function RoleChangeDialog({
       open={props.open}
       busy={props.busy}
       title={t("user.roleDialog.title")}
-      confirmation={confirmationOf("changeRole", props.self)}
+      confirmation={confirmationOf("changeRole", props.self, props.stepUp)}
       selfTicked={props.selfTicked}
       selfCheckLabel={t("user.dialog.selfCheck")}
       refusal={props.refusal}
@@ -55,6 +57,7 @@ export function RoleChangeDialog({
       </p>
       <p>{t("user.roleDialog.nextRequest")}</p>
       <p>{t("user.roleDialog.lastOwner")}</p>
+      {props.stepUp ? <p>{t("user.stepUp.promote")}</p> : null}
       {consequence === null ? null : <p className="font-medium">{t(`user.self.${consequence}`)}</p>}
     </UserConfirmDialog>
   );
@@ -68,7 +71,7 @@ export function DeactivateDialog({ t, ...props }: CommonProps) {
       open={props.open}
       busy={props.busy}
       title={t("user.deactivateDialog.title")}
-      confirmation={confirmationOf("deactivate", props.self)}
+      confirmation={confirmationOf("deactivate", props.self, props.stepUp)}
       selfTicked={props.selfTicked}
       selfCheckLabel={t("user.dialog.selfCheck")}
       refusal={props.refusal}
@@ -85,6 +88,33 @@ export function DeactivateDialog({ t, ...props }: CommonProps) {
   );
 }
 
+/**
+ * Activating a user needs no confirmation (nothing is lost), with one exception: reactivating an OWNER needs the
+ * actor's current password, and this dialog is where it is typed.
+ */
+export function ActivateDialog({ t, ...props }: CommonProps) {
+  return (
+    <UserConfirmDialog
+      t={t}
+      open={props.open}
+      busy={props.busy}
+      title={t("user.activateDialog.title")}
+      confirmation={confirmationOf("activate", props.self, props.stepUp)}
+      selfTicked={props.selfTicked}
+      selfCheckLabel={t("user.dialog.selfCheck")}
+      refusal={props.refusal}
+      confirmLabel={t("user.activateDialog.submit")}
+      onSelfTick={props.onSelfTick}
+      onConfirm={props.onConfirm}
+      onClose={props.onClose}
+    >
+      <p>{t("user.activateDialog.body", { email: props.email })}</p>
+      <p>{t("user.activateDialog.sessions")}</p>
+      {props.stepUp ? <p>{t("user.stepUp.activate")}</p> : null}
+    </UserConfirmDialog>
+  );
+}
+
 export function ResetPasswordDialog({ t, ...props }: CommonProps) {
   const consequence = selfConsequence("resetPassword", props.self);
   return (
@@ -93,7 +123,7 @@ export function ResetPasswordDialog({ t, ...props }: CommonProps) {
       open={props.open}
       busy={props.busy}
       title={t("user.resetDialog.title")}
-      confirmation={confirmationOf("resetPassword", props.self)}
+      confirmation={confirmationOf("resetPassword", props.self, props.stepUp)}
       selfTicked={props.selfTicked}
       selfCheckLabel={t("user.dialog.selfCheck")}
       refusal={props.refusal}
@@ -104,6 +134,7 @@ export function ResetPasswordDialog({ t, ...props }: CommonProps) {
     >
       <p>{t("user.resetDialog.body", { email: props.email })}</p>
       <p>{t("user.resetDialog.sessions")}</p>
+      {props.stepUp ? <p>{t("user.stepUp.reset")}</p> : null}
       {consequence === null ? (
         <p>{t("user.resetDialog.handover")}</p>
       ) : (

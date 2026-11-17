@@ -5,9 +5,21 @@ import { Link } from "react-router";
 import type { MessageDescriptor } from "../../lib/problem-messages";
 import { PATHS } from "../../router/paths";
 import { PageHeader } from "../../views/status-views";
-import { EMAIL_MAX_LENGTH, type CreateField, type CreateUserValues } from "./user-form";
+import {
+  createNeedsStepUp,
+  EMAIL_MAX_LENGTH,
+  type CreateField,
+  type CreateUserValues,
+} from "./user-form";
 import type { LookupResult } from "./user-lookup";
-import { DescriptorText, NewPasswordField, RoleBadge, RoleChoices, focusClass } from "./user-parts";
+import {
+  CURRENT_PASSWORD_MAX_LENGTH,
+  DescriptorText,
+  NewPasswordField,
+  RoleBadge,
+  RoleChoices,
+  focusClass,
+} from "./user-parts";
 import { userHref } from "./user-view";
 import { standaloneLinkClass } from "../../views/links";
 
@@ -26,6 +38,8 @@ export interface CreateUserFormViewProps {
   onEmailChange: (email: string) => void;
   onRoleChange: (role: AdminRole) => void;
   onPasswordChange: (password: string) => void;
+  /** The actor's own password (shown only while the chosen role is `owner`). */
+  onCurrentPasswordChange: (currentPassword: string) => void;
   onTogglePassword: () => void;
   onGeneratePassword: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
@@ -43,6 +57,7 @@ export function CreateUserFormView({
   onEmailChange,
   onRoleChange,
   onPasswordChange,
+  onCurrentPasswordChange,
   onTogglePassword,
   onGeneratePassword,
   onSubmit,
@@ -122,6 +137,35 @@ export function CreateUserFormView({
         onToggleVisible={onTogglePassword}
         onGenerate={onGeneratePassword}
       />
+      {createNeedsStepUp(values) ? (
+        <Field
+          id="user-current-password"
+          label={t("user.stepUp.label")}
+          hint={t("user.stepUp.createHint")}
+          error={
+            fieldErrors.currentPassword === undefined ? undefined : (
+              <DescriptorText t={t} descriptor={fieldErrors.currentPassword} />
+            )
+          }
+          required
+        >
+          {(control) => (
+            <Input
+              {...control}
+              type="password"
+              name="currentPassword"
+              autoComplete="current-password"
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
+              maxLength={CURRENT_PASSWORD_MAX_LENGTH}
+              value={values.currentPassword}
+              disabled={busy}
+              onChange={(event) => onCurrentPasswordChange(event.target.value)}
+            />
+          )}
+        </Field>
+      ) : null}
       <p className="max-w-prose text-sm text-muted-foreground">{t("user.create.handoverHint")}</p>
       <div>
         <Button type="submit" disabled={busy} aria-busy={busy || undefined}>

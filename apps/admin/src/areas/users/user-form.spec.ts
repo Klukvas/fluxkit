@@ -22,14 +22,25 @@ function problem(overrides: Partial<ProblemDetails>): ProblemDetails {
   };
 }
 
-const good = { email: "anna@example.com", role: "manager" as const, password: "a".repeat(12) };
+const good = {
+  email: "anna@example.com",
+  role: "manager" as const,
+  password: "a".repeat(12),
+  currentPassword: "",
+};
 
 describe("the create form", () => {
   it("starts empty with the least powerful role chosen", () => {
-    expect(EMPTY_CREATE_VALUES).toEqual({ email: "", role: "viewer", password: "" });
+    expect(EMPTY_CREATE_VALUES).toEqual({
+      email: "",
+      role: "viewer",
+      password: "",
+      currentPassword: "",
+    });
     expect(isCreateDirty(EMPTY_CREATE_VALUES)).toBe(false);
     expect(isCreateDirty({ ...EMPTY_CREATE_VALUES, email: "a" })).toBe(true);
     expect(isCreateDirty({ ...EMPTY_CREATE_VALUES, password: "a" })).toBe(true);
+    expect(isCreateDirty({ ...EMPTY_CREATE_VALUES, currentPassword: "a" })).toBe(true);
     expect(isCreateDirty({ ...EMPTY_CREATE_VALUES, role: "owner" })).toBe(true);
   });
 
@@ -41,6 +52,49 @@ describe("the create form", () => {
       password: "a".repeat(12),
     });
     expect(Object.keys(createBody(good)).sort()).toEqual(["email", "password", "role"]);
+  });
+
+  it("asks for the actor's own password for an owner, and sends it only then (ADR 0058)", () => {
+    const newOwner = { ...good, role: "owner" as const };
+    expect(createFormErrors(newOwner)).toEqual({
+      currentPassword: { key: "user.stepUp.required" },
+    });
+    expect(createFormErrors({ ...newOwner, currentPassword: "my-password" })).toEqual({});
+    expect(createBody({ ...newOwner, currentPassword: "my-password" })).toEqual({
+      email: good.email,
+      role: "owner",
+      password: good.password,
+      currentPassword: "my-password",
+    });
+    // A manager or viewer create is unchanged, even if a password is left in the field.
+    expect(createBody({ ...good, currentPassword: "my-password" })).toEqual({
+      email: good.email,
+      role: "manager",
+      password: good.password,
+    });
+  });
+
+  it("puts a wrong current password on its own field and never in the summary", () => {
+    const mapped = createErrorsFromProblem(
+      403,
+      problem({ status: 403, code: "forbidden", rule: "current_password_incorrect" }),
+    );
+    expect(mapped).toEqual({
+      fields: { currentPassword: { key: "user.refusal.current_password_incorrect" } },
+      other: [],
+    });
+  });
+
+  it("explains a refusal of the password re-entry that belongs to no field", () => {
+    expect(
+      createErrorsFromProblem(
+        503,
+        problem({ status: 503, code: "service_unavailable", rule: "step_up_unavailable" }),
+      ),
+    ).toEqual({ fields: {}, other: [{ key: "user.refusal.step_up_unavailable" }] });
+    expect(
+      createErrorsFromProblem(429, problem({ status: 429, code: "too_many_requests" })),
+    ).toEqual({ fields: {}, other: [{ key: "errors.code.too_many_requests" }] });
   });
 
   it("refuses an empty or too long email before sending", () => {
@@ -123,6 +177,27 @@ describe("the reset form", () => {
       fields: { newPassword: { key: "errors.reason.equals_email" } },
       other: [],
     });
+  });
+
+  it("explains the password re-entry: the form has no field for it (ADR 0058)", () => {
+    expect(
+      resetErrorsFromProblem(
+        400,
+        problem({ errors: [{ path: "currentPassword", code: "required", message: "x" }] }),
+      ),
+    ).toEqual({ fields: {}, other: [{ key: "user.stepUp.required" }] });
+    expect(
+      resetErrorsFromProblem(
+        403,
+        problem({ status: 403, code: "forbidden", rule: "current_password_incorrect" }),
+      ),
+    ).toEqual({ fields: {}, other: [{ key: "user.refusal.current_password_incorrect" }] });
+    expect(
+      resetErrorsFromProblem(
+        409,
+        problem({ status: 409, code: "rule_violation", rule: "owner_step_up_required" }),
+      ),
+    ).toEqual({ fields: {}, other: [{ key: "user.refusal.owner_step_up_required" }] });
   });
 });
 

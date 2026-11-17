@@ -1318,13 +1318,22 @@ const body = {
     object: { currentPassword: "string", newPassword: "string" },
   } satisfies Shape<Admin.AdminChangePasswordBody>,
   createUser: {
-    object: { email: "string", role, password: "string" },
+    object: {
+      email: "string",
+      role,
+      password: "string",
+      currentPassword: { optional: "string" },
+    },
   } satisfies Shape<Admin.CreateAdminUserBody>,
   updateUser: {
-    object: { role: { optional: role }, isActive: { optional: "boolean" } },
+    object: {
+      role: { optional: role },
+      isActive: { optional: "boolean" },
+      currentPassword: { optional: "string" },
+    },
   } satisfies Shape<Admin.UpdateAdminUserBody>,
   resetUserPassword: {
-    object: { newPassword: "string" },
+    object: { newPassword: "string", currentPassword: { optional: "string" } },
   } satisfies Shape<Admin.ResetAdminUserPasswordBody>,
   updateCustomer: {
     object: { isActive: "boolean" },
