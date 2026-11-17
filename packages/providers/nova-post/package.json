@@ -6,7 +6,14 @@
   "description": "Nova Post shipping provider (new REST API v.1.0, JWT): city and branch/parcel-locker lookups, estimate, waybills, find-back, cancel, tracking, labels.",
   "fluxkit": {
     "provider": "nova_post",
-    "kind": "shipping"
+    "kind": "shipping",
+    "secrets": [
+      {
+        "field": "api_key",
+        "purpose": "outbound",
+        "env": "NOVA_POST_API_KEY"
+      }
+    ]
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

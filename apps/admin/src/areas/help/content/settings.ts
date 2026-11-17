@@ -1,6 +1,6 @@
 import type { HelpArticle, HelpTopic } from "../help-model";
 
-/** Topic "Settings": email, personal data requests, admin users and roles, the audit log. */
+/** Topic "Settings": email, integrations, personal data requests, admin users and roles, the audit log. */
 export const SETTINGS_TOPIC: HelpTopic = {
   id: "settings",
   title: { uk: "Налаштування", en: "Settings" },
@@ -109,6 +109,87 @@ export const SETTINGS_ARTICLES: readonly HelpArticle[] = [
         },
       },
       { kind: "screen", route: "emailTemplates" },
+    ],
+  },
+  {
+    id: "integrations",
+    topic: "settings",
+    title: { uk: "Інтеграції та ключі сервісів", en: "Integrations and service keys" },
+    summary: {
+      uk: "Де ввести ключі API сервісів пошти, оплати та доставки, як вони зберігаються і чому ще не використовуються.",
+      en: "Where to enter the API keys of the email, payment and delivery services, how they are stored and why they are not used yet.",
+    },
+    keywords: {
+      uk: ["ключ", "токен", "інтеграція", "вебхук", "секрет", "api"],
+      en: ["key", "token", "integration", "webhook", "secret", "api"],
+    },
+    blocks: [
+      { kind: "heading", id: "keys", text: { uk: "Ключі сервісів", en: "Service keys" } },
+      {
+        kind: "paragraph",
+        text: {
+          uk: "Лише для власника. Екран «Інтеграції» показує встановлені сервіси пошти, оплати та доставки і для кожного ключа — чи його задано. Ключ можна ввести, замінити або вилучити. Сам ключ ніколи не показується знову: ні на екрані, ні у відповідях сервера.",
+          en: "Owner only. The Integrations screen lists the installed email, payment and delivery services and, for each key, whether it is set. A key can be entered, replaced or removed. The key itself is never shown again: not on the screen and not in the server's answers.",
+        },
+      },
+      {
+        kind: "warning",
+        text: {
+          uk: "Збережений ключ поки що не використовується. Сервіси й далі працюють із ключами, заданими на сервері; перехід на збережені ключі з’явиться в одному з наступних оновлень.",
+          en: "A saved key is not used yet. The services keep working with the keys set on the server; switching to saved keys comes in a later update.",
+        },
+      },
+      { kind: "screen", route: "integrations" },
+      {
+        kind: "heading",
+        id: "storage",
+        text: { uk: "Як зберігаються ключі", en: "How keys are stored" },
+      },
+      {
+        kind: "definitions",
+        items: [
+          {
+            term: { uk: "Не задано", en: "Not set" },
+            definition: {
+              uk: "Ключа немає ні на сервері, ні серед збережених.",
+              en: "There is no key on the server and none saved.",
+            },
+          },
+          {
+            term: { uk: "Збережено, ще не активний", en: "Saved, not active yet" },
+            definition: {
+              uk: "Ключ збережено зашифрованим. Ключ шифрування зберігається на сервері, а не в базі даних; якщо його змінити, збережені значення доведеться ввести знову.",
+              en: "The key is stored encrypted. The encryption key lives on the server, not in the database; if it is changed, the saved values have to be entered again.",
+            },
+          },
+          {
+            term: { uk: "Задано на сервері", en: "Set on the server" },
+            definition: {
+              uk: "Значення задано в налаштуваннях сервера. Тут воно лише для перегляду; змінює його розробник на сервері.",
+              en: "The value is set in the server settings. It is read-only here; the developer changes it on the server.",
+            },
+          },
+        ],
+      },
+      {
+        kind: "note",
+        text: {
+          uk: "Якщо на сервері не налаштовано ключ шифрування, екран попереджає про це і зберегти нічого не можна.",
+          en: "If the server has no encryption key configured, the screen says so and nothing can be saved.",
+        },
+      },
+      {
+        kind: "heading",
+        id: "password",
+        text: { uk: "Підтвердження паролем", en: "Password confirmation" },
+      },
+      {
+        kind: "paragraph",
+        text: {
+          uk: "Кожне збереження та вилучення ключа запитує ваш поточний пароль. Спроб небагато: до п’яти за 15 хвилин, разом із невдалими. Збереження, вилучення і неправильний пароль записуються в журнал дій — без самого ключа.",
+          en: "Every save and every removal of a key asks for your current password. The attempts are few: up to five in 15 minutes, failed ones included. A save, a removal and a wrong password are written to the audit log, without the key itself.",
+        },
+      },
     ],
   },
   {
@@ -311,8 +392,8 @@ export const SETTINGS_ARTICLES: readonly HelpArticle[] = [
       {
         kind: "paragraph",
         text: {
-          uk: "Лише для власника. Дії з клієнтами (деактивація, активація, розблокування), з адміністраторами (створення, зміна ролі, деактивація, активація, скидання пароля) і з персональними даними (пошук, експорт, стирання, зміни запитів). Журнал зберігає коди та ідентифікатори, без імен і адрес, і його не можна змінити.",
-          en: "Owner only. Actions on customers (deactivate, activate, unlock), on admin users (create, role change, deactivate, activate, password reset) and on personal data (lookup, export, erasure, request changes). The log keeps codes and ids, no names or addresses, and cannot be changed.",
+          uk: "Лише для власника. Дії з клієнтами (деактивація, активація, розблокування), з адміністраторами (створення, зміна ролі, деактивація, активація, скидання пароля) і з персональними даними (пошук, експорт, стирання, зміни запитів), а також із ключами інтеграцій (збереження, вилучення, неправильний пароль під час такої дії). Журнал зберігає коди та ідентифікатори, без імен і адрес, і його не можна змінити.",
+          en: "Owner only. Actions on customers (deactivate, activate, unlock), on admin users (create, role change, deactivate, activate, password reset) and on personal data (lookup, export, erasure, request changes), and on integration keys (save, remove, a wrong password on such an action). The log keeps codes and ids, no names or addresses, and cannot be changed.",
         },
       },
       { kind: "heading", id: "filters", text: { uk: "Пошук", en: "Searching" } },

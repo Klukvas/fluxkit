@@ -44,13 +44,17 @@ import type {
   AdminEmailMessageStatus,
   AdminEmailPreview,
   AdminEmailStatus,
+  AdminIntegrationDetail,
+  AdminIntegrationList,
   AdminEmailTemplateList,
   AdminShippingMethod,
   AdminShippingMethodList,
   AdminShippingProviderCheck,
   AdminShippingProviderSettings,
   CreateAdminShippingMethodBody,
+  PutAdminIntegrationSecretBody,
   PutAdminShippingProviderSettingsBody,
+  RetireAdminIntegrationSecretBody,
   SendAdminTestEmailBody,
   UpdateAdminShippingMethodBody,
   AdminBrandList,
@@ -467,6 +471,27 @@ export interface AdminClient {
     options?: AdminPreviewEmailTemplateOptions,
   ): Result<AdminEmailPreview>;
 
+  // integrations (ADR 0058; every operation needs `integrations.manage`, owner only). No answer carries a secret.
+  listIntegrations(options?: CallOptions): Result<AdminIntegrationList>;
+  getIntegration(id: string, options?: CallOptions): Result<AdminIntegrationDetail>;
+  /**
+   * Stores a candidate value, not used at runtime yet. `403 forbidden` `current_password_incorrect`; `409 rule_violation`
+   * `integration_storage_disabled`, `integration_env_override`, `integration_revision_stale`, `integration_unavailable`;
+   * `429`; `503` `step_up_unavailable`.
+   */
+  putIntegrationSecret(
+    id: string,
+    field: string,
+    body: PutAdminIntegrationSecretBody,
+    options?: CallOptions,
+  ): Result<AdminIntegrationDetail>;
+  /** `409 invalid_transition` `integration_version_not_retirable`; the password and limit answers of the save. */
+  retireIntegrationSecret(
+    id: string,
+    body: RetireAdminIntegrationSecretBody,
+    options?: CallOptions,
+  ): Result<AdminIntegrationDetail>;
+
   // brands
   createBrand(body: CreateAdminBrandBody, options?: CallOptions): Result<AdminBrand>;
   listBrands(options?: AdminPageOptions): Result<AdminBrandList>;
@@ -820,6 +845,13 @@ export function createAdminClient(options: AdminClientOptions): AdminClient {
     listEmailTemplates: (opts) => call("listEmailTemplates", { options: opts }),
     previewEmailTemplate: (key, opts) =>
       call("previewEmailTemplate", { pathParams: { key }, options: opts }),
+
+    listIntegrations: (opts) => call("listIntegrations", { options: opts }),
+    getIntegration: (id, opts) => call("getIntegration", { pathParams: { id }, options: opts }),
+    putIntegrationSecret: (id, field, body, opts) =>
+      call("putIntegrationSecret", { pathParams: { id, field }, body, options: opts }),
+    retireIntegrationSecret: (id, body, opts) =>
+      call("retireIntegrationSecret", { pathParams: { id }, body, options: opts }),
 
     createBrand: (body, opts) => call("createBrand", { body, options: opts }),
     listBrands: (opts) => call("listBrands", { options: opts }),

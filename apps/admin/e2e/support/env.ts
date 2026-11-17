@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -124,6 +124,21 @@ export function clientMarker(
   );
 }
 
+/** The key id of the run's master key; it also tells the harness's own value from one a developer exported. */
+const E2E_SECRETS_KEY = /^e2e:[A-Za-z0-9+/]{43}=$/;
+/** The fake email provider's webhook secret format (`packages/providers/_fake-email`), with the harness's own marker. */
+const E2E_FAKE_WEBHOOK_SECRET = /^fakewh_e2e[0-9a-f]{32}$/;
+
+/**
+ * A secret of this run: made here with `node:crypto`, never written in the repository. The API of the suite is started by
+ * the Playwright process, which hands the value on in the environment; `prepare-database.ts` (a child of that start) calls
+ * `apiEnvironment()` again and must keep the value it was given, so a value that already has the harness's own shape is
+ * reused. Anything else in the shell (a developer's real key) is replaced.
+ */
+function runSecret(inherited: string | undefined, shape: RegExp, create: () => string): string {
+  return inherited !== undefined && shape.test(inherited) ? inherited : create();
+}
+
 function requireVariable(env: Env, name: string): string {
   const value = env[name];
   if (value === undefined || value === "") {
@@ -191,9 +206,25 @@ export function apiEnvironment(env: Env = process.env): Env {
     MEDIA_PUBLIC_BASE_URL: `${ADMIN_E2E_ORIGIN}/media`,
     MEDIA_MAX_BYTES: "10485760",
     MEDIA_MAX_PIXELS: "50000000",
+    // Integrations (ADR 0058): the store is on, with a master key that lives for this run only (the database is wiped at
+    // the next start, so nothing sealed with it is ever read again).
+    SECRETS_ENCRYPTION_KEY: runSecret(
+      env["SECRETS_ENCRYPTION_KEY"],
+      E2E_SECRETS_KEY,
+      () => `e2e:${randomBytes(32).toString("base64")}`,
+    ),
+    // One credential of the fake email provider comes from the server, so the Integrations screen has a read-only one to show.
+    FAKE_EMAIL_WEBHOOK_SECRET: runSecret(
+      env["FAKE_EMAIL_WEBHOOK_SECRET"],
+      E2E_FAKE_WEBHOOK_SECRET,
+      () => `fakewh_e2e${randomBytes(16).toString("hex")}`,
+    ),
   };
   // The seed refuses NODE_ENV=production and the API must not run in a mode a developer's shell chose.
   delete result["NODE_ENV"];
   delete result["MEILI_API_KEY"];
+  // The other credential of the fake email provider starts "Not set", and no key is being rotated out.
+  delete result["FAKE_EMAIL_API_KEY"];
+  delete result["SECRETS_ENCRYPTION_KEY_PREVIOUS"];
   return result;
 }

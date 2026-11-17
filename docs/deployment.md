@@ -293,8 +293,20 @@ Notes:
 - **Postgres**: `docker compose ... exec -T postgres pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc > fluxkit-$(date +%F).dump` (daily, kept off the host). Restore into an empty database with `pg_restore`.
 - **Media volume** (`MEDIA_DIR`): back it up AFTER the database dump (files are only added; README "Uploaded images" explains why this order is safe): `docker run --rm -v fluxkit_media:/m:ro -v "$PWD":/b alpine tar -C /m -czf /b/media-$(date +%F).tgz .`
 - **Search index**: no backup needed. It is rebuilt from Postgres (see "Catalog search"); after a database restore run the reindex command.
-- **Secrets**: `infra/production.env` (at least `ORDER_TOKEN_SECRET`) belongs with the backups, encrypted.
+- **Secrets**: `infra/production.env` (at least `ORDER_TOKEN_SECRET`) belongs with the backups, encrypted. `SECRETS_ENCRYPTION_KEY` is kept apart from the database dump ("Integration credentials" below): a dump and this key together are the provider keys in the clear.
 - A restore has never been tested in this repository: test one before going live.
+
+## Integration credentials (ADR 0058)
+
+The owner can enter provider keys in the admin (Settings, Integrations). They are stored in Postgres, encrypted with `SECRETS_ENCRYPTION_KEY`. In this release a stored key is only kept: providers still read their keys from `production.env`, and a variable set there always wins.
+
+- **Switching it on:** add `SECRETS_ENCRYPTION_KEY=<key-id>:<base64>` to `production.env` (`openssl rand -base64 32` for the value; any short id such as `2026a`), then recreate the API containers. Every API replica needs the same value. Redis must be reachable: each change is rate limited there and is refused (`503`) when it is not.
+- **Who keeps the key:** whoever deploys the shop (our team or the client). Store a copy outside the host and apart from the database backups, with the same care as a password manager entry. Never put it into an image, a repository or a ticket.
+- **Losing it:** no shop data is lost. The stored provider keys become unreadable (the screen shows them as stored but not usable); the owner removes them and enters them again under a new key.
+- **Restore drill:** a restored database needs the key that was current when the dump was taken (or still present as `SECRETS_ENCRYPTION_KEY_PREVIOUS`). Test a restore with both.
+- **Rotation (manual for now):** set the new key as `SECRETS_ENCRYPTION_KEY` and the old one as `SECRETS_ENCRYPTION_KEY_PREVIOUS` on every replica, recreate the API, have the owner save each stored key again (new values are sealed under the new key), then remove `SECRETS_ENCRYPTION_KEY_PREVIOUS`. A rewrap command that re-encrypts without re-entering is planned, not built. Old backups stay encrypted under the old key: keep it for as long as they are kept.
+- **A leaked key or dump:** revoke the provider keys at the providers; deleting the stored copy does not revoke them.
+- Not verified on a real host yet.
 
 ## Logs
 
@@ -326,6 +338,7 @@ The test server's scripts and timers for these points are described in `docs/pla
 - [ ] Every selected primary/fallback mail provider has a verified sender, its own send key, authenticated reachable subscription, reconciled historical blocks and reviewed processor terms; migrations `0017`/`0018` and the sender cutover are complete. A local startup check does not prove remote feedback works.
 - [ ] `STOREFRONT_IMAGE_HOSTS` set before the storefront image was built; an uploaded image shows in the storefront (hairpin works).
 - [ ] Backups of Postgres and the media volume scheduled and a restore tested.
+- [ ] When the owner enters provider keys in the admin: `SECRETS_ENCRYPTION_KEY` set on every API replica and backed up apart from the database dumps ("Integration credentials").
 - [ ] Search: `infra/meilisearch.env` written (master key generated), the scoped key made, `SEARCH_ENABLED=true`, `GET /store/config` says `search: true`, a product found after the index is built; the engine's port is not published.
 - [ ] `FEATURES_ENABLED` decided; for each enabled feature the `migrate` log shows its migrations, `GET /store/config` lists it in `features` and its pages answer (section "Optional features").
 - [ ] Swagger UI stays unrouted: `/docs` and `/docs-json` answer 404 through the edge (owner's decision 2026-11-14).

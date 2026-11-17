@@ -56,5 +56,6 @@
   "nav.group.help": "Help",
   "page.help.title": "Help",
   "page.helpArticle.title": "Help article",
-  "nav.group.catalogSetup": "Catalog setup"
+  "nav.group.catalogSetup": "Catalog setup",
+  "page.integrations.title": "Integrations"
 }

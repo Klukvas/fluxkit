@@ -98,7 +98,7 @@ function renderItem(
     ...(item.current ? { "aria-current": "page" as const } : {}),
     className: cn(
       "flex items-center gap-3 rounded-control px-3 font-medium",
-      compact ? "min-h-9 py-1 text-sm pointer-coarse:min-h-11" : "min-h-11 py-2",
+      compact ? "min-h-8 py-1 text-sm pointer-coarse:min-h-11" : "min-h-11 py-2",
       collapsed && item.icon ? "justify-center" : undefined,
       focusRing,
       item.current

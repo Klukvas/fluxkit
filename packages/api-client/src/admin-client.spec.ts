@@ -705,3 +705,90 @@ describe("shared email suppressions", () => {
     expect(stub.calls).toHaveLength(1);
   });
 });
+
+describe("integrations (ADR 0058)", () => {
+  const ID = "11111111-1111-4111-8111-111111111111";
+  const VERSION = "33333333-3333-4333-8333-333333333333";
+  const integration = {
+    id: ID,
+    kind: "email",
+    providerCode: "resend",
+    secrets: [
+      {
+        field: "api_key",
+        purpose: "outbound",
+        envVariable: "RESEND_API_KEY",
+        state: "set",
+        last4: null,
+        versionId: VERSION,
+        generation: 1,
+        savedAt: "2026-11-16T10:00:00.000Z",
+        keyAvailable: true,
+      },
+    ],
+    updatedAt: "2026-11-16T10:00:00.000Z",
+  };
+  const detail = { revision: 4, storage: "ready", integration };
+
+  it("reads the list and one integration with GET and no body", async () => {
+    const list = { revision: 4, storage: "ready", items: [integration] };
+    const stub = fakeFetch((call) => jsonOk(call.url.endsWith(ID) ? detail : list));
+    const client = createAdminClient({ baseUrl: BASE, fetch: stub.fetch });
+    const listed = await client.listIntegrations();
+    expect(listed.ok && listed.data).toEqual(list);
+    const one = await client.getIntegration(ID);
+    expect(one.ok && one.data).toEqual(detail);
+    expect(stub.calls.map((call) => [call.init.method, call.url])).toEqual([
+      ["GET", `${BASE}/admin/integrations`],
+      ["GET", `${BASE}/admin/integrations/${ID}`],
+    ]);
+    expect(stub.calls[0]?.init.headers.get(CSRF_HEADER)).toBeNull();
+  });
+
+  it("sends a secret and the password in the JSON body only, with CSRF, once", async () => {
+    const stub = fakeFetch(() => jsonOk(detail));
+    const client = createAdminClient({ baseUrl: BASE, fetch: stub.fetch });
+    const body = { expectedRevision: 3, value: "re_secret_value", currentPassword: "pw" };
+    const saved = await client.putIntegrationSecret(ID, "api_key", body);
+    expect(saved.ok && saved.data).toEqual(detail);
+    const retire = { expectedRevision: 4, versionId: VERSION, currentPassword: "pw" };
+    await client.retireIntegrationSecret(ID, retire);
+    expect(stub.calls).toHaveLength(2);
+    const [put, post] = stub.calls;
+    expect([put?.init.method, put?.url]).toEqual([
+      "PUT",
+      `${BASE}/admin/integrations/${ID}/secrets/api_key`,
+    ]);
+    expect([post?.init.method, post?.url]).toEqual([
+      "POST",
+      `${BASE}/admin/integrations/${ID}/retire-secret`,
+    ]);
+    for (const call of stub.calls) {
+      expect(call.init.headers.get(CSRF_HEADER)).toBe("1");
+      expect(call.init.headers.get("Content-Type")).toBe("application/json");
+      expect(call.url).not.toContain("re_secret_value");
+      expect(call.url).not.toContain("pw");
+    }
+    expect(JSON.parse(put?.init.body as string)).toEqual(body);
+    expect(JSON.parse(post?.init.body as string)).toEqual(retire);
+  });
+
+  it("hands a wrong password back as a 403 problem with its rule, and the wait of a 429", async () => {
+    const answers = [
+      problemResponse(403, { code: "forbidden", rule: "current_password_incorrect" }),
+      problemResponse(429, { code: "too_many_requests" }, { "Retry-After": "120" }),
+    ];
+    const stub = fakeFetch(() => answers.shift() as Response);
+    const client = createAdminClient({ baseUrl: BASE, fetch: stub.fetch });
+    const body = { expectedRevision: 3, value: "re_secret_value", currentPassword: "wrong" };
+    const refused = await client.putIntegrationSecret(ID, "api_key", body);
+    expect(refused).toMatchObject({
+      ok: false,
+      status: 403,
+      problem: { code: "forbidden", rule: "current_password_incorrect" },
+    });
+    const limited = await client.putIntegrationSecret(ID, "api_key", body);
+    expect(limited).toMatchObject({ ok: false, status: 429, retryAfter: "120" });
+    expect(stub.calls).toHaveLength(2);
+  });
+});

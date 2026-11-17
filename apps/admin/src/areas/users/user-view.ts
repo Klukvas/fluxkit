@@ -28,6 +28,7 @@ export const USER_ROLE_PERMISSIONS: Readonly<Record<AdminRole, readonly AdminPer
     "email.manage",
     "payments.refund",
     "privacy.manage",
+    "integrations.manage",
   ],
   manager: [
     "catalog.read",

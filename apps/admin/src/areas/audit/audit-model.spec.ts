@@ -153,6 +153,9 @@ describe("the audit query in the URL", () => {
         "privacy.lookup",
         "privacy.request_changed",
         "email_suppression.removed",
+        "admin_user.step_up_failed",
+        "integration.secret_changed",
+        "integration.secret_retired",
       ].sort(),
     );
   });

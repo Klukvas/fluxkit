@@ -75,3 +75,25 @@ export function readResendWebhookSecret(
   }
   return secret;
 }
+
+/**
+ * The format rule of one managed secret field (`fluxkit.secrets` in package.json, ADR 0058), asked by the admin
+ * integration store before it encrypts a pasted value. Answers the problem (it names the rule, never the value) or
+ * `undefined`. The same accessors check the value when it comes from the environment.
+ */
+export function validateIntegrationSecret(field: string, value: string): string | undefined {
+  try {
+    if (field === "api_key") {
+      parseResendEnv({ RESEND_API_KEY: value });
+      return undefined;
+    }
+    if (field === "webhook_secret") {
+      readResendWebhookSecret({ RESEND_WEBHOOK_SECRET: value });
+      return undefined;
+    }
+  } catch (error) {
+    if (error instanceof ResendConfigError) return error.message;
+    throw error;
+  }
+  return "Unknown secret field.";
+}

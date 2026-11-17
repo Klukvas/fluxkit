@@ -60,3 +60,19 @@ export function parseMonobankEnv(
   }
   return Object.freeze({ token });
 }
+
+/**
+ * The format rule of one managed secret field (`fluxkit.secrets` in package.json, ADR 0058), asked by the admin
+ * integration store before it encrypts a pasted value. Answers the problem (it names the rule, never the value) or
+ * `undefined`. The same accessors check the value when it comes from the environment.
+ */
+export function validateIntegrationSecret(field: string, value: string): string | undefined {
+  if (field !== "token") return "Unknown secret field.";
+  try {
+    parseMonobankEnv({ MONOBANK_TOKEN: value });
+    return undefined;
+  } catch (error) {
+    if (error instanceof MonobankConfigError) return error.message;
+    throw error;
+  }
+}

@@ -133,6 +133,14 @@ const EMAIL_ROUTES = [
   "GET /admin/email/templates/:key/preview",
 ];
 
+/** Provider credentials (ADR 0058): owner only, declared once on the controller (`integrations.manage` for reads and writes). */
+const INTEGRATIONS_ROUTES = [
+  "GET /admin/integrations",
+  "GET /admin/integrations/:id",
+  "PUT /admin/integrations/:id/secrets/:field",
+  "POST /admin/integrations/:id/retire-secret",
+];
+
 /** The one route under /admin/products that needs an order permission: it links the orders that hold a variant's units. */
 const RESERVATIONS_ROUTE = "GET /admin/products/:id/variants/:variantId/inventory/reservations";
 
@@ -149,6 +157,7 @@ function expectedPermission(method: string, pattern: string): AdminPermission {
   }
   if (SHIPPING_ROUTES.includes(`${method} ${pattern}`)) return "shipping.manage";
   if (EMAIL_ROUTES.includes(`${method} ${pattern}`)) return "email.manage";
+  if (INTEGRATIONS_ROUTES.includes(`${method} ${pattern}`)) return "integrations.manage";
   if (CUSTOMERS_ROUTES.includes(`${method} ${pattern}`)) {
     return method === "GET" || method === "HEAD" ? "customers.read" : "customers.write";
   }
@@ -360,6 +369,7 @@ describe("admin route permissions", () => {
           !CUSTOMERS_ROUTES.includes(`${method} ${pattern}`) &&
           !SHIPPING_ROUTES.includes(`${method} ${pattern}`) &&
           !EMAIL_ROUTES.includes(`${method} ${pattern}`) &&
+          !INTEGRATIONS_ROUTES.includes(`${method} ${pattern}`) &&
           !PAYMENTS_ROUTES.includes(`${method} ${pattern}`) &&
           !ORDERS_ROUTES.includes(`${method} ${pattern}`),
       );
@@ -417,6 +427,7 @@ describe("admin route permissions", () => {
         "customers.read",
         "customers.write",
         "email.manage",
+        "integrations.manage",
         "orders.read",
         "orders.write",
         "payments.refund",
@@ -429,6 +440,9 @@ describe("admin route permissions", () => {
       }
       expect(permissionsOf("manager")).not.toContain("users.manage");
       expect(permissionsOf("manager")).not.toContain("privacy.manage");
+      // Provider credentials: the owner alone.
+      expect(permissionsOf("manager")).not.toContain("integrations.manage");
+      expect(permissionsOf("viewer")).not.toContain("integrations.manage");
       expect(permissionsOf("viewer")).not.toContain("users.manage");
       // Shipping settings are shop configuration: owner and manager, not the viewer.
       expect(permissionsOf("manager")).toContain("shipping.manage");

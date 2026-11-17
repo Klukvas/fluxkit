@@ -6,7 +6,19 @@
   "description": "Resend email provider: sends one transactional mail per call through POST https://api.resend.com/emails with the outbox message id as the idempotency key.",
   "fluxkit": {
     "provider": "resend",
-    "kind": "email"
+    "kind": "email",
+    "secrets": [
+      {
+        "field": "api_key",
+        "purpose": "outbound",
+        "env": "RESEND_API_KEY"
+      },
+      {
+        "field": "webhook_secret",
+        "purpose": "webhook",
+        "env": "RESEND_WEBHOOK_SECRET"
+      }
+    ]
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

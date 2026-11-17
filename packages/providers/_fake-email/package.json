@@ -6,7 +6,19 @@
   "description": "Test-only fake email provider. Deterministic, in-memory, no network. Fixture for the email provider matrix in CI and for tests of the email module.",
   "fluxkit": {
     "provider": "fake",
-    "kind": "email"
+    "kind": "email",
+    "secrets": [
+      {
+        "field": "api_key",
+        "purpose": "outbound",
+        "env": "FAKE_EMAIL_API_KEY"
+      },
+      {
+        "field": "webhook_secret",
+        "purpose": "webhook",
+        "env": "FAKE_EMAIL_WEBHOOK_SECRET"
+      }
+    ]
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

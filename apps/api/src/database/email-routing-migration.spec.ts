@@ -71,7 +71,10 @@ describe("email routing migration 0018 (real disposable Postgres)", () => {
     ).rows[0]?.indexdef as string;
     expect(index).toContain("(provider_code, sent_at)");
     expect(index).toContain("status = 'sent'");
+    const newerDown = await readFile(`${folder}/0019_integration_credentials.down.sql`, "utf8");
     for (let pass = 0; pass < 2; pass += 1) {
+      // The newer migration goes first: the migrator re-applies only what follows the newest journal row.
+      await pool.query(newerDown);
       await pool.query(down);
       expect(
         (await pool.query("select * from drizzle.__drizzle_migrations where created_at=$1", [when]))

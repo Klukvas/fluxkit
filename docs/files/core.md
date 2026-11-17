@@ -255,3 +255,10 @@ Pure rules for personal data (privacy plan step 3): no I/O; the clock and the ra
 - `src/email/webhook.spec.ts` — fact validation, allowlists and exact event-age boundaries.
 - `src/email/provider-port.ts` — optional authenticated `webhookVerifier` exposed through existing provider discovery.
 - `src/privacy/export.ts`, `src/privacy/audit.ts` — additive suppression metadata export and IDs-only suppression removal audit vocabulary; excludes addresses/internal receipt keys from suppression exports.
+
+## Integrations (`src/integrations/`, ADR 0058)
+
+- `src/integrations/index.ts` - barrel.
+- `src/integrations/secrets.ts` - the vocabulary of managed provider credentials: `INTEGRATION_KINDS`, `INTEGRATION_SECRET_PURPOSES`, `INTEGRATION_CREDENTIAL_STATES`, the field, variable and key-id patterns and limits; `parseIntegrationSecretDeclarations` (the `fluxkit.secrets` list of a provider manifest), `checkIntegrationSecretValue` (bounds of a pasted credential), `integrationSecretAad` (the length-prefixed additional authenticated data that binds an envelope to its row, provider, field, generation and key id). Pure: no crypto, no environment, no I/O. Spec: `secrets.spec.ts`.
+- `src/auth/roles.ts` also holds `integrations.manage` (owner only); `src/privacy/audit.ts` the actions `integration.secret_changed`, `integration.secret_retired`, `admin_user.step_up_failed` and the target kind `integration`; `src/privacy/data-inventory.ts` the class `encrypted_secret` (always excluded from export, outside a subject erasure).
+

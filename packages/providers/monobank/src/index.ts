@@ -18,6 +18,7 @@ export {
   parseMonobankEnv,
   type MonobankConfig,
   type MonobankPath,
+  validateIntegrationSecret,
 } from "./config.js";
 export {
   failureOfExchange,

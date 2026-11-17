@@ -56,5 +56,9 @@
   "audit.action.privacy.request_changed": "Запит щодо даних записано або змінено",
   "audit.action.unknown": "Інша дія",
   "audit.target.email_suppression": "Блокування пошти",
-  "audit.action.email_suppression.removed": "Блокування пошти знято"
+  "audit.action.email_suppression.removed": "Блокування пошти знято",
+  "audit.target.integration": "Інтеграція",
+  "audit.action.admin_user.step_up_failed": "Неправильний пароль під час захищеної дії",
+  "audit.action.integration.secret_changed": "Ключ інтеграції збережено",
+  "audit.action.integration.secret_retired": "Ключ інтеграції вилучено"
 }

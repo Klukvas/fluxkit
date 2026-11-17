@@ -5,6 +5,7 @@ import * as catalog from "./catalog/index.js";
 import * as content from "./content/index.js";
 import * as email from "./email/index.js";
 import * as core from "./index.js";
+import * as integrations from "./integrations/index.js";
 import * as inventory from "./inventory/index.js";
 import * as media from "./media/index.js";
 import * as orders from "./orders/index.js";
@@ -377,6 +378,7 @@ describe("public entry point", () => {
       catalog,
       content,
       email,
+      integrations,
       inventory,
       media,
       orders,

@@ -1,5 +1,6 @@
 import { customerTables } from "./tables-customer.js";
 import { fulfilmentTables } from "./tables-fulfilment.js";
+import { integrationTables } from "./tables-integrations.js";
 import { noPersonalDataTables } from "./tables-no-personal-data.js";
 import { orderTables } from "./tables-orders.js";
 import { privacyTables } from "./tables-privacy.js";
@@ -28,5 +29,6 @@ export const coreInventory: Inventory = {
   ...orderTables,
   ...fulfilmentTables,
   ...staffTables,
+  ...integrationTables,
   ...privacyTables,
 };

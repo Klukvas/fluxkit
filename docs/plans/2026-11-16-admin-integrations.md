@@ -266,3 +266,16 @@ The owner accepted the answers below ("да, принимаю, мержи пос
 4. **Redis unavailable:** the new sensitive actions (key and settings changes, test sends, connection checks) fail closed. The existing limiter's silent fallback to local counters (`apps/api/src/rate-limit/window-store.ts:107`) is a separate pre-existing issue, fixed in its own small PR outside this plan; recorded as a follow-up in `docs/HANDOFF.md`.
 5. **DNS:** the MVP uses the provider dashboard plus instructions in the wizard; automation (Resend temporary full-access key, Brevo domain reads) comes later.
 - Not changed by these answers: emergency revocation and the phasing (step 1b, then step 2 with the usage meter, then the managed-integrations MVP) follow the plan's recommendations. ADR 0057 is written at implementation start.
+
+## 12. Implementation slices (orchestrator, 2026-11-16)
+
+Section 9 item 2 is one MVP but too large for one reviewable PR. It ships as slices; a provider is never activated from the store before its safety path (bindings, revocation gate, merchant baseline) exists (§9 item 2, last sentence).
+
+| Slice | Content | State |
+|---|---|---|
+| 1. Encrypted store and owner key entry | ADR 0058; `SECRETS_ENCRYPTION_KEY` / `_PREVIOUS`; AES-256-GCM envelopes with the §3 AAD; migration 0019 (`integration_revision`, `integration`, `integration_credential_version`, `integration_secret`); `integrations.manage` (owner only); step-up with the strict fail-closed limits of §8; `GET /admin/integrations`, `GET /admin/integrations/{id}`, `PUT /admin/integrations/{id}/secrets/{field}`, `POST /admin/integrations/{id}/retire-secret`; audit `integration.secret_changed` / `integration.secret_retired` and failed step-up; privacy class `encrypted_secret`; api-client; admin Integrations screen (guided key entry, write-only, env-locked fields). Saved keys are **candidates only**: nothing reads them at runtime and providers still run from the server environment; the screen says so. | this PR |
+| 2. Runtime resolution and activation | Managed-mode discovery and per-version clients, env -> DB -> default resolver, activate/disable, `/check`, candidate test mail, durable bindings on mail/payment/shipment, final revocation gate, emergency revocation, Monobank merchant baseline, best-effort alert mails, settings (sender, route, limits) and the shipping profile move. Needs its own migration(s). | later |
+| 3. Operations | Rewrap command for master-key rotation, bounded candidate cleanup, retention review counts. | later |
+
+- Prerequisite of slice 2, outside this plan (HANDOFF section 4): password re-entry for creating, promoting, reactivating owners and resetting an owner's password. Until then a stolen owner session can mint a password and pass the step-up; in slice 1 that reaches only unused candidates, which cannot be read back.
+- Slice 1 deviations from the body, all conservative: ADR number 0058 (0057 was taken by the replica rollout); migration 0019; no `integration_setting`, merchant baseline, notification outbox or binding columns yet (added with the code that uses them); no alert mail yet (there is no active credential to protect; the audit record is written).

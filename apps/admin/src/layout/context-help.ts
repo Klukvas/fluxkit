@@ -71,6 +71,7 @@ export const CONTEXT_HELP: Readonly<Partial<Record<RouteId, ContextHelpTarget>>>
   emailMessageDetail: { article: "email", section: "messages" },
   emailTemplates: { article: "email", section: "templates" },
   emailTemplatePreview: { article: "email", section: "templates" },
+  integrations: { article: "integrations", section: "keys" },
   privacy: PRIVACY,
   privacyLookup: PRIVACY,
   privacyRequestDetail: { article: "personal-data", section: "erasure" },

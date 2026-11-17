@@ -412,6 +412,22 @@ export const ADMIN_OPERATIONS = {
     "email.manage",
     { query: ["locale"] },
   ),
+  listIntegrations: operation("GET", "/admin/integrations", [200], "integrations.manage"),
+  getIntegration: operation("GET", "/admin/integrations/{id}", [200], "integrations.manage"),
+  putIntegrationSecret: operation(
+    "PUT",
+    "/admin/integrations/{id}/secrets/{field}",
+    [200],
+    "integrations.manage",
+    { body: "json" },
+  ),
+  retireIntegrationSecret: operation(
+    "POST",
+    "/admin/integrations/{id}/retire-secret",
+    [200],
+    "integrations.manage",
+    { body: "json" },
+  ),
   createCategory: operation("POST", "/admin/categories", [201], "catalog.write", { body: "json" }),
   listCategories: operation("GET", "/admin/categories", [200], "catalog.read", {
     query: ["parentId", "limit", "offset"],

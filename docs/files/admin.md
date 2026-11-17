@@ -238,3 +238,23 @@ Run, headers and conventions: `apps/admin/README.md`. Plan: `docs/plans/2026-10-
 - `e2e/tests/email.e2e.ts` — also exercises per-row address show/hide, full-address confirmation/Keep, one CSRF DELETE and no resend in the real browser.
 
 - `src/areas/email/provider-usage-view.tsx` — ordered provider roles, shared cooldown/recovery state and UTC retained local all-account usage; clamps only visual bars, never edits limits or drives routing. `provider-usage.css` styles native progress tracks/fills with theme tokens; `provider-usage-view.spec.tsx` covers uk/en accessibility, over-cap values and off mode.
+
+## src/areas/integrations (ADR 0058 slice 1; one lazy chunk, `integrations.manage`, owner only)
+
+- `src/areas/integrations/index.tsx` — the area module: `MESSAGE_FILES` (`integrations`) and `IntegrationsPage` (`/integrations`).
+- `src/areas/integrations/integrations-page.tsx` — reads the list, opens the save or remove dialog, reloads after every answer and shows the notice (saved, removed, stale, unknown). Holds ids and names only, never a typed value.
+- `src/areas/integrations/integrations-list-view.tsx` — the "saved keys are not used yet" notice, the "no encryption key on the server" warning, providers by kind, one card per provider with its guide and its secrets (state, server variable, saved date, re-entry warning, Enter/Replace/Remove). Must NOT render a connection check, an activation or a DNS control.
+- `src/areas/integrations/integrations-view.ts` — pure view model: kind order, provider and field labels (unknown codes shown as they are), `secretView` (state, tone, which controls exist, what is disabled without storage).
+- `src/areas/integrations/provider-guides.ts` — the typed table of guide steps (message keys) and external https addresses per shipped provider. The only place of the area with an external address; never the API and never a message file.
+- `src/areas/integrations/secret-dialog.tsx` — the mounted dialog: local checks, one request per submit through `runWrite`, values taken out of the state before the request, error mapping, focus after commit.
+- `src/areas/integrations/secret-dialog-view.tsx` — the dialog's markup: two `type="password"` inputs with `autoComplete="off"` and no `name`, field errors, form alert.
+- `src/areas/integrations/use-secret-values.ts` — `useSecretValues`: the only state a typed key or password lives in; wipes on submit (`take`), close, session expiry or a change of the signed-in admin (`secretHolder`), unmount, `pagehide` and a `pageshow` from the Back/Forward cache. Must NOT be replaced by a store, a URL parameter or browser storage.
+- `src/areas/integrations/integrations-errors.ts` — maps the API's answers to messages: wrong password (403 by `rule`) on the password field, `value` codes on the key field, 409 rules, 429 with the wait, 503 on the form; `localSecretErrors`.
+- `src/areas/integrations/integrations-permissions.ts` — `canManageIntegrations` from the two write operations.
+- `src/areas/integrations/*.spec.ts(x)` — view model, error mapping, the clearing hook (a minimal hook runtime, no DOM), the per-role table, static markup in uk and en, and `integrations-source.spec.ts` (source guards of the secret lifecycle).
+- `src/messages/{uk,en}/integrations.json` — the area's strings (`intg.*`; the route title is in `navigation.json`, the permission label in `users.json`, the audit labels in `audit.json`).
+- `src/router/paths.ts`, `src/routes.ts`, `src/layout/navigation.ts`, `src/layout/context-help.ts`, `src/areas/help/content/settings.ts` — the `integrations` route (Settings group), its contextual help and the help article `integrations`.
+- `src/areas/audit/audit-model.ts`, `src/areas/users/user-view.ts` — the new audit actions and target kind, and `integrations.manage` in the owner's permission list.
+- `e2e/support/env.ts` — also `SECRETS_ENCRYPTION_KEY` (id `e2e`) and `FAKE_EMAIL_WEBHOOK_SECRET`, generated per run with `node:crypto` and reused by the child processes of the same start; `FAKE_EMAIL_API_KEY` is removed.
+- `e2e/support/step-up-limits.ts` — deletes the password re-entry limit keys of the e2e database's Redis namespace (`fluxkit:<database>:strict:*`) with the API's existing `ioredis`; called by `global-setup.ts`. Must NOT touch another namespace.
+- `e2e/tests/integrations.e2e.ts` — the browser scenarios: save, wrong password, invalid format, a server-set value, remove, no value in the page or in any answer after a reload, manager and viewer refused, a stale revision, session expiry while a key is typed. Each scenario uses an owner of its own (five password re-entries per admin in 15 minutes).

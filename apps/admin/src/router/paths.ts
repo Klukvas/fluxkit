@@ -48,6 +48,7 @@ export const PATHS = {
   emailMessageDetail: "/email/messages/:id",
   emailTemplates: "/email/templates",
   emailTemplatePreview: "/email/templates/:key",
+  integrations: "/integrations",
   privacy: "/privacy",
   privacyLookup: "/privacy/lookup",
   privacyRequestDetail: "/privacy/requests/:id",

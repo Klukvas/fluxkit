@@ -19,6 +19,7 @@ export {
   BREVO_USER_AGENT,
   BrevoConfigError,
   type BrevoConfig,
+  validateIntegrationSecret,
 } from "./config.js";
 export {
   mapBrevoAnswer,

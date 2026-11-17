@@ -25,6 +25,13 @@ export {
   type MediaStorageDriver,
 } from "./env.js";
 export {
+  parseSecretsKeyVariable,
+  SECRETS_KEY_BYTES,
+  SECRETS_KEY_ID_PATTERN,
+  type SecretsKey,
+  type SecretsKeyRing,
+} from "./secrets-key.js";
+export {
   DEFAULT_EMAIL_PROVIDER,
   EMAIL_PROVIDER_CHOICES,
   parseMailboxVariable,

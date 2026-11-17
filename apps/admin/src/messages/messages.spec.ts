@@ -10,6 +10,7 @@ import * as customers from "../areas/customers";
 import * as email from "../areas/email";
 import * as help from "../areas/help";
 import * as home from "../areas/home/home-workspace";
+import * as integrations from "../areas/integrations";
 import * as orders from "../areas/orders";
 import * as payments from "../areas/payments";
 import * as privacy from "../areas/privacy";
@@ -185,6 +186,7 @@ describe("the lazy file loader", () => {
       users: { uk: unused, en: unused },
       shipping: { uk: unused, en: unused },
       email: { uk: unused, en: unused },
+      integrations: { uk: unused, en: unused },
       payments: { uk: unused, en: unused },
       privacy: { uk: unused, en: unused },
       audit: { uk: unused, en: unused },
@@ -232,6 +234,7 @@ const AREA_FOLDERS: Record<string, readonly LazyFile[]> = {
   email: email.MESSAGE_FILES,
   help: help.MESSAGE_FILES,
   home: home.MESSAGE_FILES,
+  integrations: integrations.MESSAGE_FILES,
   orders: orders.MESSAGE_FILES,
   payments: payments.MESSAGE_FILES,
   privacy: privacy.MESSAGE_FILES,

@@ -49,6 +49,7 @@ describe("route table", () => {
       "users.manage",
       "shipping.manage",
       "email.manage",
+      "integrations.manage",
       "privacy.manage",
     ]);
     for (const route of ROUTES) {
@@ -103,6 +104,7 @@ describe("route table", () => {
       emailMessageDetail: "email.manage",
       emailTemplates: "email.manage",
       emailTemplatePreview: "email.manage",
+      integrations: "integrations.manage",
       privacy: "privacy.manage",
       privacyLookup: "privacy.manage",
       privacyRequestDetail: "privacy.manage",
