@@ -171,7 +171,13 @@ export async function checkPaymentProviderContract(
       "capabilities.currencies is not a non-empty list of distinct supported currencies",
     );
   }
-  for (const name of ["partialRefunds", "multipleRefunds", "invalidateUnpaid", "webhooks"]) {
+  for (const name of [
+    "partialRefunds",
+    "multipleRefunds",
+    "invalidateUnpaid",
+    "webhooks",
+    "formHandoff",
+  ]) {
     if (typeof capabilities?.[name] !== "boolean") {
       violations.push(`capabilities.${name} is not a boolean`);
     }
@@ -365,6 +371,7 @@ export async function checkPaymentProviderContract(
         ),
     ],
     ["verifyWebhook", (s) => provider.verifyWebhook(scenario.webhookFor(id), s)],
+    ["buildCheckoutHandoff", (s) => provider.buildCheckoutHandoff(scenario.create, s)],
   ];
   for (const [operation, call] of calls) {
     let answer: unknown;

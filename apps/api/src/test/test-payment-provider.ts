@@ -179,6 +179,19 @@ function bodyOf(fact: ProviderPaymentFact): WebhookBody {
   };
 }
 
+function parseWebhookBody(input: PaymentWebhookInput): WebhookBody {
+  const text = new TextDecoder().decode(input.rawBody);
+  const contentType = input.headers["content-type"] ?? "";
+  if (contentType.includes("application/x-www-form-urlencoded")) {
+    const data = new URLSearchParams(text).get("data");
+    if (data === null || data === "") {
+      throw new SyntaxError("missing data");
+    }
+    return JSON.parse(Buffer.from(data, "base64").toString("utf8")) as WebhookBody;
+  }
+  return JSON.parse(text) as WebhookBody;
+}
+
 function factOfBody(body: WebhookBody): ProviderPaymentFact {
   const currency = body.ccy as Money["currency"];
   return {
@@ -208,13 +221,21 @@ function factOfBody(body: WebhookBody): ProviderPaymentFact {
 @SetMetadata(PAYMENT_PROVIDER_METADATA, paymentProviderMetadata(TEST_PAYMENT_PROVIDER_CODE))
 export class TestPaymentProvider implements PaymentProviderPort {
   readonly code = TEST_PAYMENT_PROVIDER_CODE;
-  readonly capabilities = Object.freeze({
-    currencies: Object.freeze([...CURRENCY_CODES]),
-    partialRefunds: true,
-    multipleRefunds: true,
-    invalidateUnpaid: true,
-    webhooks: true,
-  });
+  /**
+   * When true, create returns the API's same-origin handoff URL and `buildCheckoutHandoff` answers a
+   * www.liqpay.ua form (the only allow-listed handoff host). Specs that exercise ADR 0059 turn this on.
+   */
+  formHandoff = false;
+  get capabilities() {
+    return Object.freeze({
+      currencies: Object.freeze([...CURRENCY_CODES]),
+      partialRefunds: true,
+      multipleRefunds: true,
+      invalidateUnpaid: true,
+      webhooks: true,
+      formHandoff: this.formHandoff,
+    });
+  }
 
   /** Invoices in creation order. */
   readonly invoices: TestInvoice[] = [];
@@ -279,6 +300,7 @@ export class TestPaymentProvider implements PaymentProviderPort {
     this.planned = [];
     this.gates.clear();
     this.refundMode = "succeeded";
+    this.formHandoff = false;
     this.tick = 0;
     this.runId = randomBytes(4).toString("hex");
   }
@@ -368,6 +390,24 @@ export class TestPaymentProvider implements PaymentProviderPort {
     return signedTestWebhook(this.webhookBody(providerPaymentId));
   }
 
+  /**
+   * Form-urlencoded webhook (ADR 0059 shape): `data` is base64(JSON status), signature still HMAC over the exact raw
+   * bytes. Lets store/webhook specs prove urlencoded bodies apply facts, without mounting a real LiqPay package.
+   */
+  formWebhookFor(providerPaymentId: string): PaymentWebhookInput {
+    const data = Buffer.from(this.webhookBody(providerPaymentId), "utf8").toString("base64");
+    const rawBody = new TextEncoder().encode(
+      new URLSearchParams({ data, signature: "form-placeholder" }).toString(),
+    );
+    return {
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        [TEST_PAYMENT_SIGNATURE_HEADER]: signTestWebhook(rawBody),
+      },
+      rawBody,
+    };
+  }
+
   createPayment(
     input: CreatePaymentInput,
     signal: ProviderAbortSignal,
@@ -393,7 +433,10 @@ export class TestPaymentProvider implements PaymentProviderPort {
       });
       return paymentProviderOk({
         providerPaymentId,
-        redirectUrl: `https://pay.test.invalid/${providerPaymentId}`,
+        redirectUrl:
+          this.formHandoff && typeof input.handoffUrl === "string" && input.handoffUrl !== ""
+            ? input.handoffUrl
+            : `https://pay.test.invalid/${providerPaymentId}`,
       });
     });
   }
@@ -497,12 +540,39 @@ export class TestPaymentProvider implements PaymentProviderPort {
         return paymentProviderFailure("invalid_signature");
       }
       try {
-        const body = JSON.parse(new TextDecoder().decode(input.rawBody)) as WebhookBody;
-        return paymentProviderOk(factOfBody(body));
+        return paymentProviderOk(factOfBody(parseWebhookBody(input)));
       } catch {
         return paymentProviderFailure("rejected", { providerCodes: ["malformed_body"] });
       }
     });
+  }
+
+  buildCheckoutHandoff(
+    input: CreatePaymentInput,
+    signal: ProviderAbortSignal,
+  ): Promise<
+    PaymentProviderResult<{ actionUrl: string; fields: Readonly<Record<string, string>> }>
+  > {
+    if (signal.aborted) {
+      return Promise.resolve(paymentProviderFailure("not_sent"));
+    }
+    if (!this.formHandoff) {
+      return Promise.resolve(
+        paymentProviderFailure("not_sent", { providerCodes: ["handoff_unsupported"] }),
+      );
+    }
+    // Host must match PaymentHandoffService's allow-list (`www.liqpay.ua`); fields are opaque to the API.
+    return Promise.resolve(
+      paymentProviderOk({
+        actionUrl: "https://www.liqpay.ua/api/3/checkout",
+        fields: Object.freeze({
+          data: Buffer.from(
+            JSON.stringify({ order_id: input.paymentId, amount: input.amount.amount }),
+          ).toString("base64"),
+          signature: "test-handoff-signature",
+        }),
+      }),
+    );
   }
 
   private now(): Date {

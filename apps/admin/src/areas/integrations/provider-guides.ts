@@ -40,6 +40,17 @@ const GUIDES = {
     ],
     fieldHintKeys: {},
   },
+  liqpay: {
+    stepKeys: ["intg.guide.liqpay.step1", "intg.guide.liqpay.step2", "intg.guide.liqpay.step3"],
+    links: [
+      { labelKey: "intg.guide.liqpay.link.docs", href: "https://www.liqpay.ua/en/doc" },
+      { labelKey: "intg.guide.liqpay.link.cabinet", href: "https://www.liqpay.ua/" },
+    ],
+    fieldHintKeys: {
+      public_key: "intg.guide.liqpay.publicKey",
+      private_key: "intg.guide.liqpay.privateKey",
+    },
+  },
   nova_post: {
     stepKeys: [
       "intg.guide.nova_post.step1",

@@ -42,7 +42,7 @@ describe("buildContentSecurityPolicy (production)", () => {
   it("forbids framing, a foreign base URI and foreign form targets", () => {
     expect(policy.get("frame-ancestors")).toEqual(["'none'"]);
     expect(policy.get("base-uri")).toEqual(["'self'"]);
-    expect(policy.get("form-action")).toEqual(["'self'"]);
+    expect(policy.get("form-action")).toEqual(["'self'", "https://www.liqpay.ua"]);
   });
 
   it("names no wildcard and no http: source", () => {
@@ -190,7 +190,9 @@ describe("no third-party origin and no cookie but the theme cookie (ADR 0033 dec
             source === "data:" || (development && (source === "ws:" || source === "wss:"));
           const imageHost =
             name === "img-src" && imageHosts.some((host) => source === `https://${host}`);
-          expect(keyword || scheme || imageHost, `${name} ${source}`).toBe(true);
+          // ADR 0059: form-action always allows the LiqPay checkout host.
+          const liqpayForm = name === "form-action" && source === "https://www.liqpay.ua";
+          expect(keyword || scheme || imageHost || liqpayForm, `${name} ${source}`).toBe(true);
         }
       }
     }

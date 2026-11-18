@@ -34,6 +34,7 @@ describe("the provider module (what the API's loader mounts)", () => {
       multipleRefunds: true,
       invalidateUnpaid: true,
       webhooks: true,
+      formHandoff: false,
     });
     // The no-network guard of this suite fails the file if anything was sent.
     await moduleRef.close();

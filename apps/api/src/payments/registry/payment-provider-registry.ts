@@ -17,6 +17,7 @@ const PORT_METHODS = [
   "invalidatePayment",
   "refund",
   "verifyWebhook",
+  "buildCheckoutHandoff",
 ] as const satisfies readonly (keyof PaymentProviderPort)[];
 
 const CAPABILITY_FLAGS = [
@@ -24,6 +25,7 @@ const CAPABILITY_FLAGS = [
   "multipleRefunds",
   "invalidateUnpaid",
   "webhooks",
+  "formHandoff",
 ] as const;
 
 /** Read-only view of the registry for the code that calls providers. */

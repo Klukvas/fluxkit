@@ -294,6 +294,7 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
       [
         join("components", "checkout-page.tsx"),
         join("components", "order-payment.tsx"),
+        join("components", "payment-handoff-page.tsx"),
         join("components", "payment-return-page.tsx"),
         join("lib", "checkout-draft.ts"),
       ].sort(),
@@ -546,9 +547,11 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
     expect(paymentFiles.map((file) => file.path).sort()).toEqual(
       [
         join("components", "order-payment.tsx"),
+        join("components", "payment-handoff-page.tsx"),
         join("components", "payment-return-page.tsx"),
         join("components", "payment-section.tsx"),
         join("lib", "payment-attempt.ts"),
+        join("lib", "payment-handoff.ts"),
         join("lib", "payment-model.ts"),
         join("lib", "payment-poll.ts"),
         join("lib", "payment-redirect.ts"),
@@ -561,13 +564,20 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
 
   it("reaches the payment routes through the typed client only: no fetch, no absolute URL, no other transport", () => {
     for (const file of paymentFiles) {
+      // Handoff allow-lists the LiqPay host (ADR 0059); it never hardcodes a full URL with a scheme.
+      if (file.path === join("lib", "payment-handoff.ts")) {
+        expect(code(file.text), file.path).not.toMatch(
+          /\bfetch\s*\(|XMLHttpRequest|WebSocket|EventSource|sendBeacon|https?:\/\//,
+        );
+        continue;
+      }
       expect(code(file.text), file.path).not.toMatch(
         /\bfetch\s*\(|XMLHttpRequest|WebSocket|EventSource|sendBeacon|https?:\/\//,
       );
     }
   });
 
-  it("calls the four payment routes from lib/payment-store.ts only (the guest token travels in their bodies there)", () => {
+  it("calls the payment routes from lib/payment-store.ts or the handoff bridge only (the guest token travels in their bodies there)", () => {
     for (const name of [
       "createOrderPayment",
       "getOrderPaymentStatus",
@@ -578,6 +588,12 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
         .filter((file) => new RegExp(`\\.${name}\\(`).test(code(file.text)))
         .map((file) => file.path);
       expect(callers, name).toEqual([join("lib", "payment-store.ts")]);
+    }
+    for (const name of ["getOrderPaymentHandoff", "getAccountOrderPaymentHandoff"]) {
+      const callers = sources
+        .filter((file) => new RegExp(`\\.${name}\\(`).test(code(file.text)))
+        .map((file) => file.path);
+      expect(callers, name).toEqual([join("lib", "payment-handoff.ts")]);
     }
   });
 
@@ -590,8 +606,15 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
     expect(code(redirect?.text ?? "")).toMatch(
       /const url = providerRedirectUrl\(raw\);\s*if \(url === null\) return false;\s*win\.location\.assign\(url\);/,
     );
-    // A provider page is reached by navigating, never by a form post (the CSP has form-action 'self').
-    for (const file of paymentFiles) expect(code(file.text), file.path).not.toMatch(/<form\b/);
+    // Provider pages are reached by navigating; the only form POST is the LiqPay handoff bridge (ADR 0059),
+    // built in lib/payment-handoff.ts (not JSX <form>).
+    for (const file of paymentFiles) {
+      if (file.path === join("lib", "payment-handoff.ts")) continue;
+      expect(code(file.text), file.path).not.toMatch(/<form\b/);
+    }
+    const handoff = sources.find((file) => file.path === join("lib", "payment-handoff.ts"));
+    expect(code(handoff?.text ?? "")).toMatch(/createElement\("form"\)/);
+    expect(code(handoff?.text ?? "")).toMatch(/www\.liqpay\.ua/);
   });
 
   it("feeds goToProvider from the API's answer only: never from a query string, a fragment or storage", () => {
@@ -607,35 +630,47 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
     );
   });
 
-  it("reads the query only in the return page, only through paymentIdFromSearch (an attempt id, nothing else)", () => {
+  it("reads the query only in the return and handoff pages, only through paymentIdFromSearch (an attempt id, nothing else)", () => {
     const readers = sources.filter((file) =>
       /location\.search|useSearchParams|URLSearchParams|searchParams/.test(code(file.text)),
     );
     const names = readers.map((file) => file.path);
     expect(names).toContain(join("components", "payment-return-page.tsx"));
-    const page = sources.find(
-      (file) => file.path === join("components", "payment-return-page.tsx"),
-    );
-    expect(code(page?.text ?? "")).toMatch(/paymentIdFromSearch\(window\.location\.search\)/);
-    // That is the ONLY read of the query in the page: a status, an amount or an order number there is never looked at.
-    expect(code(page?.text ?? "").match(/location\.search/g)).toHaveLength(1);
-    expect(code(page?.text ?? "")).not.toMatch(/useSearchParams|URLSearchParams|searchParams/);
+    expect(names).toContain(join("components", "payment-handoff-page.tsx"));
+    for (const pagePath of [
+      join("components", "payment-return-page.tsx"),
+      join("components", "payment-handoff-page.tsx"),
+    ]) {
+      const page = sources.find((file) => file.path === pagePath);
+      expect(code(page?.text ?? ""), pagePath).toMatch(
+        /paymentIdFromSearch\(window\.location\.search\)/,
+      );
+      expect(code(page?.text ?? "").match(/location\.search/g), pagePath).toHaveLength(1);
+      expect(code(page?.text ?? ""), pagePath).not.toMatch(
+        /useSearchParams|URLSearchParams|searchParams/,
+      );
+    }
     // The id parser takes the `payment` member and nothing else.
     const parser = sources.find((file) => file.path === join("lib", "payment-return.ts"));
     expect(code(parser?.text ?? "").match(/getAll\(/g)).toEqual(["getAll("]);
     expect(code(parser?.text ?? "")).toMatch(/getAll\("payment"\)/);
-    // No payment module other than the id parser touches the query.
+    // No payment module other than the id parser and those two pages touches the query.
     for (const file of paymentFiles) {
       if (file.path === join("lib", "payment-return.ts")) continue;
       if (file.path === join("components", "payment-return-page.tsx")) continue;
+      if (file.path === join("components", "payment-handoff-page.tsx")) continue;
       expect(code(file.text), file.path).not.toMatch(
         /location\.search|useSearchParams|URLSearchParams|searchParams/,
       );
     }
-    // The server shell of the return route reads nothing of the request.
-    const route = sources.find((file) => file.path.includes(join("payment", "return", "page.tsx")));
-    expect(route).toBeDefined();
-    expect(code(route?.text ?? "")).not.toMatch(/searchParams|headers\(|cookies\(/);
+    // The server shells of the return and handoff routes read nothing of the request.
+    for (const segment of ["return", "handoff"]) {
+      const route = sources.find((file) =>
+        file.path.includes(join("payment", segment, "page.tsx")),
+      );
+      expect(route, segment).toBeDefined();
+      expect(code(route?.text ?? ""), segment).not.toMatch(/searchParams|headers\(|cookies\(/);
+    }
   });
 
   // Search plan step 10a: the header box, the results page and the filter form.
@@ -719,6 +754,15 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
   it("hardcodes no payment provider, host or page: the provider URL is the API's answer", () => {
     const provider = /monobank|liqpay|wayforpay|fondy|stripe|paypal|portmone|pay\.fake/i;
     for (const file of sources) {
+      // ADR 0059: the handoff bridge allow-lists www.liqpay.ua only (host, never a full checkout URL).
+      if (file.path === join("lib", "payment-handoff.ts")) {
+        expect(code(file.text)).toMatch(/www\.liqpay\.ua/);
+        expect(code(file.text)).not.toMatch(
+          /monobank|wayforpay|fondy|stripe|paypal|portmone|pay\.fake/i,
+        );
+        expect(code(file.text)).not.toMatch(/https?:\/\/www\.liqpay\.ua/i);
+        continue;
+      }
       expect(code(file.text), `${file.path} names a payment provider`).not.toMatch(provider);
     }
   });

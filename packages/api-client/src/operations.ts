@@ -86,6 +86,10 @@ export const OPERATIONS = {
   getOrderPaymentStatus: operation("POST", "/store/orders/payments/status", [200], {
     hasBody: true,
   }),
+  /** Form-handoff checkout fields (LiqPay, ADR 0059). */
+  getOrderPaymentHandoff: operation("POST", "/store/orders/payments/handoff", [200], {
+    hasBody: true,
+  }),
   createAccountOrderPayment: operation(
     "POST",
     "/store/account/orders/{number}/payments",
@@ -95,6 +99,11 @@ export const OPERATIONS = {
   getAccountOrderPayment: operation(
     "GET",
     "/store/account/orders/{number}/payments/{paymentId}",
+    [200],
+  ),
+  getAccountOrderPaymentHandoff: operation(
+    "POST",
+    "/store/account/orders/{number}/payments/{paymentId}/handoff",
     [200],
   ),
   listBanners: operation("GET", "/store/banners", [200], { query: LOCALE }),

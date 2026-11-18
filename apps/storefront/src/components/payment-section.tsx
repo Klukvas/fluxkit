@@ -10,6 +10,7 @@ import {
 import { formatDateTime } from "../lib/date";
 import { failureText } from "../lib/failure";
 import {
+  needsPaymentProviderChoice,
   paymentFailureKey,
   paymentStatusKey,
   secondsLeft,
@@ -49,6 +50,9 @@ export interface PaymentSectionViewProps {
   pay: PayState;
   /** The clock for the countdown, epoch milliseconds. */
   now: number;
+  /** Shopper choice when `model.providers.length > 1`; ignored otherwise. */
+  selectedProvider: string | null;
+  onSelectProvider: (code: string) => void;
   onPay: () => void;
   onContinue: (url: string, paymentId: string) => void;
   onCheckStatus: (paymentId: string) => void;
@@ -100,12 +104,14 @@ function effectiveAction(
 }
 
 export function PaymentSectionView(props: PaymentSectionViewProps) {
-  const { t, locale, model, pay, now } = props;
+  const { t, locale, model, pay, now, selectedProvider } = props;
   const busy = pay.phase === "pending" || pay.phase === "redirecting";
   const wait = pay.waitUntil === null ? 0 : secondsLeft(pay.waitUntil, now);
   const waiting = wait > 0;
   const { action, paymentId } = effectiveAction(model, pay);
   const outcome = pay.outcome;
+  const chooseProvider = action === "pay" && model.providers.length > 1;
+  const providerMissing = needsPaymentProviderChoice(model.providers, selectedProvider);
   const failedText =
     model.status === "failed" || model.status === "expired"
       ? t(
@@ -157,6 +163,32 @@ export function PaymentSectionView(props: PaymentSectionViewProps) {
           {t("payment.lastAttempt", { time: formatDateTime(model.expiresAt, locale) })}
         </p>
       ) : null}
+      {chooseProvider ? (
+        <fieldset className="flex flex-col gap-2" disabled={busy}>
+          <legend className={textStyles.itemTitle}>{t("payment.provider.choose")}</legend>
+          <div className="flex flex-col gap-2" role="radiogroup" aria-required="true">
+            {model.providers.map((code) => {
+              const id = `order-payment-provider-${code}`;
+              return (
+                <label key={code} htmlFor={id} className="flex items-center gap-2 text-foreground">
+                  <input
+                    id={id}
+                    type="radio"
+                    name="order-payment-provider"
+                    value={code}
+                    checked={selectedProvider === code}
+                    onChange={() => props.onSelectProvider(code)}
+                  />
+                  <span>{t("payment.provider.option", { code })}</span>
+                </label>
+              );
+            })}
+          </div>
+          {providerMissing ? (
+            <p className="text-sm text-muted-foreground">{t("payment.provider.required")}</p>
+          ) : null}
+        </fieldset>
+      ) : null}
       {pay.insecure ? <Alert variant="danger">{t("payment.error.insecureContext")}</Alert> : null}
       {pay.returnSaved ? null : <Alert variant="warning">{t("payment.error.storage")}</Alert>}
 
@@ -202,7 +234,7 @@ export function PaymentSectionView(props: PaymentSectionViewProps) {
           <Button
             id={PAYMENT_FOCUS_IDS.action}
             onClick={props.onPay}
-            disabled={busy || waiting || pay.insecure}
+            disabled={busy || waiting || pay.insecure || providerMissing}
             aria-busy={pay.phase === "pending"}
             {...(waiting ? { "aria-describedby": "order-payment-wait" } : {})}
           >

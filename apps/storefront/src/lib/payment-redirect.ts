@@ -1,6 +1,8 @@
 /**
- * Where the browser may be sent to pay (ADR 0032 decision 6, "Storefront": the CSP has `form-action 'self'`, so the shopper
- * reaches the provider by a navigation (the location's `assign`), never a form POST).
+ * Where the browser may be sent to pay (ADR 0032 decision 6, "Storefront"). The shopper reaches the provider by a navigation
+ * (`location.assign`) to the create answer's `redirectUrl` (Monobank's page, or the same-origin LiqPay handoff bridge of
+ * ADR 0059). The only form POST is that handoff bridge (`lib/payment-handoff.ts`), which posts to `https://www.liqpay.ua`
+ * under CSP `form-action 'self' https://www.liqpay.ua`.
  *
  * The address comes from the API's answer only (`redirectUrl` of the create route, or of the order's latest attempt), never
  * from a query string, a fragment or storage, and is checked here before the browser leaves: an absolute `https` URL with a

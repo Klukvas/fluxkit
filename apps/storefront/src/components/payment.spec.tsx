@@ -34,6 +34,7 @@ const model = (over: Partial<PaymentSectionModel> = {}): PaymentSectionModel => 
   expiresAt: null,
   continueUrl: null,
   paymentId: null,
+  providers: ["fake"],
   ...over,
 });
 
@@ -45,6 +46,8 @@ function section(over: Partial<PaymentSectionViewProps> = {}) {
     orderExpiresAt: "2026-10-29T12:00:00.000Z",
     pay: initialPayState,
     now: 0,
+    selectedProvider: "fake",
+    onSelectProvider: vi.fn(),
     onPay: vi.fn(),
     onContinue: vi.fn(),
     onCheckStatus: vi.fn(),
@@ -231,6 +234,29 @@ describe("PaymentSectionView", () => {
     expect(html(view)).toContain("§payment.error.storage");
   });
 
+  it("asks for a provider choice when several are enabled and keeps Pay disabled until one is picked", () => {
+    const onSelectProvider = vi.fn();
+    const dual = section({
+      model: model({ providers: ["alpha", "beta"] }),
+      selectedProvider: null,
+      onSelectProvider,
+    });
+    expect(html(dual)).toContain("§payment.provider.choose");
+    expect(html(dual)).toContain("§payment.provider.option");
+    expect(html(dual)).toContain("§payment.provider.required");
+    expect(buttons(dual)[0]?.props["disabled"]).toBe(true);
+    const radios = findElements(dual, (el) => el.type === "input" && el.props.type === "radio");
+    expect(radios).toHaveLength(2);
+    (radios[1]?.props.onChange as () => void)();
+    expect(onSelectProvider).toHaveBeenCalledWith("beta");
+    const ready = section({
+      model: model({ providers: ["alpha", "beta"] }),
+      selectedProvider: "beta",
+    });
+    expect(buttons(ready)[0]?.props["disabled"]).toBe(false);
+    expect(html(ready)).not.toContain("§payment.provider.required");
+  });
+
   it("has no hardcoded words in any state, and every key exists in uk and en", () => {
     const baseProps: PaymentSectionViewProps = {
       t,
@@ -239,6 +265,8 @@ describe("PaymentSectionView", () => {
       orderExpiresAt: "2026-10-29T12:00:00.000Z",
       pay: initialPayState,
       now: 0,
+      selectedProvider: "fake",
+      onSelectProvider: vi.fn(),
       onPay: vi.fn(),
       onContinue: vi.fn(),
       onCheckStatus: vi.fn(),
@@ -257,6 +285,8 @@ describe("PaymentSectionView", () => {
         orderExpiresAt: "2026-10-29T12:00:00.000Z",
         pay: initialPayState,
         now: 0,
+        selectedProvider: "fake",
+        onSelectProvider: vi.fn(),
         onPay: vi.fn(),
         onContinue: vi.fn(),
         onCheckStatus: vi.fn(),

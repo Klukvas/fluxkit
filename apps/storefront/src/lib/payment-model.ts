@@ -163,6 +163,11 @@ export interface PaymentSectionModel {
   continueUrl: string | null;
   /** The latest attempt, for the status page link and the hand-off. */
   paymentId: string | null;
+  /**
+   * Enabled provider codes from the order view. With more than one, the shopper must pick one before "Pay now"
+   * (the create body sends `provider`; without it the API answers `payment_not_available`).
+   */
+  providers: readonly string[];
 }
 
 /**
@@ -195,5 +200,28 @@ export function paymentSection(
     expiresAt: latest?.expiresAt ?? null,
     continueUrl,
     paymentId: latest?.paymentId ?? null,
+    providers: payment.providers,
   };
+}
+
+/**
+ * Which provider code to send on create. One enabled provider needs no body field (the API picks it); several require an
+ * explicit choice that is still listed. Pure.
+ */
+export function selectedPaymentProvider(
+  providers: readonly string[],
+  chosen: string | null,
+): string | null {
+  if (providers.length <= 1) {
+    return providers[0] ?? null;
+  }
+  return chosen !== null && providers.includes(chosen) ? chosen : null;
+}
+
+/** True when "Pay now" must wait for an explicit provider choice. */
+export function needsPaymentProviderChoice(
+  providers: readonly string[],
+  chosen: string | null,
+): boolean {
+  return providers.length > 1 && selectedPaymentProvider(providers, chosen) === null;
 }

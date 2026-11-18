@@ -88,6 +88,7 @@ describe("FakePaymentProvider", () => {
       multipleRefunds: true,
       invalidateUnpaid: true,
       webhooks: true,
+      formHandoff: false,
     });
     expect(instance.capabilities.currencies).toContain("UAH");
   });

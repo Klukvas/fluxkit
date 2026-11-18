@@ -221,6 +221,7 @@ describe("route structure", () => {
       "(site)/cart/page.tsx",
       "(site)/checkout/page.tsx",
       "(site)/order/[number]/page.tsx",
+      "(site)/payment/handoff/page.tsx",
       "(site)/payment/return/page.tsx",
     ]);
     for (const page of personal) {

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Feature and provider matrix (AGENTS.md section 18).
-# Usage: scripts/feature-matrix.sh on|off|deleted|providers-on|providers-off|providers-deleted|providers-nova-post|providers-email-fake|providers-email-none|providers-email-resend|providers-email-brevo|providers-email-failover|providers-email-failover-exhausted|providers-email-failover-pinned|providers-email-suppression|providers-payment-fake|providers-payment-none|providers-payment-monobank|search-on|search-off
+# Usage: scripts/feature-matrix.sh on|off|deleted|providers-on|providers-off|providers-deleted|providers-nova-post|providers-email-fake|providers-email-none|providers-email-resend|providers-email-brevo|providers-email-failover|providers-email-failover-exhausted|providers-email-failover-pinned|providers-email-suppression|providers-payment-fake|providers-payment-none|providers-payment-monobank|providers-payment-liqpay|search-on|search-off|
 #   on      build, migrate and start the API with FEATURES_ENABLED=example,blog: expect /health, /example/ping, the blog's
 #           table and migrations table, `features` ["blog","example"] in GET /store/config, the blog's store routes (200, an
 #           unknown post 404) and its admin routes with their permissions (every one 401 signed out, where an unknown /admin
@@ -18,11 +18,11 @@
 # and so no new public contract.
 #   providers-on      build, start the API with SHIPPING_PROVIDERS_ENABLED=fake, expect the log line to name fake
 #   providers-off     build, start the API with no providers, expect "none" and no mention of fake
-#   providers-deleted remove packages/providers/_fake, _fake-email, _fake-payment, nova-post, resend, brevo and monobank, reinstall,
-#                     then lint, typecheck, boundaries and tests must pass, and an API told to load fake or nova_post
-#                     (shipping), or started with EMAIL_PROVIDER=fake or EMAIL_PROVIDER=resend, or with
-#                     PAYMENT_PROVIDERS_ENABLED=fake or PAYMENT_PROVIDERS_ENABLED=monobank, must refuse to start, loudly
-#                     (destructive: CI only)
+#   providers-deleted remove packages/providers/_fake, _fake-email, _fake-payment, nova-post, resend, brevo, monobank and
+#                     liqpay, reinstall, then lint, typecheck, boundaries and tests must pass, and an API told to load fake
+#                     or nova_post (shipping), or started with EMAIL_PROVIDER=fake or EMAIL_PROVIDER=resend, or with
+#                     PAYMENT_PROVIDERS_ENABLED=fake or PAYMENT_PROVIDERS_ENABLED=monobank or PAYMENT_PROVIDERS_ENABLED=liqpay,
+#                     must refuse to start, loudly (destructive: CI only)
 #   providers-nova-post build; an API with SHIPPING_PROVIDERS_ENABLED=nova_post and no NOVA_POST_API_KEY must refuse to
 #                     start naming the variable; with an invented key it must start and report nova_post, never print the
 #                     key, and send nothing to Nova Post at startup (the JWT is fetched on first use): the API runs with a
@@ -49,6 +49,11 @@
 #                     true, never print the token, and send nothing to Monobank at startup (the webhook key is fetched on
 #                     the first webhook): the API runs with a preloaded fetch wrapper that logs and refuses any request to
 #                     a *.monobank.ua host, and the log must show the wrapper active and no such request
+#   providers-payment-liqpay build; an API with PAYMENT_PROVIDERS_ENABLED=liqpay and no LIQPAY_* keys must refuse to start
+#                     naming the variable; with invented keys it must start, report liqpay and onlinePayment true, never
+#                     print the keys, and send nothing to LiqPay at startup (create is local; status/refund call on demand):
+#                     the API runs with a preloaded fetch wrapper that logs and refuses any request to www.liqpay.ua /
+#                     liqpay.ua, and the log must show the wrapper active and no such request
 # Catalog search (ADR 0034) has the observable "Search: <disabled|enabled (<prefix>)>" and the public flag `search` of
 # GET /store/config:
 #   search-off   migrate and seed the test fixture with SEARCH_ENABLED=false, start the API the same way: expect "Search: disabled",
@@ -66,7 +71,7 @@
 #                The key and the prefix's indexes are deleted at the end.
 set -euo pipefail
 
-mode="${1:?usage: scripts/feature-matrix.sh on|off|deleted|providers-on|providers-off|providers-deleted|providers-nova-post|providers-email-fake|providers-email-none|providers-email-resend|providers-email-brevo|providers-payment-fake|providers-payment-none|providers-payment-monobank|search-on|search-off}"
+mode="${1:?usage: scripts/feature-matrix.sh on|off|deleted|providers-on|providers-off|providers-deleted|providers-nova-post|providers-email-fake|providers-email-none|providers-email-resend|providers-email-brevo|providers-payment-fake|providers-payment-none|providers-payment-monobank|providers-payment-liqpay|search-on|search-off}"
 : "${DATABASE_URL:?DATABASE_URL must be set}"
 port="${MATRIX_PORT:-3999}"
 # The API refuses to start without it (ADR 0023); this one is throwaway and only lives in the process started below.
@@ -322,7 +327,7 @@ case "$mode" in
     ;;
   providers-deleted)
     [ "${CI:-}" = "true" ] || { echo "refusing to delete files outside CI (set CI=true on a throwaway copy)" >&2; exit 1; }
-    rm -rf packages/providers/_fake packages/providers/_fake-email packages/providers/_fake-payment packages/providers/nova-post packages/providers/resend packages/providers/brevo packages/providers/monobank
+    rm -rf packages/providers/_fake packages/providers/_fake-email packages/providers/_fake-payment packages/providers/nova-post packages/providers/resend packages/providers/brevo packages/providers/monobank packages/providers/liqpay
     pnpm install --no-frozen-lockfile
     pnpm lint
     pnpm typecheck
@@ -350,8 +355,9 @@ case "$mode" in
         || { echo "expected a loud startup error naming the missing email provider $code" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
     done
     # And for the payment providers: an enabled one that is gone stops the startup.
-    for code in fake monobank; do
-      if PAYMENT_PROVIDERS_ENABLED="$code" MONOBANK_TOKEN=matrix-invented-monobank-token-0000000000 PORT="$port" \
+    for code in fake monobank liqpay; do
+      if PAYMENT_PROVIDERS_ENABLED="$code" MONOBANK_TOKEN=matrix-invented-monobank-token-0000000000 \
+        LIQPAY_PUBLIC_KEY=matrixpk LIQPAY_PRIVATE_KEY=matrixsk PORT="$port" \
         timeout 60 node apps/api/dist/main.js > /tmp/fluxkit-matrix-api.log 2>&1; then
         echo "the API started although the enabled payment provider $code is deleted" >&2
         exit 1
@@ -636,6 +642,54 @@ GUARD
       || { echo "the fetch wrapper was not loaded into the API" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
     ! grep -F "matrix-guard: refused" /tmp/fluxkit-matrix-api.log \
       || { echo "the API sent a request to Monobank at startup" >&2; exit 1; }
+    rm -rf "$guard_dir"
+    ;;
+  providers-payment-liqpay)
+    pnpm build
+    # Without the keys: a loud refusal that names the variable, before anything listens.
+    if env -u LIQPAY_PUBLIC_KEY -u LIQPAY_PRIVATE_KEY PAYMENT_PROVIDERS_ENABLED=liqpay \
+      STOREFRONT_PUBLIC_URL=http://127.0.0.1:3001 PORT="$port" \
+      timeout 60 node apps/api/dist/main.js > /tmp/fluxkit-matrix-api.log 2>&1; then
+      echo "the API started with PAYMENT_PROVIDERS_ENABLED=liqpay and no LIQPAY_* keys" >&2
+      exit 1
+    fi
+    grep -E "LIQPAY_(PUBLIC|PRIVATE)_KEY is required when liqpay is in PAYMENT_PROVIDERS_ENABLED" /tmp/fluxkit-matrix-api.log \
+      || { echo "expected a startup error naming LIQPAY_PUBLIC_KEY or LIQPAY_PRIVATE_KEY" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
+    # With invented keys: it starts, reports liqpay, never prints the keys. Create is local; status/refund would
+    # call on demand. A preloaded wrapper of fetch logs and refuses any request to a LiqPay host.
+    guard_dir="$(mktemp -d)"
+    cat > "$guard_dir/no-liqpay.mjs" <<'GUARD'
+const realFetch = globalThis.fetch;
+globalThis.fetch = (input, init) => {
+  const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  const host = new URL(url).hostname;
+  if (host === "liqpay.ua" || host.endsWith(".liqpay.ua")) {
+    console.log(`matrix-guard: refused a request to ${host}`);
+    return Promise.reject(new TypeError("matrix-guard: no LiqPay request at startup"));
+  }
+  return realFetch(input, init);
+};
+console.log("matrix-guard: active");
+GUARD
+    invented_public="matrix-invented-liqpay-pk-$(date +%s)"
+    invented_private="matrix-invented-liqpay-sk-$(date +%s)"
+    LIQPAY_PUBLIC_KEY="$invented_public" LIQPAY_PRIVATE_KEY="$invented_private" \
+      STOREFRONT_PUBLIC_URL=http://127.0.0.1:3001 \
+      MATRIX_NODE_IMPORT="$guard_dir/no-liqpay.mjs" run_api "" "" "none" "liqpay"
+    sleep 3
+    grep -F "Payment providers loaded: liqpay" /tmp/fluxkit-matrix-api.log \
+      || { echo "expected the payment registry to report liqpay" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
+    config="$(curl -fsS "http://127.0.0.1:${port}/store/config")"
+    echo "store/config -> $config"
+    echo "$config" | grep -q '"onlinePayment":true' || { echo "expected onlinePayment true with liqpay loaded" >&2; exit 1; }
+    ! grep -qF "$invented_public" /tmp/fluxkit-matrix-api.log \
+      || { echo "the API log contains the LiqPay public key" >&2; exit 1; }
+    ! grep -qF "$invented_private" /tmp/fluxkit-matrix-api.log \
+      || { echo "the API log contains the LiqPay private key" >&2; exit 1; }
+    grep -F "matrix-guard: active" /tmp/fluxkit-matrix-api.log \
+      || { echo "the fetch wrapper was not loaded into the API" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
+    ! grep -F "matrix-guard: refused" /tmp/fluxkit-matrix-api.log \
+      || { echo "the API sent a request to LiqPay at startup" >&2; exit 1; }
     rm -rf "$guard_dir"
     ;;
   search-off)

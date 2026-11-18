@@ -45,6 +45,25 @@ export const guestPaymentStatusBodySchema = z.strictObject({
     .meta({ format: "uuid", description: "The attempt to show (from the return URL)." }),
 });
 
+/** `POST /store/orders/payments/handoff` (ADR 0059 form checkout). */
+export const guestPaymentHandoffBodySchema = z.strictObject({
+  number: z.string().max(64),
+  accessToken: z.string().max(256),
+  paymentId: z
+    .guid()
+    .meta({ format: "uuid", description: "The live attempt to hand off to the provider." }),
+});
+
+export const storePaymentHandoffSchema = z.object({
+  actionUrl: z.string().url().meta({
+    description:
+      "The provider checkout URL (`https` on an allow-listed host). The browser POSTs `fields` here.",
+  }),
+  fields: z.record(z.string(), z.string()).meta({
+    description: "Hidden form fields (`data`, `signature`, …). Never shown to the shopper.",
+  }),
+});
+
 export const storeCreatedPaymentSchema = z.object({
   paymentId: uuidSchema,
   status: shopperPaymentStatusSchema,
@@ -70,5 +89,7 @@ export const storePaymentStatusSchema = z.object({
 export type GuestCreatePaymentBody = z.output<typeof guestCreatePaymentBodySchema>;
 export type CustomerCreatePaymentBody = z.output<typeof customerCreatePaymentBodySchema>;
 export type GuestPaymentStatusBody = z.output<typeof guestPaymentStatusBodySchema>;
+export type GuestPaymentHandoffBody = z.output<typeof guestPaymentHandoffBodySchema>;
 export type StoreCreatedPayment = z.output<typeof storeCreatedPaymentSchema>;
 export type StorePaymentStatus = z.output<typeof storePaymentStatusSchema>;
+export type StorePaymentHandoff = z.output<typeof storePaymentHandoffSchema>;

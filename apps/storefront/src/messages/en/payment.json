@@ -14,6 +14,9 @@
   "payment.failure.technical": "A technical problem stopped the payment. You can try again.",
   "payment.failure.not_accepted": "A payment arrived, but the order could not accept it (for example it came too late). It is refunded or settled by the shop. Contact the shop if you have questions.",
   "payment.lastAttempt": "Last payment link valid until {time}",
+  "payment.provider.choose": "Choose how to pay",
+  "payment.provider.option": "Pay via {code}",
+  "payment.provider.required": "Choose a payment method to continue.",
   "payment.pay": "Pay now",
   "payment.payAgain": "Pay again",
   "payment.continue": "Continue payment",
@@ -58,5 +61,14 @@
   "payment.return.tryAgain": "Try to pay again",
   "payment.return.checkAgain": "Check again",
   "payment.return.contact": "If you have questions about a payment, contact the shop.",
-  "payment.return.signedOut.title": "Sign in to see the payment"
+  "payment.return.signedOut.title": "Sign in to see the payment",
+  "payment.handoff.title": "Opening the payment page",
+  "payment.handoff.working": "Opening the payment page",
+  "payment.handoff.workingBody": "One moment while we send you to the secure payment page.",
+  "payment.handoff.errorTitle": "Could not open the payment page",
+  "payment.handoff.noEntry": "This tab does not know which order to pay. Open the order again and choose Pay now.",
+  "payment.handoff.notFound": "This payment was not found. Open your order and try again.",
+  "payment.handoff.unavailable": "Online payment is not available for this attempt right now. Open the order and try again.",
+  "payment.handoff.error": "The payment page could not be opened. Try again in a moment.",
+  "payment.handoff.retry": "Try again"
 }

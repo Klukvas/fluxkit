@@ -93,6 +93,7 @@ describe("customer and admin principals are separate on the real routes", () => 
       "POST /store/account/logout",
       "POST /store/account/orders/:number/cancel",
       "POST /store/account/orders/:number/payments",
+      "POST /store/account/orders/:number/payments/:paymentId/handoff",
       "POST /store/account/verify-email/resend",
     ]);
     for (const { method, path } of routes) {

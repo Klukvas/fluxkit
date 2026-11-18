@@ -14,6 +14,9 @@
   "payment.failure.technical": "Технічна проблема зупинила оплату. Можна спробувати ще раз.",
   "payment.failure.not_accepted": "Платіж надійшов, але замовлення не змогло його прийняти (наприклад, він надійшов запізно). Магазин поверне кошти або врегулює платіж. Якщо є запитання, зверніться до магазину.",
   "payment.lastAttempt": "Останнє посилання на оплату діє до {time}",
+  "payment.provider.choose": "Оберіть спосіб оплати",
+  "payment.provider.option": "Оплатити через {code}",
+  "payment.provider.required": "Оберіть спосіб оплати, щоб продовжити.",
   "payment.pay": "Оплатити зараз",
   "payment.payAgain": "Оплатити ще раз",
   "payment.continue": "Продовжити оплату",
@@ -60,5 +63,14 @@
   "payment.return.tryAgain": "Спробувати оплатити ще раз",
   "payment.return.checkAgain": "Перевірити ще раз",
   "payment.return.contact": "Якщо є запитання щодо оплати, зверніться до магазину.",
-  "payment.return.signedOut.title": "Увійдіть, щоб побачити оплату"
+  "payment.return.signedOut.title": "Увійдіть, щоб побачити оплату",
+  "payment.handoff.title": "Відкриваємо сторінку оплати",
+  "payment.handoff.working": "Відкриваємо сторінку оплати",
+  "payment.handoff.workingBody": "Зачекайте: зараз відкриємо захищену сторінку оплати.",
+  "payment.handoff.errorTitle": "Не вдалося відкрити сторінку оплати",
+  "payment.handoff.noEntry": "Ця вкладка не знає, яке замовлення оплачувати. Відкрийте замовлення знову й натисніть «Сплатити».",
+  "payment.handoff.notFound": "Цю оплату не знайдено. Відкрийте замовлення й спробуйте ще раз.",
+  "payment.handoff.unavailable": "Онлайн-оплата для цієї спроби зараз недоступна. Відкрийте замовлення й спробуйте ще раз.",
+  "payment.handoff.error": "Не вдалося відкрити сторінку оплати. Спробуйте ще раз за мить.",
+  "payment.handoff.retry": "Спробувати ще раз"
 }

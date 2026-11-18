@@ -441,6 +441,76 @@ describe("payments: store routes (real Postgres)", () => {
     });
   });
 
+  describe("form handoff (ADR 0059)", () => {
+    function guestHandoff(
+      body: Record<string, unknown>,
+    ): Promise<HttpResult<Record<string, unknown> & Problem>> {
+      return http(base, "POST", "/store/orders/payments/handoff", { body });
+    }
+
+    it("returns a signed www.liqpay.ua form for a waiting attempt when the provider supports form handoff", async () => {
+      world.provider().formHandoff = true;
+      const placed = await world.place([{ quantity: 1, price: 2_000 }]);
+      const created = await guestCreate({
+        number: placed.number,
+        accessToken: placed.accessToken,
+        locale: "en",
+      });
+      expect(created.status, JSON.stringify(created.body)).toBe(201);
+      expect(created.body.redirectUrl).toMatch(/\/en\/payment\/handoff\?payment=/);
+      expect(world.provider().creates[0]?.handoffUrl).toBe(created.body.redirectUrl);
+
+      const handoff = await guestHandoff({
+        number: placed.number,
+        accessToken: placed.accessToken,
+        paymentId: created.body.paymentId,
+      });
+      expect(handoff.status, JSON.stringify(handoff.body)).toBe(200);
+      expect(handoff.headers.get("cache-control")).toBe("no-store");
+      expect(handoff.body).toEqual({
+        actionUrl: "https://www.liqpay.ua/api/3/checkout",
+        fields: {
+          data: expect.any(String),
+          signature: "test-handoff-signature",
+        },
+      });
+      expect(Object.keys(handoff.body).sort()).toEqual(["actionUrl", "fields"]);
+    });
+
+    it("answers 409 handoff_unavailable when the provider has no form handoff", async () => {
+      const placed = await world.place();
+      const created = await guestCreate({
+        number: placed.number,
+        accessToken: placed.accessToken,
+      });
+      expect(created.status).toBe(201);
+      const refused = await guestHandoff({
+        number: placed.number,
+        accessToken: placed.accessToken,
+        paymentId: created.body.paymentId,
+      });
+      expect(refused.status, JSON.stringify(refused.body)).toBe(409);
+      expect(refused.body).toMatchObject({ code: "rule_violation", rule: "handoff_unavailable" });
+    });
+
+    it("ownership for handoff matches create: wrong token is the same 404", async () => {
+      world.provider().formHandoff = true;
+      const placed = await world.place();
+      const other = await world.place();
+      const created = await guestCreate({
+        number: placed.number,
+        accessToken: placed.accessToken,
+      });
+      expect(created.status).toBe(201);
+      const miss = await guestHandoff({
+        number: placed.number,
+        accessToken: other.accessToken,
+        paymentId: created.body.paymentId,
+      });
+      expect(miss.status).toBe(404);
+    });
+  });
+
   it("logs never carry the guest's access token", async () => {
     const placed = await world.place();
     const other = await world.place();

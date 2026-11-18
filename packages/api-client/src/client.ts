@@ -19,8 +19,10 @@ import type {
   Order,
   OrderAccessBody,
   OrderList,
+  OrderPaymentHandoffBody,
   OrderPaymentStatusBody,
   PasswordResetAccepted,
+  PaymentHandoff,
   PaymentState,
   PasswordResetConfirmBody,
   PasswordResetRequestBody,
@@ -172,6 +174,11 @@ export interface StoreClient {
   ): Result<CreatedPayment>;
   /** The state of a guest order's attempt for the return page (the token travels in the POST body only). */
   getOrderPaymentStatus(body: OrderPaymentStatusBody, options?: CallOptions): Result<PaymentState>;
+  /** Signed form fields for a form-handoff provider (LiqPay, ADR 0059). */
+  getOrderPaymentHandoff(
+    body: OrderPaymentHandoffBody,
+    options?: CallOptions,
+  ): Result<PaymentHandoff>;
   /** As `createOrderPayment` for a signed-in customer's own order. */
   createAccountOrderPayment(
     number: string,
@@ -184,6 +191,12 @@ export interface StoreClient {
     paymentId: string,
     options?: CallOptions,
   ): Result<PaymentState>;
+  /** As `getOrderPaymentHandoff` for a signed-in customer's own order. */
+  getAccountOrderPaymentHandoff(
+    number: string,
+    paymentId: string,
+    options?: CallOptions,
+  ): Result<PaymentHandoff>;
   /** The home banners live now (at most 3, public fields only); no cookie is needed. */
   listBanners(options?: LocaleOptions): Result<HomeBannerList>;
   listCategories(options?: LocaleOptions): Result<CategoryList>;
@@ -276,6 +289,7 @@ export function createStoreClient(options: StoreClientOptions): StoreClient {
       });
     },
     getOrderPaymentStatus: (body, opts) => call("getOrderPaymentStatus", { body, options: opts }),
+    getOrderPaymentHandoff: (body, opts) => call("getOrderPaymentHandoff", { body, options: opts }),
     createAccountOrderPayment: async (number, body, opts) => {
       const key = idempotencyKeyOf(opts, "POST /store/account/orders/{number}/payments");
       return call("createAccountOrderPayment", {
@@ -287,6 +301,11 @@ export function createStoreClient(options: StoreClientOptions): StoreClient {
     },
     getAccountOrderPayment: (number, paymentId, opts) =>
       call("getAccountOrderPayment", { pathParams: { number, paymentId }, options: opts }),
+    getAccountOrderPaymentHandoff: (number, paymentId, opts) =>
+      call("getAccountOrderPaymentHandoff", {
+        pathParams: { number, paymentId },
+        options: opts,
+      }),
     listBanners: (opts) => call("listBanners", { options: opts }),
     listCategories: (opts) => call("listCategories", { options: opts }),
     getConfig: (opts) => call("getConfig", { options: opts }),

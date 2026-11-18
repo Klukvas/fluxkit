@@ -20,10 +20,23 @@ export const INTEGRATION_KINDS = [
 ] as const satisfies readonly AdminIntegrationKind[];
 
 /** Provider codes with a translated name (`intg.provider.<code>`); any other code is shown as it is. */
-export const KNOWN_PROVIDER_CODES = ["resend", "brevo", "monobank", "nova_post", "fake"] as const;
+export const KNOWN_PROVIDER_CODES = [
+  "resend",
+  "brevo",
+  "monobank",
+  "liqpay",
+  "nova_post",
+  "fake",
+] as const;
 
 /** Secret fields with a translated label (`intg.field.<field>`); any other field is shown by its name. */
-export const KNOWN_SECRET_FIELDS = ["api_key", "webhook_secret", "token"] as const;
+export const KNOWN_SECRET_FIELDS = [
+  "api_key",
+  "webhook_secret",
+  "token",
+  "public_key",
+  "private_key",
+] as const;
 
 /** A label that is either a message key or, for a code the screen does not know, the code itself. */
 export type Label = { key: string } | { text: string };

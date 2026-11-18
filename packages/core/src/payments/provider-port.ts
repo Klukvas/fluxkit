@@ -201,12 +201,23 @@ export interface CreatePaymentInput {
   readonly webhookUrl: string;
   /** The invoice validity end (`invoiceValidity`). */
   readonly expiresAt: Date;
+  /**
+   * Same-origin storefront handoff URL built by the API when `capabilities.formHandoff` is true (ADR 0059). Form-POST
+   * providers return it as `redirectUrl`; ignored by redirect providers.
+   */
+  readonly handoffUrl?: string;
 }
 
 export interface PaymentCreated {
   readonly providerPaymentId: string;
-  /** The hosted payment page: `https` on the plugin's allow-listed host (decision 14). */
+  /** The hosted payment page: `https` on the plugin's allow-listed host (decision 14), or the shop handoff URL (ADR 0059). */
   readonly redirectUrl: string;
+}
+
+/** Browser form POST fields for a form-handoff provider (ADR 0059). `actionUrl` is `https` on the provider's host. */
+export interface PaymentCheckoutHandoff {
+  readonly actionUrl: string;
+  readonly fields: Readonly<Record<string, string>>;
 }
 
 export interface RefundInput {
@@ -232,6 +243,11 @@ export interface PaymentProviderCapabilities {
   /** Whether an unpaid invoice can be invalidated (Monobank `invoice/remove`, M14). */
   readonly invalidateUnpaid: boolean;
   readonly webhooks: boolean;
+  /**
+   * When true the API builds `handoffUrl`, `createPayment` returns it as `redirectUrl`, and the store calls
+   * `buildCheckoutHandoff` for a signed form POST (ADR 0059, LiqPay).
+   */
+  readonly formHandoff: boolean;
 }
 
 export interface PaymentProviderPort {
@@ -264,4 +280,12 @@ export interface PaymentProviderPort {
     input: PaymentWebhookInput,
     signal: ProviderAbortSignal,
   ): Promise<PaymentProviderResult<ProviderPaymentFact>>;
+  /**
+   * Fresh signed form fields for the storefront handoff page (ADR 0059). Providers with `formHandoff: false` answer
+   * `not_sent` with code `handoff_unsupported`; the API never calls them for handoff.
+   */
+  buildCheckoutHandoff(
+    input: CreatePaymentInput,
+    signal: ProviderAbortSignal,
+  ): Promise<PaymentProviderResult<PaymentCheckoutHandoff>>;
 }

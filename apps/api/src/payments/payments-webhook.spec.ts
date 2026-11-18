@@ -165,7 +165,7 @@ describe("payments: the webhook route and verified facts (real Postgres)", () =>
     ).toBe(401);
   });
 
-  it("verifies before parsing: an unsigned garbage body is 401, a signed one 400; non-JSON is 415; an unknown provider is 404", async () => {
+  it("verifies before parsing: an unsigned garbage body is 401, a signed one 400; wrong content-type is 415; urlencoded is accepted for content-type; an unknown provider is 404", async () => {
     const garbage = new TextEncoder().encode("{not json");
     expect(
       (await world.webhook({ headers: { "content-type": "application/json" }, rawBody: garbage }))
@@ -176,8 +176,32 @@ describe("payments: the webhook route and verified facts (real Postgres)", () =>
     expect(
       (await world.webhook(signed, { headers: { "content-type": "text/plain" } })).status,
     ).toBe(415);
+    // ADR 0059: form-urlencoded is allowed at the controller (not 415). A signed JSON body with
+    // that content-type verifies then fails parse → 400 (providers that accept urlencoded).
+    expect(
+      (
+        await world.webhook(signed, {
+          headers: { "content-type": "application/x-www-form-urlencoded" },
+        })
+      ).status,
+    ).toBe(400);
     const unknown = await world.webhook(signed, { provider: "monobank" });
     expect(unknown.status).toBe(404);
+  });
+
+  it("a verified form-urlencoded success (ADR 0059 shape) pays the order like a JSON webhook", async () => {
+    const { placed, paymentId, invoiceId } = await paidAttempt();
+    const answer = await world.webhook(world.provider().formWebhookFor(invoiceId));
+    expect(answer).toEqual({ status: 200, text: "" });
+    expect(await world.payment(paymentId)).toMatchObject({
+      status: "succeeded",
+      order_outcome: "applied",
+      final_amount: 2_000,
+    });
+    expect(await world.orderStatus(placed.id)).toMatchObject({
+      status: "paid",
+      payment_reference: `fake:${invoiceId}`,
+    });
   });
 
   it("a body over 64 KiB is 413 and stores nothing", async () => {

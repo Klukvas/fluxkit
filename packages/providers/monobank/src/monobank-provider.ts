@@ -8,6 +8,7 @@ import {
   paymentProviderMetadata,
   paymentProviderOk,
   type CreatePaymentInput,
+  type PaymentCheckoutHandoff,
   type PaymentCreated,
   type PaymentProviderCapabilities,
   type PaymentProviderFailure,
@@ -84,6 +85,8 @@ export const MONOBANK_CAPABILITIES: PaymentProviderCapabilities = Object.freeze(
   invalidateUnpaid: true,
   /** Webhooks on every status change but `expired` (M8). */
   webhooks: true,
+  /** Monobank returns a GET `pageUrl`; form handoff is LiqPay (ADR 0059). */
+  formHandoff: false,
 });
 
 type Operation = "createPayment" | "getPayment" | "invalidatePayment" | "refund" | "verifyWebhook";
@@ -299,7 +302,20 @@ export class MonobankPaymentProvider implements PaymentProviderPort {
     return failure;
   }
 
-  private local(operation: Operation, code: string): PaymentProviderFailure {
+  async buildCheckoutHandoff(
+    _input: CreatePaymentInput,
+    signal: ProviderAbortSignal,
+  ): Promise<PaymentProviderResult<PaymentCheckoutHandoff>> {
+    if (signal.aborted) {
+      return this.local("buildCheckoutHandoff", "aborted");
+    }
+    return this.local("buildCheckoutHandoff", "handoff_unsupported");
+  }
+
+  private local(
+    operation: Operation | "buildCheckoutHandoff",
+    code: string,
+  ): PaymentProviderFailure {
     const failure = paymentProviderFailure("not_sent", { providerCodes: [code] });
     this.logger.warn(`${operation}: not sent -> not_sent (${code})`);
     return failure;

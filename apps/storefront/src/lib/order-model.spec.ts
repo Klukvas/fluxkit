@@ -102,6 +102,7 @@ describe("orderPaymentSection: the payment block per order status", () => {
         expiresAt: "2026-11-06T12:00:00.000Z",
         continueUrl: null,
         paymentId: "0b5d3c1e-6f0a-4a43-9a43-0a5d0b5f4a11",
+        providers: ["fake"],
       });
     }
   });
