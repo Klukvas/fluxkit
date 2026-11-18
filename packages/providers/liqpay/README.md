@@ -13,23 +13,23 @@ LiqPay (PrivatBank) payment provider, code `liqpay`, kind `payment` (ADR 0059; p
 
 ## Configuration
 
-| Variable | Required | Rule |
-|---|---|---|
-| `LIQPAY_PUBLIC_KEY` | when `liqpay` is enabled | 8–256 visible ASCII, trimmed (exact cabinet format UNKNOWN until S1). |
+| Variable             | Required                 | Rule                                                                                         |
+| -------------------- | ------------------------ | -------------------------------------------------------------------------------------------- |
+| `LIQPAY_PUBLIC_KEY`  | when `liqpay` is enabled | 8–256 visible ASCII, trimmed (exact cabinet format UNKNOWN until S1).                        |
 | `LIQPAY_PRIVATE_KEY` | when `liqpay` is enabled | Same rule. Never logged. Keys decide sandbox vs production (UNKNOWN cabinet rules until S1). |
 
 Origins are constants (`LIQPAY_API_ORIGIN`). `SHOP_CURRENCY` must be `UAH`. Nothing is sent at startup.
 
 ## Operations
 
-| Port method | Behaviour |
-|---|---|
-| `createPayment` | **Local only**: validates input + `handoffUrl`, returns `{ providerPaymentId: paymentId, redirectUrl: handoffUrl }`. Never calls LiqPay (`not_sent` on validation failure). |
+| Port method            | Behaviour                                                                                                                                                                                                  |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `createPayment`        | **Local only**: validates input + `handoffUrl`, returns `{ providerPaymentId: paymentId, redirectUrl: handoffUrl }`. Never calls LiqPay (`not_sent` on validation failure).                                |
 | `buildCheckoutHandoff` | Builds `action=pay` payload (`order_id`, major `amount`, UAH, `result_url`, `server_url`, `expired_date` UTC). Returns `{ actionUrl: https://www.liqpay.ua/api/3/checkout, fields: { data, signature } }`. |
-| `getPayment` | `POST /api/request` `action=status` by `order_id`. |
-| `refund` | `POST /api/request` `action=refund` with major `amount`. Sends `refund_ref` (our refund id) — **UNVERIFIED** whether LiqPay echoes it (S1). |
-| `invalidatePayment` | Local `{ invalidated: false }` (`invalidateUnpaid: false`). |
-| `verifyWebhook` | Parses raw `application/x-www-form-urlencoded` `data` + `signature`; SHA3-256 verify; maps fact with `providerPaymentId` = `order_id` (not LiqPay `payment_id`). |
+| `getPayment`           | `POST /api/request` `action=status` by `order_id`.                                                                                                                                                         |
+| `refund`               | `POST /api/request` `action=refund` with major `amount`. Sends `refund_ref` (our refund id) — **UNVERIFIED** whether LiqPay echoes it (S1).                                                                |
+| `invalidatePayment`    | Local `{ invalidated: false }` (`invalidateUnpaid: false`).                                                                                                                                                |
+| `verifyWebhook`        | Parses raw `application/x-www-form-urlencoded` `data` + `signature`; SHA3-256 verify; maps fact with `providerPaymentId` = `order_id` (not LiqPay `payment_id`).                                           |
 
 Signature: `base64(sha3-256(private_key + data + private_key))` over base64 JSON `data` (Node `crypto`, no extra npm deps).
 
@@ -39,15 +39,15 @@ Signature: `base64(sha3-256(private_key + data + private_key))` over base64 JSON
 
 ## Status mapping (stub-tested)
 
-`success`/`sandbox` → `succeeded`; `failure`/`error` → `failed`; `reversed`; `processing` and `wait_*` / `prepared` / `3ds_*` → `processing`; `hold_wait` → `authorized`; `invoice_wait` / `created` → `created`; `expired`; unknown → `status: null` with `providerStatus` kept.
+`success`/`sandbox` → `succeeded`; `failure`/`error`/`try_again` → `failed`; `reversed`; `processing`, documented `wait_*` / `*_verify` / `prepared` / `cash_wait` → `processing`; `hold_wait` → `authorized`; `invoice_wait` / `created` → `created`; `expired`; unknown → `status: null` with `providerStatus` kept.
 
-Amounts: to LiqPay, minor÷100 as major with two decimal places; from LiqPay answers, `Math.round(major * 100)`.
+Amounts: outbound major text from integer minor units (`payload-money.ts`, two decimals, truncate toward zero); inbound answers accept a number or a decimal string with at most two fractional digits and convert to minor units without float money arithmetic.
 
 ## UNKNOWN / S1
 
 - Sandbox vs production key rules and cabinet setup.
 - Whether unpaid checkout can be cancelled via API (`invalidateUnpaid` stays false).
-- Refund idempotency, refund listing in status, and whether `refund_ref` is accepted or returned.
+- Refund idempotency: we send `refund_ref` (our refund UUID) and map a documented refund answer `status: "reversed"` to succeeded. Whether LiqPay accepts/echoes `refund_ref`, and whether status answers list refunds for reconciliation after a lost refund response, is UNKNOWN until live S1 — a timed-out refund may stay `unknown` until then.
 - Callback retry policy and expected HTTP status codes.
 - Whether `payment_id` is always present in callbacks (never used as `providerPaymentId`).
 - PRRO / `rro_info`, USD/EUR, exact error code catalogue, rate limits, `Retry-After`.

@@ -40,6 +40,10 @@ describe("factOf status mapping", () => {
     expect(success.ok && success.fact.status).toBe("succeeded");
     const hold = factOf({ ...base, status: "hold_wait" });
     expect(hold.ok && hold.fact.status).toBe("authorized");
+    const threeDs = factOf({ ...base, status: "3ds_verify" });
+    expect(threeDs.ok && threeDs.fact.status).toBe("processing");
+    const retry = factOf({ ...base, status: "try_again" });
+    expect(retry.ok && retry.fact.status).toBe("failed");
     const weird = factOf({ ...base, status: "wait_custom_unknown" });
     expect(weird.ok && weird.fact.status).toBeNull();
     expect(weird.ok && weird.fact.providerStatus).toBe("wait_custom_unknown");

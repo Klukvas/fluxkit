@@ -117,9 +117,9 @@ describe("next.config headers", () => {
     return resolved.headers === undefined ? [] : await resolved.headers();
   }
 
-  it("applies the security headers to every path, then no-referrer to the guest order page, the emailed-link pages and the payment return page", async () => {
+  it("applies the security headers to every path, then no-referrer to the guest order page, the emailed-link pages and the payment return/handoff pages", async () => {
     const rules = await headersFor(PHASE_PRODUCTION_BUILD);
-    expect(rules).toHaveLength(4);
+    expect(rules).toHaveLength(5);
     expect(rules[0]?.source).toBe("/:path*");
     expect(rules[1]).toEqual({
       source: "/:locale/order/:path*",
@@ -131,6 +131,10 @@ describe("next.config headers", () => {
     });
     expect(rules[3]).toEqual({
       source: "/:locale/payment/return",
+      headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
+    });
+    expect(rules[4]).toEqual({
+      source: "/:locale/payment/handoff",
       headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
     });
     const names = rules[0]?.headers.map((header) => header.key) ?? [];

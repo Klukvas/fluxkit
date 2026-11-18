@@ -14,7 +14,7 @@ import {
   type SupportedCurrency,
 } from "@fluxkit/core";
 import { LIQPAY_CURRENCY, LIQPAY_VERSION } from "./config.js";
-import { majorAmountOf, majorAmountText, minorAmountOf } from "./payload-money.js";
+import { majorAmountOf, minorAmountOf } from "./payload-money.js";
 import { encodeData, signData } from "./signature.js";
 
 export { majorAmountOf, majorAmountText, minorAmountOf } from "./payload-money.js";
@@ -164,6 +164,8 @@ const PAYMENT_STATUS: Readonly<Record<string, ProviderPaymentStatus>> = Object.f
   failure: "failed",
   error: "failed",
   reversed: "reversed",
+  /** Shopper should retry; treat as failed so a new attempt is accepted. */
+  try_again: "failed",
   processing: "processing",
   prepared: "processing",
   wait_accept: "processing",
@@ -172,9 +174,25 @@ const PAYMENT_STATUS: Readonly<Record<string, ProviderPaymentStatus>> = Object.f
   wait_capture: "processing",
   wait_sender: "processing",
   wait_card: "processing",
+  /** Documented 3DS status (older docs also used `wait_3ds`). */
+  "3ds_verify": "processing",
   wait_3ds: "processing",
   wait_crypto: "processing",
   wait_sender_card: "processing",
+  wait_qr: "processing",
+  wait_compensation: "processing",
+  wait_reserve: "processing",
+  cash_wait: "processing",
+  captcha_verify: "processing",
+  cvv_verify: "processing",
+  ivr_verify: "processing",
+  otp_verify: "processing",
+  password_verify: "processing",
+  phone_verify: "processing",
+  pin_verify: "processing",
+  senderapp_verify: "processing",
+  p24_verify: "processing",
+  mp_verify: "processing",
   hold_wait: "authorized",
   invoice_wait: "created",
   created: "created",
