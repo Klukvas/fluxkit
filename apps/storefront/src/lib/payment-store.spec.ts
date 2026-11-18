@@ -321,6 +321,37 @@ describe("the sources talk through the typed client with the token in the body",
     });
   });
 
+  it("guest and account send the chosen provider when several are enabled", async () => {
+    const createOrderPayment = vi.fn(() => Promise.resolve(created()));
+    const createAccountOrderPayment = vi.fn(() => Promise.resolve(created()));
+    const guest = guestPaySource(
+      { createOrderPayment } as unknown as Pick<StoreClient, "createOrderPayment">,
+      "7K3M-9QX2",
+      TOKEN,
+      "en",
+      "alpha",
+    );
+    const account = accountPaySource(
+      { createAccountOrderPayment } as unknown as Pick<StoreClient, "createAccountOrderPayment">,
+      "7K3M-9QX2",
+      "uk",
+      "beta",
+    );
+    await guest.create("key-g");
+    await account.create("key-a");
+    expect(createOrderPayment).toHaveBeenCalledWith(
+      { number: "7K3M-9QX2", accessToken: TOKEN, locale: "en", provider: "alpha" },
+      expect.objectContaining({ idempotencyKey: "key-g" }),
+    );
+    expect(createAccountOrderPayment).toHaveBeenCalledWith(
+      "7K3M-9QX2",
+      { locale: "uk", provider: "beta" },
+      expect.objectContaining({ idempotencyKey: "key-a" }),
+    );
+    expect(guest.identity.provider).toBe("alpha");
+    expect(account.identity.provider).toBe("beta");
+  });
+
   it("account: createAccountOrderPayment by number, no token anywhere", async () => {
     const createAccountOrderPayment = vi.fn(() => Promise.resolve(created()));
     const source = accountPaySource(

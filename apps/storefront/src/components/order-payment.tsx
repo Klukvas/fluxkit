@@ -1,10 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { sessionAttemptStorage, webAttemptCrypto } from "../lib/checkout-attempt";
 import { createPaymentAttemptManager, type PaymentAttemptManager } from "../lib/payment-attempt";
-import type { PaymentSectionModel } from "../lib/payment-model";
+import { selectedPaymentProvider, type PaymentSectionModel } from "../lib/payment-model";
 import { goToProvider } from "../lib/payment-redirect";
 import { paymentReturnHref } from "../lib/payment-return";
 import {
@@ -45,29 +45,39 @@ function usePayFocus(state: PayState): void {
 }
 
 /**
- * The payment section of one order page (guest or customer). `source` is the guest or account twin
- * (`payment-store.ts`); the page re-reads the order through `onOrderChanged` when a start shows the order moved on. The
- * store keeps its state across renders; the browser parts (`sessionStorage`, the navigation) are made here, in the browser
- * only. The page renders this only when `paymentSection` found something to show.
+ * The payment section of one order page (guest or customer). `makeSource` builds the guest or account twin for the
+ * shopper's provider choice (`payment-store.ts`); the page re-reads the order through `onOrderChanged` when a start shows
+ * the order moved on. The store keeps its state across renders; the browser parts (`sessionStorage`, the navigation) are
+ * made here, in the browser only. The page renders this only when `paymentSection` found something to show.
  */
 export function OrderPayment({
   model,
   orderExpiresAt,
-  source,
+  makeSource,
   onOrderChanged,
   onSignedOut,
 }: {
   model: PaymentSectionModel;
   orderExpiresAt: string;
-  source: PaySource;
+  makeSource: (provider: string | null) => PaySource;
   onOrderChanged: () => void;
   onSignedOut?: () => void;
 }) {
   const { locale, t } = useI18n();
   const router = useRouter();
+  const [chosenProvider, setChosenProvider] = useState<string | null>(null);
+  const provider = selectedPaymentProvider(model.providers, chosenProvider);
+  const source = useMemo(() => makeSource(provider), [makeSource, provider]);
   const [store, setStore] = useState<PayStore | null>(null);
   const callbacks = useRef({ onOrderChanged, onSignedOut });
   callbacks.current = { onOrderChanged, onSignedOut };
+
+  useEffect(() => {
+    // Drop a stale choice when the order's provider list changes (config reload).
+    if (chosenProvider !== null && !model.providers.includes(chosenProvider)) {
+      setChosenProvider(null);
+    }
+  }, [chosenProvider, model.providers]);
 
   useEffect(() => {
     const storage = sessionAttemptStorage(() => window.sessionStorage);
@@ -107,6 +117,8 @@ export function OrderPayment({
       orderExpiresAt={orderExpiresAt}
       pay={state}
       now={now}
+      selectedProvider={provider}
+      onSelectProvider={setChosenProvider}
       onPay={() => void store?.pay()}
       onContinue={(url, paymentId) => store?.continuePayment(url, paymentId)}
       onCheckStatus={(paymentId) => {

@@ -32,12 +32,19 @@ export function guestPaySource(
   number: string,
   accessToken: string,
   locale: string,
+  /** When several providers are enabled, the shopper's choice; otherwise `null` (the API picks the only one). */
+  provider: string | null = null,
 ): PaySource {
   return {
-    identity: { orderNumber: number, provider: null, locale },
+    identity: { orderNumber: number, provider, locale },
     create: (idempotencyKey) =>
       client.createOrderPayment(
-        { number, accessToken, locale },
+        {
+          number,
+          accessToken,
+          locale,
+          ...(provider === null ? {} : { provider }),
+        },
         { idempotencyKey, fetchOptions: NO_STORE },
       ),
     returnEntry: (paymentId) => ({ kind: "guest", number, accessToken, paymentId }),
@@ -48,13 +55,15 @@ export function accountPaySource(
   client: Pick<StoreClient, "createAccountOrderPayment">,
   number: string,
   locale: string,
+  /** When several providers are enabled, the shopper's choice; otherwise `null` (the API picks the only one). */
+  provider: string | null = null,
 ): PaySource {
   return {
-    identity: { orderNumber: number, provider: null, locale },
+    identity: { orderNumber: number, provider, locale },
     create: (idempotencyKey) =>
       client.createAccountOrderPayment(
         number,
-        { locale },
+        { locale, ...(provider === null ? {} : { provider }) },
         { idempotencyKey, fetchOptions: NO_STORE },
       ),
     returnEntry: (paymentId) => ({ kind: "account", number, paymentId }),

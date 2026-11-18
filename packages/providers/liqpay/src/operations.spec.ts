@@ -101,7 +101,25 @@ describe("getPayment and refund", () => {
     expect(fact.reference).toBe(id);
     expect(fact.status).toBe("succeeded");
     expect(fact.amount.amount).toBe(125_000);
-    expect(fact.card?.last4).toBe("1902");
+    expect(fact.card).toEqual({ system: "visa", last4: "1902" });
+  });
+
+  it("refunds map documented reversed answers to succeeded", async () => {
+    const { provider } = providerOn(stub);
+    const id = await createdPayment(provider, stub);
+    stub.pay(id);
+    const refunded = valueOf(
+      await provider.refund(
+        {
+          providerPaymentId: id,
+          refundId: "6f1c2d3e-4a5b-4c6d-8e9f-0a1b2c3d4e5f",
+          amount: { amount: 125_000, currency: "UAH" },
+          full: true,
+        },
+        live(),
+      ),
+    );
+    expect(refunded.status).toBe("succeeded");
   });
 
   it("invalidates unpaid without network", async () => {

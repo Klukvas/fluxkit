@@ -13,10 +13,12 @@ import { messagesByLocale } from "../messages";
 import {
   DEFAULT_WAIT_SECONDS,
   createPaymentOutcome,
+  needsPaymentProviderChoice,
   paymentFailureKey,
   paymentSection,
   paymentStatusKey,
   secondsLeft,
+  selectedPaymentProvider,
 } from "./payment-model";
 
 const ID = "6f1c1d8e-5f0a-4f6e-9a0b-0c2f4b7d1a11";
@@ -241,7 +243,24 @@ describe("paymentSection: what the order page offers", () => {
       order("awaiting_payment", { canPay: true, providers: ["fake"], latest: null }),
       true,
     );
-    expect(model).toMatchObject({ action: "pay", status: null, continueUrl: null });
+    expect(model).toMatchObject({
+      action: "pay",
+      status: null,
+      continueUrl: null,
+      providers: ["fake"],
+    });
+  });
+
+  it("exposes every enabled provider code for the shopper choice", () => {
+    const model = paymentSection(
+      order("awaiting_payment", {
+        canPay: true,
+        providers: ["alpha", "beta"],
+        latest: null,
+      }),
+      true,
+    );
+    expect(model?.providers).toEqual(["alpha", "beta"]);
   });
 
   it("offers Continue payment for a waiting attempt with a safe page, without creating a new attempt", () => {
@@ -308,6 +327,18 @@ describe("paymentSection: what the order page offers", () => {
       );
       expect(model?.action ?? "none").toBe("none");
     }
+  });
+});
+
+describe("selectedPaymentProvider", () => {
+  it("auto-picks the only enabled provider and requires a listed choice otherwise", () => {
+    expect(selectedPaymentProvider([], null)).toBeNull();
+    expect(selectedPaymentProvider(["alpha"], null)).toBe("alpha");
+    expect(selectedPaymentProvider(["alpha", "beta"], null)).toBeNull();
+    expect(selectedPaymentProvider(["alpha", "beta"], "beta")).toBe("beta");
+    expect(selectedPaymentProvider(["alpha", "beta"], "gone")).toBeNull();
+    expect(needsPaymentProviderChoice(["alpha", "beta"], null)).toBe(true);
+    expect(needsPaymentProviderChoice(["alpha"], null)).toBe(false);
   });
 });
 

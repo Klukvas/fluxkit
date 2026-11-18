@@ -7,7 +7,6 @@ import {
   PAYMENT_PROVIDER_STATUS_PATTERN,
   providerPaymentFactProblems,
   type CreatePaymentInput,
-  type Money,
   type ProviderPaymentFact,
   type ProviderPaymentStatus,
   type ProviderRefundFact,
@@ -15,7 +14,10 @@ import {
   type SupportedCurrency,
 } from "@fluxkit/core";
 import { LIQPAY_CURRENCY, LIQPAY_VERSION } from "./config.js";
+import { majorAmountOf, majorAmountText, minorAmountOf } from "./payload-money.js";
 import { encodeData, signData } from "./signature.js";
+
+export { majorAmountOf, majorAmountText, minorAmountOf } from "./payload-money.js";
 
 /*
  * LiqPay checkout and status shapes (ADR 0059; public docs read 2026-11-18, never called live). Maps answers to
@@ -29,23 +31,8 @@ const MAX_URL_LENGTH = 2048;
 
 const LIQPAY_DATE = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?(Z|[+-]\d{2}:\d{2})$/;
-
-/** Minor units to LiqPay major amount (UAH: two decimal places, truncate toward zero). */
-export function majorAmountOf(amount: Money): number {
-  if (!Number.isSafeInteger(amount.amount) || amount.amount < 0) {
-    return Number.NaN;
-  }
-  return Math.trunc(amount.amount) / 100;
-}
-
-/** LiqPay major amount to core minor units (rounding half away from zero via Math.round). */
-export function minorAmountOf(major: number): number | undefined {
-  if (!Number.isFinite(major) || major < 0) {
-    return undefined;
-  }
-  const minor = Math.round(major * 100);
-  return Number.isSafeInteger(minor) ? minor : undefined;
-}
+/** LiqPay docs use millisecond epoch strings (`"1715597977414"`). */
+const MS_EPOCH = /^\d{12,16}$/;
 
 export function expiredDateOf(expiresAt: Date): string {
   const y = expiresAt.getUTCFullYear();
@@ -198,14 +185,18 @@ const REFUND_STATUS: Readonly<Record<string, ProviderRefundStatus>> = Object.fre
   processing: "processing",
   success: "succeeded",
   sandbox: "succeeded",
+  /** Documented refund API answer (`status: "reversed"`) means the payment was returned. */
+  reversed: "succeeded",
   failure: "failed",
   error: "failed",
 });
 
+const amountField = z.union([z.number(), z.string().max(32)]);
+
 const statusSchema = z.looseObject({
   order_id: z.string().max(255),
   status: z.string().max(64),
-  amount: z.number().optional().nullable(),
+  amount: amountField.optional().nullable(),
   currency: z.string().max(8).optional().nullable(),
   err_code: z
     .union([z.string().max(64), z.number()])
@@ -214,6 +205,8 @@ const statusSchema = z.looseObject({
   err_description: z.string().max(4096).optional().nullable(),
   sender_card_mask2: z.string().max(64).optional().nullable(),
   sender_card_mask: z.string().max(64).optional().nullable(),
+  /** Card brand (`visa`, `mc`, …). Prefer over `paytype` (which is the method: `card`, `privat24`). */
+  sender_card_type: z.string().max(32).optional().nullable(),
   paytype: z.string().max(32).optional().nullable(),
   create_date: z
     .union([z.string().max(32), z.number()])
@@ -227,12 +220,30 @@ const statusSchema = z.looseObject({
     .array(
       z.looseObject({
         status: z.string().max(64),
-        amount: z.number().optional().nullable(),
+        amount: amountField.optional().nullable(),
         refund_id: z.string().max(64).optional().nullable(),
         refund_ref: z.string().max(64).optional().nullable(),
       }),
     )
     .max(PAYMENT_LIMITS.maxFactRefunds)
+    .optional()
+    .nullable(),
+});
+
+/** Narrow refund API answer (docs: result/status/payment_id; often no order_id/amount). */
+const refundAnswerSchema = z.looseObject({
+  result: z.string().max(32).optional().nullable(),
+  status: z.string().max(64),
+  payment_id: z
+    .union([z.string().max(64), z.number()])
+    .optional()
+    .nullable(),
+  wait_amount: z
+    .union([z.boolean(), z.string().max(16)])
+    .optional()
+    .nullable(),
+  err_code: z
+    .union([z.string().max(64), z.number()])
     .optional()
     .nullable(),
 });
@@ -247,6 +258,14 @@ function dateOf(value: string | number | undefined | null): Date | undefined {
     return Number.isFinite(date.getTime()) ? date : undefined;
   }
   const text = String(value).trim();
+  if (MS_EPOCH.test(text)) {
+    const ms = Number(text);
+    if (!Number.isSafeInteger(ms)) {
+      return undefined;
+    }
+    const date = new Date(ms);
+    return Number.isFinite(date.getTime()) ? date : undefined;
+  }
   if (!LIQPAY_DATE.test(text) && !ISO_DATE.test(text)) {
     return undefined;
   }
@@ -255,10 +274,15 @@ function dateOf(value: string | number | undefined | null): Date | undefined {
   return Number.isFinite(date.getTime()) ? date : undefined;
 }
 
-function cardOf(mask: string | undefined | null, paytype: string | undefined | null) {
+function cardOf(
+  mask: string | undefined | null,
+  senderCardType: string | undefined | null,
+  paytype: string | undefined | null,
+) {
   const raw = (mask ?? "").trim();
   const last4 = /([0-9]{4})$/.exec(raw)?.[1];
-  const system = (paytype ?? "").trim().toLowerCase();
+  const system =
+    (senderCardType ?? "").trim().toLowerCase() || (paytype ?? "").trim().toLowerCase();
   if (
     last4 === undefined ||
     system === "" ||
@@ -341,7 +365,11 @@ export function factOf(json: unknown, expectedOrderId?: string): FactReading {
     failureCode:
       failureCode !== null && PAYMENT_CODE_PATTERN.test(failureCode) ? failureCode : null,
     refunds: Object.freeze(refunds),
-    card: cardOf(answer.sender_card_mask2 ?? answer.sender_card_mask, answer.paytype),
+    card: cardOf(
+      answer.sender_card_mask2 ?? answer.sender_card_mask,
+      answer.sender_card_type,
+      answer.paytype,
+    ),
   });
   return providerPaymentFactProblems(fact).length === 0
     ? { ok: true, fact }
@@ -349,11 +377,16 @@ export function factOf(json: unknown, expectedOrderId?: string): FactReading {
 }
 
 export function readRefundStatus(json: unknown): ProviderRefundStatus | undefined {
-  const parsed = statusSchema.safeParse(json);
-  if (!parsed.success) {
+  const refund = refundAnswerSchema.safeParse(json);
+  if (refund.success) {
+    return REFUND_STATUS[refund.data.status];
+  }
+  // A status payload that already includes refunds may also answer a refund call in some environments.
+  const status = statusSchema.safeParse(json);
+  if (!status.success) {
     return undefined;
   }
-  return REFUND_STATUS[parsed.data.status];
+  return REFUND_STATUS[status.data.status];
 }
 
 /** Parse `data` and `signature` from a raw urlencoded webhook body (exact bytes). */

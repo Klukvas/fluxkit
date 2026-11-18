@@ -17,7 +17,10 @@ const KNOWN_PATHS: ReadonlySet<string> = new Set(Object.values(LIQPAY_PATHS));
 export interface LiqPayAnswer {
   readonly status: number;
   readonly retryAfter: string | null;
-  /** Decoded JSON from a urlencoded `data` field when present and valid. */
+  /**
+   * Response body as JSON. LiqPay `/api/request` answers with a direct JSON object (status/refund docs).
+   * A urlencoded `data` envelope is accepted as a fallback for older stubs.
+   */
   readonly json: unknown;
   readonly empty: boolean;
   readonly rawForm: Readonly<Record<string, string>> | undefined;
@@ -116,6 +119,35 @@ function decodeDataField(data: string | undefined): unknown {
   }
 }
 
+function parseAnswerBody(bytes: Uint8Array): {
+  json: unknown;
+  rawForm: Record<string, string> | undefined;
+} {
+  if (bytes.byteLength === 0) {
+    return { json: undefined, rawForm: undefined };
+  }
+  let text: string;
+  try {
+    text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    return { json: undefined, rawForm: undefined };
+  }
+  const trimmed = text.trim();
+  if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+    try {
+      return { json: JSON.parse(trimmed) as unknown, rawForm: undefined };
+    } catch {
+      // Fall through to urlencoded parsing.
+    }
+  }
+  try {
+    const rawForm = parseUrlencodedForm(bytes);
+    return { json: decodeDataField(rawForm.data), rawForm };
+  } catch {
+    return { json: undefined, rawForm: undefined };
+  }
+}
+
 export class LiqPayHttp {
   readonly publicKey: string;
   readonly privateKey: string;
@@ -176,16 +208,15 @@ export class LiqPayHttp {
           error instanceof TooLarge ? "too_large" : signal.aborted ? "timeout" : "unreadable";
         return { kind: "failed", code, status: response.status };
       }
-      const rawForm = bytes.byteLength === 0 ? undefined : parseUrlencodedForm(bytes);
-      const json = decodeDataField(rawForm?.data);
+      const parsed = parseAnswerBody(bytes);
       return {
         kind: "answered",
         answer: {
           status: response.status,
           retryAfter,
-          json,
+          json: parsed.json,
           empty: bytes.byteLength === 0,
-          rawForm,
+          rawForm: parsed.rawForm,
         },
       };
     } finally {

@@ -265,8 +265,11 @@ function OrderDetail({
   useCancelFocus(state.cancel);
 
   const malformed = !isOrderNumber(number);
-  const paySource = useMemo(
-    () => (malformed ? null : accountPaySource(client, number, locale)),
+  const makePaySource = useMemo(
+    () =>
+      malformed
+        ? null
+        : (provider: string | null) => accountPaySource(client, number, locale, provider),
     [client, number, locale, malformed],
   );
   const payment =
@@ -291,11 +294,11 @@ function OrderDetail({
         <OrderDetailsView
           order={state.load.order}
           payment={
-            payment === null || paySource === null ? null : (
+            payment === null || makePaySource === null ? null : (
               <OrderPayment
                 model={payment}
                 orderExpiresAt={state.load.order.expiresAt}
-                source={paySource}
+                makeSource={makePaySource}
                 onOrderChanged={() => void store.load()}
                 onSignedOut={() => account.sessionEnded()}
               />

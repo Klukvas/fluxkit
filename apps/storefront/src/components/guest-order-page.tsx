@@ -17,7 +17,7 @@ import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react
 import { failureText } from "../lib/failure";
 import { localizedHref } from "../lib/locale-path";
 import { guestOrderHref, isOrderNumber, tokenFromFragment } from "../lib/order-links";
-import { guestPaySource, type PaySource } from "../lib/payment-store";
+import { guestPaySource } from "../lib/payment-store";
 import { orderPaymentSection, type ShopMoney } from "../lib/order-model";
 import {
   createOrderStore,
@@ -177,8 +177,8 @@ export function GuestOrderPage({
   const client = useStoreClient();
   const [store, setStore] = useState<OrderStore | null>(null);
   const [link, setLink] = useState<string | null>(null);
-  // Holds the access token for the payment requests (their POST body), like the order store's source; never rendered.
-  const [paySource, setPaySource] = useState<PaySource | null>(null);
+  // Holds the guest token so `makeSource` can put it in the payment POST body only; never rendered.
+  const [guestToken, setGuestToken] = useState<string | null>(null);
   const [missing, setMissing] = useState(false);
   const [copy, setCopy] = useState<CopyState>("idle");
   const state = useOrderState(store);
@@ -193,7 +193,7 @@ export function GuestOrderPage({
     }
     const created = createOrderStore({ source: guestOrderSource(client, number, token, locale) });
     setStore(created);
-    setPaySource(guestPaySource(client, number, token, locale));
+    setGuestToken(token);
     setLink(`${window.location.origin}${guestOrderHref(locale, number, token)}`);
     void created.load();
   }, [client, number, locale]);
@@ -242,11 +242,13 @@ export function GuestOrderPage({
         onKeepOrder={() => store.keepOrder()}
         onConfirmCancel={() => void store.cancel()}
         payment={
-          payment === null || paySource === null ? null : (
+          payment === null || guestToken === null ? null : (
             <OrderPayment
               model={payment}
               orderExpiresAt={state.load.order.expiresAt}
-              source={paySource}
+              makeSource={(provider) =>
+                guestPaySource(client, number, guestToken, locale, provider)
+              }
               onOrderChanged={() => void store.load()}
             />
           )

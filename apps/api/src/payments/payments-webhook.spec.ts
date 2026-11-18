@@ -176,7 +176,7 @@ describe("payments: the webhook route and verified facts (real Postgres)", () =>
     expect(
       (await world.webhook(signed, { headers: { "content-type": "text/plain" } })).status,
     ).toBe(415);
-    // ADR 0059: form-urlencoded is allowed at the controller; the fake still expects JSON so signature fails.
+    // ADR 0059: form-urlencoded is allowed at the controller; a JSON body with that content-type fails signature/parse.
     expect(
       (
         await world.webhook(signed, {
@@ -186,6 +186,21 @@ describe("payments: the webhook route and verified facts (real Postgres)", () =>
     ).toBe(401);
     const unknown = await world.webhook(signed, { provider: "monobank" });
     expect(unknown.status).toBe(404);
+  });
+
+  it("a verified form-urlencoded success (ADR 0059 shape) pays the order like a JSON webhook", async () => {
+    const { placed, paymentId, invoiceId } = await paidAttempt();
+    const answer = await world.webhook(world.provider().formWebhookFor(invoiceId));
+    expect(answer).toEqual({ status: 200, text: "" });
+    expect(await world.payment(paymentId)).toMatchObject({
+      status: "succeeded",
+      order_outcome: "applied",
+      final_amount: 2_000,
+    });
+    expect(await world.orderStatus(placed.id)).toMatchObject({
+      status: "paid",
+      payment_reference: `fake:${invoiceId}`,
+    });
   });
 
   it("a body over 64 KiB is 413 and stores nothing", async () => {

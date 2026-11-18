@@ -37,6 +37,7 @@ interface StubOrder {
   status: string;
   refunds: StubRefund[];
   paytype?: string;
+  sender_card_type?: string;
   sender_card_mask2?: string;
   create_date: string;
   end_date: string;
@@ -49,7 +50,7 @@ export interface StubLiqPay {
   readonly orders: ReadonlyMap<string, StubOrder>;
   override(next: Override | undefined): void;
   register(orderId: string, amountMinor: number): void;
-  pay(orderId: string, card?: { paytype: string; mask: string }): void;
+  pay(orderId: string, card?: { paytype?: string; cardType?: string; mask?: string }): void;
   setStatus(orderId: string, status: string, errCode?: string): void;
   statusJson(orderId: string): Record<string, unknown>;
   webhookFor(orderId: string): { headers: Record<string, string>; rawBody: Uint8Array };
@@ -87,16 +88,14 @@ function decodeData(form: Record<string, string>): unknown {
   }
 }
 
-function signedResponse(json: Record<string, unknown>): {
+/** Direct JSON body as documented for `/api/request` status and refund answers. */
+function jsonResponse(json: Record<string, unknown>): {
   body: string;
   headers: Record<string, string>;
 } {
-  const data = encodeData(json);
-  const signature = signData(data, STUB_PRIVATE_KEY);
-  const body = new URLSearchParams({ data, signature }).toString();
   return {
-    body,
-    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: JSON.stringify(json),
+    headers: { "content-type": "application/json" },
   };
 }
 
@@ -131,7 +130,7 @@ export async function startStubLiqPay(): Promise<StubLiqPay> {
     }
     if (overrideAnswer !== undefined) {
       if (overrideAnswer.json !== undefined) {
-        const payload = signedResponse(overrideAnswer.json);
+        const payload = jsonResponse(overrideAnswer.json);
         res.writeHead(overrideAnswer.status, payload.headers);
         res.end(payload.body);
       } else {
@@ -160,8 +159,8 @@ export async function startStubLiqPay(): Promise<StubLiqPay> {
       signature === undefined ||
       !signatureValid(data, signature, STUB_PRIVATE_KEY)
     ) {
-      res.writeHead(403);
-      res.end(signedResponse({ status: "error", err_code: "err_auth" }).body);
+      res.writeHead(403, { "content-type": "application/json" });
+      res.end(JSON.stringify({ status: "error", err_code: "err_auth" }));
       return;
     }
 
@@ -172,15 +171,16 @@ export async function startStubLiqPay(): Promise<StubLiqPay> {
     if (action === "status") {
       const order = orders.get(orderId);
       if (order === undefined) {
-        res.writeHead(404);
-        res.end(
-          signedResponse({ status: "error", err_code: "payment_not_found", order_id: orderId })
-            .body,
-        );
+        const out = jsonResponse({
+          status: "error",
+          err_code: "payment_not_found",
+          order_id: orderId,
+        });
+        res.writeHead(404, out.headers);
+        res.end(out.body);
         return;
       }
-      const json = orderToJson(order);
-      const out = signedResponse(json);
+      const out = jsonResponse(orderToJson(order));
       res.writeHead(200, out.headers);
       res.end(out.body);
       return;
@@ -189,41 +189,59 @@ export async function startStubLiqPay(): Promise<StubLiqPay> {
     if (action === "refund") {
       const order = orders.get(orderId);
       if (order === undefined) {
-        res.writeHead(404);
-        res.end(
-          signedResponse({ status: "error", err_code: "payment_not_found", order_id: orderId })
-            .body,
-        );
+        const out = jsonResponse({
+          result: "error",
+          status: "error",
+          err_code: "payment_not_found",
+        });
+        res.writeHead(404, out.headers);
+        res.end(out.body);
         return;
       }
-      const amount = typeof params?.amount === "number" ? params.amount : 0;
+      const amount =
+        typeof params?.amount === "number"
+          ? params.amount
+          : typeof params?.amount === "string"
+            ? Number(params.amount)
+            : 0;
       const refundRef = typeof params?.refund_ref === "string" ? params.refund_ref : "unknown";
       order.refunds.push({ status: "success", amount, refund_ref: refundRef });
       order.status = "reversed";
-      order.end_date = new Date().toISOString().replace("T", " ").slice(0, 19);
-      const json = { ...orderToJson(order), status: "sandbox" };
-      const out = signedResponse(json);
+      order.end_date = String(Date.now());
+      // Documented refund answer: result/status/payment_id (no order_id/amount required).
+      const out = jsonResponse({
+        result: "ok",
+        wait_amount: false,
+        payment_id: "2417662437",
+        status: "reversed",
+      });
       res.writeHead(200, out.headers);
       res.end(out.body);
       return;
     }
 
-    res.writeHead(400);
-    res.end(signedResponse({ status: "error", err_code: "err_missing" }).body);
+    const missing = jsonResponse({ status: "error", err_code: "err_missing" });
+    res.writeHead(400, missing.headers);
+    res.end(missing.body);
   });
 
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
   const port = (server.address() as AddressInfo).port;
 
   function orderToJson(order: StubOrder): Record<string, unknown> {
+    const whole = Math.trunc(order.amountMinor / 100);
+    const frac = Math.abs(order.amountMinor % 100);
+    const amountText = `${String(whole)}.${String(frac).padStart(2, "0")}`;
     return {
       order_id: order.orderId,
       status: order.status,
-      amount: order.amountMinor / 100,
+      // Docs often return decimal strings and millisecond epoch strings.
+      amount: amountText,
       currency: "UAH",
       create_date: order.create_date,
       end_date: order.end_date,
       paytype: order.paytype,
+      sender_card_type: order.sender_card_type,
       sender_card_mask2: order.sender_card_mask2,
       err_code: order.err_code,
       refunds: order.refunds.map((entry) => ({
@@ -246,7 +264,7 @@ export async function startStubLiqPay(): Promise<StubLiqPay> {
       custom = next;
     },
     register(orderId, amountMinor) {
-      const stamp = "2026-11-18 10:00:01";
+      const stamp = "1731916801000";
       orders.set(orderId, {
         orderId,
         amountMinor,
@@ -260,8 +278,9 @@ export async function startStubLiqPay(): Promise<StubLiqPay> {
       const order = orders.get(orderId);
       if (order === undefined) return;
       order.status = "success";
-      order.end_date = "2026-11-18 10:05:00";
+      order.end_date = "1731917100000";
       order.paytype = card?.paytype ?? "card";
+      order.sender_card_type = card?.cardType ?? "visa";
       order.sender_card_mask2 = card?.mask ?? "444403******1902";
     },
     setStatus(orderId, status, errCode) {
@@ -269,7 +288,7 @@ export async function startStubLiqPay(): Promise<StubLiqPay> {
       if (order === undefined) return;
       order.status = status;
       order.err_code = errCode;
-      order.end_date = "2026-11-18 10:06:00";
+      order.end_date = "1731917160000";
     },
     statusJson(orderId) {
       const order = orders.get(orderId);
