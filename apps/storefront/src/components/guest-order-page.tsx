@@ -13,7 +13,7 @@ import {
   type Translator,
 } from "@fluxkit/ui";
 import Link from "next/link";
-import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { failureText } from "../lib/failure";
 import { localizedHref } from "../lib/locale-path";
 import { guestOrderHref, isOrderNumber, tokenFromFragment } from "../lib/order-links";
@@ -218,6 +218,15 @@ export function GuestOrderPage({
     );
   }
   const payment = orderPaymentSection(state.load.order, onlinePayment);
+  // Stable like the account order page: a new function every render would remake the pay store and wipe a refused start.
+  const makePaySource = useMemo(
+    () =>
+      guestToken === null
+        ? null
+        : (provider: string | null) =>
+            guestPaySource(client, number, guestToken, locale, provider),
+    [client, number, guestToken, locale],
+  );
   return (
     <Page>
       <OrderDetailsView
@@ -242,13 +251,11 @@ export function GuestOrderPage({
         onKeepOrder={() => store.keepOrder()}
         onConfirmCancel={() => void store.cancel()}
         payment={
-          payment === null || guestToken === null ? null : (
+          payment === null || makePaySource === null ? null : (
             <OrderPayment
               model={payment}
               orderExpiresAt={state.load.order.expiresAt}
-              makeSource={(provider) =>
-                guestPaySource(client, number, guestToken, locale, provider)
-              }
+              makeSource={makePaySource}
               onOrderChanged={() => void store.load()}
             />
           )

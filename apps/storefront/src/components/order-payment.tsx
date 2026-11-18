@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { sessionAttemptStorage, webAttemptCrypto } from "../lib/checkout-attempt";
 import { createPaymentAttemptManager, type PaymentAttemptManager } from "../lib/payment-attempt";
 import { selectedPaymentProvider, type PaymentSectionModel } from "../lib/payment-model";
@@ -67,10 +67,9 @@ export function OrderPayment({
   const router = useRouter();
   const [chosenProvider, setChosenProvider] = useState<string | null>(null);
   const provider = selectedPaymentProvider(model.providers, chosenProvider);
-  const source = useMemo(() => makeSource(provider), [makeSource, provider]);
   const [store, setStore] = useState<PayStore | null>(null);
-  const callbacks = useRef({ onOrderChanged, onSignedOut });
-  callbacks.current = { onOrderChanged, onSignedOut };
+  const callbacks = useRef({ onOrderChanged, onSignedOut, makeSource });
+  callbacks.current = { onOrderChanged, onSignedOut, makeSource };
 
   useEffect(() => {
     // Drop a stale choice when the order's provider list changes (config reload).
@@ -80,6 +79,9 @@ export function OrderPayment({
   }, [chosenProvider, model.providers]);
 
   useEffect(() => {
+    // Rebuild only when the shopper's provider choice changes. `makeSource` is read from a ref so an unstable
+    // parent callback (or an order re-read after a refused start) cannot wipe the pay outcome and focus target.
+    const source = callbacks.current.makeSource(provider);
     const storage = sessionAttemptStorage(() => window.sessionStorage);
     let manager: PaymentAttemptManager | null = null;
     setStore(
@@ -99,7 +101,7 @@ export function OrderPayment({
         onSignedOut: () => callbacks.current.onSignedOut?.(),
       }),
     );
-  }, [source]);
+  }, [provider]);
 
   const state = useSyncExternalStore(
     (listener) => store?.subscribe(listener) ?? (() => {}),
