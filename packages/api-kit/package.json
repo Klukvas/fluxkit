@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@fluxkit/core": "workspace:*",
-    "@nestjs/common": "12.4.2",
+    "@nestjs/common": "12.5.0",
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.2"
   },
