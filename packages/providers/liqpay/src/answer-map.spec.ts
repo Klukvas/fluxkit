@@ -14,8 +14,10 @@ describe("LiqPay error mapping", () => {
   it("maps non-2xx payment_not_found to not_found", () => {
     const failure = mapLiqPayError({
       status: 404,
+      retryAfter: null,
       json: { status: "error", err_code: "payment_not_found" },
-      text: "",
+      empty: false,
+      rawForm: undefined,
     });
     expect(failure.ok).toBe(false);
     if (!failure.ok) {
