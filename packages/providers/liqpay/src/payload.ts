@@ -168,7 +168,11 @@ const PAYMENT_STATUS: Readonly<Record<string, ProviderPaymentStatus>> = Object.f
   try_again: "failed",
   processing: "processing",
   prepared: "processing",
-  wait_accept: "processing",
+  /**
+   * Money already charged; shop verification pending (auto-cancel after 60 days if never activated).
+   * Treat as paid for the order; a later `reversed` webhook settles a cancellation.
+   */
+  wait_accept: "succeeded",
   wait_secure: "processing",
   wait_lc: "processing",
   wait_capture: "processing",

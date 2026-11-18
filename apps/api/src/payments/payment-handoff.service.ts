@@ -88,9 +88,9 @@ export class PaymentHandoffService {
     row: PaymentRow,
     provider: PaymentProviderPort,
   ): Promise<CreatePaymentInput> {
-    const locale = this.locales.locales.includes(order.locale)
-      ? order.locale
-      : (this.locales.locales[0] as string);
+    // Prefer the locale baked into the attempt's redirect URL at create (shopper request locale),
+    // not only `order.locale`, so a guest paying from `/en/...` on a `uk` order keeps `en` URLs.
+    const locale = localeForHandoff(row.redirectUrl, order.locale, this.locales.locales);
     const base = (this.config.storefrontPublicUrl ?? "").replace(/\/+$/, "");
     const amount = moneyOf(row.amount, row.currency);
     const handoffUrl = `${base}/${encodeURIComponent(locale)}/payment/handoff?payment=${row.id}`;
@@ -137,6 +137,38 @@ export class PaymentHandoffService {
             },
     });
     return decided.ok ? decided.lines : [];
+  }
+}
+
+/**
+ * Locale for signed `result_url` / handoff URLs: the path segment from the stored create redirect
+ * (`/{locale}/payment/handoff`), else the order locale, else the first configured locale.
+ */
+export function localeForHandoff(
+  redirectUrl: string | null,
+  orderLocale: string,
+  locales: readonly string[],
+): string {
+  const fromRedirect = localeFromPaymentRedirect(redirectUrl);
+  if (fromRedirect !== undefined && locales.includes(fromRedirect)) {
+    return fromRedirect;
+  }
+  if (locales.includes(orderLocale)) {
+    return orderLocale;
+  }
+  return locales[0] as string;
+}
+
+function localeFromPaymentRedirect(redirectUrl: string | null): string | undefined {
+  if (redirectUrl === null || redirectUrl === "") {
+    return undefined;
+  }
+  try {
+    const path = new URL(redirectUrl).pathname;
+    const match = /^\/([^/]+)\/payment\/(?:handoff|return)(?:\/|$)/.exec(path);
+    return match?.[1] === undefined ? undefined : decodeURIComponent(match[1]);
+  } catch {
+    return undefined;
   }
 }
 

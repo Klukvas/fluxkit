@@ -23,6 +23,7 @@ export {
 } from "./config.js";
 export {
   failureOfExchange,
+  isLiqPayNotFoundAnswer,
   malformedAnswer,
   mapLiqPayError,
   LIQPAY_ERROR_CODES,

@@ -20,7 +20,13 @@ import {
   type ProviderRefundStatus,
   type RefundInput,
 } from "@fluxkit/core";
-import { failureOfExchange, malformedAnswer, mapLiqPayError } from "./answer-map.js";
+import {
+  failureOfExchange,
+  isLiqPayNotFoundAnswer,
+  liqpayErrorCodeOf,
+  malformedAnswer,
+  mapLiqPayError,
+} from "./answer-map.js";
 import { LIQPAY_API_ORIGIN, LIQPAY_CURRENCY, LIQPAY_PATHS, LIQPAY_VERSION } from "./config.js";
 import { LiqPayHttp, type LiqPayAnswer, type LiqPayExchange } from "./http.js";
 import {
@@ -283,7 +289,16 @@ export class LiqPayPaymentProvider implements PaymentProviderPort {
     }
     const { answer } = exchange;
     const result =
-      answer.status >= 200 && answer.status < 300 ? read(answer) : mapLiqPayError(answer);
+      answer.status >= 200 && answer.status < 300
+        ? isLiqPayNotFoundAnswer(answer.json)
+          ? paymentProviderFailure("not_found", {
+              providerCodes: [
+                liqpayErrorCodeOf(answer.json) ?? "payment_not_found",
+                String(answer.status),
+              ],
+            })
+          : read(answer)
+        : mapLiqPayError(answer);
     if (typeof result === "object" && result !== null && "ok" in result && result.ok === false) {
       this.logFailure(
         operation,

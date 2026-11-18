@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { encodeData, signData, signatureValid } from "./signature.js";
 
@@ -19,5 +20,14 @@ describe("LiqPay signature", () => {
     expect(signatureValid(data, `${signature}x`, privateKey)).toBe(false);
     const tampered = encodeData({ ...params, amount: 1251 });
     expect(signatureValid(tampered, signature, privateKey)).toBe(false);
+  });
+
+  it("accepts the SHA-1 digest used in official callback sample snippets", () => {
+    const data = encodeData(params);
+    const sha1 = createHash("sha1")
+      .update(privateKey + data + privateKey, "utf8")
+      .digest("base64");
+    expect(signatureValid(data, sha1, privateKey)).toBe(true);
+    expect(signData(data, privateKey)).not.toBe(sha1);
   });
 });

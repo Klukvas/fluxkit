@@ -104,6 +104,17 @@ describe("getPayment and refund", () => {
     expect(fact.card).toEqual({ system: "visa", last4: "1902" });
   });
 
+  it("maps live-style HTTP 200 payment_not_found to not_found (pre-submit poll)", async () => {
+    const { provider } = providerOn(stub);
+    const missing = await provider.getPayment("6f1c2d3e-4a5b-4c6d-8e9f-0a1b2c3d4e5f", live());
+    expect(missing.ok).toBe(false);
+    if (!missing.ok) {
+      expect(missing.reason).toBe("not_found");
+      expect(missing.providerCodes).toContain("payment_not_found");
+      expect(missing.providerCodes).toContain("200");
+    }
+  });
+
   it("refunds map documented reversed answers to succeeded", async () => {
     const { provider } = providerOn(stub);
     const id = await createdPayment(provider, stub);

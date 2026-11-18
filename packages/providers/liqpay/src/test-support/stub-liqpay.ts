@@ -170,13 +170,14 @@ export async function startStubLiqPay(): Promise<StubLiqPay> {
 
     if (action === "status") {
       const order = orders.get(orderId);
+      // Live LiqPay answers HTTP 200 + err_code for an unknown order_id (form create is local).
       if (order === undefined) {
         const out = jsonResponse({
           status: "error",
           err_code: "payment_not_found",
           order_id: orderId,
         });
-        res.writeHead(404, out.headers);
+        res.writeHead(200, out.headers);
         res.end(out.body);
         return;
       }
@@ -194,7 +195,7 @@ export async function startStubLiqPay(): Promise<StubLiqPay> {
           status: "error",
           err_code: "payment_not_found",
         });
-        res.writeHead(404, out.headers);
+        res.writeHead(200, out.headers);
         res.end(out.body);
         return;
       }

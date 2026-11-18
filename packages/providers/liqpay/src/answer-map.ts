@@ -30,6 +30,15 @@ export function liqpayErrorCodeOf(json: unknown): LiqPayErrorCode | undefined {
     : undefined;
 }
 
+/**
+ * Live `action=status` / refund often answer HTTP 200 with `{ status: "error", err_code: "payment_not_found" }`
+ * before the shopper has submitted the form (create is local). Treat that as `not_found`, not a malformed fact.
+ */
+export function isLiqPayNotFoundAnswer(json: unknown): boolean {
+  const code = liqpayErrorCodeOf(json);
+  return code === "payment_not_found" || code === "order_not_found";
+}
+
 export function mapLiqPayError(answer: LiqPayAnswer): PaymentProviderFailure {
   const { status } = answer;
   const code = liqpayErrorCodeOf(answer.json);

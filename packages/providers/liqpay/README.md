@@ -29,9 +29,10 @@ Origins are constants (`LIQPAY_API_ORIGIN`). `SHOP_CURRENCY` must be `UAH`. Noth
 | `getPayment`           | `POST /api/request` `action=status` by `order_id`.                                                                                                                                                         |
 | `refund`               | `POST /api/request` `action=refund` with major `amount`. Sends `refund_ref` (our refund id) — **UNVERIFIED** whether LiqPay echoes it (S1).                                                                |
 | `invalidatePayment`    | Local `{ invalidated: false }` (`invalidateUnpaid: false`).                                                                                                                                                |
-| `verifyWebhook`        | Parses raw `application/x-www-form-urlencoded` `data` + `signature`; SHA3-256 verify; maps fact with `providerPaymentId` = `order_id` (not LiqPay `payment_id`).                                           |
+| `verifyWebhook`        | Parses raw `application/x-www-form-urlencoded` `data` + `signature`; verifies SHA3-256 **or** SHA-1 (callback sample snippets); maps fact with `providerPaymentId` = `order_id` (not LiqPay `payment_id`). |
+| `getPayment` / `refund`| Treat HTTP 200 `{ status: "error", err_code: "payment_not_found" }` as `not_found` (live pre-submit poll after local create).                                                                                 |
 
-Signature: `base64(sha3-256(private_key + data + private_key))` over base64 JSON `data` (Node `crypto`, no extra npm deps).
+Signature: outbound `base64(sha3-256(private_key + data + private_key))` over base64 JSON `data` (Node `crypto`, no extra npm deps). Inbound verify also accepts the SHA-1 digest used in LiqPay's published callback samples.
 
 ## Capabilities
 
@@ -39,7 +40,7 @@ Signature: `base64(sha3-256(private_key + data + private_key))` over base64 JSON
 
 ## Status mapping (stub-tested)
 
-`success`/`sandbox`/`wait_compensation` → `succeeded`; `failure`/`error`/`try_again` → `failed`; `reversed`; `processing`, documented `wait_*` (except compensation) / `*_verify` / `prepared` / `cash_wait` → `processing`; `hold_wait` → `authorized`; `invoice_wait` / `created` → `created`; `expired`; unknown → `status: null` with `providerStatus` kept. Refund answers with `wait_amount: true` stay `processing`.
+`success`/`sandbox`/`wait_compensation`/`wait_accept` → `succeeded`; `failure`/`error`/`try_again` → `failed`; `reversed`; `processing`, documented `wait_*` (except compensation/accept) / `*_verify` / `prepared` / `cash_wait` → `processing`; `hold_wait` → `authorized`; `invoice_wait` / `created` → `created`; `expired`; unknown → `status: null` with `providerStatus` kept. Refund answers with `wait_amount: true` stay `processing`.
 
 Amounts: outbound major text from integer minor units (`payload-money.ts`, two decimals, truncate toward zero); inbound answers accept a number or a decimal string with at most two fractional digits and convert to minor units without float money arithmetic.
 
