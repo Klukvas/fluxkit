@@ -3,7 +3,7 @@
 Read this first (Claude Code, Codex or a human). Rules live in `AGENTS.md`; decisions in `docs/adr/` (0001 to 0058, index in `docs/adr/README.md`); plans in `docs/plans/`.
 The long per-step history that used to live here is archived verbatim in `docs/HISTORY.md` (not current). Update this file in every PR that changes project state; keep it short and keep "Last updated" to one line.
 
-Last updated: 2026-11-18, LiqPay second review fixes on `cursor/liqpay-provider-package-135a` (HTTP 200 `payment_not_found` → `not_found`, inbound SHA-1|SHA3 verify, `wait_accept` paid, handoff locale from stored redirect; API route-list CI fixes). Earlier the same day: LiqPay first review fixes (direct JSON status/refund, integer money, dual-provider storefront). Earlier: rolling deploy linger (`cursor/fix-rollout-no-502`); stored email route merged (PR 351).
+Last updated: 2026-11-18, LiqPay admin Integrations guide/labels on `cursor/liqpay-provider-package-135a` (owner can paste public/private keys; still candidates — payments runtime stays env until integrations slice 2). Earlier the same day: LiqPay review fixes and green CI on PR 354.
 
 ## 1. Current state
 

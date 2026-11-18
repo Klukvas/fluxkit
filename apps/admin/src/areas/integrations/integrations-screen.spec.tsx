@@ -381,18 +381,25 @@ describe("the area's messages", () => {
 });
 
 describe("the provider guides", () => {
-  it("cover the four shipped providers, each with steps and https links to the provider's own site", () => {
-    expect([...GUIDED_PROVIDER_CODES].sort()).toEqual(["brevo", "monobank", "nova_post", "resend"]);
+  it("cover the shipped providers, each with steps and https links to the provider's own site", () => {
+    expect([...GUIDED_PROVIDER_CODES].sort()).toEqual([
+      "brevo",
+      "liqpay",
+      "monobank",
+      "nova_post",
+      "resend",
+    ]);
     const hosts = GUIDED_PROVIDER_CODES.flatMap((code) =>
       (providerGuide(code)?.links ?? []).map((link) => new URL(link.href)),
     );
     expect(hosts.every((url) => url.protocol === "https:")).toBe(true);
-    expect(hosts.map((url) => url.host).sort()).toEqual([
+    expect([...new Set(hosts.map((url) => url.host))].sort()).toEqual([
       "api.monobank.ua",
       "new.novaposhta.ua",
       "onboarding.brevo.com",
       "resend.com",
       "web.monobank.ua",
+      "www.liqpay.ua",
     ]);
     for (const code of GUIDED_PROVIDER_CODES) {
       expect(providerGuide(code)?.stepKeys.length, code).toBeGreaterThanOrEqual(3);
