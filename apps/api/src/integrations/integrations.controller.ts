@@ -10,16 +10,20 @@ import { ApiProblemResponses, ApiZodBody, ApiZodResponse } from "../common/opena
 import { ZodValidationPipe } from "../common/zod-validation.pipe.js";
 import { INTEGRATIONS_ADMIN_PERMISSIONS } from "./integrations.permissions.js";
 import {
+  emailRouteResponseSchema,
   integrationDetailResponseSchema,
   integrationListResponseSchema,
   integrationMutationSchema,
   putIntegrationSecretSchema,
   retireIntegrationSecretSchema,
+  setEmailRouteSchema,
+  type EmailRouteResponse,
   type IntegrationDetailResponse,
   type IntegrationListResponse,
   type IntegrationMutationBody,
   type PutIntegrationSecretBody,
   type RetireIntegrationSecretBody,
+  type SetEmailRouteBody,
 } from "./integrations.schemas.js";
 import { IntegrationsService, type IntegrationActor } from "./integrations.service.js";
 
@@ -64,6 +68,23 @@ export class IntegrationsController {
   @ApiZodResponse(200, integrationListResponseSchema, "The integrations and the current revision.")
   list(): Promise<IntegrationListResponse> {
     return this.integrations.list();
+  }
+
+  @Put("email-route")
+  @ApiOperation({
+    summary: "Choose how stored Resend and Brevo share mail",
+    description:
+      "`equal` alternates new mail between Resend and Brevo. `resend` starts every message with Resend and waits out a cooldown instead of skipping to Brevo. A definite non-acceptance is tried on the other. Applies whenever both are in the send chain, including a chain set on the server. Asks for the owner's current password. `409`: `integration_revision_stale`.",
+  })
+  @ApiZodBody(setEmailRouteSchema)
+  @ApiZodResponse(200, emailRouteResponseSchema, "The route mode after the change.")
+  @ApiProblemResponses(400, 403, 409, 429, 503)
+  setEmailRoute(
+    @Body(new ZodValidationPipe(setEmailRouteSchema)) body: SetEmailRouteBody,
+    @CurrentAdmin() admin: AdminPrincipal,
+    @Req() request: Request,
+  ): Promise<EmailRouteResponse> {
+    return this.integrations.setEmailRoute(actorOf(admin, request), body);
   }
 
   @Get(":id")

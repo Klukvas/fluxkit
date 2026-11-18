@@ -175,6 +175,8 @@ export class EmailMessageChanges {
     routing?: {
       readonly providers: readonly EmailProviderPort[];
       readonly excluded: readonly string[];
+      /** Wait for the first candidate instead of calling the next one while it is cooling down. */
+      readonly holdStart?: boolean;
     },
   ): Promise<EmailClaimResult> {
     return withJobTransaction(
@@ -243,6 +245,9 @@ export class EmailMessageChanges {
             const admission = await admitEmailProvider(tx, candidate.code);
             if (!admission.allowed) {
               waitMs = Math.min(waitMs, admission.waitMs);
+              // The route's starting provider is this message's half (or Resend, in that mode). A cooldown is
+              // not a refusal of this message, so the next provider does not take it.
+              if (routing.holdStart === true) break;
               continue;
             }
             providerCode = candidate.code;

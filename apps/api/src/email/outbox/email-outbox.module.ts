@@ -3,6 +3,7 @@ import { EmailTemplatesModule } from "../templates/index.js";
 import { EMAIL_DELIVERY_CONFIG, type EmailDeliveryConfig } from "./email-delivery-config.js";
 import { EMAIL_LINK_SOURCE, GUEST_ORDER_ACCESS, StorefrontEmailLinks } from "./email-links.js";
 import { EmailMessageChanges } from "./email-message-changes.js";
+import { EmailRoutePolicy } from "./email-route-policy.js";
 import { EmailOutboxRepository } from "./email-outbox.repository.js";
 import { EmailOutbox } from "./email-outbox.service.js";
 import { DatabaseGuestOrderAccess } from "./guest-order-access.js";
@@ -45,6 +46,7 @@ export class EmailOutboxModule {
         { provide: EMAIL_LINK_SOURCE, useClass: StorefrontEmailLinks },
         EmailOutboxRepository,
         EmailMessageChanges,
+        EmailRoutePolicy,
         EmailOutbox,
         EmailSender,
         { provide: EMAIL_SUPPRESSION_GUARD_WIRED, useValue: true },

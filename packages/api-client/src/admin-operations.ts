@@ -413,6 +413,15 @@ export const ADMIN_OPERATIONS = {
     { query: ["locale"] },
   ),
   listIntegrations: operation("GET", "/admin/integrations", [200], "integrations.manage"),
+  setEmailRouteMode: operation(
+    "PUT",
+    "/admin/integrations/email-route",
+    [200],
+    "integrations.manage",
+    {
+      body: "json",
+    },
+  ),
   getIntegration: operation("GET", "/admin/integrations/{id}", [200], "integrations.manage"),
   putIntegrationSecret: operation(
     "PUT",

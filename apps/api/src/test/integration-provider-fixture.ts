@@ -127,6 +127,48 @@ export async function createIntegrationProviderFixture(): Promise<IntegrationPro
   return { dir, remove: () => rm(dir, { recursive: true, force: true }) };
 }
 
+const ROUTE_CLIENT = (code: string) => `
+import { appendFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+export function validateIntegrationSecret(field, value) {
+  if (field !== "api_key") return "Unknown secret field.";
+  return /^[A-Za-z0-9]{8,64}$/.test(value) ? undefined : "Must be 8 to 64 letters or digits.";
+}
+export function createOutboundClient() {
+  return {
+    code: "${code}",
+    capabilities: Object.freeze({ idempotencyKeys: true, maxRecipients: 1 }),
+    async send() {
+      appendFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "sent.log"), "${code}\\n");
+      if ("${code}" === "resend") {
+        return { ok: false, reason: "quota_exceeded", providerCodes: [], quotaPeriod: "daily" };
+      }
+      return { ok: true, value: { providerMessageId: "accepted-1" } };
+    },
+  };
+}
+`;
+
+/** Resend and Brevo stand-ins. Resend always answers a proven quota refusal; Brevo accepts. */
+export async function createStoredRouteFixture(): Promise<IntegrationProviderFixture> {
+  const dir = await mkdtemp(join(tmpdir(), "fluxkit-stored-email-route-"));
+  await writeFile(join(dir, "sent.log"), "");
+  for (const code of ["resend", "brevo"] as const) {
+    await writePackage(
+      dir,
+      code,
+      {
+        provider: code,
+        kind: "email",
+        secrets: [{ field: "api_key", purpose: "outbound", env: `${code.toUpperCase()}_API_KEY` }],
+      },
+      ROUTE_CLIENT(code),
+    );
+  }
+  return { dir, remove: () => rm(dir, { recursive: true, force: true }) };
+}
+
 /** A fresh random master key, as `loadEnv` parses `SECRETS_ENCRYPTION_KEY`. */
 export function testSecretsKey(id: string): SecretsKey {
   return { id, bytes: new Uint8Array(randomBytes(32)) };

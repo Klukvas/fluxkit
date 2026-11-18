@@ -3,10 +3,12 @@ import {
   check,
   foreignKey,
   index,
+  bigint,
   integer,
   jsonb,
   pgTable,
   primaryKey,
+  smallint,
   text,
   timestamp,
   unique,
@@ -112,6 +114,8 @@ export const emailMessage = pgTable(
     providerCode: text("provider_code"),
     providerMessageId: text("provider_message_id"),
     routeProviderCode: text("route_provider_code"),
+    // Equal mode remembers which of Resend or Brevo this mail started with. Null in resend-first mode.
+    assignedProviderCode: text("assigned_provider_code"),
     pinnedProviderCode: text("pinned_provider_code"),
     pinnedAt: timestamp("pinned_at", { withTimezone: true }),
     // The credential version this mail is bound to (ADR 0058). Null while the provider key comes from the environment.
@@ -218,6 +222,10 @@ export const emailMessage = pgTable(
     check(
       "email_message_route_provider_code_check",
       sql`${t.routeProviderCode} IS NULL OR ${t.routeProviderCode} ~ ${sql.raw(`'${PROVIDER_CODE_PATTERN}'`)}`,
+    ),
+    check(
+      "email_message_assigned_provider_code_check",
+      sql`${t.assignedProviderCode} IS NULL OR ${t.assignedProviderCode} IN ('resend', 'brevo')`,
     ),
     check(
       "email_message_provider_code_check",
@@ -402,5 +410,20 @@ export const emailProviderState = pgTable(
       "email_provider_state_probe_check",
       sql`(${t.probeToken} IS NULL) = (${t.probeUntil} IS NULL)`,
     ),
+  ],
+);
+
+/** One row: how stored Resend and Brevo share mail. `equal` alternates; `resend` tries Resend first. */
+export const emailRouteSetting = pgTable(
+  "email_route_setting",
+  {
+    id: smallint("id").primaryKey(),
+    mode: text("mode").notNull().default("equal"),
+    turn: bigint("turn", { mode: "number" }).notNull().default(0),
+  },
+  (t) => [
+    check("email_route_setting_singleton_check", sql`${t.id} = 1`),
+    check("email_route_setting_mode_check", sql`${t.mode} IN ('equal', 'resend')`),
+    check("email_route_setting_turn_check", sql`${t.turn} >= 0`),
   ],
 );

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
+import { sql } from "drizzle-orm";
 import {
   checkIntegrationSecretValue,
   type IntegrationSecretDeclaration,
@@ -25,6 +26,8 @@ import {
 } from "./installed-integrations.js";
 import { INTEGRATIONS_CONFIG, type IntegrationsConfig } from "./integrations.config.js";
 import { IntegrationRuntime } from "./integration-runtime.js";
+import { readEmailRouteMode } from "../email/outbox/email-route-policy.js";
+import { storedEmailActivationAllowed } from "./stored-email-route.js";
 import {
   IntegrationsRepository,
   type IntegrationRow,
@@ -37,10 +40,14 @@ import type {
   IntegrationResponse,
   PutIntegrationSecretBody,
   RetireIntegrationSecretBody,
+  SetEmailRouteBody,
 } from "./integrations.schemas.js";
 import { SecretCipher } from "./secret-cipher.js";
 
 const PERMISSION = "integrations.manage";
+
+/** Audit target for the singleton route setting. The table has no uuid of its own. */
+const EMAIL_ROUTE_AUDIT_TARGET = "00000000-0000-4000-8000-000000000001";
 
 /** The `rule` values of this module's 409 answers (`docs/api/integrations.md`). */
 export const INTEGRATION_RULES = Object.freeze({
@@ -93,9 +100,10 @@ export class IntegrationsService {
   async list(): Promise<IntegrationListResponse> {
     const installed = await this.installed.list();
     await this.repository.ensure(installed);
-    const [revision, rows] = await Promise.all([
+    const [revision, rows, emailRouteMode] = await Promise.all([
       this.repository.currentRevision(),
       this.repository.list(),
+      this.emailRouteMode(),
     ]);
     const resolved = rows.flatMap((row) => {
       const match = installed.find(
@@ -108,6 +116,7 @@ export class IntegrationsService {
     return {
       revision,
       storage: this.storage(),
+      emailRouteMode,
       items: resolved.map((entry) => this.view(entry, stored)),
     };
   }
@@ -155,6 +164,38 @@ export class IntegrationsService {
     );
     this.runtime.drop();
     return this.get(id);
+  }
+
+  /**
+   * `equal` alternates new mail between Resend and Brevo. `resend` starts every message with Resend and uses Brevo
+   * only after a proven refusal. A chain that contains both follows this, including a chain set on the server.
+   */
+  async setEmailRoute(
+    actor: IntegrationActor,
+    body: SetEmailRouteBody,
+  ): Promise<{ revision: number; emailRouteMode: "equal" | "resend" }> {
+    await this.assertRevisionFresh(body.expectedRevision);
+    const verified = await this.stepUp.verify({
+      principal: actor.principal,
+      currentPassword: body.currentPassword,
+      clientAddress: actor.clientAddress,
+      operation: "integration.route_changed",
+    });
+    await withTransaction(this.db, async (transaction) => {
+      const now = this.clock.now();
+      await this.stepUp.assertStillValid(transaction, verified, PERMISSION);
+      await this.advanceRevision(transaction, body.expectedRevision, now);
+      const updated = await transaction.execute<{ mode: string }>(sql`
+        update email_route_setting set mode = ${body.mode} where id = 1 returning mode`);
+      if (updated.rows[0]?.mode !== body.mode) throw new Error("email_route_setting_missing");
+      await this.audit.record(transaction, verified.userId, {
+        action: "integration.route_changed",
+        targetKind: "integration",
+        targetId: EMAIL_ROUTE_AUDIT_TARGET,
+        detail: { mode: body.mode },
+      });
+    });
+    return { revision: await this.repository.currentRevision(), emailRouteMode: body.mode };
   }
 
   async retireSecret(
@@ -431,7 +472,10 @@ export class IntegrationsService {
     const fields = await this.repository.secretFields(this.db, candidate.id);
     if (!outbound.every((entry) => fields.includes(entry.field))) throw notActivatable();
     const enabled = await this.repository.lockEnabled(this.db, "email");
-    if (enabled.some((entry) => entry.id !== row.id)) throw routeUnset();
+    this.assertEmailRoutePair(
+      enabled.filter((entry) => entry.id !== row.id).map((entry) => entry.providerCode),
+      row.providerCode,
+    );
   }
 
   private async writeActivation(
@@ -457,7 +501,10 @@ export class IntegrationsService {
     }
     if (this.config.emailFromAddress === null) throw senderRequired();
     const enabled = await this.repository.lockEnabled(transaction, "email");
-    if (enabled.some((entry) => entry.id !== locked.id)) throw routeUnset();
+    this.assertEmailRoutePair(
+      enabled.filter((entry) => entry.id !== locked.id).map((entry) => entry.providerCode),
+      locked.providerCode,
+    );
     const candidate = await this.repository.findCandidateForUpdate(
       transaction,
       locked.id,
@@ -498,6 +545,14 @@ export class IntegrationsService {
         version: candidate.id,
       },
     });
+  }
+
+  private emailRouteMode(): Promise<"equal" | "resend"> {
+    return readEmailRouteMode(this.db);
+  }
+
+  private assertEmailRoutePair(enabledCodes: readonly string[], nextCode: string): void {
+    if (!storedEmailActivationAllowed(enabledCodes, nextCode)) throw routeUnset();
   }
 
   private storage(): "ready" | "disabled" {
@@ -580,6 +635,13 @@ export class IntegrationsService {
           generation: saved?.generation ?? null,
           savedAt: saved?.savedAt.toISOString() ?? null,
           keyAvailable: saved === undefined ? null : this.cipher.hasKey(saved.keyId),
+          versionState:
+            saved?.state === "candidate" ||
+            saved?.state === "active" ||
+            saved?.state === "draining" ||
+            saved?.state === "revoked"
+              ? saved.state
+              : null,
         };
       }),
     };
@@ -609,7 +671,7 @@ function senderRequired(): ProblemException {
 
 function routeUnset(): ProblemException {
   return ruleViolation(
-    "Another email provider is already on. Turn it off before activating this one.",
+    "Only Resend and Brevo can be on together. Turn the other email provider off first.",
     INTEGRATION_RULES.routeUnset,
   );
 }

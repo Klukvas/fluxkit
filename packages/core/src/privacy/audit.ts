@@ -24,6 +24,7 @@ export const ADMIN_AUDIT_ACTIONS = Object.freeze([
   "integration.activated",
   "integration.disabled",
   "integration.revoked",
+  "integration.route_changed",
 ] as const);
 
 export type AdminAuditAction = (typeof ADMIN_AUDIT_ACTIONS)[number];

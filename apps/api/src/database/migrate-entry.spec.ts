@@ -170,6 +170,7 @@ describe("built db:migrate entry (real process, real Postgres)", () => {
       "integration_credential_version",
       "integration",
       "integration_revision",
+      "email_route_setting",
       "email_provider_state",
       "email_suppression",
       "email_webhook_receipt",
@@ -202,7 +203,7 @@ describe("built db:migrate entry (real process, real Postgres)", () => {
     expect(await appliedRows(database)).toEqual(before);
   });
 
-  it("applies only 0002 to 0020_integration_runtime to a database migrated up to 0001", async () => {
+  it("applies only 0002 to 0021_email_route_mode to a database migrated up to 0001", async () => {
     const database = await freshDatabase();
     await migrateUpTo(database, 2);
     expect(await tableExists(database, "admin_user")).toBe(false);
@@ -211,7 +212,7 @@ describe("built db:migrate entry (real process, real Postgres)", () => {
 
     expect(outcome.code).toBe(0);
     expect(outcome.stdout).toBe(
-      `Migrating database "${database.name}"\nApplied 19 migrations:\n  0002_admin_auth\n  0003_pricing_inventory\n  0004_cart_customers_orders\n  0005_media_upload\n  0006_shipping\n  0007_email\n  0008_payments\n  0009_privacy\n  0010_search\n  0011_append_only_truncate_payment_list\n  0012_banner\n  0013_product_type_option_guide_page\n  0014_split_listing\n  0015_inventory_reserved_upper_bound\n  0016_email_provider_pin\n  0017_email_suppression\n  0018_email_provider_routing\n  0019_integration_credentials\n  0020_integration_runtime\n`,
+      `Migrating database "${database.name}"\nApplied 20 migrations:\n  0002_admin_auth\n  0003_pricing_inventory\n  0004_cart_customers_orders\n  0005_media_upload\n  0006_shipping\n  0007_email\n  0008_payments\n  0009_privacy\n  0010_search\n  0011_append_only_truncate_payment_list\n  0012_banner\n  0013_product_type_option_guide_page\n  0014_split_listing\n  0015_inventory_reserved_upper_bound\n  0016_email_provider_pin\n  0017_email_suppression\n  0018_email_provider_routing\n  0019_integration_credentials\n  0020_integration_runtime\n  0021_email_route_mode\n`,
     );
     expect(await appliedRows(database)).toEqual(journal.map((entry) => entry.when));
     expect(await tableExists(database, "admin_user")).toBe(true);

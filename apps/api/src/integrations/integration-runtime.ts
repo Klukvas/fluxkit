@@ -8,6 +8,7 @@ import { InstalledIntegrations, IntegrationUnavailableError } from "./installed-
 import { IntegrationsRepository } from "./integrations.repository.js";
 import { ManagedEmailProvider } from "./managed-email-provider.js";
 import { SecretCipher } from "./secret-cipher.js";
+import { storedEmailChain } from "./stored-email-route.js";
 
 const MESSAGE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -16,14 +17,15 @@ type OutboundModule = {
 };
 
 /**
- * Resolves the email credential the process may send with while the route is delegated to the database (ADR 0058).
+ * Resolves the stored email chain while the route is delegated to the database (ADR 0058).
+ * Resend and Brevo may both be on, in that order. Any other second email provider is refused at activation.
  * Every resolve reads the revision. A matching snapshot younger than five seconds is reused; a new revision reloads
  * at once. Plaintext and clients stay in this process. A database failure refuses the send instead of guessing.
  */
 @Injectable()
 export class IntegrationRuntime {
   private readonly logger = new Logger(IntegrationRuntime.name);
-  private readonly cache = new RevisionCache<EmailProviderPort | undefined>();
+  private readonly cache = new RevisionCache<readonly EmailProviderPort[]>();
 
   constructor(
     @Inject(DRIZZLE) private readonly db: Database,
@@ -37,13 +39,13 @@ export class IntegrationRuntime {
     this.cache.clear();
   }
 
-  async emailProvider(now = Date.now()): Promise<EmailProviderPort | undefined> {
+  async emailProviders(now = Date.now()): Promise<readonly EmailProviderPort[]> {
     const revision = await this.repository.currentRevision();
     const cached = this.cache.get(revision, now);
     if (cached.hit) return cached.value;
-    const provider = await this.loadEmailProvider();
-    this.cache.set(revision, now, provider);
-    return provider;
+    const providers = await this.loadEmailProviders();
+    this.cache.set(revision, now, providers);
+    return providers;
   }
 
   /**
@@ -80,14 +82,24 @@ export class IntegrationRuntime {
     );
   }
 
-  private async loadEmailProvider(): Promise<EmailProviderPort | undefined> {
-    if (!this.cipher.isEnabled) return undefined;
+  private async loadEmailProviders(): Promise<readonly EmailProviderPort[]> {
+    if (!this.cipher.isEnabled) return [];
     const rows = await this.repository.list();
-    const enabled = rows.filter((row) => row.kind === "email" && row.enabled);
-    if (enabled.length === 0) return undefined;
-    if (enabled.length > 1) throw new Error("More than one email integration is enabled.");
-    const row = enabled[0];
-    if (row === undefined || row.activeOutboundVersionId === null) return undefined;
+    const enabled = storedEmailChain(rows.filter((row) => row.kind === "email" && row.enabled));
+    const providers: EmailProviderPort[] = [];
+    for (const row of enabled) {
+      const provider = await this.loadEmailProvider(row);
+      if (provider !== undefined) providers.push(provider);
+    }
+    return providers;
+  }
+
+  private async loadEmailProvider(row: {
+    readonly id: string;
+    readonly providerCode: string;
+    readonly activeOutboundVersionId: string | null;
+  }): Promise<EmailProviderPort | undefined> {
+    if (row.activeOutboundVersionId === null) return undefined;
     const version = await this.repository.findVersion(row.activeOutboundVersionId);
     if (version === undefined || version.state !== "active") return undefined;
     const installed = await this.installed.find("email", row.providerCode);

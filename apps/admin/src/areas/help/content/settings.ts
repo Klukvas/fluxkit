@@ -135,8 +135,8 @@ export const SETTINGS_ARTICLES: readonly HelpArticle[] = [
       {
         kind: "warning",
         text: {
-          uk: "Збережений ключ лишається вимкненим, доки його не ввімкнуть. Цей екран його зберігає і не вмикає. Оплата та доставка й далі працюють із ключами, заданими на сервері.",
-          en: "A saved key stays off until it is activated. This screen stores it and does not turn it on. Payment and delivery still use the keys set on the server.",
+          uk: "Для пошти збережений ключ вмикають з цього екрана. Коли Resend і Brevo обидва в ланцюжку відправки, екран ділить нові листи порівну або починає з Resend; це стосується і ланцюжка, заданого на сервері. Лист чекає, поки стартовий сервіс на паузі, і переходить до іншого лише після точної відмови прийняти. Таймаут і відхилення лишаються на тому сервісі. Вимкнення зупиняє нові листи; ті, що вже в дорозі, можуть дійти. Оплата та доставка й далі працюють із ключами, заданими на сервері.",
+          en: "For email, turn a saved key on from this screen. When Resend and Brevo are both in the send chain, the screen shares new mail evenly or starts with Resend; a chain set on the server follows the same choice. A message waits while its starting provider is cooling down and moves to the other only after a definite non-acceptance. A timeout or a rejection stays on that provider. Turning a key off stops new mail; mail already on its way can finish. Payment and delivery still use the keys set on the server.",
         },
       },
       { kind: "screen", route: "integrations" },

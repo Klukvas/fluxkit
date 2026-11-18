@@ -120,6 +120,7 @@ export const customerTables: Inventory = {
       "deadline_at",
       "provider_code",
       "route_provider_code",
+      "assigned_provider_code",
       "pinned_provider_code",
       "pinned_at",
       "integration_credential_version_id",

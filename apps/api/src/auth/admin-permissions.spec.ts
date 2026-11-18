@@ -136,6 +136,7 @@ const EMAIL_ROUTES = [
 /** Provider credentials (ADR 0058): owner only, declared once on the controller (`integrations.manage` for reads and writes). */
 const INTEGRATIONS_ROUTES = [
   "GET /admin/integrations",
+  "PUT /admin/integrations/email-route",
   "GET /admin/integrations/:id",
   "PUT /admin/integrations/:id/secrets/:field",
   "POST /admin/integrations/:id/retire-secret",

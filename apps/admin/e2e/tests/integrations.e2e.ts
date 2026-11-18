@@ -26,6 +26,7 @@ interface IntegrationView {
   id: string;
   kind: string;
   providerCode: string;
+  enabled: boolean;
   secrets: SecretView[];
 }
 interface IntegrationList {
@@ -182,6 +183,19 @@ test("the owner stores, replaces nothing by accident and removes a provider key;
   await expect(
     main.getByText("The key is saved. It stays off until it is activated."),
   ).toBeVisible();
+
+  // The suite's API sets EMAIL_PROVIDER, so turning the saved key on is refused before the password is checked.
+  await main.getByRole("button", { name: `Turn on ${PROVIDER}` }).click();
+  const turnOn = page.getByRole("dialog", { name: `Turn on ${PROVIDER}` });
+  await expect(turnOn.getByLabel("Key", { exact: true })).toHaveCount(0);
+  await turnOn.getByLabel("Your current password", { exact: true }).fill(account.password);
+  await turnOn.getByRole("button", { name: "Turn on", exact: true }).click();
+  await expect(
+    turnOn.getByText("The server already sets this, so it cannot be changed or turned on here."),
+  ).toBeVisible();
+  await turnOn.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(turnOn).toBeHidden();
+  expect((await fakeEmail(api)).integration).toMatchObject({ enabled: false });
   await expect(apiKey.getByText("Saved, not active yet", { exact: true })).toBeVisible();
   await expect(apiKey).toContainText(/Saved \w/);
   await expect(apiKey.getByRole("button", { name: /^Replace the saved key/ })).toBeVisible();

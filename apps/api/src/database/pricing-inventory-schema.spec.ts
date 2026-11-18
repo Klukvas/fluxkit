@@ -49,6 +49,7 @@ describe("pricing and inventory schema (real Postgres)", () => {
       "integration_credential_version",
       "integration",
       "integration_revision",
+      "email_route_setting",
       "email_provider_state",
       "email_webhook_receipt",
       "email_suppression",

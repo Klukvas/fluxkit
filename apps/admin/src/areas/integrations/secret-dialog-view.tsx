@@ -2,7 +2,7 @@ import { Alert, Button, Dialog, Field, Input, type Translator } from "@fluxkit/u
 import type { FormEvent, Ref } from "react";
 import type { MessageDescriptor } from "../../lib/problem-messages";
 import type { SecretFormField } from "./integrations-errors";
-import type { SecretAction } from "./integrations-list-view";
+import { PASSWORD_ONLY_ACTIONS, type SecretAction } from "./integrations-list-view";
 
 export const SECRET_VALUE_INPUT_ID = "intg-secret-value";
 export const SECRET_PASSWORD_INPUT_ID = "intg-secret-password";
@@ -47,7 +47,8 @@ export function SecretDialogView({
   formErrorRef,
 }: SecretDialogViewProps) {
   const describe = (descriptor: MessageDescriptor) => t(descriptor.key, descriptor.values);
-  const isRemoval = action === "remove";
+  const passwordOnly = (PASSWORD_ONLY_ACTIONS as readonly string[]).includes(action);
+  const destructive = action === "remove" || action === "turnOff" || action === "revoke";
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     onSubmit();
@@ -80,7 +81,7 @@ export function SecretDialogView({
             </Alert>
           </div>
         )}
-        {isRemoval ? null : (
+        {passwordOnly ? null : (
           <Field
             id={SECRET_VALUE_INPUT_ID}
             label={t("intg.dialog.value")}
@@ -120,7 +121,7 @@ export function SecretDialogView({
               {...control}
               type="password"
               autoComplete="off"
-              data-autofocus={isRemoval ? "" : undefined}
+              data-autofocus={passwordOnly ? "" : undefined}
               maxLength={PASSWORD_MAX_LENGTH}
               value={values.currentPassword}
               onChange={(event) => onChange("currentPassword", event.target.value)}
@@ -133,7 +134,7 @@ export function SecretDialogView({
           </Button>
           <Button
             type="submit"
-            variant={isRemoval ? "danger" : "primary"}
+            variant={destructive ? "danger" : "primary"}
             disabled={busy}
             aria-busy={busy || undefined}
           >

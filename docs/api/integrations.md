@@ -2,11 +2,15 @@
 
 Core, no feature flag (ADR 0058; plan `docs/plans/2026-11-16-admin-integrations.md`, slice 1). Every route needs `integrations.manage` (owner only), the admin session, and for changes the CSRF header and JSON (`docs/api/auth.md`). Responses are `no-store`; errors are `application/problem+json`.
 
-A stored credential is a **candidate**: it is encrypted and kept, and nothing uses it at runtime yet. Providers still read their keys from the server environment. No route here calls a provider, and no route returns a secret, a part of one, a ciphertext or a key id.
+A stored credential is encrypted and never returned. No route calls a provider or returns a secret, a part of one, a ciphertext or a key id. An email credential sends only after `activate`, and only while `EMAIL_PROVIDER` is absent. Payment and shipping stay stored until their own checks exist. When Resend and Brevo are both in the send chain, `emailRouteMode` chooses who starts each new message; a chain set with `EMAIL_PROVIDER` follows the same choice.
 
 | Endpoint | Auth | Purpose | Request | Response | Errors |
 |---|---|---|---|---|---|
-| `GET /admin/integrations` | `integrations.manage` | Installed provider packages that declare secrets (`fluxkit.secrets`), enabled or not; test-only providers are left out in production | none | `{revision, storage, items: Integration[]}` | 401, 403 |
+| `GET /admin/integrations` | `integrations.manage` | Installed provider packages that declare secrets (`fluxkit.secrets`), enabled or not; test-only providers are left out in production | none | `{revision, storage, emailRouteMode, items: Integration[]}` | 401, 403 |
+| `PUT /admin/integrations/email-route` | `integrations.manage` + current password | `equal` alternates new mail between Resend and Brevo; `resend` starts every message with Resend. A definite non-acceptance is tried on the other. A cooled-down starter is waited on. Applies whenever both are in the send chain | `{mode, expectedRevision, currentPassword}` | `{revision, emailRouteMode}` | 400, 401, 403, 409, 429, 503 |
+| `POST /admin/integrations/{id}/activate` | `integrations.manage` + current password | Turns on a stored email credential when `EMAIL_PROVIDER` is absent and `EMAIL_FROM` is set. Payment and shipping stay refused | `{expectedRevision, currentPassword}` | `{revision, storage, integration}` | 400, 401, 403, 404, 409, 429, 503 |
+| `POST /admin/integrations/{id}/disable` | `integrations.manage` + current password | Stops new mail on this integration. Mail already bound may finish | `{expectedRevision, currentPassword}` | `{revision, storage, integration}` | 400, 401, 403, 404, 409, 429, 503 |
+| `POST /admin/integrations/{id}/revoke-secret` | `integrations.manage` + current password | Marks a version revoked. It cannot be activated again, and mail bound to it is not sent. The envelope stays | `{expectedRevision, versionId, currentPassword}` | `{revision, storage, integration}` | 400, 401, 403, 404, 409, 429, 503 |
 | `GET /admin/integrations/{id}` | `integrations.manage` | One integration | none | `{revision, storage, integration}` | 400, 401, 403, 404 |
 | `PUT /admin/integrations/{id}/secrets/{field}` | `integrations.manage` + current password | Encrypts the value into a new candidate version; an earlier candidate of the same credential is retired | `{expectedRevision, value, currentPassword}` | `{revision, storage, integration}` | 400, 401, 403, 404, 409, 429, 503 |
 | `POST /admin/integrations/{id}/retire-secret` | `integrations.manage` + current password | Deletes the encrypted value of a candidate version; the version stays as a tombstone. Works without `SECRETS_ENCRYPTION_KEY` | `{expectedRevision, versionId, currentPassword}` | `{revision, storage, integration}` | 400, 401, 403, 404, 409, 429, 503 |
@@ -15,13 +19,15 @@ A stored credential is a **candidate**: it is encrypted and kept, and nothing us
 
 - `revision`: whole number, rises with every change; send it back as `expectedRevision`.
 - `storage`: `ready`, or `disabled` when the server has no `SECRETS_ENCRYPTION_KEY` (nothing can be saved).
-- `Integration`: `{id, kind, providerCode, secrets: Secret[], updatedAt}`; `kind` is `email`, `payment` or `shipping`.
-- `Secret`: `{field, purpose, envVariable, state, last4, versionId, generation, savedAt, keyAvailable}`.
+- `emailRouteMode`: `equal` or `resend`. A missing or other stored value fails the read (`email_route_mode_invalid`), it is not treated as `equal`.
+- `Integration`: `{id, kind, providerCode, enabled, secrets: Secret[], updatedAt}`; `kind` is `email`, `payment` or `shipping`. `enabled` is true when new mail uses the stored outbound credential.
+- `Secret`: `{field, purpose, envVariable, state, last4, versionId, generation, savedAt, keyAvailable, versionState}`.
   - `purpose`: `outbound` (calls to the provider) or `webhook` (verifying what the provider sends).
   - `state`: `env` (the server variable `envVariable` is set: it wins and the field is read-only here), `set` (a value is stored), `not_set`.
   - `last4`: always `null`.
   - `versionId`, `generation`, `savedAt`: the stored version, `null` when nothing is stored. A value stored before the variable was set is still reported while `state` is `env`.
   - `keyAvailable`: `false` when this server does not hold the master key that sealed the value (enter it again); `null` when nothing is stored.
+  - `versionState`: `candidate` (saved, not used), `active` (new mail uses it), `draining` (turned off; mail already bound may finish), `revoked` (unusable). `null` when nothing is stored.
 - `value`: 1 to 4096 printable ASCII characters without spaces, then the provider's own format rule. `currentPassword`: the signed-in owner's password. Both are `writeOnly` in OpenAPI.
 
 ## Order of checks for a change
@@ -39,8 +45,8 @@ A stored credential is a **candidate**: it is encrypted and kept, and nothing us
 | 400 | `validation_failed` | `value`: `required`, `too_long`, `invalid_characters`, `invalid_format` (the plugin's rule; the message never contains the value); body and path shape errors |
 | 403 | `forbidden` | no `rule`: the role lacks `integrations.manage` or the CSRF header is missing. `rule: current_password_incorrect`: wrong password, locked account, or the account changed during the check; nothing was saved |
 | 404 | `not_found` | unknown integration, undeclared field, or a version of another integration |
-| 409 | `rule_violation` | `integration_storage_disabled`, `integration_env_override`, `integration_revision_stale`, `integration_unavailable` (the provider package could not be loaded, so its format rule is unknown) |
-| 409 | `invalid_transition` | `integration_version_not_retirable`: only a candidate can be retired |
+| 409 | `rule_violation` | `integration_storage_disabled`, `integration_env_override`, `integration_revision_stale`, `integration_unavailable` (the provider package could not be loaded, so its format rule is unknown), `integration_runtime_not_ready` (payment and shipping cannot be activated), `integration_sender_required` (`EMAIL_FROM` is unset), `integration_route_unset` (a second email provider is not the Resend/Brevo pair), `integration_not_activatable` (no complete outbound candidate) |
+| 409 | `invalid_transition` | `integration_version_not_retirable`: only a candidate can be retired. `integration_version_not_revocable`: the version cannot be revoked. `integration_not_enabled`: disable of an integration that is already off |
 | 429 | `too_many_requests` | the step-up limits; `Retry-After` |
 | 503 | `service_unavailable` | `rule: step_up_unavailable`: the shared limits (Redis) cannot be reached; no password was checked and nothing was saved; `Retry-After` |
 
@@ -48,6 +54,7 @@ A stored credential is a **candidate**: it is encrypted and kept, and nothing us
 
 - `integration.secret_changed` (target `integration`): `kind`, `provider`, `field`, `purpose`, `generation`, `version`, `replaced`.
 - `integration.secret_retired` (target `integration`): `kind`, `provider`, `purpose`, `generation`, `version`.
+- `integration.route_changed` (target `integration`, a fixed id of the route setting): `{mode}` (`equal` or `resend`).
 - `admin_user.step_up_failed` (target `admin_user`, the actor): `operation`. Written in its own transaction, so it stays although the change was refused.
 
 ## Provider packages
@@ -58,4 +65,4 @@ A stored credential is a **candidate**: it is encrypted and kept, and nothing us
 
 ## Not in this slice
 
-Activation and runtime use, connection checks, test sends through a candidate, settings (sender, route, limits), emergency revocation, key rotation rewrap (plan sections 9 and 12).
+Connection checks, test sends through a candidate, sender and limit settings, key rotation rewrap (plan sections 9 and 12). Payment and shipping activation.

@@ -2759,7 +2759,8 @@
                 "integration.secret_retired",
                 "integration.activated",
                 "integration.disabled",
-                "integration.revoked"
+                "integration.revoked",
+                "integration.route_changed"
               ]
             }
           },
@@ -2835,7 +2836,8 @@
                               "integration.secret_retired",
                               "integration.activated",
                               "integration.disabled",
-                              "integration.revoked"
+                              "integration.revoked",
+                              "integration.route_changed"
                             ]
                           },
                           "targetKind": {
@@ -30121,6 +30123,11 @@
                       "enum": ["ready", "disabled"],
                       "description": "`disabled`: `SECRETS_ENCRYPTION_KEY` is not set on the server, so nothing can be saved here."
                     },
+                    "emailRouteMode": {
+                      "type": "string",
+                      "enum": ["equal", "resend"],
+                      "description": "How Resend and Brevo share mail when both are in the send chain. `equal` alternates. `resend` starts every message with Resend. A chain with only one of them is unchanged."
+                    },
                     "items": {
                       "type": "array",
                       "items": {
@@ -30190,6 +30197,12 @@
                                   "nullable": true,
                                   "description": "Whether this server holds the master key that sealed the stored value; false means it must be entered again. Null when nothing is stored.",
                                   "type": "boolean"
+                                },
+                                "versionState": {
+                                  "nullable": true,
+                                  "description": "`candidate`: saved, not used. `active`: new mail uses it. `draining`: turned off, mail already bound to it can finish. `revoked`: unusable. Null when nothing is stored.",
+                                  "type": "string",
+                                  "enum": ["candidate", "active", "draining", "revoked"]
                                 }
                               },
                               "required": [
@@ -30201,7 +30214,8 @@
                                 "versionId",
                                 "generation",
                                 "savedAt",
-                                "keyAvailable"
+                                "keyAvailable",
+                                "versionState"
                               ],
                               "additionalProperties": false
                             }
@@ -30224,7 +30238,7 @@
                       }
                     }
                   },
-                  "required": ["revision", "storage", "items"],
+                  "required": ["revision", "storage", "emailRouteMode", "items"],
                   "additionalProperties": false
                 }
               }
@@ -30262,6 +30276,157 @@
           }
         },
         "summary": "List the installed providers that can hold credentials",
+        "tags": ["admin-integrations"],
+        "x-fluxkit-permission": "integrations.manage"
+      }
+    },
+    "/admin/integrations/email-route": {
+      "put": {
+        "description": "`equal` alternates new mail between Resend and Brevo. `resend` starts every message with Resend and waits out a cooldown instead of skipping to Brevo. A definite non-acceptance is tried on the other. Applies whenever both are in the send chain, including a chain set on the server. Asks for the owner's current password. `409`: `integration_revision_stale`.",
+        "operationId": "IntegrationsController_setEmailRoute",
+        "parameters": [
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "enum": ["equal", "resend"],
+                    "description": "`equal`: new mail alternates between Resend and Brevo. `resend`: every new message starts with Resend. A definite non-acceptance is tried on the other. A chain that contains both follows this, including a chain set on the server. A timeout or a rejected message stays on the provider that saw it."
+                  },
+                  "expectedRevision": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "The `revision` of the last read. Another change since then answers 409 (`rule: integration_revision_stale`)."
+                  },
+                  "currentPassword": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024,
+                    "writeOnly": true,
+                    "format": "password",
+                    "description": "The signed-in owner's current password, asked again for every change."
+                  }
+                },
+                "required": ["mode", "expectedRevision", "currentPassword"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The route mode after the change.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "revision": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Rises with every integration change; send it back as `expectedRevision`."
+                    },
+                    "emailRouteMode": {
+                      "type": "string",
+                      "enum": ["equal", "resend"],
+                      "description": "How Resend and Brevo share mail when both are in the send chain. `equal` alternates. `resend` starts every message with Resend. A chain with only one of them is unchanged."
+                    }
+                  },
+                  "required": ["revision", "emailRouteMode"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable: a transient failure, try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Choose how stored Resend and Brevo share mail",
         "tags": ["admin-integrations"],
         "x-fluxkit-permission": "integrations.manage"
       }
@@ -30367,6 +30532,12 @@
                                 "nullable": true,
                                 "description": "Whether this server holds the master key that sealed the stored value; false means it must be entered again. Null when nothing is stored.",
                                 "type": "boolean"
+                              },
+                              "versionState": {
+                                "nullable": true,
+                                "description": "`candidate`: saved, not used. `active`: new mail uses it. `draining`: turned off, mail already bound to it can finish. `revoked`: unusable. Null when nothing is stored.",
+                                "type": "string",
+                                "enum": ["candidate", "active", "draining", "revoked"]
                               }
                             },
                             "required": [
@@ -30378,7 +30549,8 @@
                               "versionId",
                               "generation",
                               "savedAt",
-                              "keyAvailable"
+                              "keyAvailable",
+                              "versionState"
                             ],
                             "additionalProperties": false
                           }
@@ -30613,6 +30785,12 @@
                                 "nullable": true,
                                 "description": "Whether this server holds the master key that sealed the stored value; false means it must be entered again. Null when nothing is stored.",
                                 "type": "boolean"
+                              },
+                              "versionState": {
+                                "nullable": true,
+                                "description": "`candidate`: saved, not used. `active`: new mail uses it. `draining`: turned off, mail already bound to it can finish. `revoked`: unusable. Null when nothing is stored.",
+                                "type": "string",
+                                "enum": ["candidate", "active", "draining", "revoked"]
                               }
                             },
                             "required": [
@@ -30624,7 +30802,8 @@
                               "versionId",
                               "generation",
                               "savedAt",
-                              "keyAvailable"
+                              "keyAvailable",
+                              "versionState"
                             ],
                             "additionalProperties": false
                           }
@@ -30876,6 +31055,12 @@
                                 "nullable": true,
                                 "description": "Whether this server holds the master key that sealed the stored value; false means it must be entered again. Null when nothing is stored.",
                                 "type": "boolean"
+                              },
+                              "versionState": {
+                                "nullable": true,
+                                "description": "`candidate`: saved, not used. `active`: new mail uses it. `draining`: turned off, mail already bound to it can finish. `revoked`: unusable. Null when nothing is stored.",
+                                "type": "string",
+                                "enum": ["candidate", "active", "draining", "revoked"]
                               }
                             },
                             "required": [
@@ -30887,7 +31072,8 @@
                               "versionId",
                               "generation",
                               "savedAt",
-                              "keyAvailable"
+                              "keyAvailable",
+                              "versionState"
                             ],
                             "additionalProperties": false
                           }
@@ -31134,6 +31320,12 @@
                                 "nullable": true,
                                 "description": "Whether this server holds the master key that sealed the stored value; false means it must be entered again. Null when nothing is stored.",
                                 "type": "boolean"
+                              },
+                              "versionState": {
+                                "nullable": true,
+                                "description": "`candidate`: saved, not used. `active`: new mail uses it. `draining`: turned off, mail already bound to it can finish. `revoked`: unusable. Null when nothing is stored.",
+                                "type": "string",
+                                "enum": ["candidate", "active", "draining", "revoked"]
                               }
                             },
                             "required": [
@@ -31145,7 +31337,8 @@
                               "versionId",
                               "generation",
                               "savedAt",
-                              "keyAvailable"
+                              "keyAvailable",
+                              "versionState"
                             ],
                             "additionalProperties": false
                           }
@@ -31392,6 +31585,12 @@
                                 "nullable": true,
                                 "description": "Whether this server holds the master key that sealed the stored value; false means it must be entered again. Null when nothing is stored.",
                                 "type": "boolean"
+                              },
+                              "versionState": {
+                                "nullable": true,
+                                "description": "`candidate`: saved, not used. `active`: new mail uses it. `draining`: turned off, mail already bound to it can finish. `revoked`: unusable. Null when nothing is stored.",
+                                "type": "string",
+                                "enum": ["candidate", "active", "draining", "revoked"]
                               }
                             },
                             "required": [
@@ -31403,7 +31602,8 @@
                               "versionId",
                               "generation",
                               "savedAt",
-                              "keyAvailable"
+                              "keyAvailable",
+                              "versionState"
                             ],
                             "additionalProperties": false
                           }
@@ -31655,6 +31855,12 @@
                                 "nullable": true,
                                 "description": "Whether this server holds the master key that sealed the stored value; false means it must be entered again. Null when nothing is stored.",
                                 "type": "boolean"
+                              },
+                              "versionState": {
+                                "nullable": true,
+                                "description": "`candidate`: saved, not used. `active`: new mail uses it. `draining`: turned off, mail already bound to it can finish. `revoked`: unusable. Null when nothing is stored.",
+                                "type": "string",
+                                "enum": ["candidate", "active", "draining", "revoked"]
                               }
                             },
                             "required": [
@@ -31666,7 +31872,8 @@
                               "versionId",
                               "generation",
                               "savedAt",
-                              "keyAvailable"
+                              "keyAvailable",
+                              "versionState"
                             ],
                             "additionalProperties": false
                           }

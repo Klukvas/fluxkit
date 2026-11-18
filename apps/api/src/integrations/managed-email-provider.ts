@@ -7,6 +7,8 @@ import {
   type OutgoingEmail,
   type ProviderAbortSignal,
 } from "@fluxkit/core";
+import { SAFE_FALLBACK_REASONS } from "../email/outbox/email-provider-state.js";
+
 /** The stored credential the client was built from. */
 export interface ManagedEmailSnapshot {
   readonly providerCode: string;
@@ -46,7 +48,9 @@ export class ManagedEmailProvider implements EmailProviderPort {
       return emailProviderFailure("not_sent", { providerCodes: ["credential_revoked"] });
     }
     const result = await this.snapshot.client.send(message, options, signal);
-    if (!result.ok && result.reason === "not_sent") {
+    // A proven refusal means the message did not leave, so the next stored provider may bind this mail.
+    // An ambiguous result keeps the binding: the message may already have been accepted.
+    if (!result.ok && SAFE_FALLBACK_REASONS.some((reason) => reason === result.reason)) {
       await this.runtime.release(options.idempotencyKey, this.snapshot.versionId);
     }
     return result;

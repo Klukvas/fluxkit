@@ -63,5 +63,6 @@
   "audit.action.integration.secret_retired": "Integration key removed",
   "audit.action.integration.activated": "Integration activated",
   "audit.action.integration.disabled": "Integration turned off",
-  "audit.action.integration.revoked": "Integration key revoked"
+  "audit.action.integration.revoked": "Integration key revoked",
+  "audit.action.integration.route_changed": "Email sharing changed"
 }

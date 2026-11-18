@@ -1005,6 +1005,11 @@ export interface AdminIntegrationSecret {
   savedAt: string | null;
   /** False: this server can no longer decrypt the stored value, enter it again. Null when nothing is stored. */
   keyAvailable: boolean | null;
+  /**
+   * `candidate`: saved, not used. `active`: new mail uses it. `draining`: turned off, bound mail can finish.
+   * `revoked`: unusable. Null when nothing is stored.
+   */
+  versionState: "candidate" | "active" | "draining" | "revoked" | null;
 }
 
 export interface AdminIntegration {
@@ -1017,11 +1022,30 @@ export interface AdminIntegration {
   updatedAt: string;
 }
 
+export type AdminEmailRouteMode = "equal" | "resend";
+
 export interface AdminIntegrationList {
   /** Rises with every integration change; send it back as `expectedRevision`. */
   revision: number;
   storage: AdminIntegrationStorage;
+  /**
+   * How stored Resend and Brevo share mail when the server is not choosing the provider.
+   * `equal` alternates. `resend` starts every message with Resend.
+   */
+  emailRouteMode: AdminEmailRouteMode;
   items: AdminIntegration[];
+}
+
+export interface AdminEmailRoute {
+  revision: number;
+  emailRouteMode: AdminEmailRouteMode;
+}
+
+export interface SetAdminEmailRouteBody {
+  mode: AdminEmailRouteMode;
+  expectedRevision: number;
+  /** The signed-in owner's current password, asked again for every change. */
+  currentPassword: string;
 }
 
 export interface AdminIntegrationDetail {
@@ -1070,7 +1094,8 @@ export type AdminAuditAction =
   | "integration.secret_retired"
   | "integration.activated"
   | "integration.disabled"
-  | "integration.revoked";
+  | "integration.revoked"
+  | "integration.route_changed";
 
 export type AdminAuditTargetKind =
   "customer" | "order" | "admin_user" | "privacy_request" | "email_suppression" | "integration";

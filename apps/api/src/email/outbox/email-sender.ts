@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger, Optional } from "@nestjs/common";
 import {
   validateOutgoingEmail,
   emailRetryDeadline,
@@ -28,6 +28,7 @@ import {
 import { EmailMessageChanges, type ClaimedEmailMessage } from "./email-message-changes.js";
 import type { EmailAttemptOutcome, NotRenderableCode } from "./email-outcome.js";
 import { callEmailProvider, failureOfCall } from "./email-provider-call.js";
+import { EmailRoutePolicy, isEmailRoutePair, orderEmailProviders } from "./email-route-policy.js";
 import { SendPacer } from "./send-pacer.js";
 import { SAFE_FALLBACK_REASONS } from "./email-provider-state.js";
 import { resolveAdminTestVersion } from "../templates/admin-test.template.js";
@@ -93,6 +94,7 @@ export class EmailSender {
     @Inject(EMAIL_SEND_PACER) private readonly pacer: SendPacer,
     @Inject(EmailSuppressionService)
     private readonly suppressions: Pick<EmailSuppressionService, "isSuppressed">,
+    @Optional() @Inject(EmailRoutePolicy) private readonly routes?: EmailRoutePolicy,
   ) {}
 
   /** The loaded provider, `undefined` with `EMAIL_PROVIDER=none`. */
@@ -117,7 +119,15 @@ export class EmailSender {
   ): Promise<EmailAttemptReport> {
     await this.providers.prepare?.();
     const primary = this.providers.get();
-    const chain = this.providers.list?.() ?? (primary === undefined ? [] : [primary]);
+    let chain = this.providers.list?.() ?? (primary === undefined ? [] : [primary]);
+    // One provider, or a chain that is not the Resend/Brevo pair, keeps its own order.
+    const share = isEmailRoutePair(chain.map((item) => item.code));
+    if (share) {
+      if (this.routes === undefined) throw new Error("email_route_policy_missing");
+      if ((await this.routes.mode()) === "equal") {
+        chain = orderEmailProviders(chain, await this.routes.assign(id));
+      }
+    }
     let excluded: readonly string[] = [];
     let passLeaseEnd: number | undefined;
     const passRemaining = () =>
@@ -126,7 +136,15 @@ export class EmailSender {
         passLeaseEnd === undefined ? Number.POSITIVE_INFINITY : passLeaseEnd - clock().getTime(),
       );
     for (let position = 0; position < Math.max(1, chain.length); position += 1) {
-      const result = await this.attemptProvider(id, clock, limits, chain, excluded, passRemaining);
+      const result = await this.attemptProvider(
+        id,
+        clock,
+        limits,
+        chain,
+        excluded,
+        share,
+        passRemaining,
+      );
       passLeaseEnd ??= result.leaseUntil;
       if (result.nextProviderCode === undefined) return result.report;
       excluded = [...excluded, result.providerCode as string];
@@ -142,6 +160,7 @@ export class EmailSender {
     limits: JobLimits,
     chain: readonly EmailProviderPort[],
     excluded: readonly string[],
+    holdStart: boolean,
     remainingMs?: () => number,
   ): Promise<{
     readonly report: EmailAttemptReport;
@@ -156,7 +175,7 @@ export class EmailSender {
       primary?.code,
       limits,
       primary?.capabilities,
-      chain.length > 0 ? { providers: chain, excluded } : undefined,
+      chain.length > 0 ? { providers: chain, excluded, holdStart } : undefined,
     );
     if (claim.kind === "skipped") {
       return { report: claim };
