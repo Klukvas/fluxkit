@@ -12,13 +12,17 @@ import { RateLimit } from "../../rate-limit/rate-limit.decorator.js";
 import {
   customerCreatePaymentBodySchema,
   guestCreatePaymentBodySchema,
+  guestPaymentHandoffBodySchema,
   guestPaymentStatusBodySchema,
   storeCreatedPaymentSchema,
+  storePaymentHandoffSchema,
   storePaymentStatusSchema,
   type CustomerCreatePaymentBody,
   type GuestCreatePaymentBody,
+  type GuestPaymentHandoffBody,
   type GuestPaymentStatusBody,
   type StoreCreatedPayment,
+  type StorePaymentHandoff,
   type StorePaymentStatus,
 } from "./store-payments.schemas.js";
 import { StorePaymentsService } from "./store-payments.service.js";
@@ -85,6 +89,23 @@ export class StorePaymentsController {
   ): Promise<StorePaymentStatus> {
     return this.payments.statusAsGuest(body.number, body.accessToken, body.paymentId);
   }
+
+  @Post("payments/handoff")
+  @RateLimit("paymentStatus")
+  @HttpCode(200)
+  @ApiOperation({
+    summary: "Fetch a signed form-checkout handoff for a guest payment",
+    description:
+      "For providers with form handoff (LiqPay, ADR 0059): returns `{ actionUrl, fields }` so the storefront can POST to the provider's page. Same ownership as payment status (order number + access token). 409 when the attempt is not waiting or the provider has no form handoff. Limited per address (`paymentStatus`); `no-store`.",
+  })
+  @ApiZodBody(guestPaymentHandoffBodySchema)
+  @ApiZodResponse(200, storePaymentHandoffSchema, "Signed form fields for an auto-POST.")
+  @ApiProblemResponses(400, 404, 409, 429, 503)
+  handoff(
+    @Body(new ZodValidationPipe(guestPaymentHandoffBodySchema)) body: GuestPaymentHandoffBody,
+  ): Promise<StorePaymentHandoff> {
+    return this.payments.handoffAsGuest(body.number, body.accessToken, body.paymentId);
+  }
 }
 
 /**
@@ -146,5 +167,25 @@ export class AccountPaymentsController {
     @Param("paymentId", uuidParam("paymentId")) paymentId: string,
   ): Promise<StorePaymentStatus> {
     return this.payments.statusAsCustomer(customer.customerId, number, paymentId);
+  }
+
+  @Post(":number/payments/:paymentId/handoff")
+  @RateLimit("paymentStatus")
+  @HttpCode(200)
+  @ApiOperation({
+    summary: "Fetch a signed form-checkout handoff for an own payment",
+    description:
+      "As `POST /store/orders/payments/handoff` for a signed-in customer. 404 for another customer's order.",
+  })
+  @ApiParam({ name: "number", description: "The order number, `XXXX-XXXX`." })
+  @ApiParam({ name: "paymentId", format: "uuid", description: "The payment attempt id." })
+  @ApiZodResponse(200, storePaymentHandoffSchema, "Signed form fields for an auto-POST.")
+  @ApiProblemResponses(400, 401, 404, 409, 429, 503)
+  handoff(
+    @CurrentCustomer() customer: CustomerPrincipal,
+    @Param("number", numberParam) number: string,
+    @Param("paymentId", uuidParam("paymentId")) paymentId: string,
+  ): Promise<StorePaymentHandoff> {
+    return this.payments.handoffAsCustomer(customer.customerId, number, paymentId);
   }
 }

@@ -80,6 +80,7 @@ function stubProvider(breaks: Partial<Record<string, boolean>> = {}): PaymentPro
       multipleRefunds: true,
       invalidateUnpaid: true,
       webhooks: true,
+      formHandoff: false,
     },
     async createPayment(input, abort) {
       if (abort.aborted && !breaks.ignoresAbort) {
@@ -150,6 +151,12 @@ function stubProvider(breaks: Partial<Record<string, boolean>> = {}): PaymentPro
       return invoice === undefined
         ? paymentProviderFailure("not_found")
         : paymentProviderOk(toFact(invoice));
+    },
+    async buildCheckoutHandoff(_input, abort) {
+      if (abort.aborted) {
+        return paymentProviderFailure("not_sent");
+      }
+      return paymentProviderFailure("not_sent", { providerCodes: ["handoff_unsupported"] });
     },
   };
 }

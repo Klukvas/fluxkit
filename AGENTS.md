@@ -32,7 +32,7 @@ Every decision must keep these facts in mind:
   `infra/docker-compose.prod.yml`, edge proxies in `infra/proxy/`); smoke-tested by `deploy-smoke`, not yet run on a real host.
 - First market: Ukraine (UAH, `uk`/`en`, Ukrainian payment and shipping providers as plugins), then EU/US.
   Currencies, locales, payment and shipping providers are core abstractions, not hardcoded.
-- Provider plugins (`packages/providers`): Nova Post shipping (ADR 0030), Resend email (ADR 0031), Monobank payments (ADR 0032).
+- Provider plugins (`packages/providers`): Nova Post shipping (ADR 0030), Resend email (ADR 0031), Monobank payments (ADR 0032), LiqPay payments (ADR 0059).
 
 ## Tooling (decided, see `docs/adr/0003-tooling.md`)
 
@@ -49,7 +49,7 @@ Root scripts (always check `package.json` before using; do not invent commands):
   `pnpm jobs:run-once` (builds, runs the scheduled jobs once), `pnpm search:reindex` (builds, rebuilds the search index),
   `pnpm feature-matrix <mode>`: `on`, `off`, `deleted`, `providers-on`, `providers-off`, `providers-deleted`, `providers-nova-post`, `providers-email-none`, `providers-email-fake`, `providers-email-resend`, `providers-email-brevo`,
   `providers-email-failover`, `providers-email-failover-exhausted`, `providers-email-failover-pinned`, `providers-email-suppression`,
-  `providers-payment-none`, `providers-payment-fake`, `providers-payment-monobank`, `search-off`, `search-on` (`deleted` and `providers-deleted` only with `CI=true`, they remove files;
+  `providers-payment-none`, `providers-payment-fake`, `providers-payment-monobank`, `providers-payment-liqpay`, `search-off`, `search-on` (`deleted` and `providers-deleted` only with `CI=true`, they remove files;
   `on`, `off` and `deleted` cover the `example` and `blog` features, see the script's header).
 - App dev servers (no root `dev` yet): `pnpm --filter @fluxkit/storefront dev`, `pnpm --filter @fluxkit/admin dev` (run `pnpm build` once first so workspace packages exist).
 - Run the built API: `pnpm build && pnpm --filter @fluxkit/api start` (reads the root `.env`; variables already set in your shell take precedence).
@@ -57,7 +57,7 @@ Root scripts (always check `package.json` before using; do not invent commands):
 - Integration tests need real services and fail (not skip) without `DATABASE_URL` (database name must end in `_test`), `REDIS_URL`, `MEILI_URL` and `MEILI_MASTER_KEY`; see the README quick start.
 - Configuration (all in `.env.example` and `docs/contracts/config.md`), besides the services: `FEATURES_ENABLED`, `ORDER_TOKEN_SECRET`, `MAX_OPEN_ORDERS`, `TRUST_PROXY`,
   `SCHEDULER_ENABLED`, `SCHEDULER_INTERVAL_SECONDS`; shipping `SHIPPING_PROVIDERS_ENABLED`, `NOVA_POST_API_KEY`, `NOVA_POST_ENVIRONMENT`; email `EMAIL_PROVIDER`, `EMAIL_FALLBACK_PROVIDERS`, `EMAIL_USAGE_LIMITS`, `EMAIL_FROM`, `EMAIL_REPLY_TO`,
-  `STOREFRONT_PUBLIC_URL`, `RESEND_API_KEY`, `BREVO_API_KEY`, `BREVO_WEBHOOK_SECRET`; payments `PAYMENT_PROVIDERS_ENABLED`, `MONOBANK_TOKEN`; privacy `ORDER_CONTACT_RETENTION_DAYS`; integration credentials `SECRETS_ENCRYPTION_KEY`, `SECRETS_ENCRYPTION_KEY_PREVIOUS` (ADR 0058); search `SEARCH_ENABLED`, `MEILI_URL` (also read by the API),
+  `STOREFRONT_PUBLIC_URL`, `RESEND_API_KEY`, `BREVO_API_KEY`, `BREVO_WEBHOOK_SECRET`; payments `PAYMENT_PROVIDERS_ENABLED`, `MONOBANK_TOKEN`, `LIQPAY_PUBLIC_KEY`, `LIQPAY_PRIVATE_KEY`; privacy `ORDER_CONTACT_RETENTION_DAYS`; integration credentials `SECRETS_ENCRYPTION_KEY`, `SECRETS_ENCRYPTION_KEY_PREVIOUS` (ADR 0058); search `SEARCH_ENABLED`, `MEILI_URL` (also read by the API),
   `MEILI_API_KEY`, `MEILI_INDEX_PREFIX`; storefront `STOREFRONT_FORWARD_CLIENT_ADDRESS`, `STOREFRONT_REQUIRE_LEGAL_TEXT` (build time only); admin dev server `ADMIN_DEV_API_URL`.
   Test only (fake providers): `FAKE_EMAIL_CAPTURE_FILE`, `FAKE_PAYMENT_ADOPT_WEBHOOKS`. E2E only: `E2E_DATABASE_URL`, `E2E_PORT`, `E2E_API_PORT`, `E2E_STOREFRONT_PORT`,
   `E2E_STOREFRONT_UNFORWARDED_PORT`, `E2E_SEARCH`, `E2E_FEATURES`, `ADMIN_E2E_PORT`, `ADMIN_E2E_API_PORT`, `ADMIN_E2E_FEATURES`; visual comparison only (`scripts/visual-compare.sh` sets the two directories itself):

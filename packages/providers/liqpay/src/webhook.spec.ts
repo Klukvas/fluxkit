@@ -31,7 +31,9 @@ describe("verifyWebhook", () => {
     const id = await createdPayment(provider, stub);
     const webhook = stub.webhookFor(id);
     const rawBody = Uint8Array.from(webhook.rawBody);
-    rawBody[rawBody.length - 1] ^= 0x01;
+    const last = rawBody.length - 1;
+    expect(last).toBeGreaterThanOrEqual(0);
+    rawBody[last] = (rawBody[last] ?? 0) ^ 0x01;
     const result = await provider.verifyWebhook({ headers: webhook.headers, rawBody }, live());
     expect(result.ok).toBe(false);
     if (!result.ok) {

@@ -14,12 +14,14 @@ import { OrdersRepository, type OrderRow } from "../../orders/orders.repository.
 import { OrdersService } from "../../orders/orders.service.js";
 import { PaymentsRepository, type PaymentRow } from "../attempts/payments.repository.js";
 import { PaymentCreateService, type CreatePaymentRefusal } from "../payment-create.service.js";
+import { PaymentHandoffService } from "../payment-handoff.service.js";
 import { PaymentReadsService } from "../payment-reads.service.js";
 import { shopperViewOf, StorePaymentViews } from "./store-payment-views.js";
 import type {
   CustomerCreatePaymentBody,
   GuestCreatePaymentBody,
   StoreCreatedPayment,
+  StorePaymentHandoff,
   StorePaymentStatus,
 } from "./store-payments.schemas.js";
 
@@ -61,6 +63,7 @@ export class StorePaymentsService {
     @Inject(StoreService) private readonly store: StoreService,
     @Inject(PaymentsRepository) private readonly payments: PaymentsRepository,
     @Inject(PaymentCreateService) private readonly create: PaymentCreateService,
+    @Inject(PaymentHandoffService) private readonly handoffs: PaymentHandoffService,
     @Inject(PaymentReadsService) private readonly reads: PaymentReadsService,
     @Inject(StorePaymentViews) private readonly views: StorePaymentViews,
     @Inject(CLOCK) private readonly clock: Clock,
@@ -108,6 +111,26 @@ export class StorePaymentsService {
   ): Promise<StorePaymentStatus> {
     const order = await this.customerOrder(customerId, number);
     return this.statusFor(order, paymentId);
+  }
+
+  /** `POST /store/orders/payments/handoff` (ADR 0059). */
+  async handoffAsGuest(
+    number: string,
+    accessToken: string,
+    paymentId: string,
+  ): Promise<StorePaymentHandoff> {
+    const order = await this.guestOrder(number, accessToken);
+    return this.handoffs.handoffForAttempt(order, paymentId);
+  }
+
+  /** `POST /store/account/orders/{number}/payments/{paymentId}/handoff` (ADR 0059). */
+  async handoffAsCustomer(
+    customerId: string,
+    number: string,
+    paymentId: string,
+  ): Promise<StorePaymentHandoff> {
+    const order = await this.customerOrder(customerId, number);
+    return this.handoffs.handoffForAttempt(order, paymentId);
   }
 
   private async createFor(

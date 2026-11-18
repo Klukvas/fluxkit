@@ -28,8 +28,7 @@ const CONTROL = /[\u0000-\u001f\u007f]/;
 const MAX_URL_LENGTH = 2048;
 
 const LIQPAY_DATE = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}$/;
-const ISO_DATE =
-  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?(Z|[+-]\d{2}:\d{2})$/;
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?(Z|[+-]\d{2}:\d{2})$/;
 
 /** Minor units to LiqPay major amount (UAH: two decimal places, truncate toward zero). */
 export function majorAmountOf(amount: Money): number {
@@ -65,10 +64,7 @@ function isHttpsUrl(value: unknown): boolean {
   try {
     const url = new URL(value);
     return (
-      url.protocol === "https:" &&
-      url.hostname !== "" &&
-      url.username === "" &&
-      url.password === ""
+      url.protocol === "https:" && url.hostname !== "" && url.username === "" && url.password === ""
     );
   } catch {
     return false;
@@ -211,13 +207,22 @@ const statusSchema = z.looseObject({
   status: z.string().max(64),
   amount: z.number().optional().nullable(),
   currency: z.string().max(8).optional().nullable(),
-  err_code: z.union([z.string().max(64), z.number()]).optional().nullable(),
+  err_code: z
+    .union([z.string().max(64), z.number()])
+    .optional()
+    .nullable(),
   err_description: z.string().max(4096).optional().nullable(),
   sender_card_mask2: z.string().max(64).optional().nullable(),
   sender_card_mask: z.string().max(64).optional().nullable(),
   paytype: z.string().max(32).optional().nullable(),
-  create_date: z.union([z.string().max(32), z.number()]).optional().nullable(),
-  end_date: z.union([z.string().max(32), z.number()]).optional().nullable(),
+  create_date: z
+    .union([z.string().max(32), z.number()])
+    .optional()
+    .nullable(),
+  end_date: z
+    .union([z.string().max(32), z.number()])
+    .optional()
+    .nullable(),
   refunds: z
     .array(
       z.looseObject({

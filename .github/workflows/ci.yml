@@ -111,6 +111,7 @@ jobs:
             providers-payment-fake,
             providers-payment-none,
             providers-payment-monobank,
+            providers-payment-liqpay,
             search-on,
             search-off,
           ]

@@ -1,14 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { PaymentProviderResult } from "@fluxkit/core";
 import { LIQPAY_API_ORIGIN, LIQPAY_PATHS } from "./config.js";
-import { encodeData, signData } from "./signature.js";
+import { signData } from "./signature.js";
 import {
   createdPayment,
   createInput,
   live,
   PAYMENT_ID,
   providerOn,
-  REFUND_ID,
 } from "./test-support/fixtures.js";
 import { STUB_PRIVATE_KEY, startStubLiqPay, type StubLiqPay } from "./test-support/stub-liqpay.js";
 

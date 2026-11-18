@@ -214,6 +214,7 @@ export class TestPaymentProvider implements PaymentProviderPort {
     multipleRefunds: true,
     invalidateUnpaid: true,
     webhooks: true,
+    formHandoff: false,
   });
 
   /** Invoices in creation order. */
@@ -503,6 +504,20 @@ export class TestPaymentProvider implements PaymentProviderPort {
         return paymentProviderFailure("rejected", { providerCodes: ["malformed_body"] });
       }
     });
+  }
+
+  buildCheckoutHandoff(
+    _input: CreatePaymentInput,
+    signal: ProviderAbortSignal,
+  ): Promise<
+    PaymentProviderResult<{ actionUrl: string; fields: Readonly<Record<string, string>> }>
+  > {
+    if (signal.aborted) {
+      return Promise.resolve(paymentProviderFailure("not_sent"));
+    }
+    return Promise.resolve(
+      paymentProviderFailure("not_sent", { providerCodes: ["handoff_unsupported"] }),
+    );
   }
 
   private now(): Date {

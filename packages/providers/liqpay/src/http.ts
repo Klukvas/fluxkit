@@ -140,10 +140,7 @@ export class LiqPayHttp {
     return { data, signature };
   }
 
-  async call(
-    request: LiqPayRequest,
-    callerSignal: ProviderAbortSignal,
-  ): Promise<LiqPayExchange> {
+  async call(request: LiqPayRequest, callerSignal: ProviderAbortSignal): Promise<LiqPayExchange> {
     if (!KNOWN_PATHS.has(request.path)) {
       throw new RangeError("LiqPayHttp calls only the plugin's fixed routes");
     }

@@ -24,6 +24,13 @@ import { PaymentProviderRegistry } from "../registry/index.js";
 import { RAW_WEBHOOK_BODY, type RequestWithRawWebhookBody } from "./webhook-raw-body.js";
 
 const JSON_CONTENT_TYPE = /^application\/json(\s*;.*)?$/i;
+/** LiqPay (ADR 0059) posts `data`+`signature` as form fields; Monobank stays JSON. */
+const FORM_URLENCODED_CONTENT_TYPE = /^application\/x-www-form-urlencoded(\s*;.*)?$/i;
+
+function isAcceptedWebhookContentType(value: string | undefined): boolean {
+  const header = value ?? "";
+  return JSON_CONTENT_TYPE.test(header) || FORM_URLENCODED_CONTENT_TYPE.test(header);
+}
 
 /** Request headers as the provider port takes them: lower-case names, one string each. */
 function headersOf(request: RequestWithRawWebhookBody): Record<string, string> {
@@ -40,15 +47,15 @@ function headersOf(request: RequestWithRawWebhookBody): Record<string, string> {
 
 /**
  * `POST /webhooks/payments/{provider}` (ADR 0032 decision 12; red zone: an unauthenticated public route). The caller is
- * the payment provider: no session, no CSRF (the route is outside `/store` and `/admin`, whose guards do not apply), JSON
- * only, at most 64 KiB, limit `paymentWebhook` per address. The raw body bytes are read by `paymentWebhookRawBody` (app
- * factory) before any parser, and the signature is checked by the provider port over EXACTLY those bytes BEFORE anything
- * of the body is read: an invalid signature is `401` with no detail and stores nothing. A verified fact goes through
- * `PaymentFactsService` (dedupe by the SHA-256 of the raw body, binding, ordering, `markPaidIn`) in one transaction; the
- * answer is `200` with an empty body once it is durably recorded, also for a duplicate and for an attempt we do not know
- * (a retry would not help). A database failure answers `503` so the provider sends it again (Monobank: up to 3 more
- * times, M9). No outbound call on this path except what the plugin needs to verify (its key refetch). Bodies,
- * signatures and headers are never logged.
+ * the payment provider: no session, no CSRF (the route is outside `/store` and `/admin`, whose guards do not apply),
+ * `application/json` or `application/x-www-form-urlencoded` (ADR 0059), at most 64 KiB, limit `paymentWebhook` per
+ * address. The raw body bytes are read by `paymentWebhookRawBody` (app factory) before any parser, and the signature is
+ * checked by the provider port over EXACTLY those bytes BEFORE anything of the body is read: an invalid signature is
+ * `401` with no detail and stores nothing. A verified fact goes through `PaymentFactsService` (dedupe by the SHA-256 of
+ * the raw body, binding, ordering, `markPaidIn`) in one transaction; the answer is `200` with an empty body once it is
+ * durably recorded, also for a duplicate and for an attempt we do not know (a retry would not help). A database failure
+ * answers `503` so the provider sends it again (Monobank: up to 3 more times, M9). No outbound call on this path except
+ * what the plugin needs to verify (its key refetch). Bodies, signatures and headers are never logged.
  */
 @ApiTags("webhooks")
 @Controller("webhooks/payments")
@@ -72,7 +79,8 @@ export class PaymentWebhookController {
   })
   @ApiParam({ name: "provider", description: "An enabled payment provider code, e.g. `monobank`." })
   @ApiBody({
-    description: "The provider's own JSON notification, verified by its signature header.",
+    description:
+      "The provider's own notification: JSON (Monobank) or `application/x-www-form-urlencoded` with `data` and `signature` (LiqPay, ADR 0059). Verified by the plugin over the exact raw bytes.",
     schema: { type: "object" },
   })
   @ApiResponse({ status: 200, description: "Recorded (or a duplicate, or not ours). Empty body." })
@@ -85,11 +93,11 @@ export class PaymentWebhookController {
     if (provider === undefined) {
       throw notFound("Payment provider");
     }
-    if (!JSON_CONTENT_TYPE.test(request.headers["content-type"] ?? "")) {
+    if (!isAcceptedWebhookContentType(request.headers["content-type"])) {
       throw new ProblemException({
         code: "validation_failed",
         status: 415,
-        detail: "The notification must be JSON.",
+        detail: "The notification must be JSON or form-urlencoded.",
       });
     }
     const rawBody = request[RAW_WEBHOOK_BODY] ?? Buffer.alloc(0);

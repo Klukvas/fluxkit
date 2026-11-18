@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { parseLiqPayEnv } from "./config.js";
 import { createInput, live, providerOn, REFUND_ID } from "./test-support/fixtures.js";
-import { STUB_PRIVATE_KEY, STUB_PUBLIC_KEY, startStubLiqPay, type StubLiqPay } from "./test-support/stub-liqpay.js";
+import {
+  STUB_PRIVATE_KEY,
+  STUB_PUBLIC_KEY,
+  startStubLiqPay,
+  type StubLiqPay,
+} from "./test-support/stub-liqpay.js";
 
 describe("no keys in logs or results", () => {
   let stub: StubLiqPay;

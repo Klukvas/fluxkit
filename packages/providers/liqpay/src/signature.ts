@@ -6,7 +6,7 @@ import { createHash } from "node:crypto";
 
 const SIGNATURE_BASE64 = /^[A-Za-z0-9+/]{8,256}={0,2}$/;
 
-export function encodeData(params: Record<string, unknown>): string {
+export function encodeData(params: object): string {
   return Buffer.from(JSON.stringify(params), "utf8").toString("base64");
 }
 

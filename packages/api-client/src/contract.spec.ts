@@ -31,7 +31,9 @@ import type {
   OrderAccessBody,
   OrderList,
   OrderPayment,
+  OrderPaymentHandoffBody,
   OrderPaymentStatusBody,
+  PaymentHandoff,
   PaymentState,
   ProblemDetails,
   ProductDetail,
@@ -334,6 +336,13 @@ const paymentState: Shape<PaymentState> = {
     expiresAt: "string",
     orderStatus,
     canRetry: "boolean",
+  },
+};
+
+const paymentHandoff: Shape<PaymentHandoff> = {
+  object: {
+    actionUrl: "string",
+    fields: { record: "string" },
   },
 };
 
@@ -807,6 +816,7 @@ const createAccountOrderPaymentBody: Shape<CreateAccountOrderPaymentBody> = {
 const orderPaymentStatusBody: Shape<OrderPaymentStatusBody> = {
   object: { number: "string", accessToken: "string", paymentId: "string" },
 };
+const orderPaymentHandoffBody: Shape<OrderPaymentHandoffBody> = orderPaymentStatusBody;
 
 /** Success body per operation, typed by what the client function really returns. */
 type DataOf<N extends OperationName> = Extract<
@@ -847,8 +857,10 @@ const RESPONSE_SHAPES: { [N in OperationName]: Shape<CurrentResponse<N>> } = {
   cancelAccountOrder: order,
   createOrderPayment: createdPayment,
   getOrderPaymentStatus: paymentState,
+  getOrderPaymentHandoff: paymentHandoff,
   createAccountOrderPayment: createdPayment,
   getAccountOrderPayment: paymentState,
+  getAccountOrderPaymentHandoff: paymentHandoff,
   listBanners: homeBannerList,
   listCategories: categoryList,
   getConfig: storeConfig,
@@ -889,8 +901,10 @@ const REQUEST_SHAPES: { [N in OperationName]: ShapeNode | null } = {
   cancelAccountOrder: null,
   createOrderPayment: createOrderPaymentBody,
   getOrderPaymentStatus: orderPaymentStatusBody,
+  getOrderPaymentHandoff: orderPaymentHandoffBody,
   createAccountOrderPayment: createAccountOrderPaymentBody,
   getAccountOrderPayment: null,
+  getAccountOrderPaymentHandoff: null,
   listBanners: null,
   listCategories: null,
   getConfig: null,

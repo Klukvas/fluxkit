@@ -8,6 +8,7 @@ import { AdminPaymentsService } from "./admin/admin-payments.service.js";
 import { PaymentAttemptsModule } from "./attempts/payment-attempts.module.js";
 import { PaymentCreateService } from "./payment-create.service.js";
 import { PaymentFactsService } from "./payment-facts.service.js";
+import { PaymentHandoffService } from "./payment-handoff.service.js";
 import { PaymentReadsService } from "./payment-reads.service.js";
 import { PaymentReconcileService } from "./payment-reconcile.service.js";
 import { PaymentRefundsService } from "./payment-refunds.service.js";
@@ -48,6 +49,7 @@ export class PaymentsModule {
         { provide: PAYMENTS_CONFIG, useValue: config },
         PaymentFactsService,
         PaymentCreateService,
+        PaymentHandoffService,
         PaymentRefundsService,
         PaymentReconcileService,
         PaymentReadsService,
@@ -59,6 +61,7 @@ export class PaymentsModule {
         PAYMENTS_CONFIG,
         PaymentFactsService,
         PaymentCreateService,
+        PaymentHandoffService,
         PaymentRefundsService,
         PaymentReconcileService,
         PaymentReadsService,

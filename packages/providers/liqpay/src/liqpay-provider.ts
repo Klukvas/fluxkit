@@ -122,7 +122,10 @@ export class LiqPayPaymentProvider implements PaymentProviderPort {
     providerPaymentId: string,
     signal: ProviderAbortSignal,
   ): Promise<PaymentProviderResult<ProviderPaymentFact>> {
-    if (typeof providerPaymentId !== "string" || !PROVIDER_PAYMENT_ID_PATTERN.test(providerPaymentId)) {
+    if (
+      typeof providerPaymentId !== "string" ||
+      !PROVIDER_PAYMENT_ID_PATTERN.test(providerPaymentId)
+    ) {
       return this.local("getPayment", "invalid_provider_payment_id");
     }
     return this.exchange(
@@ -146,7 +149,10 @@ export class LiqPayPaymentProvider implements PaymentProviderPort {
     if (signal.aborted) {
       return this.local("invalidatePayment", "aborted");
     }
-    if (typeof providerPaymentId !== "string" || !PROVIDER_PAYMENT_ID_PATTERN.test(providerPaymentId)) {
+    if (
+      typeof providerPaymentId !== "string" ||
+      !PROVIDER_PAYMENT_ID_PATTERN.test(providerPaymentId)
+    ) {
       return this.local("invalidatePayment", "invalid_provider_payment_id");
     }
     return paymentProviderOk({ invalidated: false });
@@ -296,7 +302,10 @@ export class LiqPayPaymentProvider implements PaymentProviderPort {
     elapsedMs: number,
   ): void {
     const line = `${operation}: ${what} -> ${failure.reason} (${failure.providerCodes.join(",")}) after ${String(elapsedMs)} ms`;
-    if (failure.reason === "misconfigured" && failure.providerCodes.some((c) => c === "403" || c === "401")) {
+    if (
+      failure.reason === "misconfigured" &&
+      failure.providerCodes.some((c) => c === "403" || c === "401")
+    ) {
       if (!this.keysMisconfiguredLogged) {
         this.keysMisconfiguredLogged = true;
         this.logger.error(

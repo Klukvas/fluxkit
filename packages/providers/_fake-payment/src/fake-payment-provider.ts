@@ -369,6 +369,7 @@ export class FakePaymentProvider implements PaymentProviderPort {
     multipleRefunds: true,
     invalidateUnpaid: true,
     webhooks: true,
+    formHandoff: false,
   });
 
   private readonly invoiceById = new Map<string, MutableInvoice>();
@@ -692,6 +693,20 @@ export class FakePaymentProvider implements PaymentProviderPort {
       }
       return paymentProviderOk(fact);
     });
+  }
+
+  buildCheckoutHandoff(
+    _input: CreatePaymentInput,
+    signal: ProviderAbortSignal,
+  ): Promise<
+    PaymentProviderResult<{ actionUrl: string; fields: Readonly<Record<string, string>> }>
+  > {
+    if (signal.aborted) {
+      return Promise.resolve(paymentProviderFailure("not_sent", { providerCodes: ["aborted"] }));
+    }
+    return Promise.resolve(
+      paymentProviderFailure("not_sent", { providerCodes: ["handoff_unsupported"] }),
+    );
   }
 
   /*

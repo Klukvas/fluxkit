@@ -87,7 +87,10 @@ function decodeData(form: Record<string, string>): unknown {
   }
 }
 
-function signedResponse(json: Record<string, unknown>): { body: string; headers: Record<string, string> } {
+function signedResponse(json: Record<string, unknown>): {
+  body: string;
+  headers: Record<string, string>;
+} {
   const data = encodeData(json);
   const signature = signData(data, STUB_PRIVATE_KEY);
   const body = new URLSearchParams({ data, signature }).toString();
@@ -127,11 +130,8 @@ export async function startStubLiqPay(): Promise<StubLiqPay> {
       await new Promise((resolve) => setTimeout(resolve, overrideAnswer.delayMs));
     }
     if (overrideAnswer !== undefined) {
-      const payload =
-        overrideAnswer.json === undefined
-          ? { status: overrideAnswer.status, body: "" }
-          : signedResponse(overrideAnswer.json);
       if (overrideAnswer.json !== undefined) {
+        const payload = signedResponse(overrideAnswer.json);
         res.writeHead(overrideAnswer.status, payload.headers);
         res.end(payload.body);
       } else {
@@ -174,7 +174,8 @@ export async function startStubLiqPay(): Promise<StubLiqPay> {
       if (order === undefined) {
         res.writeHead(404);
         res.end(
-          signedResponse({ status: "error", err_code: "payment_not_found", order_id: orderId }).body,
+          signedResponse({ status: "error", err_code: "payment_not_found", order_id: orderId })
+            .body,
         );
         return;
       }
@@ -190,7 +191,8 @@ export async function startStubLiqPay(): Promise<StubLiqPay> {
       if (order === undefined) {
         res.writeHead(404);
         res.end(
-          signedResponse({ status: "error", err_code: "payment_not_found", order_id: orderId }).body,
+          signedResponse({ status: "error", err_code: "payment_not_found", order_id: orderId })
+            .body,
         );
         return;
       }
@@ -277,12 +279,14 @@ export async function startStubLiqPay(): Promise<StubLiqPay> {
       return orderToJson(order);
     },
     webhookFor(orderId) {
-      const json = this.statusJson(orderId);
+      const order = orders.get(orderId);
+      const json =
+        order === undefined
+          ? { status: "error", err_code: "payment_not_found" }
+          : orderToJson(order);
       const data = encodeData(json);
       const signature = signData(data, STUB_PRIVATE_KEY);
-      const rawBody = new TextEncoder().encode(
-        new URLSearchParams({ data, signature }).toString(),
-      );
+      const rawBody = new TextEncoder().encode(new URLSearchParams({ data, signature }).toString());
       return { headers: { "content-type": "application/x-www-form-urlencoded" }, rawBody };
     },
     close() {

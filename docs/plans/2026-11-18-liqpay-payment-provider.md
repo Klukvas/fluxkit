@@ -1,6 +1,6 @@
 # Plan: LiqPay payment provider (second Ukrainian acquiring plugin)
 
-Status: **proposed** (2026-11-18). Waiting for owner answers on the quiz below before any implementation. Follows ADR 0032 (online payments; LiqPay listed as later) and the Monobank plugin pattern (`packages/providers/monobank`, plan `docs/plans/2026-10-26-payments-monobank.md`).
+Status: **approved for implementation** (2026-11-18). Owner asked to review the plan and start coding; all quiz answers taken as the recommended options (recorded below). Independent plan review (approve-with-fixes) applied in "Review fixes" before code. Follows ADR 0032 and ADR 0059; Monobank plugin pattern in `packages/providers/monobank`.
 
 ## Goal
 
@@ -53,13 +53,14 @@ Fluxkit today:
 
 LiqPay checkout needs a signed **POST** to `https://www.liqpay.ua/api/3/checkout`.
 
-### Recommended handoff (A) — same-origin bridge
+### Recommended handoff (A) — same-origin bridge (review-fixed)
 
-1. Plugin `createPayment` is **local** for the checkout payload: builds and signs `data`/`signature`, does not call LiqPay yet (`not_sent` until the browser posts). Sets `providerPaymentId` = our payment attempt id (LiqPay `order_id`).
-2. `redirectUrl` = same-origin storefront handoff page built by the **API** from `STOREFRONT_PUBLIC_URL` + locale already used for `returnUrl`, e.g. `/{locale}/payment/handoff?payment=<id>` (provider-agnostic path; no provider host in storefront source).
-3. Handoff page (storefront): authenticated to the order the same way as the return page; calls a new store route that returns `{ actionUrl, fields: { data, signature } }` only for a live attempt of an enabled form-handoff provider; auto-submits a POST form (no card fields).
-4. CSP change (narrow): `form-action 'self' https://www.liqpay.ua` when LiqPay can be used (build-time from config, or always allow that one host when the template ships LiqPay — prefer **always allow the one host** so a fork that enables LiqPay later does not need a rebuild; document the trade-off).
-5. "Continue payment" reopens the same handoff URL; the API re-signs fresh `data`/`signature` for the same `order_id`/amount/expiry (LiqPay UNIQUE `order_id` — re-sign must not create a second payment; S1 confirms).
+1. **API** builds `handoffUrl` = `{STOREFRONT_PUBLIC_URL}/{locale}/payment/handoff?payment={id}` in `providerRequest` (same place as `returnUrl` / `webhookUrl`) and passes it as additive `CreatePaymentInput.handoffUrl` when `capabilities.formHandoff` is true.
+2. Plugin `createPayment` is **local**: validates input, does **not** call LiqPay, returns `ok { providerPaymentId: paymentId, redirectUrl: handoffUrl }`. `providerPaymentId` is **always** our attempt UUID (LiqPay `order_id`). Facts from status/webhook must set `providerPaymentId` and `reference` to that same id; LiqPay numeric `payment_id` is never used as `providerPaymentId` (would `provider_payment_id_mismatch`).
+3. Port adds required `buildCheckoutHandoff(input)` → `{ actionUrl, fields }` (fresh `data`/`signature`). Providers with `formHandoff: false` answer `not_sent` / `handoff_unsupported` and are never called by the API for handoff.
+4. Store routes (guest **POST** with order token + CSRF like payment status; customer session GET/POST parity): return handoff fields only for a live attempt of a `formHandoff` provider; rate limit `paymentStatus`. No unsigned GET of secrets by payment id alone.
+5. Handoff page: navigated via existing `window.location` assigner; fetches fields from the store route; auto-POSTs. CSP: `form-action 'self' https://www.liqpay.ua` always (documented trade-off in contracts); page also sends `Referrer-Policy: no-referrer`.
+6. "Continue payment" reuses stored `redirectUrl` (handoff); each handoff fetch re-signs the same `order_id`/amount/expiry.
 
 ### Rejected / later alternatives
 
@@ -201,6 +202,25 @@ Recommended option first. Marked **[OWNER]** where judgement / money / legal is 
 - Matrix: `providers-payment-liqpay`, `providers-payment-none`, `providers-payment-monobank`, `providers-deleted`.
 - Docs checks: `check:env`, `check:docs`, privacy processor row, dependencies entry.
 - Not claimed without running: live LiqPay, production settlement, PRRO.
+
+## Owner answers (2026-11-18)
+
+Owner: review the plan and start implementation. All quiz items taken as recommended.
+
+| Question | Answer |
+|---|---|
+| 1. Proceed with LiqPay v1? | Yes |
+| 2. Checkout handoff? | A — same-origin auto-POST bridge + CSP allow `https://www.liqpay.ua` |
+| 3. Currency? | UAH only |
+| 4. Alongside Monobank? | Allow both via `PAYMENT_PROVIDERS_ENABLED` |
+| 5. PRRO? | Omit `rro_info` in v1 |
+| 6. Webhook content types? | JSON and `application/x-www-form-urlencoded` on the shared path |
+| 7. Invalidate unpaid? | `invalidateUnpaid: false` until S1 |
+| 8. Integrations secrets? | Declare `fluxkit.secrets`; runtime env-only |
+
+## Review fixes (independent review, 2026-11-18)
+
+Applied before coding: handoff signing via port `buildCheckoutHandoff` + API-built `handoffUrl`; `providerPaymentId` = attempt UUID forever; guest handoff uses POST + order token (not bare GET); ADR 0059 for form handoff + urlencoded webhooks; CSP allow-list recorded in contracts; amount conversion = minor÷100 with two decimal places (truncate toward zero for positive integers); OpenAPI/e2e webhook matrices updated with the content-type change.
 
 ## Report template (implementation PR)
 

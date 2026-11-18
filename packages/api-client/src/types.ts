@@ -357,6 +357,9 @@ export interface OrderPaymentStatusBody {
   paymentId: string;
 }
 
+/** `getOrderPaymentHandoff` (guest): same ownership as status (ADR 0059). */
+export type OrderPaymentHandoffBody = OrderPaymentStatusBody;
+
 export interface CreatedPayment {
   paymentId: string;
   status: ShopperPaymentStatus;
@@ -373,6 +376,12 @@ export interface PaymentState {
   orderStatus: OrderStatus;
   /** Whether a new attempt would be accepted now. */
   canRetry: boolean;
+}
+
+/** Form-handoff fields for an auto-POST to the provider (ADR 0059). */
+export interface PaymentHandoff {
+  actionUrl: string;
+  fields: Record<string, string>;
 }
 
 export interface OrderSummary {

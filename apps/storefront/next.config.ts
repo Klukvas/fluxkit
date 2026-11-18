@@ -473,7 +473,9 @@ export function buildContentSecurityPolicy(options: SecurityHeadersOptions): str
     ["connect-src", connectSources],
     ["frame-ancestors", ["'none'"]],
     ["base-uri", ["'self'"]],
-    ["form-action", ["'self'"]],
+    // ADR 0059: LiqPay checkout is a browser form POST. Always allow this one host so enabling
+    // `liqpay` needs no rebuild (documented trade-off in docs/contracts/config.md).
+    ["form-action", ["'self'", "https://www.liqpay.ua"]],
   ];
   return directives.map(([name, sources]) => `${name} ${sources.join(" ")}`).join("; ");
 }
@@ -490,6 +492,12 @@ export const TOKEN_PAGE_SOURCE = "/:locale/order/:path*";
  * The id is an attempt reference, not a secret, but the page belongs to one order, so it sends no `Referer` either.
  */
 export const PAYMENT_RETURN_PAGE_SOURCE = "/:locale/payment/return";
+
+/**
+ * The LiqPay (and other form-handoff) bridge page (ADR 0059): `/{locale}/payment/handoff?payment=<id>`.
+ * It auto-POSTs signed fields to the provider; send no Referer so the signature does not leak to analytics.
+ */
+export const PAYMENT_HANDOFF_PAGE_SOURCE = "/:locale/payment/handoff";
 
 /**
  * The three pages of the emailed links (email plan step 10): forgot password, reset password and verify email. The last two
@@ -515,6 +523,10 @@ export function headerRules(
     },
     {
       source: PAYMENT_RETURN_PAGE_SOURCE,
+      headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
+    },
+    {
+      source: PAYMENT_HANDOFF_PAGE_SOURCE,
       headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
     },
   ];

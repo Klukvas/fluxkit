@@ -299,15 +299,21 @@ export class PaymentCreateService {
         : order.locale;
     const base = (this.config.storefrontPublicUrl ?? "").replace(/\/+$/, "");
     const amount = moneyOf(row.amount, row.currency);
+    const returnUrl = `${base}/${encodeURIComponent(locale)}/payment/return?payment=${row.id}`;
+    const webhookUrl = `${base}/webhooks/payments/${encodeURIComponent(provider.code)}`;
+    const handoffUrl = provider.capabilities.formHandoff
+      ? `${base}/${encodeURIComponent(locale)}/payment/handoff?payment=${row.id}`
+      : undefined;
     return {
       paymentId: row.id,
       orderNumber: order.number,
       amount,
       description: paymentDescription(order.number, [locale, order.locale]),
       lines: await this.basket(tx, order, amount, [locale, order.locale]),
-      returnUrl: `${base}/${encodeURIComponent(locale)}/payment/return?payment=${row.id}`,
-      webhookUrl: `${base}/webhooks/payments/${encodeURIComponent(provider.code)}`,
+      returnUrl,
+      webhookUrl,
       expiresAt: row.expiresAt,
+      ...(handoffUrl === undefined ? {} : { handoffUrl }),
     };
   }
 

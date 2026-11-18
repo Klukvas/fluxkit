@@ -96,6 +96,9 @@ const INVOCATIONS: Record<keyof StoreClient, (client: StoreClient) => Promise<un
     ),
   getOrderPaymentStatus: (c) =>
     c.getOrderPaymentStatus({ number: "FK-1", accessToken: "tok", paymentId: VARIANT_ID }),
+  getOrderPaymentHandoff: (c) =>
+    c.getOrderPaymentHandoff({ number: "FK-1", accessToken: "tok", paymentId: VARIANT_ID }),
+  getAccountOrderPaymentHandoff: (c) => c.getAccountOrderPaymentHandoff("FK-1", VARIANT_ID),
   createAccountOrderPayment: (c) =>
     c.createAccountOrderPayment(
       "FK-1",

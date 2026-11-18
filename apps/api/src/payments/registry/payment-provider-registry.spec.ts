@@ -18,6 +18,7 @@ const UAH_ONLY: PaymentProviderCapabilities = {
   multipleRefunds: true,
   invalidateUnpaid: true,
   webhooks: true,
+  formHandoff: false,
 };
 
 /** A complete provider; the failing variants below are built from it. */
@@ -31,6 +32,7 @@ function portOf(code: string): PaymentProviderPort {
     invalidatePayment: unused,
     refund: unused,
     verifyWebhook: unused,
+    buildCheckoutHandoff: unused,
   };
 }
 
