@@ -39,7 +39,7 @@ Signature: `base64(sha3-256(private_key + data + private_key))` over base64 JSON
 
 ## Status mapping (stub-tested)
 
-`success`/`sandbox` → `succeeded`; `failure`/`error`/`try_again` → `failed`; `reversed`; `processing`, documented `wait_*` / `*_verify` / `prepared` / `cash_wait` → `processing`; `hold_wait` → `authorized`; `invoice_wait` / `created` → `created`; `expired`; unknown → `status: null` with `providerStatus` kept.
+`success`/`sandbox`/`wait_compensation` → `succeeded`; `failure`/`error`/`try_again` → `failed`; `reversed`; `processing`, documented `wait_*` (except compensation) / `*_verify` / `prepared` / `cash_wait` → `processing`; `hold_wait` → `authorized`; `invoice_wait` / `created` → `created`; `expired`; unknown → `status: null` with `providerStatus` kept. Refund answers with `wait_amount: true` stay `processing`.
 
 Amounts: outbound major text from integer minor units (`payload-money.ts`, two decimals, truncate toward zero); inbound answers accept a number or a decimal string with at most two fractional digits and convert to minor units without float money arithmetic.
 
@@ -47,7 +47,7 @@ Amounts: outbound major text from integer minor units (`payload-money.ts`, two d
 
 - Sandbox vs production key rules and cabinet setup.
 - Whether unpaid checkout can be cancelled via API (`invalidateUnpaid` stays false).
-- Refund idempotency: we send `refund_ref` (our refund UUID) and map a documented refund answer `status: "reversed"` to succeeded. Whether LiqPay accepts/echoes `refund_ref`, and whether status answers list refunds for reconciliation after a lost refund response, is UNKNOWN until live S1 — a timed-out refund may stay `unknown` until then.
+- Refund idempotency / listing: we send `refund_ref` (our refund UUID) and map a documented refund answer (`status: "reversed"`, honouring `wait_amount`) from the refund call itself. Fluxkit also needs `getPayment` to list that refund under the same id after a lost answer; the local stub models a `refunds[]`/`refund_ref` status shape for the provider contract, but whether live LiqPay status answers echo that is UNKNOWN until S1 — until then a timed-out refund may stay `unknown` in production.
 - Callback retry policy and expected HTTP status codes.
 - Whether `payment_id` is always present in callbacks (never used as `providerPaymentId`).
 - PRRO / `rro_info`, USD/EUR, exact error code catalogue, rate limits, `Retry-After`.

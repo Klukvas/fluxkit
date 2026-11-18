@@ -180,7 +180,8 @@ const PAYMENT_STATUS: Readonly<Record<string, ProviderPaymentStatus>> = Object.f
   wait_crypto: "processing",
   wait_sender_card: "processing",
   wait_qr: "processing",
-  wait_compensation: "processing",
+  /** Successful payment awaiting LiqPay's daily settlement to the merchant. */
+  wait_compensation: "succeeded",
   wait_reserve: "processing",
   cash_wait: "processing",
   captcha_verify: "processing",
@@ -397,6 +398,10 @@ export function factOf(json: unknown, expectedOrderId?: string): FactReading {
 export function readRefundStatus(json: unknown): ProviderRefundStatus | undefined {
   const refund = refundAnswerSchema.safeParse(json);
   if (refund.success) {
+    // Docs: wait_amount true means the refund is accepted but waiting on merchant receipts.
+    if (refund.data.wait_amount === true || refund.data.wait_amount === "true") {
+      return "processing";
+    }
     return REFUND_STATUS[refund.data.status];
   }
   // A status payload that already includes refunds may also answer a refund call in some environments.

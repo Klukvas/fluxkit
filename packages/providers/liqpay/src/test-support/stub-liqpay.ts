@@ -244,11 +244,18 @@ export async function startStubLiqPay(): Promise<StubLiqPay> {
       sender_card_type: order.sender_card_type,
       sender_card_mask2: order.sender_card_mask2,
       err_code: order.err_code,
-      refunds: order.refunds.map((entry) => ({
-        status: entry.status,
-        amount: entry.amount,
-        refund_ref: entry.refund_ref,
-      })),
+      // Fluxkit's payment-provider contract requires getPayment to list refunds under our refund UUID after a
+      // successful refund call. Whether live LiqPay status answers echo `refund_ref` / a `refunds[]` list is UNKNOWN
+      // until S1; the stub models the shape Fluxkit needs so lost-refund reconciliation can be tested locally.
+      ...(order.refunds.length === 0
+        ? {}
+        : {
+            refunds: order.refunds.map((entry) => ({
+              status: entry.status,
+              amount: entry.amount,
+              refund_ref: entry.refund_ref,
+            })),
+          }),
     };
   }
 

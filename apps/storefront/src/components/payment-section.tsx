@@ -165,7 +165,7 @@ export function PaymentSectionView(props: PaymentSectionViewProps) {
       ) : null}
       {chooseProvider ? (
         <fieldset className="flex flex-col gap-2" disabled={busy}>
-          <legend className="text-foreground">{t("payment.provider.choose")}</legend>
+          <legend className={textStyles.itemTitle}>{t("payment.provider.choose")}</legend>
           <div className="flex flex-col gap-2" role="radiogroup" aria-required="true">
             {model.providers.map((code) => {
               const id = `order-payment-provider-${code}`;

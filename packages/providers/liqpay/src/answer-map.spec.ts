@@ -122,4 +122,29 @@ describe("readRefundStatus", () => {
       }),
     ).toBe("succeeded");
   });
+
+  it("keeps wait_amount true as processing", () => {
+    expect(
+      readRefundStatus({
+        result: "ok",
+        wait_amount: true,
+        payment_id: 2417662437,
+        status: "reversed",
+      }),
+    ).toBe("processing");
+  });
+});
+
+describe("settlement statuses", () => {
+  it("treats wait_compensation as succeeded", () => {
+    const read = factOf({
+      order_id: "6f1c2d3e-4a5b-4c6d-8e9f-0a1b2c3d4e5f",
+      status: "wait_compensation",
+      amount: 10,
+      currency: "UAH",
+      create_date: "2026-11-18 10:00:01",
+      end_date: "2026-11-18 10:05:00",
+    });
+    expect(read.ok && read.fact.status).toBe("succeeded");
+  });
 });
