@@ -66,8 +66,17 @@ export interface SecretView {
   needsReentry: boolean;
   /** `null`: no enter control at all (the server environment decides the value). */
   enter: { mode: "enter" | "replace"; disabled: boolean } | null;
-  /** The stored version a "Remove" would retire; null when nothing is stored. */
+  /** A candidate a "Remove" would retire. An active or draining version is revoked, not removed. */
   removableVersionId: string | null;
+  /** An active or draining version a "Revoke" would end. */
+  revocableVersionId: string | null;
+}
+
+export interface ProviderRuntime {
+  /** Email, off, with every outbound field saved as a candidate and storage ready. */
+  turnOn: boolean;
+  /** Email that new mail is using. */
+  turnOff: boolean;
 }
 
 /**
@@ -80,9 +89,18 @@ export function secretView(
   storage: AdminIntegrationStorage,
 ): SecretView {
   const stored = secret.versionId !== null;
+  const versionState = stored ? secret.versionState : null;
   return {
-    statusKey: `intg.state.${secret.state}`,
-    tone: secret.state === "not_set" ? "neutral" : secret.state === "env" ? "success" : "warning",
+    statusKey:
+      versionState === null || versionState === "candidate"
+        ? `intg.state.${secret.state}`
+        : `intg.state.${versionState}`,
+    tone:
+      secret.state === "env" || versionState === "active"
+        ? "success"
+        : secret.state === "not_set" || versionState === "revoked"
+          ? "neutral"
+          : "warning",
     envVariable: secret.state === "env" ? secret.envVariable : null,
     savedAt: stored ? secret.savedAt : null,
     needsReentry: secret.keyAvailable === false,
@@ -90,6 +108,25 @@ export function secretView(
       secret.state === "env"
         ? null
         : { mode: stored ? "replace" : "enter", disabled: storage === "disabled" },
-    removableVersionId: secret.versionId,
+    removableVersionId: versionState === "candidate" ? secret.versionId : null,
+    revocableVersionId:
+      versionState === "active" || versionState === "draining" ? secret.versionId : null,
+  };
+}
+
+/** Whether this provider can be turned on or off from the screen. Payment and delivery cannot. */
+export function providerRuntime(
+  integration: AdminIntegration,
+  storage: AdminIntegrationStorage,
+): ProviderRuntime {
+  const outbound = integration.secrets.filter((secret) => secret.purpose === "outbound");
+  return {
+    turnOn:
+      integration.kind === "email" &&
+      !integration.enabled &&
+      storage === "ready" &&
+      outbound.length > 0 &&
+      outbound.every((secret) => secret.versionState === "candidate" && secret.state === "set"),
+    turnOff: integration.kind === "email" && integration.enabled,
   };
 }

@@ -7,6 +7,7 @@ import type { Inventory } from "./types.js";
  * `checkInventory` rejects a `none` column whose name looks like personal data.
  */
 export const noPersonalDataTables: Inventory = {
+  email_route_setting: none("D16", "id", "mode", "turn"),
   email_provider_state: none(
     "D16",
     "provider_code",

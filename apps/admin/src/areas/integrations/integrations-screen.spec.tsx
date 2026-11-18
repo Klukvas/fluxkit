@@ -34,6 +34,7 @@ function secret(overrides: Partial<AdminIntegrationSecret> = {}): AdminIntegrati
     generation: null,
     savedAt: null,
     keyAvailable: null,
+    versionState: null,
     ...overrides,
   };
 }
@@ -50,6 +51,7 @@ const resend: AdminIntegration = {
       generation: 1,
       savedAt: "2026-11-16T11:00:00.000Z",
       keyAvailable: true,
+      versionState: "candidate",
     }),
     secret({
       field: "webhook_secret",
@@ -81,7 +83,7 @@ function ready(
   items: AdminIntegration[],
   storage: "ready" | "disabled" = "ready",
 ): IntegrationsState {
-  return { status: "ready", data: { revision: 7, storage, items } };
+  return { status: "ready", data: { revision: 7, storage, emailRouteMode: "equal", items } };
 }
 
 function list(state: IntegrationsState, options: { canManage?: boolean; busy?: boolean } = {}) {
@@ -159,16 +161,19 @@ describe("the Integrations list", () => {
     const html = list(ready([resend, monobank]));
     const labels = textAttributes(html);
     expect(labels).toEqual([
+      "§intg.action.turnOnLabel",
       "§intg.action.replaceLabel",
       "§intg.action.removeLabel",
       "§intg.action.enterLabel",
     ]);
-    expect(buttons(html)).toHaveLength(3);
+    expect(buttons(html)).toHaveLength(4);
   });
 
-  it("has no connection check, activation or DNS control", () => {
+  it("offers turn on for a saved email key and no connection check or DNS control", () => {
     const html = list(ready([resend, monobank, unknown]));
-    expect(html).not.toMatch(/activate|check|dns/i);
+    expect(html).toContain("§intg.action.turnOnLabel");
+    expect(html).not.toMatch(/dns/i);
+    expect(list(ready([monobank]))).not.toContain("§intg.action.turnOnLabel");
   });
 
   it("warns when the server cannot store keys, names the variable and disables every save control but not the removal", () => {
@@ -191,6 +196,7 @@ describe("the Integrations list", () => {
           generation: 1,
           savedAt: "2026-11-16T11:00:00.000Z",
           keyAvailable: false,
+          versionState: "candidate",
         }),
       ],
     };
@@ -300,7 +306,7 @@ describe("the save and remove dialog", () => {
   });
 
   it("renders no hardcoded text in any mode", () => {
-    for (const action of ["enter", "replace", "remove"] as const) {
+    for (const action of ["enter", "replace", "remove", "turnOn", "turnOff", "revoke"] as const) {
       expect(leftoverText(dialog({ action })), action).toBe("");
     }
   });
@@ -312,11 +318,22 @@ describe("the area's messages", () => {
       ...INTEGRATION_KINDS.map((kind) => `intg.kind.${kind}`),
       ...KNOWN_PROVIDER_CODES.map((code) => `intg.provider.${code}`),
       ...KNOWN_SECRET_FIELDS.map((field) => `intg.field.${field}`),
-      ...["not_set", "set", "env"].map((state) => `intg.state.${state}`),
+      ...["not_set", "set", "env", "active", "draining", "revoked"].map(
+        (state) => `intg.state.${state}`,
+      ),
       ...INTEGRATION_REFUSAL_RULES.map((rule) => `intg.refusal.${rule}`),
       ...VALUE_ERROR_CODES.map((code) => `intg.error.value.${code}`),
-      ...["saved", "removed", "stale", "unknown"].map((notice) => `intg.notice.${notice}`),
-      ...["enter", "replace", "remove"].flatMap((action) => [
+      ...[
+        "saved",
+        "removed",
+        "turnedOn",
+        "turnedOff",
+        "revoked",
+        "routeSaved",
+        "stale",
+        "unknown",
+      ].map((notice) => `intg.notice.${notice}`),
+      ...["enter", "replace", "remove", "turnOn", "turnOff", "revoke"].flatMap((action) => [
         `intg.action.${action}`,
         `intg.action.${action}Label`,
         `intg.dialog.${action}.title`,

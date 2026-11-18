@@ -4,7 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useI18n } from "../../i18n/i18n-context";
 import { adminClient } from "../../lib/api";
 import { useRefreshingResource } from "../../lib/use-refreshing-resource";
+import { useSession } from "../../session/session-context";
 import { PageHeader } from "../../views/status-views";
+import { EmailRouteForm, type EmailRouteResult } from "./email-route-form";
 import {
   IntegrationsListView,
   type IntegrationsState,
@@ -12,6 +14,7 @@ import {
 } from "./integrations-list-view";
 import { useCanManageIntegrations } from "./integrations-permissions";
 import { SecretDialog, type SecretDialogResult, type SecretDialogTarget } from "./secret-dialog";
+import { secretHolder } from "./use-secret-values";
 
 const focusClass =
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
@@ -23,6 +26,7 @@ const focusClass =
  */
 export function IntegrationsPage() {
   const { t, locale } = useI18n();
+  const session = useSession();
   const canManage = useCanManageIntegrations();
   const resource = useRefreshingResource((signal) => adminClient.listIntegrations({ signal }), []);
   const [target, setTarget] = useState<SecretDialogTarget | null>(null);
@@ -44,7 +48,7 @@ export function IntegrationsPage() {
   function open(
     action: SecretAction,
     integration: AdminIntegration,
-    secret: AdminIntegrationSecret,
+    secret: AdminIntegrationSecret | null,
   ) {
     if (!canManage || resource.refreshing) return;
     setNotice(null);
@@ -52,6 +56,11 @@ export function IntegrationsPage() {
   }
 
   const close = useCallback(() => setTarget(null), []);
+
+  function routeDone(result: EmailRouteResult) {
+    setNotice(result);
+    resource.reload();
+  }
 
   function done(result: SecretDialogResult) {
     setTarget(null);
@@ -65,6 +74,17 @@ export function IntegrationsPage() {
       <div ref={statusRef} tabIndex={-1} className={focusClass}>
         <LiveRegion>{notice === null ? null : t(`intg.notice.${notice}`)}</LiveRegion>
       </div>
+      {state.status === "ready" && canManage ? (
+        <EmailRouteForm
+          key={state.data.emailRouteMode}
+          t={t}
+          mode={state.data.emailRouteMode}
+          revision={state.data.revision}
+          holder={secretHolder(session.state)}
+          busy={resource.refreshing || target !== null}
+          onDone={routeDone}
+        />
+      ) : null}
       <IntegrationsListView
         t={t}
         uiLocale={locale}

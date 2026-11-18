@@ -200,6 +200,27 @@ describe("safe email fallback (real Postgres, independent provider key stores)",
     expect((await world.row(id)).route_provider_code).toBe("fake_fallback");
     expect(b().calls).toEqual([]);
   });
+  it("waits for a cooled-down starter when the route holds it, and does not call the next provider", async () => {
+    const id = await world.enqueued();
+    await withTransaction(world.database, (tx) =>
+      recordEmailProviderCooldown(tx, "fake", emailProviderFailure("quota_exceeded"), 1),
+    );
+    const claim = await world.changes.claim(
+      id,
+      world.clock.now(),
+      "fake",
+      undefined,
+      a().capabilities,
+      { providers: [a(), b()], excluded: [], holdStart: true },
+    );
+    expect(claim.kind).toBe("skipped");
+    expect(await world.row(id)).toMatchObject({
+      status: "pending",
+      provider_code: null,
+      last_error_code: "provider_cooldown",
+    });
+    expect(b().calls).toEqual([]);
+  });
   it("persists shared cooldown across instances and grants a single recovery probe", async () => {
     const first = await world.enqueued();
     a().failNext({ reason: "quota_exceeded" });

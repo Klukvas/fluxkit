@@ -50,13 +50,14 @@ Purposes and legal bases are proposals taken from the plan. TODO(fluxkit): legal
 | `customer_session` | `expires_at` | pseudonymous (Q) | D3 | excluded | cascade | Derived from the created time and the configured limits. |
 | `domain_event` | `id`, `type`, `created_at`, `dispatched_at`, `attempts`, `last_error_code` | none | D17 | not_applicable | not_applicable |  |
 | `domain_event` | `aggregate_id`, `payload` | pseudonymous (Q) | D17 | excluded | keep | Ids only, by rule (docs/contracts/events.md); deleted by job 4 seven days after dispatch. |
-| `email_message` | `id`, `template_version`, `attempts`, `next_attempt_at`, `lease_until`, `deadline_at`, `provider_code`, `route_provider_code`, `pinned_provider_code`, `pinned_at`, `integration_credential_version_id`, `last_error_code`, `resend_of`, `updated_at` | none | D16 | not_applicable | not_applicable |  |
+| `email_message` | `id`, `template_version`, `attempts`, `next_attempt_at`, `lease_until`, `deadline_at`, `provider_code`, `route_provider_code`, `assigned_provider_code`, `pinned_provider_code`, `pinned_at`, `integration_credential_version_id`, `last_error_code`, `resend_of`, `updated_at` | none | D16 | not_applicable | not_applicable |  |
 | `email_message` | `to_address` | personal (P) | D16 | excluded | delete_row | The account email is exported once; the mail export lists template key, status and times only. |
 | `email_message` | `variables` | personal (P) | D16 | excluded | delete_row | Order lines, totals and a tracking number for rendering; no rendered body is stored. |
 | `email_message` | `template_key`, `locale`, `recipient_kind`, `status`, `created_at`, `sent_at` | pseudonymous (Q) | D16 | included | delete_row |  |
 | `email_message` | `customer_id`, `order_id`, `dedupe_key`, `provider_message_id` | pseudonymous (Q) | D16 | excluded | delete_row | Internal id or provider reference only the shop can use. |
 | `email_message` | `admin_user_id`, `created_by_admin_id` | staff (S) | D20 | excluded | set_null | Admin actor id; admin ids are not exported. |
 | `email_provider_state` | all 6 columns | none | D16 | not_applicable | not_applicable | |
+| `email_route_setting` | all 3 columns | none | D16 | not_applicable | not_applicable | |
 | `email_suppression` | `id` | pseudonymous (Q) | D16 | excluded | delete_row | Internal entry ID; removed only in verified address scope or by an authorized admin. |
 | `email_suppression` | `to_address` | personal (P) | D16 | excluded | delete_row | Normalized global block address; export does not repeat the subject address. Retained until authorized removal or verified-address erasure. |
 | `email_suppression` | `reason`, `source_provider`, `first_seen_at`, `last_seen_at` | pseudonymous (Q) | D16 | included | delete_row | Subject-linked safety metadata; retained until authorized removal or verified-address erasure. |

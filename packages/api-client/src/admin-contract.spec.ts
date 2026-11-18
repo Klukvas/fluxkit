@@ -819,6 +819,7 @@ const auditEventList: Shape<Admin.AdminAuditEventList> = paginated({
         "integration.activated",
         "integration.disabled",
         "integration.revoked",
+        "integration.route_changed",
       ],
     },
     targetKind: {
@@ -854,6 +855,7 @@ const integration: Shape<Admin.AdminIntegration> = {
           generation: { nullable: "integer" },
           savedAt: { nullable: "string" },
           keyAvailable: { nullable: "boolean" },
+          versionState: { nullable: { enum: ["candidate", "active", "draining", "revoked"] } },
         },
       },
     },
@@ -862,7 +864,15 @@ const integration: Shape<Admin.AdminIntegration> = {
 };
 const integrationStorage = { enum: ["ready", "disabled"] } as const;
 const integrationList: Shape<Admin.AdminIntegrationList> = {
-  object: { revision: "integer", storage: integrationStorage, items: { array: integration } },
+  object: {
+    revision: "integer",
+    storage: integrationStorage,
+    emailRouteMode: { enum: ["equal", "resend"] },
+    items: { array: integration },
+  },
+};
+const emailRoute: Shape<Admin.AdminEmailRoute> = {
+  object: { revision: "integer", emailRouteMode: { enum: ["equal", "resend"] } },
 };
 const integrationDetail: Shape<Admin.AdminIntegrationDetail> = {
   object: { revision: "integer", storage: integrationStorage, integration },
@@ -1451,6 +1461,13 @@ const body = {
   activateIntegration: {
     object: { expectedRevision: "integer", currentPassword: "string" },
   } satisfies Shape<Admin.AdminIntegrationChangeBody>,
+  setEmailRouteMode: {
+    object: {
+      mode: { enum: ["equal", "resend"] },
+      expectedRevision: "integer",
+      currentPassword: "string",
+    },
+  } satisfies Shape<Admin.SetAdminEmailRouteBody>,
   disableIntegration: {
     object: { expectedRevision: "integer", currentPassword: "string" },
   } satisfies Shape<Admin.AdminIntegrationChangeBody>,
@@ -1758,6 +1775,7 @@ const RESPONSE_SHAPES: { [N in AdminOperationName]: ResponseShapeOf<N> } = {
   listEmailMessages: emailMessageList,
   listAuditEvents: auditEventList,
   listIntegrations: integrationList,
+  setEmailRouteMode: emailRoute,
   getIntegration: integrationDetail,
   putIntegrationSecret: integrationDetail,
   retireIntegrationSecret: integrationDetail,
@@ -1905,6 +1923,7 @@ const REQUEST_SHAPES: { [N in AdminOperationName]: RequestShapeOf<N> } = {
   listEmailMessages: null,
   listAuditEvents: null,
   listIntegrations: null,
+  setEmailRouteMode: body.setEmailRouteMode,
   getIntegration: null,
   putIntegrationSecret: body.putIntegrationSecret,
   retireIntegrationSecret: body.retireIntegrationSecret,

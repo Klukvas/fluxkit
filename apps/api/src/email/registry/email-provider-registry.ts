@@ -15,7 +15,7 @@ export const EMAIL_ROUTE_DELEGATED = Symbol("fluxkit:email-route-delegated");
 
 /** The stored-credential resolver. Provided by the integrations module; absent means env mode only. */
 export interface ManagedEmailSource {
-  emailProvider(now?: number): Promise<EmailProviderPort | undefined>;
+  emailProviders(now?: number): Promise<readonly EmailProviderPort[]>;
 }
 export const MANAGED_EMAIL_SOURCE = Symbol("fluxkit:managed-email-source");
 
@@ -56,7 +56,7 @@ function implementsPort(value: unknown): value is EmailProviderPort {
 export class EmailProviderRegistry implements OnApplicationBootstrap, EmailProviderSource {
   private readonly logger = new Logger(EmailProviderRegistry.name);
   private providers: readonly EmailProviderPort[] = [];
-  private managed: EmailProviderPort | undefined;
+  private managed: readonly EmailProviderPort[] = [];
 
   constructor(
     @Inject(DiscoveryService) private readonly discovery: DiscoveryService,
@@ -73,7 +73,7 @@ export class EmailProviderRegistry implements OnApplicationBootstrap, EmailProvi
   /** Loads the stored email credential when the route is delegated. No provider package is imported otherwise. */
   async prepare(): Promise<void> {
     if (!this.delegated || this.runtime === undefined) return;
-    this.managed = await this.runtime.emailProvider();
+    this.managed = await this.runtime.emailProviders();
   }
 
   onApplicationBootstrap(): void {
@@ -152,24 +152,15 @@ export class EmailProviderRegistry implements OnApplicationBootstrap, EmailProvi
   }
 
   get(code?: string): EmailProviderPort | undefined {
-    if (this.delegated) {
-      if (this.managed === undefined) return undefined;
-      return code === undefined || this.managed.code === code ? this.managed : undefined;
-    }
-    return code === undefined
-      ? this.providers[0]
-      : this.providers.find((provider) => provider.code === code);
+    const selected = this.delegated ? this.managed : this.providers;
+    return code === undefined ? selected[0] : selected.find((provider) => provider.code === code);
   }
 
   list(): readonly EmailProviderPort[] {
-    return this.delegated
-      ? this.managed === undefined
-        ? []
-        : [this.managed]
-      : [...this.providers];
+    return this.delegated ? [...this.managed] : [...this.providers];
   }
 
   deliveryEnabled(): boolean {
-    return this.delegated ? this.managed !== undefined : this.providers.length > 0;
+    return (this.delegated ? this.managed : this.providers).length > 0;
   }
 }

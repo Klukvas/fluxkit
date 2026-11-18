@@ -27,7 +27,7 @@ export class EmailRegistryModule {
         { provide: EMAIL_ROUTE_DELEGATED, useValue: delegated },
         EmailProviderRegistry,
       ],
-      exports: [EmailProviderRegistry],
+      exports: [EmailProviderRegistry, EMAIL_ROUTE_DELEGATED],
     };
   }
 }

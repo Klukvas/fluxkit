@@ -26,6 +26,7 @@ interface IntegrationView {
   id: string;
   kind: string;
   providerCode: string;
+  enabled: boolean;
   secrets: SecretView[];
 }
 interface IntegrationList {
@@ -92,7 +93,7 @@ function row(page: Page, field: string): Locator {
   return card(page).getByRole("listitem").filter({ hasText: field });
 }
 
-/** Every value a text or password input of the page holds right now. */
+/** Every value an input of the page holds right now. */
 function inputValues(page: Page): Promise<string[]> {
   return page.evaluate(() =>
     [...document.querySelectorAll("input, textarea")].map(
@@ -100,6 +101,12 @@ function inputValues(page: Page): Promise<string[]> {
     ),
   );
 }
+
+/**
+ * The route choice stays on the screen: two radios and an empty password. A secret dialog's own inputs come after
+ * these, and a closed dialog must leave exactly these.
+ */
+const ROUTE_INPUTS = ["equal", "resend", ""];
 
 test("the owner stores, replaces nothing by accident and removes a provider key; the value never comes back", async ({
   page,
@@ -182,6 +189,19 @@ test("the owner stores, replaces nothing by accident and removes a provider key;
   await expect(
     main.getByText("The key is saved. It stays off until it is activated."),
   ).toBeVisible();
+
+  // The suite's API sets EMAIL_PROVIDER, so turning the saved key on is refused before the password is checked.
+  await main.getByRole("button", { name: `Turn on ${PROVIDER}` }).click();
+  const turnOn = page.getByRole("dialog", { name: `Turn on ${PROVIDER}` });
+  await expect(turnOn.getByLabel("Key", { exact: true })).toHaveCount(0);
+  await turnOn.getByLabel("Your current password", { exact: true }).fill(account.password);
+  await turnOn.getByRole("button", { name: "Turn on", exact: true }).click();
+  await expect(
+    turnOn.getByText("The server already sets this, so it cannot be changed or turned on here."),
+  ).toBeVisible();
+  await turnOn.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(turnOn).toBeHidden();
+  expect((await fakeEmail(api)).integration).toMatchObject({ enabled: false });
   await expect(apiKey.getByText("Saved, not active yet", { exact: true })).toBeVisible();
   await expect(apiKey).toContainText(/Saved \w/);
   await expect(apiKey.getByRole("button", { name: /^Replace the saved key/ })).toBeVisible();
@@ -195,7 +215,7 @@ test("the owner stores, replaces nothing by accident and removes a provider key;
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.locator("body")).not.toContainText(key);
   expect(await page.content()).not.toContain(key);
-  expect(await inputValues(page)).toEqual([]);
+  expect(await inputValues(page)).toEqual(ROUTE_INPUTS);
 
   // 5. Remove, with the password again.
   await apiKey.getByRole("button", { name: `Remove the saved key: API key, ${PROVIDER}` }).click();
@@ -291,7 +311,7 @@ test("a change made elsewhere meanwhile: the save is refused, the list is read a
   // The list now shows what the other client stored; this screen's own value was not saved over it.
   await expect(apiKey.getByText("Saved, not active yet", { exact: true })).toBeVisible();
   await expect(apiKey.getByRole("button", { name: /^Replace the saved key/ })).toBeEnabled();
-  expect(await inputValues(page)).toEqual([]);
+  expect(await inputValues(page)).toEqual(ROUTE_INPUTS);
   expect(await page.content()).not.toContain(lost);
   // Still the version the other client stored: the refused save created none.
   expect(secretOf((await fakeEmail(elsewhere)).integration, "api_key")).toEqual(savedElsewhere);
@@ -314,7 +334,7 @@ test("the session ends while a key is typed: nothing typed stays in the page und
   const key = fakeKey();
   await dialog.getByLabel("Key", { exact: true }).fill(key);
   await dialog.getByLabel("Your current password", { exact: true }).fill(account.password);
-  expect(await inputValues(page)).toEqual([key, account.password]);
+  expect(await inputValues(page)).toEqual([...ROUTE_INPUTS, key, account.password]);
 
   // The browser's session, signed out from another client: its cookie is now dead (as in `session.e2e.ts`).
   const other = await playwright.request.newContext({

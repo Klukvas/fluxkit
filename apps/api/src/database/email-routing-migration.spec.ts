@@ -72,8 +72,11 @@ describe("email routing migration 0018 (real disposable Postgres)", () => {
     expect(index).toContain("(provider_code, sent_at)");
     expect(index).toContain("status = 'sent'");
     const newerDown = await readFile(`${folder}/0019_integration_credentials.down.sql`, "utf8");
+    // 0021 stays out of the released 0019 down script. Roll it back first, or its journal row blocks 0018.
+    const routeDown = await readFile(`${folder}/0021_email_route_mode.down.sql`, "utf8");
     for (let pass = 0; pass < 2; pass += 1) {
       // The newer migration goes first: the migrator re-applies only what follows the newest journal row.
+      await pool.query(routeDown);
       await pool.query(newerDown);
       await pool.query(down);
       expect(

@@ -159,6 +159,7 @@ describe("the audit query in the URL", () => {
         "integration.activated",
         "integration.disabled",
         "integration.revoked",
+        "integration.route_changed",
       ].sort(),
     );
   });

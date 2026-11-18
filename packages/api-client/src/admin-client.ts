@@ -44,6 +44,7 @@ import type {
   AdminEmailMessageStatus,
   AdminEmailPreview,
   AdminEmailStatus,
+  AdminEmailRoute,
   AdminIntegrationDetail,
   AdminIntegrationList,
   AdminEmailTemplateList,
@@ -53,6 +54,7 @@ import type {
   AdminShippingProviderSettings,
   CreateAdminShippingMethodBody,
   PutAdminIntegrationSecretBody,
+  SetAdminEmailRouteBody,
   PutAdminShippingProviderSettingsBody,
   AdminIntegrationChangeBody,
   RetireAdminIntegrationSecretBody,
@@ -474,6 +476,11 @@ export interface AdminClient {
 
   // integrations (ADR 0058; every operation needs `integrations.manage`, owner only). No answer carries a secret.
   listIntegrations(options?: CallOptions): Result<AdminIntegrationList>;
+  /**
+   * `equal` shares new mail between Resend and Brevo. `resend` starts every message with Resend.
+   * A set `EMAIL_PROVIDER` keeps the server's chain either way.
+   */
+  setEmailRouteMode(body: SetAdminEmailRouteBody, options?: CallOptions): Result<AdminEmailRoute>;
   getIntegration(id: string, options?: CallOptions): Result<AdminIntegrationDetail>;
   /**
    * Stores a candidate value, not used at runtime yet. `403 forbidden` `current_password_incorrect`; `409 rule_violation`
@@ -870,6 +877,7 @@ export function createAdminClient(options: AdminClientOptions): AdminClient {
       call("previewEmailTemplate", { pathParams: { key }, options: opts }),
 
     listIntegrations: (opts) => call("listIntegrations", { options: opts }),
+    setEmailRouteMode: (body, opts) => call("setEmailRouteMode", { body, options: opts }),
     getIntegration: (id, opts) => call("getIntegration", { pathParams: { id }, options: opts }),
     putIntegrationSecret: (id, field, body, opts) =>
       call("putIntegrationSecret", { pathParams: { id, field }, body, options: opts }),

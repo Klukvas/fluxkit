@@ -7,6 +7,8 @@ import { z } from "zod";
 import { timestampSchema, uuidSchema } from "../common/openapi-formats.js";
 
 export const INTEGRATION_SECRET_STATES = ["not_set", "set", "env"] as const;
+/** States a listed secret can be in. `retired` is omitted: a retired version has no envelope and is not listed. */
+export const LISTED_CREDENTIAL_STATES = ["candidate", "active", "draining", "revoked"] as const;
 export const INTEGRATION_STORAGE_STATES = ["ready", "disabled"] as const;
 
 const CURRENT_PASSWORD_MAX_LENGTH = 1024;
@@ -49,6 +51,18 @@ export const integrationMutationSchema = z.strictObject({
 });
 export type IntegrationMutationBody = z.infer<typeof integrationMutationSchema>;
 
+export const EMAIL_ROUTE_MODES = ["equal", "resend"] as const;
+
+export const setEmailRouteSchema = z.strictObject({
+  mode: z.enum(EMAIL_ROUTE_MODES).meta({
+    description:
+      "`equal`: new mail alternates between Resend and Brevo. `resend`: every new message starts with Resend. A definite non-acceptance is tried on the other. A chain that contains both follows this, including a chain set on the server. A timeout or a rejected message stays on the provider that saw it.",
+  }),
+  expectedRevision,
+  currentPassword,
+});
+export type SetEmailRouteBody = z.infer<typeof setEmailRouteSchema>;
+
 export const integrationSecretSchema = z.object({
   field: z.string(),
   purpose: z.enum(INTEGRATION_SECRET_PURPOSES),
@@ -68,6 +82,10 @@ export const integrationSecretSchema = z.object({
   keyAvailable: z.boolean().nullable().meta({
     description:
       "Whether this server holds the master key that sealed the stored value; false means it must be entered again. Null when nothing is stored.",
+  }),
+  versionState: z.enum(LISTED_CREDENTIAL_STATES).nullable().meta({
+    description:
+      "`candidate`: saved, not used. `active`: new mail uses it. `draining`: turned off, mail already bound to it can finish. `revoked`: unusable. Null when nothing is stored.",
   }),
 });
 
@@ -92,12 +110,24 @@ const storage = z.enum(INTEGRATION_STORAGE_STATES).meta({
     "`disabled`: `SECRETS_ENCRYPTION_KEY` is not set on the server, so nothing can be saved here.",
 });
 
+const emailRouteMode = z.enum(EMAIL_ROUTE_MODES).meta({
+  description:
+    "How Resend and Brevo share mail when both are in the send chain. `equal` alternates. `resend` starts every message with Resend. A chain with only one of them is unchanged.",
+});
+
 export const integrationListResponseSchema = z.object({
   revision,
   storage,
+  emailRouteMode,
   items: z.array(integrationSchema),
 });
 export type IntegrationListResponse = z.infer<typeof integrationListResponseSchema>;
+
+export const emailRouteResponseSchema = z.object({
+  revision,
+  emailRouteMode,
+});
+export type EmailRouteResponse = z.infer<typeof emailRouteResponseSchema>;
 
 export const integrationDetailResponseSchema = z.object({
   revision,

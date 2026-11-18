@@ -725,6 +725,7 @@ describe("integrations (ADR 0058)", () => {
         generation: 1,
         savedAt: "2026-11-16T10:00:00.000Z",
         keyAvailable: true,
+        versionState: "candidate",
       },
     ],
     updatedAt: "2026-11-16T10:00:00.000Z",
@@ -732,7 +733,7 @@ describe("integrations (ADR 0058)", () => {
   const detail = { revision: 4, storage: "ready", integration };
 
   it("reads the list and one integration with GET and no body", async () => {
-    const list = { revision: 4, storage: "ready", items: [integration] };
+    const list = { revision: 4, storage: "ready", emailRouteMode: "equal", items: [integration] };
     const stub = fakeFetch((call) => jsonOk(call.url.endsWith(ID) ? detail : list));
     const client = createAdminClient({ baseUrl: BASE, fetch: stub.fetch });
     const listed = await client.listIntegrations();

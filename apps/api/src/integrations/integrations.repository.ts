@@ -27,6 +27,7 @@ export interface StoredSecretSummary {
   readonly purpose: string;
   readonly field: string;
   readonly keyId: string;
+  readonly state: string;
   readonly savedAt: Date;
 }
 
@@ -119,6 +120,7 @@ export class IntegrationsRepository {
         purpose: integrationCredentialVersion.purpose,
         field: integrationSecret.field,
         keyId: integrationSecret.keyId,
+        state: integrationCredentialVersion.state,
         savedAt: integrationSecret.createdAt,
       })
       .from(integrationSecret)
