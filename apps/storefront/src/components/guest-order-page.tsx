@@ -183,6 +183,15 @@ export function GuestOrderPage({
   const [copy, setCopy] = useState<CopyState>("idle");
   const state = useOrderState(store);
   useCancelFocus(state.cancel);
+  // Stable like the account order page: a new function every render would remake the pay store and wipe a refused start.
+  // Must stay above early returns (Rules of Hooks).
+  const makePaySource = useMemo(
+    () =>
+      guestToken === null
+        ? null
+        : (provider: string | null) => guestPaySource(client, number, guestToken, locale, provider),
+    [client, number, guestToken, locale],
+  );
 
   useEffect(() => {
     const token = tokenFromFragment(window.location.hash);
@@ -218,15 +227,6 @@ export function GuestOrderPage({
     );
   }
   const payment = orderPaymentSection(state.load.order, onlinePayment);
-  // Stable like the account order page: a new function every render would remake the pay store and wipe a refused start.
-  const makePaySource = useMemo(
-    () =>
-      guestToken === null
-        ? null
-        : (provider: string | null) =>
-            guestPaySource(client, number, guestToken, locale, provider),
-    [client, number, guestToken, locale],
-  );
   return (
     <Page>
       <OrderDetailsView
