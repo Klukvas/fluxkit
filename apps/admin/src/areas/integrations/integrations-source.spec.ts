@@ -39,6 +39,11 @@ describe("integrations area source guards", () => {
     }
     // The dialog itself has no state for them besides the hook.
     expect(sourceOf("secret-dialog.tsx")).not.toMatch(/useState<SecretValuesState>/);
+    const route = sourceOf("email-route-form.tsx");
+    const take = route.indexOf("secrets.take()");
+    expect(route).toMatch(/useSecretValues\(/);
+    expect(take).toBeGreaterThan(0);
+    expect(route.indexOf("adminClient.setEmailRouteMode")).toBeGreaterThan(take);
   });
 
   it("renders the dialog only while it is open, so closing it unmounts the inputs and drops their state", () => {

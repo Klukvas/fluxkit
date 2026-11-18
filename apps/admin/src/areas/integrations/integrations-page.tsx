@@ -1,24 +1,20 @@
-import type {
-  AdminEmailRouteMode,
-  AdminIntegration,
-  AdminIntegrationSecret,
-} from "@fluxkit/api-client";
+import type { AdminIntegration, AdminIntegrationSecret } from "@fluxkit/api-client";
 import { LiveRegion } from "@fluxkit/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useI18n } from "../../i18n/i18n-context";
 import { adminClient } from "../../lib/api";
-import { runWrite } from "../../lib/run-write";
 import { useRefreshingResource } from "../../lib/use-refreshing-resource";
+import { useSession } from "../../session/session-context";
 import { PageHeader } from "../../views/status-views";
-import { EmailRouteForm } from "./email-route-form";
+import { EmailRouteForm, type EmailRouteResult } from "./email-route-form";
 import {
   IntegrationsListView,
   type IntegrationsState,
   type SecretAction,
 } from "./integrations-list-view";
-import { secretProblemErrors } from "./integrations-errors";
 import { useCanManageIntegrations } from "./integrations-permissions";
 import { SecretDialog, type SecretDialogResult, type SecretDialogTarget } from "./secret-dialog";
+import { secretHolder } from "./use-secret-values";
 
 const focusClass =
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
@@ -30,11 +26,11 @@ const focusClass =
  */
 export function IntegrationsPage() {
   const { t, locale } = useI18n();
+  const session = useSession();
   const canManage = useCanManageIntegrations();
   const resource = useRefreshingResource((signal) => adminClient.listIntegrations({ signal }), []);
   const [target, setTarget] = useState<SecretDialogTarget | null>(null);
   const [notice, setNotice] = useState<SecretDialogResult | null>(null);
-  const [routeError, setRouteError] = useState<string | null>(null);
   const statusRef = useRef<HTMLDivElement>(null);
 
   // After the dialog's own cleanup (it hands the focus back to its opener, which a removal may have taken off the page).
@@ -61,36 +57,9 @@ export function IntegrationsPage() {
 
   const close = useCallback(() => setTarget(null), []);
 
-  async function saveRoute(mode: AdminEmailRouteMode, currentPassword: string) {
-    const data = resource.data;
-    if (data === null || resource.refreshing || target !== null) return;
-    const outcome = await runWrite(() =>
-      adminClient.setEmailRouteMode({
-        mode,
-        expectedRevision: data.revision,
-        currentPassword,
-      }),
-    );
-    if (outcome.kind === "aborted") return;
-    if (outcome.kind === "ok") {
-      setRouteError(null);
-      setNotice("routeSaved");
-      resource.reload();
-      return;
-    }
-    if (outcome.kind === "unknown") {
-      setNotice("unknown");
-      resource.reload();
-      return;
-    }
-    const mapped = secretProblemErrors(outcome.status, outcome.problem, outcome.retryAfter);
-    if (mapped.stale) {
-      setNotice("stale");
-      resource.reload();
-      return;
-    }
-    const descriptor = mapped.fields.currentPassword ?? mapped.form[0];
-    setRouteError(descriptor === undefined ? null : t(descriptor.key, descriptor.values));
+  function routeDone(result: EmailRouteResult) {
+    setNotice(result);
+    resource.reload();
   }
 
   function done(result: SecretDialogResult) {
@@ -110,11 +79,10 @@ export function IntegrationsPage() {
           key={state.data.emailRouteMode}
           t={t}
           mode={state.data.emailRouteMode}
+          revision={state.data.revision}
+          holder={secretHolder(session.state)}
           busy={resource.refreshing || target !== null}
-          error={routeError}
-          onSave={(mode, currentPassword) => {
-            void saveRoute(mode, currentPassword);
-          }}
+          onDone={routeDone}
         />
       ) : null}
       <IntegrationsListView

@@ -13,9 +13,10 @@ describe("the email route form", () => {
       <EmailRouteForm
         t={sentinelTranslator()}
         mode="equal"
+        revision={1}
+        holder="markup"
         busy={false}
-        error={null}
-        onSave={noop}
+        onDone={noop}
       />,
     );
     expect(html).toContain("§intg.route.equal");
@@ -31,7 +32,14 @@ describe("the email route form", () => {
     for (const locale of locales) {
       const t = createTranslator(await messagesForArea(locale, MESSAGE_FILES), locale);
       const html = renderToStaticMarkup(
-        <EmailRouteForm t={t} mode="resend" busy={false} error={null} onSave={noop} />,
+        <EmailRouteForm
+          t={t}
+          mode="resend"
+          revision={1}
+          holder="markup"
+          busy={false}
+          onDone={noop}
+        />,
       );
       expect(html).not.toContain("intg.");
       expect(html).toContain("Resend");
