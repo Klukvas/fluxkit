@@ -68,6 +68,9 @@ ENV NODE_ENV=production \
 # The package managers of the base image are not needed at run time.
 RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
            /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack /opt/yarn-* /usr/local/bin/yarn /usr/local/bin/yarnpkg
+# API and storefront. Without FLUXKIT_STOP_LINGER_SECONDS it execs the command unchanged (migrate, admin CLI).
+COPY --chmod=0755 infra/docker/stop-linger.sh /usr/local/bin/stop-linger
+ENTRYPOINT ["stop-linger"]
 
 # --- the API (also runs the scheduler, the migrator and the admin commands) ---
 FROM runtime AS api

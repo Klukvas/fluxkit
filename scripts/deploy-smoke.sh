@@ -100,6 +100,8 @@ trap cleanup EXIT
 # --- the deploy script's rolling helpers, without Docker (fast; the real script runs against the stack at the end) ---
 bash infra/deploy/fluxkit-deploy.spec.sh
 pass "fluxkit-deploy rolling helpers (infra/deploy/fluxkit-deploy.spec.sh)"
+bash infra/docker/stop-linger.spec.sh
+pass "stop linger keeps a retiring replica in DNS (infra/docker/stop-linger.spec.sh)"
 
 # --- images ---
 read -r -a EXTRA_BUILD_ARGS <<<"${SMOKE_BUILD_ARGS:-}"
@@ -497,7 +499,7 @@ request GET /store/config
 expect_status 502 "unavailable API: store config"
 pass "API outage: only email feedback maps to 429 with Retry-After"
 compose up -d --no-build --no-deps --wait --wait-timeout 120 api >/dev/null
-# nginx marked both api replicas failed during the outage (fail_timeout 10 s): wait until it routes again, so the rollout
+# nginx marked both api replicas failed during the outage (fail_timeout 20 s): wait until it routes again, so the rollout
 # traffic below measures the rollout, not the end of this outage.
 EDGE_STATUS=000
 for _ in $(seq 1 30); do

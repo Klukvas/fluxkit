@@ -15,7 +15,9 @@ resolver ${NGINX_LOCAL_RESOLVERS} valid=10s ipv6=off;
 
 upstream fluxkit_api {
     zone fluxkit_api 64k;
-    server ${FLUXKIT_API_UPSTREAM} resolve;
+    # One refused connection takes the address out for 20 s: longer than the stop linger plus the 10 s
+    # DNS cache, so a replica that has stopped accepting is not selected again while nginx still lists it.
+    server ${FLUXKIT_API_UPSTREAM} resolve max_fails=1 fail_timeout=20s;
     keepalive 16;
     # Close after the request that crosses 10 s: retiring connections end within the 30 s stop grace.
     # The API additionally answers Connection: close while draining.
@@ -28,7 +30,7 @@ upstream fluxkit_storefront {
     # over all replicas (checked with nginx 1.29.8, ADR 0057).
     hash $request_uri;
     zone fluxkit_storefront 64k;
-    server ${FLUXKIT_STOREFRONT_UPSTREAM} resolve;
+    server ${FLUXKIT_STOREFRONT_UPSTREAM} resolve max_fails=1 fail_timeout=20s;
     keepalive 16;
     # Close after the request that crosses 10 s, so sustained keep-alive traffic cannot hold Next's drain open.
     # Retiring connections end well inside the 30 s stop grace (long requests can still exceed it).
