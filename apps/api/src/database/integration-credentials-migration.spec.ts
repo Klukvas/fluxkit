@@ -242,7 +242,10 @@ describe("integration credentials migration 0019 (real disposable Postgres)", ()
   it("runs up, down, up, down with the exact journal row and restores the audit target kinds", async () => {
     // Identity rows alone hold no credential: they do not block the rollback.
     await newIntegration();
+    // 0021 is not part of this released down script. Its journal row would block the re-apply below.
+    const routeDown = await readFile(`${folder}/0021_email_route_mode.down.sql`, "utf8");
     for (let pass = 0; pass < 2; pass += 1) {
+      await pool.query(routeDown);
       await pool.query(down);
       expect(await tablesPresent()).toEqual([]);
       expect(

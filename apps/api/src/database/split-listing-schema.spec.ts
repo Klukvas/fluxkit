@@ -43,6 +43,9 @@ describe("0014 split listing migration (real Postgres, _test database only)", ()
   });
 
   async function down(): Promise<void> {
+    // 0021 is newer than this chain and is not folded into the released 0019 down script. Its journal
+    // row would stop the migrator from re-applying 0014.
+    await pool.query(await readFile(`${migrationsFolder}/0021_email_route_mode.down.sql`, "utf8"));
     await pool.query(
       await readFile(`${migrationsFolder}/0019_integration_credentials.down.sql`, "utf8"),
     );
