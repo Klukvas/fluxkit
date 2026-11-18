@@ -176,14 +176,15 @@ describe("payments: the webhook route and verified facts (real Postgres)", () =>
     expect(
       (await world.webhook(signed, { headers: { "content-type": "text/plain" } })).status,
     ).toBe(415);
-    // ADR 0059: form-urlencoded is allowed at the controller; a JSON body with that content-type fails signature/parse.
+    // ADR 0059: form-urlencoded is allowed at the controller (not 415). A signed JSON body with
+    // that content-type verifies then fails parse → 400 (providers that accept urlencoded).
     expect(
       (
         await world.webhook(signed, {
           headers: { "content-type": "application/x-www-form-urlencoded" },
         })
       ).status,
-    ).toBe(401);
+    ).toBe(400);
     const unknown = await world.webhook(signed, { provider: "monobank" });
     expect(unknown.status).toBe(404);
   });
