@@ -15,6 +15,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { adminUser } from "./admin-auth.js";
+import { integrationCredentialVersion } from "./integrations.js";
 import { salesOrder } from "./orders.js";
 
 /**
@@ -250,6 +251,7 @@ export const shipment = pgTable(
     id: id(),
     orderId: uuid("order_id").notNull(),
     providerCode: text("provider_code").notNull(),
+    integrationCredentialVersionId: uuid("integration_credential_version_id"),
     providerService: text("provider_service"),
     status: text("status").notNull(),
     carrierStatusCode: text("carrier_status_code"),
@@ -332,6 +334,12 @@ export const shipment = pgTable(
       sql`${t.seats} BETWEEN 1 AND ${sql.raw(`${SEATS_PER_SHIPMENT}`)}`,
     ),
     check("shipment_tracking_attempts_check", sql`${t.trackingAttempts} >= 0`),
+    foreignKey({
+      name: "shipment_integration_credential_version_id_fkey",
+      columns: [t.integrationCredentialVersionId],
+      foreignColumns: [integrationCredentialVersion.id],
+    }).onDelete("restrict"),
+    index("shipment_integration_credential_version_id_idx").on(t.integrationCredentialVersionId),
     index("shipment_order_id_idx").on(t.orderId),
     // One active shipment per order (owner answer 9); cancel and create again is allowed.
     uniqueIndex("shipment_order_id_active_key")

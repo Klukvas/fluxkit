@@ -4,6 +4,7 @@ import {
   MAX_PROVIDER_CODES,
   SHIPPING_PROVIDER_TIMEOUTS_MS,
   type ProviderFailureReason,
+  type IntegrationTransportGate,
 } from "@fluxkit/core";
 
 /*
@@ -75,6 +76,7 @@ export interface Answer {
 export interface NovaPostHttpOptions {
   readonly baseUrl: string;
   readonly apiKey: string;
+  readonly transport?: IntegrationTransportGate;
   readonly logger: NovaPostLogger;
   /** The clock for the JWT's lifetime (tests replace it). */
   readonly now?: () => number;
@@ -398,15 +400,37 @@ export class NovaPostHttp {
     const started = performance.now();
     const elapsed = () => Math.round(performance.now() - started);
     let response: Response;
+    let transportStarted = false;
     try {
-      response = await fetch(url, {
-        method: init.method,
-        headers: { ...init.headers, accept: read.accept },
-        body: init.body,
-        redirect: "error",
-        signal,
-      });
-    } catch {
+      const start = () => {
+        transportStarted = true;
+        return {
+          completion: fetch(url, {
+            method: init.method,
+            headers: { ...init.headers, accept: read.accept },
+            body: init.body,
+            redirect: "error",
+            signal,
+          }),
+        };
+      };
+      response =
+        this.options.transport === undefined
+          ? await start().completion
+          : await this.options.transport.start(signal, start);
+    } catch (error) {
+      if (
+        !transportStarted &&
+        error instanceof Error &&
+        error.name === "CredentialAdmissionDenied" &&
+        "code" in error &&
+        (error.code === "credential_revoked" || error.code === "credential_unavailable")
+      ) {
+        throw new NovaPostCallError(operation, "unavailable", [
+          error.code,
+          ...(operation === "createWaybill" && init.method === "POST" ? ["not_sent"] : []),
+        ]);
+      }
       // The error's text may contain the URL (and so the key): only its kind is kept.
       const kind = signal.aborted ? "timeout" : "network";
       this.options.logger.warn(`${operation}: ${kind} after ${String(elapsed())} ms`);

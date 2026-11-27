@@ -169,6 +169,13 @@
       "when": 1795794376041,
       "tag": "0023_managed_payment_credentials",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1795800130582,
+      "tag": "0024_managed_shipping_credentials",
+      "breakpoints": true
     }
   ]
 }

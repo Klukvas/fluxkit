@@ -111,7 +111,7 @@ export class ShipmentWorld {
     return this.orders.pool;
   }
 
-  /** The test carrier inside one of the apps (each app has its own instance). */
+  /** The env-only test carrier inside one app; managed scenarios use ShippingProviders instead. */
   provider(running: RunningApp = this.orders.owner): TestShippingProvider {
     return running.app
       .get(ShippingProviderRegistry)

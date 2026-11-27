@@ -658,6 +658,7 @@ export interface AppEnv {
   enabledPaymentProviders: string[];
   /** Absent enablement delegates new payments to the admin; present blank remains off. */
   paymentDelegated: boolean;
+  shippingDelegated: boolean;
   /**
    * `EMAIL_PROVIDER` (ADR 0031): `none` (default) loads no provider and no mail is sent; `resend`, `brevo` or `fake` names the primary
    * provider package the API loads; ordered fallbacks are additive. `fake` is test-only and refused in production.
@@ -829,6 +830,7 @@ export function loadEnv(source: Record<string, string | undefined>): AppEnv {
     emailProvider: env.EMAIL_PROVIDER ?? DEFAULT_EMAIL_PROVIDER,
     emailProviderDelegated: source.EMAIL_PROVIDER === undefined,
     paymentDelegated: source.PAYMENT_PROVIDERS_ENABLED === undefined,
+    shippingDelegated: source.SHIPPING_PROVIDERS_ENABLED === undefined,
     ...emailRoutingValues(
       env.EMAIL_PROVIDER ?? DEFAULT_EMAIL_PROVIDER,
       env.EMAIL_FALLBACK_PROVIDERS,

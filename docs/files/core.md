@@ -264,3 +264,5 @@ Pure rules for personal data (privacy plan step 3): no I/O; the clock and the ra
 - `src/integrations/provider-runtime.ts` - pure managed runtime contracts: `IntegrationTransportGate`, `ManagedProviderContext`, `CredentialAdmissionDenied`, check codes/outcomes, account identity and webhook locator results, kind-appropriate factories and optional hooks. No provider import, env, Nest, DB or I/O. The gate starts transport synchronously under API-owned authority locks and awaits only after commit; it cannot select a different version. Existing one-argument email factories remain compatible. Contract: `docs/contracts/integrations.md`.
 
 - `src/integrations/secrets.ts` — also builds separate length-prefixed `integrationMerchantBaselineAad`; merchant envelopes cannot be transplanted into secret envelopes.
+
+- Shipping port and managed provider context remain unchanged in PR 3; API runtime reuses the shipping registry port validator. Nova Post declares the existing managed environment descriptor.

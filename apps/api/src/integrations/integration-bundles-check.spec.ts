@@ -311,6 +311,7 @@ describe("candidate bundles and explicit checks (real Postgres/Redis)", () => {
       emailRouteDelegated: false,
       emailFromAddress: null,
       paymentDelegated: false,
+      shippingDelegated: false,
       shopCurrency: "UAH",
       orderPaymentTtlMinutes: 30,
       storefrontPublicUrl: null,

@@ -83,3 +83,5 @@ Payment, shipping and email provider plugins, one package per provider. Each pro
 
 
 - `monobank/src/managed.ts`, `liqpay/src/managed.ts`, adjacent `managed.spec.ts` — saved-bundle factories with gated transports/local signing and bounded pure webhook locators; Monobank read-only merchant identity/check; env Nest modules stay unchanged.
+
+- `packages/providers/nova-post/src/managed.ts` — env-free managed factory and code-only fresh-JWT/division credential check; each version owns its HTTP/JWT cache, all fetch starts use the context gate. `src/managed.spec.ts` checks the managed contract, denial and JWT/environment isolation.

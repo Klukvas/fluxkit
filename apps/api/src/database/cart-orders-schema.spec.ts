@@ -66,6 +66,9 @@ describe("cart, customers and orders schema (real Postgres)", () => {
     await pool.query(
       'alter table if exists "payment" drop constraint if exists "payment_integration_credential_version_id_fkey"',
     );
+    await pool.query(
+      'alter table if exists "shipment" drop constraint if exists "shipment_integration_credential_version_id_fkey"',
+    );
     // Reverse dependency order, no CASCADE (same reasoning as migrations.spec.ts).
     for (const name of [
       "integration_merchant_baseline",

@@ -11,6 +11,7 @@ import {
   type ShippingPayer,
   type ShippingSelection,
   type StoreLocale,
+  type ShippingProviderPort,
 } from "@fluxkit/core";
 import { PRICING_CONFIG, type PricingConfig } from "../../common/pricing-config.js";
 import { findPostgresError } from "../../common/postgres-errors.js";
@@ -44,6 +45,7 @@ const METHOD_FK = "order_shipping_method_id_fkey";
 export interface PreparedShipping {
   readonly pickup?: {
     readonly providerCode: string;
+    readonly identity: string;
     readonly ref: string;
     readonly resolution: PickupPointResolution;
   };
@@ -102,12 +104,9 @@ export class ShippingCheckoutService {
    */
   async offeredMethodExists(tx: Transaction): Promise<boolean> {
     const rows = await this.repository.listActive(SHIPPING_STORE_LIMITS.maxMethods, tx);
+    const providers = await this.directory.providers(tx);
     return (
-      offeredMethods(
-        rows,
-        this.pricing.shopCurrency,
-        (code) => this.directory.provider(code) !== undefined,
-      ).length > 0
+      offeredMethods(rows, this.pricing.shopCurrency, (code) => providers.has(code)).length > 0
     );
   }
 
@@ -121,13 +120,14 @@ export class ShippingCheckoutService {
     if (method === undefined || method.kind !== "pickup_point" || method.providerCode === null) {
       return NOTHING_PREPARED;
     }
-    const provider = this.directory.provider(method.providerCode);
+    const provider = await this.directory.provider(method.providerCode);
     if (provider === undefined) {
       return NOTHING_PREPARED;
     }
     return {
       pickup: {
         providerCode: provider.code,
+        identity: this.directory.identity(provider),
         ref,
         // The reserved gate slot: a flood of store lookups cannot make a checkout wait for its point (review m-2).
         resolution: await this.directory.resolvePickupPoint(provider, ref, "priority"),
@@ -154,7 +154,9 @@ export class ShippingCheckoutService {
     }
     const kind = methodKind(method);
     const provider =
-      method.providerCode === null ? undefined : this.directory.provider(method.providerCode);
+      method.providerCode === null
+        ? undefined
+        : await this.directory.provider(method.providerCode, tx);
     // A request shaped for another kind (a pickup point ref for an address method, none for a pickup point, an address for
     // a pickup point, no address for an address method) means the shopper's page shows the method as it was before an
     // admin changed its kind: `shipping_changed` with the fresh option (ADR 0029 decision 4, review m-4), never a field
@@ -184,7 +186,7 @@ export class ShippingCheckoutService {
 
     let point: PickupPoint | null = null;
     if (kind === "pickup_point" && provider !== undefined) {
-      point = this.pickupPoint(provider.code, selection.pickupPointRef ?? "", input.prepared);
+      point = this.pickupPoint(provider, selection.pickupPointRef ?? "", input.prepared);
     }
     const countryCode =
       kind === "pickup_point" ? point?.countryCode : input.shippingAddress?.countryCode;
@@ -214,7 +216,7 @@ export class ShippingCheckoutService {
     const estimate =
       point === null || provider === undefined
         ? null
-        : this.directory.peekEstimate({
+        : this.directory.peekEstimate(provider, {
             providerCode: provider.code,
             methodCode: method.code,
             service: method.providerService,
@@ -292,10 +294,15 @@ export class ShippingCheckoutService {
   }
 
   /** The point resolved before the transaction, else the cache; never a provider call here. */
-  private pickupPoint(providerCode: string, ref: string, prepared: PreparedShipping): PickupPoint {
+  private pickupPoint(
+    provider: ShippingProviderPort,
+    ref: string,
+    prepared: PreparedShipping,
+  ): PickupPoint {
     const early =
       prepared.pickup !== undefined &&
-      prepared.pickup.providerCode === providerCode &&
+      prepared.pickup.providerCode === provider.code &&
+      prepared.pickup.identity === this.directory.identity(provider) &&
       prepared.pickup.ref === ref
         ? prepared.pickup.resolution
         : undefined;
@@ -306,7 +313,7 @@ export class ShippingCheckoutService {
       return early.point;
     }
     // Not prepared for this provider (the method changed in between) or the provider was unreachable: the cache only.
-    const cached = this.directory.peekPickupPoint(providerCode, ref);
+    const cached = this.directory.peekPickupPoint(provider, ref);
     if (cached === undefined) {
       throw shippingProviderUnavailable(SHIPPING_STORE_LIMITS.retryAfterSeconds);
     }

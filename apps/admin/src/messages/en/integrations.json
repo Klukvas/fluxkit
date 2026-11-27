@@ -1,7 +1,7 @@
 {
   "intg.intro": "The API keys of the email, payment and delivery services installed in this shop.",
   "intg.inactive.title": "Saved keys stay off until activated",
-  "intg.inactive.body": "Keys are stored encrypted. Email and payment providers can be turned on here after their required fields are saved. Delivery keys can be saved and checked; delivery activation arrives later. Saving or checking a key never turns a provider on.",
+  "intg.inactive.body": "Keys are stored encrypted. Email, payment and delivery providers can be turned on here after their required fields are saved. A delivery provider also needs a sender profile and shipping methods. Saving or checking a key never turns a provider on.",
   "intg.storageDisabled.title": "Keys cannot be saved on this server",
   "intg.storageDisabled.body": "The server has no encryption key configured (the server variable {variable}). Ask the developer to set it; until then nothing can be saved here.",
   "intg.kind.email": "Email",
@@ -67,7 +67,7 @@
   "intg.guide.liqpay.privateKey": "The private key from the same shop in the LiqPay cabinet. Paste it into Private key. It is never shown again after save.",
   "intg.guide.nova_post.step1": "Sign in to the Nova Post business cabinet.",
   "intg.guide.nova_post.step2": "Open Settings, then Security, and create an API key.",
-  "intg.guide.nova_post.step3": "Enter the key and choose an environment if offered. Each saved version keeps its environment. Delivery activation arrives later; a shipping profile and methods are also required. Tracking uses polling without webhook setup.",
+  "intg.guide.nova_post.step3": "Choose sandbox or production and use a key issued for that environment; sandbox keys may not be available for Ukrainian accounts. Save, check, then turn on explicitly. The check obtains a fresh JWT and reads one division; it creates no waybill. Configure the sender profile and shipping methods too. Tracking keeps polling after turn off; bound shipments keep their original key for tracking, cancellation and labels. Revoke stops later calls. No webhook setup is needed.",
   "intg.guide.nova_post.link.cabinet": "Nova Post business cabinet",
   "intg.dialog.enter.title": "Enter the key: {field}, {provider}",
   "intg.dialog.enter.description": "The key is stored encrypted and is never shown again. It stays off until it is activated.",
@@ -156,7 +156,7 @@
   "intg.refusal.invalid_credentials": "The provider refused this credential. Check it and enter it again.",
   "intg.refusal.integration_merchant_mismatch": "This key belongs to a different merchant. Enter a replacement key from the merchant enrolled on the first save.",
   "intg.refusal.integration_merchant_not_enrolled": "Save the key again to verify its merchant before activation.",
-  "intg.refusal.integration_legacy_work_open": "Existing payments still need the server key. Finish or reconcile them before switching to stored credentials.",
+  "intg.refusal.integration_legacy_work_open": "Existing payments or shipments still need the server key. Finish or reconcile them before switching to stored credentials.",
   "intg.refusal.integration_currency_unsupported": "This provider does not support the shop currency.",
   "intg.refusal.integration_public_url_required": "Set a public storefront URL on the server before activating payments.",
   "intg.refusal.integration_payment_window_too_short": "The order payment window must be at least 8 minutes before online payments can be activated. Ask the developer to update the server settings."

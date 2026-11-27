@@ -7,6 +7,7 @@ import {
   SHIPPING_METHOD_KINDS,
   type Money,
   type PickupPoint,
+  type ShippingProviderPort,
   type ShippingMethodKind,
   type ShippingQuote,
   type StoreLocale,
@@ -133,16 +134,16 @@ export class ShippingOptionsService {
     }
     // A method in another currency than the shop's (ADR 0029 decision 3) or a pickup point method of a provider that is
     // not loaded is never offered: not even as unavailable (review M-1; the checkout's switch uses the same filter).
+    const providers = await this.directory.providers();
     const methods = offeredMethods(
       await this.repository.listActive(SHIPPING_STORE_LIMITS.maxMethods),
       this.pricing.shopCurrency,
-      (code) => this.directory.provider(code) !== undefined,
+      (code) => providers.has(code),
     );
-    const points = await this.pointsOf(methods, query.pickupPointRef);
+    const points = await this.pointsOf(methods, query.pickupPointRef, providers);
     const options = await Promise.all(
       methods.map(async (row) => {
-        const provider =
-          row.providerCode === null ? undefined : this.directory.provider(row.providerCode);
+        const provider = row.providerCode === null ? undefined : providers.get(row.providerCode);
         const point = row.providerCode === null ? undefined : points.get(row.providerCode);
         const kind = methodKind(row);
         const quote = quoteShippingMethod({
@@ -185,6 +186,7 @@ export class ShippingOptionsService {
   private async pointsOf(
     methods: readonly StoreShippingMethodRow[],
     ref: string | undefined,
+    providers: ReadonlyMap<string, ShippingProviderPort>,
   ): Promise<Map<string, PickupPoint>> {
     const found = new Map<string, PickupPoint>();
     if (ref === undefined) {
@@ -197,7 +199,7 @@ export class ShippingOptionsService {
     );
     await Promise.all(
       [...codes].map(async (code) => {
-        const provider = this.directory.provider(code);
+        const provider = providers.get(code);
         if (provider === undefined) {
           return;
         }

@@ -13,3 +13,5 @@ export {
   SHIPMENT_CALL_TIMEOUTS,
   type ShipmentCallTimeouts,
 } from "./provider-timeouts.js";
+
+export { ShippingProviders } from "./shipping-providers.js";

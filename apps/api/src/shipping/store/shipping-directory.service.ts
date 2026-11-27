@@ -13,8 +13,9 @@ import {
   type PickupPoint,
   type ShippingProviderPort,
 } from "@fluxkit/core";
+import type { DbExecutor } from "../../common/transaction.js";
 import { CLOCK, type Clock } from "../../auth/clock.js";
-import { ShippingProviderRegistry } from "../registry/index.js";
+import { ShippingProviders } from "../registry/index.js";
 import {
   ConcurrencyGate,
   GateBusyError,
@@ -144,7 +145,7 @@ export class ShippingDirectoryService {
   private readonly estimates: ProviderCache<Money>;
 
   constructor(
-    @Inject(ShippingProviderRegistry) private readonly registry: ShippingProviderRegistry,
+    @Inject(ShippingProviders) private readonly registry: ShippingProviders,
     @Inject(ShippingStoreRepository) private readonly repository: ShippingStoreRepository,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {
@@ -164,8 +165,15 @@ export class ShippingDirectoryService {
   }
 
   /** The loaded provider of that code, or `undefined` (not enabled, or deleted). */
-  provider(code: string): ShippingProviderPort | undefined {
-    return this.registry.get(code);
+  async provider(code: string, executor?: DbExecutor): Promise<ShippingProviderPort | undefined> {
+    return (await this.registry.available(executor)).find((port) => port.code === code);
+  }
+
+  async providers(executor?: DbExecutor): Promise<ReadonlyMap<string, ShippingProviderPort>> {
+    return new Map((await this.registry.available(executor)).map((port) => [port.code, port]));
+  }
+  identity(provider: ShippingProviderPort): string {
+    return this.registry.identity(provider);
   }
 
   /** City search by normalized query (lower case, single spaces). Throws `ShippingProviderUnavailableError`. */
@@ -175,7 +183,7 @@ export class ShippingDirectoryService {
     locale: string,
   ): Promise<DirectoryPage<CityResult>> {
     const normalized = query.trim().replace(/\s+/gu, " ").toLowerCase();
-    const key = [provider.code, locale, normalized].join(SEPARATOR);
+    const key = [this.registry.identity(provider), locale, normalized].join(SEPARATOR);
     const read = await this.cities.get(key, async () => {
       const found = await this.call(provider, "searchCities", "lookup", (signal) =>
         provider.searchCities(
@@ -207,7 +215,7 @@ export class ShippingDirectoryService {
     provider: ShippingProviderPort,
     cityRef: string,
   ): Promise<DirectoryPage<PickupPoint>> {
-    const key = [provider.code, cityRef].join(SEPARATOR);
+    const key = [this.registry.identity(provider), cityRef].join(SEPARATOR);
     if (this.emptyPointLists.peek(key) !== undefined) {
       return { items: [], stale: false };
     }
@@ -243,11 +251,11 @@ export class ShippingDirectoryService {
     ref: string,
     priority: GatePriority = "ordinary",
   ): Promise<PickupPointResolution> {
-    const listed = this.findInLists(provider.code, ref, false);
+    const listed = this.findInLists(this.registry.identity(provider), ref, false);
     if (listed !== undefined) {
       return { status: "found", point: listed, stale: false };
     }
-    const key = [provider.code, ref].join(SEPARATOR);
+    const key = [this.registry.identity(provider), ref].join(SEPARATOR);
     if (this.unknownPointRefs.peek(key) !== undefined) {
       return { status: "unknown" };
     }
@@ -281,7 +289,7 @@ export class ShippingDirectoryService {
       if (!(error instanceof ShippingProviderUnavailableError)) {
         throw error;
       }
-      const stale = this.findInLists(provider.code, ref, true);
+      const stale = this.findInLists(this.registry.identity(provider), ref, true);
       return stale === undefined
         ? { status: "unavailable" }
         : { status: "found", point: stale, stale: true };
@@ -289,10 +297,24 @@ export class ShippingDirectoryService {
   }
 
   /** The point from the cache only (fresh, or stale within the window); no call. For the checkout's transaction. */
-  peekPickupPoint(providerCode: string, ref: string): PickupPoint | undefined {
+  peekPickupPoint(provider: ShippingProviderPort | string, ref: string): PickupPoint | undefined {
     return (
-      this.findInLists(providerCode, ref, true) ??
-      this.pointsByRef.peek([providerCode, ref].join(SEPARATOR), { allowStale: true })?.value ??
+      this.findInLists(
+        typeof provider === "string"
+          ? `${provider}\u0000legacy\u0000env`
+          : this.registry.identity(provider),
+        ref,
+        true,
+      ) ??
+      this.pointsByRef.peek(
+        [
+          typeof provider === "string"
+            ? `${provider}\u0000legacy\u0000env`
+            : this.registry.identity(provider),
+          ref,
+        ].join(SEPARATOR),
+        { allowStale: true },
+      )?.value ??
       undefined
     );
   }
@@ -305,7 +327,7 @@ export class ShippingDirectoryService {
     if (!provider.capabilities.estimate) {
       return null;
     }
-    const key = this.estimateKey(query);
+    const key = this.estimateKey(provider, query);
     try {
       const read = await this.estimates.get(key, async () => {
         const settings = await this.repository.providerSettings(provider.code);
@@ -355,13 +377,13 @@ export class ShippingDirectoryService {
   }
 
   /** The cached estimate only (no call): what the checkout records as `estimated_carrier_amount`. */
-  peekEstimate(query: EstimateQuery): Money | null {
-    return this.estimates.peek(this.estimateKey(query))?.value ?? null;
+  peekEstimate(provider: ShippingProviderPort, query: EstimateQuery): Money | null {
+    return this.estimates.peek(this.estimateKey(provider, query))?.value ?? null;
   }
 
-  private estimateKey(query: EstimateQuery): string {
+  private estimateKey(provider: ShippingProviderPort, query: EstimateQuery): string {
     return [
-      query.providerCode,
+      this.registry.identity(provider),
       query.methodCode,
       query.cityRef,
       query.pickupPointRef ?? "",
@@ -443,7 +465,10 @@ export class ShippingDirectoryService {
       return await untilAborted(
         this.gateOf(provider.code).run(
           controller.signal,
-          () => Promise.resolve().then(() => work(controller.signal)),
+          async () => {
+            await this.registry.assertActive(provider);
+            return work(controller.signal);
+          },
           priority,
         ),
         controller.signal,

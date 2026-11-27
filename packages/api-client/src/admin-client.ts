@@ -508,8 +508,8 @@ export interface AdminClient {
     options?: CallOptions,
   ): Result<AdminIntegrationDetail>;
   /**
-   * Uses the stored email credential when `EMAIL_PROVIDER` is absent. `409 rule_violation`
-   * `integration_runtime_not_ready` for payment and shipping, `integration_env_override`,
+   * Activates stored email, payment or shipping credentials when enablement is delegated. `409 rule_violation`
+   * `integration_legacy_work_open`, `integration_env_override`,
    * `integration_sender_required`, `integration_route_unset`, `integration_not_activatable`.
    */
   activateIntegration(

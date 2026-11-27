@@ -509,3 +509,17 @@ describe("payment delegation", () => {
     ).toMatchObject({ paymentDelegated: false, enabledPaymentProviders: ["monobank"] });
   });
 });
+
+describe("shipping delegation", () => {
+  it("delegates only when the enablement variable is absent", () => {
+    expect(loadEnv({ DATABASE_URL: "postgres://x" })).toMatchObject({
+      shippingDelegated: true,
+      enabledShippingProviders: [],
+    });
+    for (const value of ["", " ", "nova_post"]) {
+      expect(
+        loadEnv({ DATABASE_URL: "postgres://x", SHIPPING_PROVIDERS_ENABLED: value }),
+      ).toMatchObject({ shippingDelegated: false });
+    }
+  });
+});

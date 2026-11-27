@@ -1,3 +1,5 @@
+import { ShippingActivationService } from "./shipping-activation.service.js";
+import { ShippingProviders } from "../shipping/registry/shipping-providers.js";
 import { PaymentProviders } from "../payments/registry/payment-providers.js";
 import { PaymentActivationService } from "./payment-activation.service.js";
 import { MerchantBaselineCipher } from "./merchant-baseline-cipher.js";
@@ -34,9 +36,11 @@ export class IntegrationsModule {
         IntegrationsRepository,
         IntegrationRuntime,
         PaymentProviders,
+        ShippingProviders,
         MerchantBaselineCipher,
         PaymentMerchantEnrollment,
         PaymentActivationService,
+        ShippingActivationService,
         { provide: MANAGED_EMAIL_SOURCE, useExisting: IntegrationRuntime },
         IntegrationsService,
         IntegrationCheckService,
@@ -47,6 +51,7 @@ export class IntegrationsModule {
         IntegrationRuntime,
         MANAGED_EMAIL_SOURCE,
         PaymentProviders,
+        ShippingProviders,
         IntegrationsRepository,
         InstalledIntegrations,
         SecretCipher,

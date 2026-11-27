@@ -75,6 +75,7 @@ export type CreateAppEnv = Pick<AppEnv, "databaseUrl" | "enabledFeatures" | "fea
       | "emailProvider"
       | "emailProviderDelegated"
       | "paymentDelegated"
+      | "shippingDelegated"
       | "emailFallbackProviders"
       | "emailUsageLimits"
       | "emailFrom"
@@ -186,6 +187,7 @@ function integrationsConfigOf(env: CreateAppEnv, options: CreateAppOptions): Int
     emailRouteDelegated: env.emailProviderDelegated ?? false,
     emailFromAddress: env.emailFrom?.address ?? null,
     paymentDelegated: env.paymentDelegated ?? false,
+    shippingDelegated: env.shippingDelegated ?? false,
     orderPaymentTtlMinutes: env.orderPaymentTtlMinutes ?? DEFAULT_ORDERS_CONFIG.paymentTtlMinutes,
     shopCurrency: env.shopCurrency ?? DEFAULT_PRICING_CONFIG.shopCurrency,
     storefrontPublicUrl: env.storefrontPublicUrl ?? null,
@@ -226,6 +228,7 @@ export async function createApp(
       shippingProviders: [...shippingProviders, ...(options.extraShippingProviders ?? [])],
       paymentProviders: [...paymentProviders, ...(options.extraPaymentProviders ?? [])],
       paymentDelegated: env.paymentDelegated ?? false,
+      shippingDelegated: env.shippingDelegated ?? false,
       payments: {
         storefrontPublicUrl: env.storefrontPublicUrl ?? null,
         providerTimeoutMs:

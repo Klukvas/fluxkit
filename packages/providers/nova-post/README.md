@@ -2,7 +2,7 @@
 
 Purpose: the Nova Post shipping provider (code `nova_post`) on the new Nova Post REST API `v.1.0` (JWT), ADR 0030. It implements `ShippingProviderPort` for Ukraine: city and branch/parcel-locker lookups for the storefront picker, an informational estimate, waybill creation, find-back after a lost answer (`reconcile`), cancellation, tracking by polling and the marking label. Plan: `docs/plans/2026-10-25-nova-post-plugin.md` (every carrier fact used is cited there: spike 7a on production and its rerun, the official documentation).
 
-- Flag: `SHIPPING_PROVIDERS_ENABLED=nova_post` (comma-separated list of provider codes).
+- Env selection: `SHIPPING_PROVIDERS_ENABLED=nova_post`. Presence (including blank = off) selects the unchanged env Nest module. Absence delegates to explicitly activated encrypted admin credentials.
 - Manifest: `"fluxkit": { "provider": "nova_post", "kind": "shipping" }` in `package.json`.
 - Entry: `src/index.ts` exports `providerModule`, loaded dynamically by `apps/api` only when the code is enabled.
 - Dependencies: `@fluxkit/core`, `zod` 4.6.7 (the version the workspace pins); Node 22 `fetch`. No HTTP library.
@@ -45,3 +45,12 @@ Timeouts: the API's signal plus a per-request ceiling from `SHIPPING_PROVIDER_TI
 `pnpm --filter @fluxkit/provider-nova-post test`: a local stub carrier on `127.0.0.1` (`src/test-support/stub-carrier.ts`, invented data only) and a no-network guard (`src/test-support/no-network.ts`) that fails a spec file on any request to another host. The stub refuses what production refused (a create body without a required field or with a one-word contact name, a print without `type=marking`, settlements without upper-case `countryCodes[]`; `src/stub-carrier.spec.ts`), and a spec that does not import the guard checks it is wired for every file (`src/no-network-wired.spec.ts`). Specs cover the verified request shapes, the JWT cache, error and size mapping, `findWaybill` paging, the status table, secrets in logs, the module's startup refusal and the core provider contract check.
 
 How to remove: delete `packages/providers/nova-post`, remove `nova_post` from `SHIPPING_PROVIDERS_ENABLED` and the two variables from the environment. Nothing in core or `apps/api` references it (CI: `scripts/feature-matrix.sh providers-deleted`). Orders and shipments already made keep their snapshot; their shipment actions answer `409 provider_not_enabled`.
+
+## Managed credentials (PR 3)
+
+- Manifest environments: `sandbox`, `production`, default `sandbox`, env lock `NOVA_POST_ENVIRONMENT`. Keys are issued per environment; Ukrainian sandbox key availability remains unverified. Environment changes require saving a new immutable version; a JWT never crosses versions/environments.
+- Entry exports `createOutboundClient(secrets, context)` and `checkCredentials(secrets, context, signal)`. The factory reads only `secrets.api_key` and `context.environment`; it does no I/O and reads no process env. The existing env Nest module is unchanged.
+- Each client's `NovaPostHttp` owns its JWT cache/single-flight. Every actual request passes `context.transport.start`, including fresh JWT exchange, retries and each directory/list page; the gate thunk starts fetch synchronously. Refusal makes no fetch and returns code-only failure. Authorization URLs/query values, JWTs and carrier text are never logged.
+- Check reuses `checkConnection`: fresh JWT, then one division read; no waybill is created. Tracking remains polling; no webhook setup is needed.
+- Activation/rotation selects keys only for new work. Bound shipments keep their old active/draining key for reconcile, tracking, cancellation and labels after disable; revoke stops later calls. Directory caches belong to the exact version/environment. A sender profile and shipping methods are still required, with no profile relocation.
+- Managed contract tests run against the HTTP stub; denial tests assert zero fetch, including authorization. This does not establish live sandbox/account behavior. See [deployment cutover](../../../docs/deployment.md#switching-shipping-from-env-keys-to-admin-keys).

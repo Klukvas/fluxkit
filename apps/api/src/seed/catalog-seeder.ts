@@ -202,6 +202,7 @@ export class CatalogSeeder {
     private readonly inventory: InventoryService,
     private readonly pricing: PricingConfig,
     private readonly shippingMethods: ShippingMethodsService,
+    // Deliberately the env-only boot registry; seeding must never activate managed credentials.
     private readonly shippingProviders: ShippingProviderRegistry,
     private readonly banners: BannersService,
     /** `null` with search off: the demo synonym groups are then not written at all. */

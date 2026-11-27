@@ -30,7 +30,7 @@ import { PRICING_CONFIG, type PricingConfig } from "../common/pricing-config.js"
 import type { DbExecutor } from "../common/transaction.js";
 import { ProblemException, type FieldError } from "../common/problem.js";
 import { z } from "zod";
-import { ShippingProviderRegistry } from "../shipping/registry/index.js";
+import { ShippingProviders } from "../shipping/registry/index.js";
 import { CartRepository } from "./cart.repository.js";
 import type { CartResponse } from "./cart.schemas.js";
 
@@ -118,7 +118,7 @@ export class CartPricingService {
     @Inject(StoreRepository) private readonly store: StoreRepository,
     @Inject(PRICING_CONFIG) private readonly pricing: PricingConfig,
     @Inject(CartRepository) private readonly carts: CartRepository,
-    @Inject(ShippingProviderRegistry) private readonly providers: ShippingProviderRegistry,
+    @Inject(ShippingProviders) private readonly providers: ShippingProviders,
   ) {}
 
   emptyCart(): CartResponse {
@@ -222,6 +222,9 @@ export class CartPricingService {
       };
     });
     const result = priceCart(this.pricing.shopCurrency, inputs);
+    const shippingProviders = new Set(
+      (await this.providers.available(executor)).map((port) => port.code),
+    );
     const shippingMethods: readonly FreeShippingMethod[] =
       present.length > 0
         ? (await this.carts.listActiveShippingMethods(executor)).map((row) => ({
@@ -229,8 +232,7 @@ export class CartPricingService {
             isActive: row.isActive,
             currency: row.currency,
             pricing: row.pricing,
-            providerEnabled:
-              row.providerCode === null || this.providers.get(row.providerCode) !== undefined,
+            providerEnabled: row.providerCode === null || shippingProviders.has(row.providerCode),
           }))
         : [];
     const labelsByVariant = new Map<string, VariantOptionLabelRow[]>();

@@ -8,7 +8,7 @@ import {
 } from "@fluxkit/core";
 import { translatePostgresError } from "../../common/postgres-errors.js";
 import { notFound, validationFailed } from "../../common/problem.js";
-import { ShippingProviderRegistry } from "../registry/shipping-provider-registry.js";
+import { ShippingProviders } from "../registry/shipping-providers.js";
 import { callProvider, describeOutcome } from "../shipments/provider-call.js";
 import { providerSettingsErrors } from "./provider-settings.js";
 import {
@@ -25,13 +25,15 @@ export class ShippingProvidersService {
   private readonly logger = new Logger("ShippingProviders");
 
   constructor(
-    @Inject(ShippingProviderRegistry) private readonly providers: ShippingProviderRegistry,
+    @Inject(ShippingProviders)
+    private readonly providers:
+      Pick<ShippingProviders, "get"> | { get(code: string): ShippingProviderPort | undefined },
     @Inject(ShippingProviderSettingsRepository)
     private readonly settings: ShippingProviderSettingsRepository,
   ) {}
 
   async getSettings(code: string): Promise<ProviderSettingsResponse> {
-    this.provider(code);
+    await this.provider(code);
     return toResponse(code, await this.settings.find(code));
   }
 
@@ -40,7 +42,7 @@ export class ShippingProvidersService {
     settings: Record<string, unknown>,
     adminUserId: string,
   ): Promise<ProviderSettingsResponse> {
-    const provider = this.provider(code);
+    const provider = await this.provider(code);
     // The bounded check every provider gets first, then the provider's own rules (plan step 7b).
     const generic = providerSettingsErrors(settings);
     const errors = (generic.length > 0 ? generic : this.providerIssues(provider, settings)).map(
@@ -67,7 +69,7 @@ export class ShippingProvidersService {
    * outcome kind and the error's class name only.
    */
   async check(code: string): Promise<ProviderCheckResponse> {
-    const provider = this.provider(code);
+    const provider = await this.provider(code);
     const outcome = await callProvider(SHIPPING_PROVIDER_TIMEOUTS_MS.lookup, (signal) =>
       provider.checkConnection(signal),
     );
@@ -114,9 +116,9 @@ export class ShippingProvidersService {
   }
 
   /** A provider the shop runs, or 404. A code that is not even a code is the controller's 400. */
-  private provider(code: string): ShippingProviderPort {
+  private async provider(code: string): Promise<ShippingProviderPort> {
     const provider = SHIPPING_PROVIDER_CODE_PATTERN.test(code)
-      ? this.providers.get(code)
+      ? await this.providers.get(code)
       : undefined;
     if (provider === undefined) {
       throw notFound("Shipping provider");

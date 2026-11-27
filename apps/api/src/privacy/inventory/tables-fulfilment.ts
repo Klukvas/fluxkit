@@ -16,7 +16,7 @@ const actorSetNull = classified("staff", "D20", "excluded", "set_null", ACTOR);
 export const fulfilmentTables: Inventory = {
   shipment: {
     ...none("D13", "next_track_at", "tracking_attempts"),
-    ...many(keptInternal, "id", "order_id", "provider_ref"),
+    ...many(keptInternal, "id", "order_id", "provider_ref", "integration_credential_version_id"),
     ...many(
       kept,
       "provider_code",

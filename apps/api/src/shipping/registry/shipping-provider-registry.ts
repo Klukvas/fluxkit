@@ -31,7 +31,7 @@ export interface ShippingProviderSource {
   list(): readonly ShippingProviderPort[];
 }
 
-function implementsPort(value: unknown): value is ShippingProviderPort {
+export function implementsPort(value: unknown): value is ShippingProviderPort {
   if (typeof value !== "object" || value === null) {
     return false;
   }

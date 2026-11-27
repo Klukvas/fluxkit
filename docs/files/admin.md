@@ -263,3 +263,5 @@ Run, headers and conventions: `apps/admin/README.md`. Plan: `docs/plans/2026-10-
 
 - `src/layout/config-refresh.ts`, `src/areas/catalog-dictionaries/config-gate.tsx` — invalidate and reload admin config hints after integration activation/disable; API admission remains authoritative.
 - `src/areas/integrations/`, `src/areas/help/content/settings.ts` — payment lifecycle actions, code-only uk/en refusals, permanent Monobank merchant enrollment and paired LiqPay setup guidance; shipping activation remains refused.
+
+- Integrations shipping controls mirror payment activation/replacement/disable/revoke and existing config refresh; uk/en Nova Post help explains environments, check without waybill and continued polling.

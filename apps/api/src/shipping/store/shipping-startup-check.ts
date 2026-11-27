@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger, type OnApplicationBootstrap } from "@nestjs/common";
 import { summarizeError } from "../../common/error-summary.js";
 import { PRICING_CONFIG, type PricingConfig } from "../../common/pricing-config.js";
-import { ShippingProviderRegistry } from "../registry/index.js";
+import { ShippingProviders } from "../registry/index.js";
 import { SHIPPING_STORE_LIMITS } from "./shipping-store-limits.js";
 import { ShippingStoreRepository } from "./shipping-store.repository.js";
 
@@ -20,7 +20,7 @@ export class ShippingStartupCheck implements OnApplicationBootstrap {
 
   constructor(
     @Inject(ShippingStoreRepository) private readonly repository: ShippingStoreRepository,
-    @Inject(ShippingProviderRegistry) private readonly registry: ShippingProviderRegistry,
+    @Inject(ShippingProviders) private readonly registry: ShippingProviders,
     @Inject(PRICING_CONFIG) private readonly pricing: PricingConfig,
   ) {}
 
@@ -36,8 +36,9 @@ export class ShippingStartupCheck implements OnApplicationBootstrap {
   async run(): Promise<string[]> {
     const rows = await this.repository.listActive(SHIPPING_STORE_LIMITS.maxMethods);
     const warnings: string[] = [];
+    const providers = new Set((await this.registry.available()).map((port) => port.code));
     const unloaded = rows.filter(
-      (row) => row.providerCode !== null && this.registry.get(row.providerCode) === undefined,
+      (row) => row.providerCode !== null && !providers.has(row.providerCode),
     );
     if (unloaded.length > 0) {
       warnings.push(

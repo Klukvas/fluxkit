@@ -121,6 +121,8 @@ export async function ensureMigrated(
       "order_shipping_immutable",
       "shipment_status_change_append_only",
       "integration_outbound_version_same_row",
+      "shipment_credential_binding_guard",
+      "integration_managed_shipping_identity_guard",
     ]) {
       await client.query(`drop function if exists "public".${client.escapeIdentifier(name)}()`);
     }

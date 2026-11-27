@@ -74,6 +74,7 @@ export interface AppModuleOptions {
   /** The enabled payment provider packages (`PAYMENT_PROVIDERS_ENABLED`); defaults to none (no online payment). */
   paymentProviders?: LoadedPaymentProvider[];
   paymentDelegated?: boolean;
+  shippingDelegated?: boolean;
   /** `STOREFRONT_PUBLIC_URL` for the payment URLs and the provider call timeout; defaults to none (no online payment URLs). */
   payments?: PaymentsConfig;
   /** The loaded email provider package (`EMAIL_PROVIDER`): zero or one; defaults to none (`EMAIL_PROVIDER=none`). */
@@ -185,6 +186,8 @@ export class AppModule {
         EmailAdminModule,
         IntegrationsModule.register({
           ...(options.integrations ?? DISABLED_INTEGRATIONS_CONFIG),
+          shippingDelegated:
+            options.shippingDelegated ?? options.integrations?.shippingDelegated ?? false,
           paymentDelegated:
             options.paymentDelegated ?? options.integrations?.paymentDelegated ?? false,
         }),

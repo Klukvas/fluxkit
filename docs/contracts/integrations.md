@@ -10,7 +10,7 @@ Additive extension of the provider package contracts in [config](config.md), [AD
 | `fluxkit.secrets` | Optional array of at most eight `{field, purpose, env}` entries. `field` matches `[a-z][a-z0-9_]{0,31}`; `purpose` is `outbound` or `webhook`; env names match `[A-Z][A-Z0-9_]{0,63}` and start with this provider's uppercase code plus `_`. Field and env names are unique. Several fields may share a purpose: all are required for a complete bundle. Absent/empty secrets means no credential integration. |
 | `fluxkit.environments` | Optional `{values: string[], default: string, env: string}`. One to eight distinct values, each matching the field-code bound; `default` belongs to `values`; `env` obeys the variable/prefix rule above. Absent means a fixed `default` environment without a selector. API metadata renames `env` to `envVariable`. |
 
-Listing a package or exporting a factory never enables it. PR 2 enables managed payments with immutable resource bindings; shipping activation remains unavailable. Existing env registries and configured-provider startup failures remain unchanged; no runtime marker or provider-name allowlist grants managed activation.
+Listing a package or exporting a factory never enables it. PRs 2–3 enable managed payments and shipping with immutable resource bindings. Existing env registries and configured-provider startup failures remain unchanged; no runtime marker or provider-name allowlist grants managed activation.
 
 ## Entry exports
 
@@ -18,7 +18,7 @@ Type signatures below describe the extension point; construction is synchronous 
 
 | Export / type | Contract |
 |---|---|
-| `CreateOutboundClient<K>` / `createOutboundClient(secrets, context)` | Produces the existing port for the kind (`EmailProviderPort`, `PaymentProviderPort` or `ShippingProviderPort`). Email and payment ports are validated at activation; shipping activation remains refused. Email validation checks the returned code, required methods and capabilities. Existing one-argument email factories remain compatible. |
+| `CreateOutboundClient<K>` / `createOutboundClient(secrets, context)` | Produces the existing port for the kind (`EmailProviderPort`, `PaymentProviderPort` or `ShippingProviderPort`). All kind-appropriate ports are validated at activation; shipping reuses the boot registry validator. Email validation checks the returned code, required methods and capabilities. Existing one-argument email factories remain compatible. |
 | `CheckCredentials` / `checkCredentials(secrets, context, signal)` | Optional async `CredentialCheckOutcome`: `{code, retryAfterSeconds?}`. `CredentialCheckCode` is `ok`, `invalid_credentials`, `unavailable`, `rate_limited`, `not_supported`; retry is an integer 0–86400. Missing hook means `not_supported`, never a fabricated success. |
 | `AccountIdentity` / `accountIdentity(secrets, context, signal)` | Optional async `AccountIdentityResult`: `{ok: true, identity: string}` or `{ok: false, code, retryAfterSeconds?}` with a check failure code. Identity is a canonical opaque UTF-8 value of 1–256 bytes, server-only. PR 2 enrolls a permanent encrypted baseline on each outbound save for packages exporting this hook. |
 | `LocateWebhook` / `locateWebhook(input)` | Optional pure synchronous `PaymentWebhookInput` → `WebhookLocation` or null. Location has `reference?` and/or `providerPaymentId?`, at least one bounded validated identifier. It is a lookup hint, never signature verification or a payment fact. Managed payment adapters with webhooks require it in PR 2. |
@@ -33,7 +33,7 @@ Provider code must use no environment reads in managed factories. Optional hooks
 - The API checks authority under integration then credential-version `FOR SHARE` locks, invokes the thunk there, commits/releases the locks, and only then awaits `completion`. Every retry, page, JWT acquisition and public-key refresh needs its own gate. A cached client grants no authority.
 - A denial throws `CredentialAdmissionDenied`, an Error-shaped interface with `name: CredentialAdmissionDenied` and code `credential_revoked` or `credential_unavailable`; provider adapters preserve that code-only boundary. No HTTP status/body, request headers, credential or underlying cause crosses it.
 - Revoked is terminal. A revoke committed before transport admission prevents the thunk; an already-started request may finish. A transport started before a failed admission-transaction commit is ambiguous and must never be treated as definitely unsent.
-- Explicit saved-version checks and managed payment adapters use this authority; shipping runtime remains later work.
+- Explicit saved-version checks and managed payment/shipping adapters use this authority.
 
 ## Bundle identity and API
 
@@ -52,3 +52,9 @@ A package with `accountIdentity` enrolls a permanent `(kind, provider, environme
 ## Shopper payment availability (PR 2)
 
 - Persisted order/payment views remain readable when new managed admissions fail. Store order `payment` and guest/customer payment status responses add optional `unavailableReason: "payment_not_available"`; it accompanies `canPay: false` / `canRetry: false`. It describes new-work availability, not the persisted payment outcome. Admission remains fail-closed.
+
+## Shipping bindings (PR 3)
+
+The async shipping source exposes active `{code, versionId, environment, port}` snapshots, `forShipment(row, executor?)` and `admit(tx, code)`. Callers propagate their executor; advisory reads on a caller transaction use a savepoint before fallback. New waybills bind before transport. Migration 0024 guards the nullable FK, matching outbound/shipping/provider identity and immutable non-null bindings; down refuses any binding. Null-bound shipments are served only by the explicit env registry, never a DB key.
+
+Nova Post exports `createOutboundClient` and `checkCredentials`. Its per-version HTTP client owns its environment and JWT single-flight. Every actual fetch, including authorization, is gated. Checks use a fresh JWT and one division read without a waybill. Directory caches include version/environment; tracking batches split by version and back off unavailable groups independently. Disable retains bound service; revoke stops each subsequent start. Profile settings stay outside credentials with their existing permission and a non-terminal-work edit lock.

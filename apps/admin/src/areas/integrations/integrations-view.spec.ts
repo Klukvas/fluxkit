@@ -166,7 +166,7 @@ describe("secretView", () => {
 });
 
 describe("providerRuntime", () => {
-  it("offers turn on for email and payment complete candidates; shipping stays unavailable", () => {
+  it("offers turn on for complete email, payment and shipping candidates", () => {
     const email = integration({
       secrets: [secret({ state: "set", ...stored })],
     });
@@ -181,7 +181,7 @@ describe("providerRuntime", () => {
       turnOff: false,
     });
     expect(providerRuntime({ ...email, kind: "shipping" }, "ready")).toEqual({
-      turnOn: false,
+      turnOn: true,
       turnOff: false,
     });
     expect(providerRuntime({ ...email, enabled: true, kind: "payment" }, "ready")).toEqual({

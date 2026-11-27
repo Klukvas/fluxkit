@@ -16,6 +16,7 @@ export interface IntegrationsConfig {
   /** The effective `EMAIL_FROM` address. Email cannot be activated without one. */
   readonly emailFromAddress: string | null;
   readonly paymentDelegated: boolean;
+  readonly shippingDelegated: boolean;
   readonly shopCurrency: string;
   readonly orderPaymentTtlMinutes: number;
   readonly storefrontPublicUrl: string | null;
@@ -30,6 +31,7 @@ export const DISABLED_INTEGRATIONS_CONFIG: IntegrationsConfig = Object.freeze({
   emailRouteDelegated: false,
   emailFromAddress: null,
   paymentDelegated: false,
+  shippingDelegated: false,
   shopCurrency: "UAH",
   orderPaymentTtlMinutes: 30,
   storefrontPublicUrl: null,
