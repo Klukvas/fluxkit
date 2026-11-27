@@ -3,9 +3,11 @@
 Read this first (Claude Code, Codex or a human). Rules live in `AGENTS.md`; decisions in `docs/adr/` (0001 to 0060, index in `docs/adr/README.md`); plans in `docs/plans/`.
 The long per-step history that used to live here is archived verbatim in `docs/HISTORY.md` (not current). Update this file in every PR that changes project state; keep it short and keep "Last updated" to one line.
 
-Last updated: 2026-11-27, integrations slice 2 part 1 (PR 368): shared provider contract, multi-field keys, checks, owner alerts.
+Last updated: 2026-11-27, integrations slice 2 part 2: admin-managed Monobank and LiqPay keys.
 
 ## 1. Current state
+
+- **Admin integrations slice 2, part 2 (2026-11-27):** with `PAYMENT_PROVIDERS_ENABLED` absent, Monobank and LiqPay run from keys activated in Settings → Integrations. A new payment binds the active credential version before the first provider call; reads, refunds, reconcile, LiqPay handoff and webhooks use the bound version through the final revocation gate; disable stops new payments only, revoke stops every later call. Monobank: the first saved key locks the shop to its merchant (`GET /api/merchant/details`), a key of another merchant is refused. Activation is refused while env-bound payments of that provider are still open (`integration_legacy_work_open`; switch procedure in `docs/deployment.md`). Keep `SECRETS_ENCRYPTION_KEY_PREVIOUS` installed until the slice 3 rewrap command exists. Migration 0023. Env mode unchanged. Not verified live (stub-tested only).
 
 - **Admin integrations slice 2, part 1 (2026-11-27, PR 368):** design [plan](plans/2026-11-27-integrations-slice2-payments-shipping.md) (section 0 = decisions), [ADR 0060](adr/0060-managed-provider-runtime-contract.md). Provider-package contract for admin-managed keys (`createOutboundClient`, `checkCredentials`, `accountIdentity`, `locateWebhook`, final transport gate); a key may have several fields (LiqPay is listed again); per-version environment with `fluxkit.environments`; `POST /admin/integrations/{id}/check` (strict fail-closed limits, audited before and after); `versions` metadata; best-effort owner alert mails. Migration 0022. Payment and shipping activation still refused: parts 2 (payments, migration 0023) and 3 (shipping, 0024) follow, then slice 3 (rewrap, cleanup, retention counts).
 

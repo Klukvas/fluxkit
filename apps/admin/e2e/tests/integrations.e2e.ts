@@ -138,7 +138,7 @@ test("the owner stores, replaces nothing by accident and removes a provider key;
   await expect(main.getByRole("heading", { level: 1, name: "Integrations" })).toBeVisible();
   await expect(main.getByText(INACTIVE_NOTICE, { exact: true })).toBeVisible();
   await expect(
-    main.getByText(/Payment and delivery keys can be saved and explicitly checked now/),
+    main.getByText(/Delivery keys can be saved and checked; delivery activation arrives later/),
   ).toBeVisible();
   await expect(main.getByText("Keys cannot be saved on this server")).toHaveCount(0);
 
