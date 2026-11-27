@@ -112,10 +112,17 @@ describe("managed Monobank", () => {
     expect(await first.verifyWebhook(oldWebhook, live())).toMatchObject({ ok: true });
     stub.rotateKey();
     const second = managed.createOutboundClient(secrets, { ...base, versionId: "second-version" });
-    expect(
-      await second.verifyWebhook(stub.webhookFor(made.value.providerPaymentId), live()),
-    ).toMatchObject({ ok: true });
+    const newWebhook = stub.webhookFor(made.value.providerPaymentId);
+    expect(await second.verifyWebhook(newWebhook, live())).toMatchObject({ ok: true });
     expect(await first.verifyWebhook(oldWebhook, live())).toMatchObject({ ok: true });
+    expect(await first.verifyWebhook(newWebhook, live())).toMatchObject({
+      ok: false,
+      reason: "invalid_signature",
+    });
+    expect(await second.verifyWebhook(oldWebhook, live())).toMatchObject({
+      ok: false,
+      reason: "invalid_signature",
+    });
     expect(stub.requests.filter(({ path }) => path === "/api/merchant/pubkey")).toHaveLength(2);
     revoked = true;
     const requests = stub.requests.length;
