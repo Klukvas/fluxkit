@@ -39,13 +39,24 @@ release_digest() {
   done | sha256sum | cut -d ' ' -f 1
 }
 
+# A failed diagnostic write (a full log disk) must never stop a rollback under `set -e`.
 log() {
-  printf 'fluxkit deploy: %s\n' "$*" >&2
+  printf 'fluxkit deploy: %s\n' "$*" >&2 || true
   if [ -n "${summary_file:-}" ]; then
-    printf 'fluxkit deploy: %s\n' "$*" >> "$summary_file"
+    printf 'fluxkit deploy: %s\n' "$*" >> "$summary_file" || true
   fi
 }
 fail() { log "$@"; exit 1; }
+
+# A dropped upload can end at a member boundary, which tar accepts: require the end-of-archive marker (two zero blocks at
+# the end of a whole number of blocks), so a truncated release is never unpacked and kept as releases/<tag>.
+check_archive_complete() {
+  local size
+  size=$(wc -c < "$1" | tr -d ' ')
+  [ "$size" -ge 1024 ] && [ $((size % 512)) -eq 0 ] &&
+    [ -z "$(tail -c 1024 "$1" | tr -d '\000')" ] &&
+    tar -tf "$1" >/dev/null 2>&1
+}
 
 check_backup_command() {
   # The check and the call must name the same file: a relative name would be checked here and looked up in PATH later.
@@ -310,6 +321,9 @@ if [ "${1:-}" = --worker ] && [ -z "${SSH_ORIGINAL_COMMAND+x}" ]; then
   exit 0
 fi
 
+case "${SSH_ORIGINAL_COMMAND-}" in
+  *$'\n'* | *$'\r'*) fail "usage: deploy <commit sha, 7 to 40 lowercase hex characters>" ;;
+esac
 read -r action tag extra <<< "${SSH_ORIGINAL_COMMAND:-$*}" || true
 if [ "${action:-}" != deploy ] || ! [[ "${tag:-}" =~ ^[0-9a-f]{7,40}$ ]] || [ -n "${extra:-}" ]; then
   fail "usage: deploy <commit sha, 7 to 40 lowercase hex characters>"
@@ -320,18 +334,20 @@ if [ -L "$LOG_DIR" ] || ! (umask 077; mkdir -p -- "$LOG_DIR") ||
   [ ! -O "$LOG_DIR" ] || ! chmod -- 700 "$LOG_DIR"; then
   fail "cannot secure the deploy log directory $LOG_DIR"
 fi
+# Lock before reading the upload: a second upload that finishes after the running deployment must still be refused.
+exec 9> "$LOCK_FILE"
+flock -n 9 || fail "another deployment is running"
 archive=$(umask 077; mktemp "$LOG_DIR/.upload-XXXXXX")
 trap 'rm -f -- "$archive"' EXIT
 trap 'exit 129' HUP
 trap 'exit 143' TERM
 cat > "$archive"
+check_archive_complete "$archive" || fail "the release archive is incomplete (upload interrupted?); nothing was changed"
 # An open descriptor passes the completed upload to the worker without leaving a named tar behind.
 exec 8< "$archive"
 rm -f -- "$archive"
 trap - EXIT HUP TERM
 
-exec 9> "$LOCK_FILE"
-flock -n 9 || fail "another deployment is running"
 deploy_log=$(umask 077; mktemp "$LOG_DIR/fluxkit-deploy-$(date -u +%Y%m%dT%H%M%S%NZ)-$tag-XXXXXX.log")
 (umask 077; : > "$deploy_log.summary")
 # Ignore hangups through the handoff. The worker inherits the already-held lock and no SSH streams.

@@ -611,6 +611,8 @@ REQUEST_PID=
 if grep -qv '^fluxkit deploy: ' "$WORK/broken-deploy.out"; then fail "the client received detailed deployment output"; fi
 BROKEN_LOG=$(sed -n 's/^fluxkit deploy: detailed log: //p' "$WORK/broken-deploy.out")
 [[ "$BROKEN_LOG" == "$HOST_ROOT/logs/"*.log && -f "$BROKEN_LOG" ]] || fail "the client did not name the detailed log"
+[[ "$(stat -c %a "$HOST_ROOT/logs") $(stat -c %a "$BROKEN_LOG") $(stat -c %a "$BROKEN_LOG.summary")" == "700 600 600" ]] ||
+  fail "the deploy log directory or files are not private"
 grep -Eq '^(api|migrate)-[0-9]+[[:space:]]*\|' "$BROKEN_LOG" || fail "container output is missing from the detailed log"
 cat "$WORK/broken-deploy.out"
 assert_roll_traffic "failed release" false

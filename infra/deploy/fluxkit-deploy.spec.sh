@@ -75,6 +75,22 @@ echo 'ok   log retention keeps 20 deploy logs and leaves unrelated files alone'
 )
 echo 'ok   deploy requires an executable backup command unless the opt-out is exactly 1'
 
+(
+  fixture=$(mktemp -d)
+  trap 'rm -rf "$fixture"' EXIT
+  mkdir -p "$fixture/infra"
+  head -c 3000 /dev/urandom > "$fixture/infra/docker-compose.prod.yml"
+  printf 'b\n' > "$fixture/infra/second"
+  tar -cf "$fixture/whole.tar" -C "$fixture" infra
+  check_archive_complete "$fixture/whole.tar" || fail 'a complete archive was refused'
+  # Cut after the first member (header + 3000 bytes padded to 3072): a boundary tar itself accepts.
+  head -c 3584 "$fixture/whole.tar" > "$fixture/cut.tar"
+  if check_archive_complete "$fixture/cut.tar"; then fail 'an archive cut at a member boundary was accepted'; fi
+  head -c 100 "$fixture/whole.tar" > "$fixture/short.tar"
+  if check_archive_complete "$fixture/short.tar"; then fail 'a short archive was accepted'; fi
+)
+echo 'ok   an upload cut before the end-of-archive marker is refused'
+
 # shellcheck disable=SC2329 # The evaluated real Compose helper calls these Docker/timeout boundaries indirectly.
 (
   fixture=$(mktemp -d)
