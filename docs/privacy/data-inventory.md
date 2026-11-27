@@ -73,7 +73,7 @@ Purposes and legal bases are proposals taken from the plan. TODO(fluxkit): legal
 | `integration_merchant_baseline` | `key_id`, `nonce`, `ciphertext`, `tag` | encrypted secret (E) | D26 | excluded | out_of_scope | Permanent encrypted merchant identity of the shop; never exported or erased by shopper requests, and retained across provider lifecycle changes. |
 | `integration_revision` | all 3 columns | none | D26 | not_applicable | not_applicable | |
 | `integration_secret` | `id`, `version_id`, `field`, `created_at` | none | D26 | not_applicable | not_applicable |  |
-| `integration_secret` | `key_id`, `nonce`, `ciphertext`, `tag` | encrypted secret (E) | D26 | excluded | out_of_scope | An encrypted credential of the shop's own provider account (ADR 0058): no shopper's data, never exported or returned by any API, removed only when the owner retires it. |
+| `integration_secret` | `key_id`, `nonce`, `ciphertext`, `tag` | encrypted secret (E) | D26 | excluded | out_of_scope | An encrypted credential of the shop's own provider account (ADR 0058): no shopper's data, never exported or returned by any API, removed when an unused candidate is retired by the owner or the bounded 90-day cleanup. Master-key rewrap changes only the encryption envelope. |
 | `inventory_level` | all 6 columns | none | D24 | not_applicable | not_applicable | |
 | `location` | all 6 columns | none | D24 | not_applicable | not_applicable | |
 | `media` | all 9 columns | none | D24 | not_applicable | not_applicable | |
@@ -182,4 +182,4 @@ Purposes and legal bases are proposals taken from the plan. TODO(fluxkit): legal
 | D23 | Catalog images | Job 7 removes abandoned uploads |
 | D24 | No personal data (catalog, pricing, inventory, shipping methods, search, health) | Not applicable |
 | D25 | Accountability (L, LI) | Requests 1095 days after completion, audit events 365 days; only when `ORDER_CONTACT_RETENTION_DAYS` is set (job 12) |
-| D26 | Provider credentials of the shop (C, LI) | Credential envelopes until eligible retirement; version rows and permanent encrypted merchant baselines stay (ADR 0058, ADR 0060) |
+| D26 | Provider credentials of the shop (C, LI) | Credential envelopes until eligible candidate retirement (unused candidates strictly older than 90 days: bounded system cleanup); version tombstones and permanent encrypted merchant baselines stay. Rewrap preserves identities; dependency counts expose no shopper data (ADR 0058, ADR 0060) |

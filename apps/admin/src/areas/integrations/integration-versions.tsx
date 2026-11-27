@@ -128,6 +128,7 @@ function VersionRow({
       <p className="text-sm text-muted-foreground">
         {t("intg.secret.savedAt", { date: formatDateTime(version.createdAt, uiLocale) })}
       </p>
+      <VersionDependents t={t} uiLocale={uiLocale} version={version} />
       <ul className="flex flex-col gap-1">
         {[
           ...new Set([
@@ -206,27 +207,66 @@ export function IntegrationVersions({
   onReload: () => void;
 }) {
   return (
-    <ul aria-label={t("intg.version.list")} className="flex flex-col gap-3">
-      {integration.versions.map((version) => {
-        const declared = integration.secrets.filter((secret) => secret.purpose === version.purpose);
-        const complete =
-          declared.length > 0 && declared.every((secret) => version.fields.includes(secret.field));
-        return (
-          <VersionRow
-            key={version.id}
-            t={t}
-            uiLocale={uiLocale}
-            integration={integration}
-            version={version}
-            revision={revision}
-            canManage={canManage}
-            busy={busy}
-            canCheck={storageReady && complete && version.state !== "revoked"}
-            onRevoke={() => onRevoke(version)}
-            onReload={onReload}
-          />
-        );
-      })}
-    </ul>
+    <div className="flex flex-col gap-3">
+      <p className="text-sm text-muted-foreground">{t("intg.dependents.retention")}</p>
+      <ul aria-label={t("intg.version.list")} className="flex flex-col gap-3">
+        {integration.versions.map((version) => {
+          const declared = integration.secrets.filter(
+            (secret) => secret.purpose === version.purpose,
+          );
+          const complete =
+            declared.length > 0 &&
+            declared.every((secret) => version.fields.includes(secret.field));
+          return (
+            <VersionRow
+              key={version.id}
+              t={t}
+              uiLocale={uiLocale}
+              integration={integration}
+              version={version}
+              revision={revision}
+              canManage={canManage}
+              busy={busy}
+              canCheck={storageReady && complete && version.state !== "revoked"}
+              onRevoke={() => onRevoke(version)}
+              onReload={onReload}
+            />
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+/** Aggregate operational metadata only; no customer details or disposal action. */
+function VersionDependents({
+  t,
+  uiLocale,
+  version,
+}: {
+  t: Translator;
+  uiLocale: string;
+  version: AdminIntegrationVersion;
+}) {
+  const counts = version.dependents;
+  if ("emails" in counts)
+    return (
+      <p className="text-sm tabular-nums text-muted-foreground">
+        {t("intg.dependents.emails", counts.emails)}
+      </p>
+    );
+  const resource = "payments" in counts ? counts.payments : counts.shipments;
+  const kind = "payments" in counts ? "payments" : "shipments";
+  return (
+    <div className="text-sm tabular-nums text-muted-foreground">
+      <p>{t(`intg.dependents.${kind}`, { open: resource.open, total: resource.total })}</p>
+      <p>
+        {resource.oldestOpenAt === null
+          ? t("intg.dependents.noneOpen")
+          : t("intg.dependents.oldestOpen", {
+              date: formatDateTime(resource.oldestOpenAt, uiLocale),
+            })}
+      </p>
+    </div>
   );
 }

@@ -33,7 +33,8 @@
     "check:docs": "node scripts/check-docs.mjs --base origin/main",
     "notices": "node scripts/third-party-notices.mjs",
     "feature-matrix": "bash scripts/feature-matrix.sh",
-    "audit:prod": "pnpm audit --prod --audit-level=high"
+    "audit:prod": "pnpm audit --prod --audit-level=high",
+    "integrations:rewrap": "pnpm build && pnpm --filter @fluxkit/api integrations:rewrap"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

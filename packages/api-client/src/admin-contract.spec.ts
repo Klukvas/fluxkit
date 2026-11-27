@@ -871,6 +871,33 @@ const integration: Shape<Admin.AdminIntegration> = {
           environment: "string",
           createdAt: "string",
           fields: { array: "string" },
+          dependents: {
+            oneOf: [
+              {
+                object: {
+                  payments: {
+                    object: {
+                      open: "integer",
+                      total: "integer",
+                      oldestOpenAt: { nullable: "string" },
+                    },
+                  },
+                },
+              },
+              {
+                object: {
+                  shipments: {
+                    object: {
+                      open: "integer",
+                      total: "integer",
+                      oldestOpenAt: { nullable: "string" },
+                    },
+                  },
+                },
+              },
+              { object: { emails: { object: { pending: "integer", total: "integer" } } } },
+            ],
+          },
         },
       },
     },

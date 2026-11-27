@@ -77,7 +77,7 @@ describe("JobsRunner (real Postgres, injected time)", () => {
     await pool.end();
   });
 
-  it("runs the fourteen jobs in the documented order and reports each", async () => {
+  it("runs the fifteen jobs in the documented order and reports each", async () => {
     const reports = await runner.runAll(START);
     expect(reports.map((report) => report.name)).toEqual([...JOB_NAMES]);
     expect(JOB_NAMES).toEqual([
@@ -95,6 +95,7 @@ describe("JobsRunner (real Postgres, injected time)", () => {
       "anonymise-orders",
       "sync-search-index",
       "rebuild-search-index",
+      "retire-stale-candidates",
     ]);
     expect(reports.every((report) => report.ok)).toBe(true);
   });

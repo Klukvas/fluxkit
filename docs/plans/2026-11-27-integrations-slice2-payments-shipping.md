@@ -283,10 +283,10 @@ With 1 to 9 applied, §12's two "needs owner approval" rows reduce to: the provi
 
 - Payments/auth/order-total behavior beyond these approved-plan safety changes remains outside scope and needs the owner. No new permission, owner-management redesign, pricing rule, payment status or dependency is proposed.
 
-## 13. Slice 3 sketch — later operations PR(s)
+## 13. Slice 3 as built — operations
 
-- Rewrap command: advisory lock, bounded pages by key ID/row ID, new nonce/AAD and envelope CAS, resumable checkpoints; same version IDs/environment/bindings. Handle v1/v2 secrets and a privileged baseline rewrap that proves identity equality. No provider calls or startup rotation.
-- Validate both key-ring members across every instance before promotion, expose key-check metadata only internally, keep old backup escrow, and remove previous key only after zero live dependencies; document interrupted-run and restore drills.
-- Bounded candidate cleanup: age/page limits, row locks and CAS, never active/draining/revoked/bound versions or baseline; tombstones retain monotonically increasing generation. Do not delete shared credentials during customer erasure.
-- Retention review: counts/oldest dependency age per version for payments/refunds, shipment cancellation/label/tracking and mail; pending, ambiguous and supported service windows block disposal. Owner approves windows before enabling retirement; revoked stays a revoked tombstone after envelope disposal.
-- Operations paths/migrations/commands get their own scoped design/approval; no rewrap/cleanup command is claimed to exist or executed by this task.
+- Standalone `integrations:rewrap [--dry-run]`: dedicated Postgres advisory try-lock (second runner exits 1), 100-row keyset pages, one transaction per envelope, fresh nonce/AAD and old-key CAS. Revoked envelopes are included; interrupted runs resume with the same key pair, preserving credential ids/generations/environments/states/bindings.
+- Migration 0025 permits only baseline envelope updates with transaction-local `fluxkit.baseline_rewrap=on`; identity/delete guards remain. Rewrap authenticates the old baseline and the persisted replacement, requiring byte-equal identity; down restores the strict 0023 guard.
+- Two fleet-wide key-ring steps before rewrap (new key as previous everywhere, then swap to new current/old previous everywhere), then rewrap, remove previous only after zero remaining rows in both tables, keep old keys separately until old database backups expire. No persisted key-check registry, provider calls or startup rotation.
+- Scheduler job retires at most 100 unused candidates strictly older than 90 days per run, under revision/integration/version locks and reference re-checks; envelopes go, generation tombstones and code-only system audit remain. Other states and baselines stay.
+- Kind-specific grouped dependency counts and oldest open resource timestamp appear in existing version metadata/admin. Core terminal vocabularies apply (including open late-success payments and refunds in flight); zero counts never authorize disposal. Non-candidate retirement remains refused until owner-approved service windows exist.

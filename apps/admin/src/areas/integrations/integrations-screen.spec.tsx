@@ -1,3 +1,4 @@
+import { formatDateTime } from "../../lib/format";
 import type {
   AdminIntegration,
   AdminIntegrationCheck,
@@ -148,6 +149,65 @@ describe("the Integrations list", () => {
     expect(html).not.toContain("§intg.storageDisabled.title");
   });
 
+  it("shows kind-specific counts and oldest open work in both locales without a disposal action", async () => {
+    for (const locale of ["en", "uk"] as const) {
+      const t = createTranslator(await messagesForArea(locale, MESSAGE_FILES), locale);
+      for (const [kind, dependents] of [
+        ["payment", { payments: { open: 2, total: 7, oldestOpenAt: "2024-01-01T00:00:00.000Z" } }],
+        ["shipping", { shipments: { open: 0, total: 3, oldestOpenAt: null } }],
+        ["email", { emails: { pending: 1, total: 4 } }],
+      ] as const) {
+        const integration: AdminIntegration = {
+          ...monobank,
+          kind,
+          versions: [
+            {
+              id: VERSION,
+              purpose: "outbound",
+              generation: 1,
+              state: "draining",
+              environment: "default",
+              createdAt: "2024-01-01T00:00:00.000Z",
+              fields: ["token"],
+              dependents,
+            },
+          ],
+        };
+        const html = renderToStaticMarkup(
+          <IntegrationsListView
+            t={t}
+            uiLocale={locale}
+            state={ready([integration])}
+            canManage={true}
+            busy={false}
+            onRetry={noop}
+            onAction={noop}
+          />,
+        );
+        const key = kind === "payment" ? "payments" : kind === "shipping" ? "shipments" : "emails";
+        const values = {
+          open: kind === "payment" ? 2 : 0,
+          total: kind === "payment" ? 7 : kind === "shipping" ? 3 : 4,
+          pending: 1,
+        };
+        expect(html).toContain(t(`intg.dependents.${key}`, values));
+        expect(html).toContain(t("intg.dependents.retention"));
+        expect(html).toContain("tabular-nums");
+        expect(html).not.toContain("§intg");
+        expect(html).not.toContain(
+          t("intg.action.removeLabel", { field: "token", provider: "Monobank" }),
+        );
+        if (kind === "payment")
+          expect(html).toContain(
+            t("intg.dependents.oldestOpen", {
+              date: formatDateTime("2024-01-01T00:00:00.000Z", locale),
+            }),
+          );
+        if (kind === "shipping") expect(html).toContain(t("intg.dependents.noneOpen"));
+      }
+    }
+  });
+
   it("groups both LiqPay fields under one candidate and exposes only complete versions to Check", () => {
     const liqpay: AdminIntegration = {
       ...monobank,
@@ -161,6 +221,7 @@ describe("the Integrations list", () => {
           state: "candidate",
           environment: "default",
           createdAt: "2026-11-27T12:00:00.000Z",
+          dependents: { payments: { open: 0, total: 0, oldestOpenAt: null } },
           fields: ["public_key"],
         },
       ],
@@ -184,6 +245,7 @@ describe("the Integrations list", () => {
                 environment: "default",
                 createdAt: "2026-11-27T12:00:00.000Z",
               },
+              dependents: { payments: { open: 0, total: 0, oldestOpenAt: null } },
               fields: ["public_key", "private_key"],
             },
           ],
@@ -213,6 +275,7 @@ describe("the Integrations list", () => {
           state: "active",
           environment: "trial<region>",
           createdAt: "2026-11-27T12:00:00.000Z",
+          dependents: { payments: { open: 0, total: 0, oldestOpenAt: null } },
           fields: ["merchant<code>", "signing_key"],
         },
       ],
@@ -255,6 +318,7 @@ describe("the Integrations list", () => {
           state: "draining",
           environment: "default",
           createdAt: "2026-11-27T12:00:00.000Z",
+          dependents: { payments: { open: 0, total: 0, oldestOpenAt: null } },
           fields: ["token"],
         },
         {
@@ -264,6 +328,7 @@ describe("the Integrations list", () => {
           state: "revoked",
           environment: "default",
           createdAt: "2026-11-27T12:00:00.000Z",
+          dependents: { payments: { open: 0, total: 0, oldestOpenAt: null } },
           fields: ["token"],
         },
       ],

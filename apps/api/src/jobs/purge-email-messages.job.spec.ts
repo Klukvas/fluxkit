@@ -178,18 +178,22 @@ describe("purge-email-messages (job 10; real Postgres, injected time)", () => {
     expect((await world.pool.query("select 1 from email_suppression")).rows).toHaveLength(1);
   });
 
-  it("is job 10 of the tick (jobs 11 to 14, the payment reconcile, the privacy retention and the search index, run after it)", async () => {
+  it("is job 10 of the tick (jobs 11 to 15 run after it)", async () => {
     const id = await row("sent", 31 * DAY);
     const reports = await world.get(JobsRunner).runAll(now());
-    expect(reports.map((report) => report.name).slice(-6)).toEqual([
+    expect(reports.map((report) => report.name).slice(-7)).toEqual([
       "send-emails",
       "purge-email-messages",
       "reconcile-payments",
       "anonymise-orders",
       "sync-search-index",
       "rebuild-search-index",
+      "retire-stale-candidates",
     ]);
-    expect(reports.at(-5)).toMatchObject({ ok: true, result: { deleted: 1 } });
+    expect(reports.find((report) => report.name === "purge-email-messages")).toMatchObject({
+      ok: true,
+      result: { deleted: 1 },
+    });
     expect(await exists(id)).toBe(false);
   });
 });

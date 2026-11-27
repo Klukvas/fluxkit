@@ -3,7 +3,7 @@ import type { Inventory } from "./types.js";
 
 const ACTOR_REASON = "Admin actor id; admin ids are not exported.";
 const ENVELOPE_REASON =
-  "An encrypted credential of the shop's own provider account (ADR 0058): no shopper's data, never exported or returned by any API, removed only when the owner retires it.";
+  "An encrypted credential of the shop's own provider account (ADR 0058): no shopper's data, never exported or returned by any API, removed when an unused candidate is retired by the owner or the bounded 90-day cleanup. Master-key rewrap changes only the encryption envelope.";
 
 /** The integration store (plan row D26): provider identities, credential versions and their encrypted envelopes. */
 export const integrationTables: Inventory = {

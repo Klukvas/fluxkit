@@ -265,3 +265,5 @@ Run, headers and conventions: `apps/admin/README.md`. Plan: `docs/plans/2026-10-
 - `src/areas/integrations/`, `src/areas/help/content/settings.ts` — payment and shipping lifecycle actions, code-only uk/en refusals, permanent Monobank merchant enrollment, paired LiqPay setup and Nova Post environment guidance.
 
 - Integrations shipping controls mirror payment activation/replacement/disable/revoke and existing config refresh; uk/en Nova Post help explains environments, check without waybill and continued polling.
+
+- `src/areas/integrations/integration-versions.tsx` — accessible uk/en retention counts/oldest work with tabular numbers and existing tokens; explains candidate-only retirement until owner-approved service windows exist. `src/areas/help/content/settings.ts` explains retention service windows; `integrations-screen.spec.tsx` covers count labels and absence of a disposal action.

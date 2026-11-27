@@ -29,3 +29,5 @@ Typed clients for the public store API (`createStoreClient`) and the admin API (
 - `src/admin-types.ts`, `src/admin-operations.ts`, `src/admin-client.ts` — integrations slice 2 PR 1: bounded `AdminIntegrationVersion` metadata and optional declared environments; secret PUT accepts optional `environment`; `checkIntegration(id, {expectedRevision, versionId})` returns version/code/time and optional retry seconds, never keys or provider text. `admin-contract.spec.ts` checks OpenAPI parity and `admin-client.spec.ts` checks request/response transport.
 
 - `src/admin-client.ts` — existing integration lifecycle methods also activate shipping; request/response shapes stay unchanged.
+
+- `src/admin-types.ts` — `AdminIntegrationDependents` / `IntegrationResourceDependents` on each version: kind-specific payment/refund, shipment or email counts with nullable oldest-open timestamp. `admin-contract.spec.ts` checks the required union against OpenAPI.

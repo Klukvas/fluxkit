@@ -284,6 +284,9 @@ describe("managed payment migration guarded rollback cycle", () => {
     expect(when).toBeTypeOf("number");
     for (let pass = 0; pass < 2; pass += 1) {
       await pool.query(
+        await readFile(`${folder}/0025_integration_baseline_rewrap.down.sql`, "utf8"),
+      );
+      await pool.query(
         await readFile(`${folder}/0024_managed_shipping_credentials.down.sql`, "utf8"),
       );
       await pool.query(down);

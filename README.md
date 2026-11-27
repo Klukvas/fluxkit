@@ -500,6 +500,7 @@ Notes:
 | `pnpm admin:create --email <address> [--role <role>]` | builds, then creates one admin user (default role `owner`); password from `ADMIN_PASSWORD` or a prompt; never updates an existing user |
 | `pnpm admin:unlock --email <address>` | builds, then clears the failed-login counter and the lock of one admin user (nothing else changes); see Admin sign-in |
 | `pnpm demo:up` / `pnpm demo:down` / `pnpm demo:pay` | local demo only: prepare and start everything, stop the services (data kept), pay the newest unpaid order of the test-only `fake` payment provider; see Try it locally |
+| `pnpm integrations:rewrap [--dry-run]` | builds, then rewraps credential and merchant-baseline envelopes with current/previous master keys; counts only with `--dry-run`, exit 1 on failure/unknown key/lock held; [rotation procedure](docs/deployment.md#integration-credentials-adr-0058) |
 | `pnpm jobs:run-once` | builds, then runs every scheduler job once under the scheduler lock (exit 0 ran, 1 failed, 2 lock held); see Scheduler and jobs |
 | `pnpm openapi:export` | regenerates `docs/api/openapi.json` (a test fails when it is stale) |
 | `pnpm check:licenses` / `pnpm audit:prod` / `pnpm notices` | license policy, production audit, third-party notices file |

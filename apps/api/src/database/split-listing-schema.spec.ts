@@ -46,6 +46,9 @@ describe("0014 split listing migration (real Postgres, _test database only)", ()
     // 0021 is newer than this chain and is not folded into the released 0019 down script. Its journal
     // row would stop the migrator from re-applying 0014.
     await pool.query(
+      await readFile(`${migrationsFolder}/0025_integration_baseline_rewrap.down.sql`, "utf8"),
+    );
+    await pool.query(
       await readFile(`${migrationsFolder}/0024_managed_shipping_credentials.down.sql`, "utf8"),
     );
     await pool.query(

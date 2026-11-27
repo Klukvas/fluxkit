@@ -1012,6 +1012,16 @@ export interface AdminIntegrationSecret {
   versionState: "candidate" | "active" | "draining" | "revoked" | null;
 }
 
+export interface IntegrationResourceDependents {
+  open: number;
+  total: number;
+  oldestOpenAt: string | null;
+}
+export type AdminIntegrationDependents =
+  | { payments: IntegrationResourceDependents }
+  | { shipments: IntegrationResourceDependents }
+  | { emails: { pending: number; total: number } };
+
 export interface AdminIntegrationVersion {
   id: string;
   purpose: "outbound" | "webhook";
@@ -1021,6 +1031,7 @@ export interface AdminIntegrationVersion {
   createdAt: string;
   /** Saved field names only; never values or suffixes. */
   fields: string[];
+  dependents: AdminIntegrationDependents;
 }
 
 export interface AdminIntegrationEnvironments {
