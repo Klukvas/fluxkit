@@ -40,6 +40,7 @@ export function legalPageRoute(slug: LegalPageSlug) {
     const locale = await routeLocale(params);
     return (
       <LegalPage
+        website={new URL(await publicOrigin()).host}
         slug={slug}
         locale={locale}
         t={createTranslator(messagesByLocale[locale], locale)}

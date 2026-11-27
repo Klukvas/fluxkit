@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { messagePlaceholders } from "@fluxkit/ui";
 import { describe, expect, it } from "vitest";
-import { withoutLegalMarker } from "../config/legal";
+import { LEGAL_PLACEHOLDER_MARKER, withoutLegalMarker } from "../config/legal";
 import { SLOT_NAMES } from "../lib/slots";
 import { messagesByLocale } from "./index";
 
@@ -85,10 +85,16 @@ describe("message files", () => {
 });
 
 describe("shopper-visible texts (repair batch 2: the owner's review saw developer notes on the page)", () => {
-  it("carry no TODO marker, source path or bracketed placeholder; the legal marker only starts a legal intro, which the page strips", () => {
+  it("carry no TODO marker, source path or bracketed placeholder; legacy legal intro markers are stripped", () => {
     for (const [locale, messages] of Object.entries(files)) {
       for (const [key, message] of Object.entries(messages)) {
         const legalIntro = /^legal\.[a-z]+\.intro$/.test(key);
+        if (message.includes(LEGAL_PLACEHOLDER_MARKER)) {
+          expect(legalIntro, `${locale} ${key}: only an intro can hide the legacy marker`).toBe(
+            true,
+          );
+          expect(message.startsWith(LEGAL_PLACEHOLDER_MARKER), `${locale} ${key}`).toBe(true);
+        }
         const text = legalIntro ? withoutLegalMarker(message) : message;
         expect(text, `${locale} ${key}`).not.toMatch(/TODO|FIXME|fluxkit\)/i);
         expect(text, `${locale} ${key}`).not.toMatch(/\bsrc\/|\.tsx?\b|\.json\b/);

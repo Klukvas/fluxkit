@@ -268,7 +268,11 @@ describe("checkout page: the form", () => {
     // The wording that says "no payment is taken" must not be shown beside a pay button.
     expect(en["checkout.payment.noteOnline"]).not.toMatch(/No payment is taken/);
     for (const messages of [en, uk]) {
-      expect(JSON.stringify(messages)).not.toMatch(/card number|номер картки/i);
+      // Legal copy describes the card data the shop does not receive; checkout copy must never request it.
+      const nonLegal = Object.fromEntries(
+        Object.entries(messages).filter(([key]) => !key.startsWith("legal.")),
+      );
+      expect(JSON.stringify(nonLegal)).not.toMatch(/card number|номер картки/i);
     }
     // The checkout form itself has no card field (the card is entered on the provider's page).
     expect(html).not.toMatch(/autocomplete="cc-|name="card/);

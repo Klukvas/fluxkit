@@ -274,7 +274,7 @@ describe("the legal pages never show the developer marker (repair batch 2)", () 
     expect(withoutLegalMarker("Own text.")).toBe("Own text.");
   });
 
-  it("keeps the placeholder box while the text carries the marker, but not the marker itself, in both languages", () => {
+  it("shows the default legal review box from legalTexts and never the marker, in both languages", () => {
     for (const [locale, messages] of [
       ["uk", uk],
       ["en", en],
@@ -282,7 +282,7 @@ describe("the legal pages never show the developer marker (repair batch 2)", () 
       const translator = createTranslator(messages, locale);
       for (const page of legalPages) {
         const html = renderToStaticMarkup(
-          <LegalPage slug={page.slug} locale={locale} t={translator} />,
+          <LegalPage website="shop.example.test" slug={page.slug} locale={locale} t={translator} />,
         );
         expect(html, `${locale} ${page.slug}`).not.toContain("TODO");
         expect(html).not.toContain("fluxkit)");
