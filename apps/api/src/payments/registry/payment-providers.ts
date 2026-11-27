@@ -11,7 +11,13 @@ import {
   type WebhookLocation,
 } from "@fluxkit/core";
 import type { DbExecutor } from "../../common/transaction.js";
-import { serviceUnavailable, unauthorized, ruleViolation } from "../../common/problem.js";
+import {
+  ProblemException,
+  serviceUnavailable,
+  unauthorized,
+  ruleViolation,
+} from "../../common/problem.js";
+import { findPostgresError } from "../../common/postgres-errors.js";
 import { DRIZZLE, type Database } from "../../database/database.module.js";
 import { integration, integrationCredentialVersion, payment } from "../../database/schema/index.js";
 import { RevisionCache } from "../../integrations/credential-cache.js";
@@ -20,12 +26,15 @@ import {
   IntegrationUnavailableError,
   type InstalledIntegration,
 } from "../../integrations/installed-integrations.js";
-import { IntegrationsRepository } from "../../integrations/integrations.repository.js";
+import {
+  IntegrationsRepository,
+  IntegrationRevisionUnavailableError,
+} from "../../integrations/integrations.repository.js";
 import {
   INTEGRATIONS_CONFIG,
   type IntegrationsConfig,
 } from "../../integrations/integrations.config.js";
-import { SecretCipher } from "../../integrations/secret-cipher.js";
+import { SecretCipher, SecretUnavailableError } from "../../integrations/secret-cipher.js";
 import { transportGateFor } from "../../integrations/integration-transport-gate.js";
 import { implementsPort, PaymentProviderRegistry } from "./payment-provider-registry.js";
 
@@ -78,7 +87,8 @@ export class PaymentProviders {
       result.sort((a, b) => a.code.localeCompare(b.code));
       this.snapshot.set(revision, now, result);
       return result;
-    } catch {
+    } catch (error) {
+      if (!isReadinessFailure(error)) throw error;
       new Logger(PaymentProviders.name).error("payment_credentials_unavailable");
       throw serviceUnavailable(5);
     }
@@ -321,7 +331,8 @@ export class PaymentProviders {
       }
       this.clients.set(versionId, { port, at: now });
       return port;
-    } catch {
+    } catch (error) {
+      if (!isReadinessFailure(error)) throw error;
       new Logger(PaymentProviders.name).error("payment_credential_unavailable");
       throw serviceUnavailable(5);
     }
@@ -394,6 +405,23 @@ export class PaymentProviders {
 }
 const CLIENT_IDLE_MS = 5 * 60_000;
 const MAX_CLIENTS = 128;
+/** Only expected credential/readiness outages become advisory unavailability; bugs must escape. */
+function isReadinessFailure(error: unknown): boolean {
+  if (
+    error instanceof IntegrationUnavailableError ||
+    error instanceof IntegrationRevisionUnavailableError ||
+    error instanceof SecretUnavailableError
+  )
+    return true;
+  if (error instanceof ProblemException)
+    return (
+      error.code === "service_unavailable" ||
+      (error.code === "rule_violation" && error.extensions.rule === "integration_env_override")
+    );
+  const code = findPostgresError(error)?.code;
+  // Statement cancellation and lock timeout can be retried. Other SQL errors retain their identity.
+  return code === "57014" || code === "55P03";
+}
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function validLocation(value: WebhookLocation): boolean {
   return (

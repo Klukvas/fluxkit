@@ -114,7 +114,12 @@ export class StorePaymentViews {
   ): Promise<Pick<StoreOrderPaymentView, "canPay" | "providers" | "unavailableReason">> {
     let providers: string[];
     try {
-      providers = await this.providersFor(order.currency, db);
+      // A failed SQL read aborts PostgreSQL's transaction. Roll back the savepoint BEFORE falling back,
+      // so checkout cannot acknowledge an order that COMMIT would silently roll back.
+      providers =
+        db === undefined
+          ? await this.providersFor(order.currency)
+          : await db.transaction((tx) => this.providersFor(order.currency, tx));
     } catch (error) {
       if (!(error instanceof ProblemException) || error.code !== "service_unavailable") throw error;
       return { canPay: false, providers: [], unavailableReason: "payment_not_available" };

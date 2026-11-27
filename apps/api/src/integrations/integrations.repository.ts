@@ -33,6 +33,13 @@ export interface StoredSecretSummary {
 }
 
 const REVISION_ROW_ID = 1;
+/** The store cannot supply a coherent credential snapshot without its singleton revision. */
+export class IntegrationRevisionUnavailableError extends Error {
+  constructor() {
+    super("The integration_revision row is missing");
+    this.name = "IntegrationRevisionUnavailableError";
+  }
+}
 /** Envelopes that still exist. A candidate is listed before an active one so retire keeps working. */
 const VISIBLE_STATES: readonly IntegrationCredentialState[] = [
   "candidate",
@@ -51,7 +58,7 @@ export class IntegrationsRepository {
       .select({ revision: integrationRevision.revision })
       .from(integrationRevision)
       .where(eq(integrationRevision.id, REVISION_ROW_ID));
-    if (row === undefined) throw new Error("The integration_revision row is missing");
+    if (row === undefined) throw new IntegrationRevisionUnavailableError();
     return row.revision;
   }
 
