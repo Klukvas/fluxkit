@@ -31,6 +31,7 @@ export WAIT_SECONDS=1 MIGRATE_WAIT_SECONDS=600
   if (check_backup_command) 2>/dev/null; then fail 'backup opt-out accepted a value other than 1'; fi
 
   unset FLUXKIT_DEPLOY_ALLOW_NO_BACKUP
+  if (BACKUP_COMMAND=backup check_backup_command) 2>/dev/null; then fail 'relative backup command was allowed'; fi
   printf '#!/bin/sh\nexit 0\n' > "$BACKUP_COMMAND"
   if (check_backup_command) 2>/dev/null; then fail 'non-executable backup command was allowed'; fi
   chmod +x "$BACKUP_COMMAND"

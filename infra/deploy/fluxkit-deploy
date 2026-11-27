@@ -42,6 +42,11 @@ release_digest() {
 }
 
 check_backup_command() {
+  # The check and the call must name the same file: a relative name would be checked here and looked up in PATH later.
+  case "$BACKUP_COMMAND" in
+    /*) ;;
+    *) fail "FLUXKIT_DEPLOY_BACKUP must be an absolute path, got $BACKUP_COMMAND" ;;
+  esac
   if [ -f "$BACKUP_COMMAND" ] && [ -x "$BACKUP_COMMAND" ]; then
     backup_enabled=true
   elif [ "${FLUXKIT_DEPLOY_ALLOW_NO_BACKUP:-0}" = 1 ]; then
