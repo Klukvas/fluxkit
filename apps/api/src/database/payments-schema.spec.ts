@@ -1479,7 +1479,7 @@ describe("payments schema (migration 0008, real Postgres)", () => {
   });
 
   describe("triggers and indexes", () => {
-    it("has exactly the journal trigger of ADR 0032 on the payment tables", async () => {
+    it("has the journal protections and immutable managed credential binding on the payment tables", async () => {
       const result = await client.query<{ table: string; name: string; definition: string }>(
         `select c.relname as "table", t.tgname as name, pg_get_triggerdef(t.oid) as definition
          from pg_trigger t join pg_class c on c.oid = t.tgrelid
@@ -1487,12 +1487,16 @@ describe("payments schema (migration 0008, real Postgres)", () => {
         [["payment", "payment_event", "payment_refund"]],
       );
       expect(result.rows.map((row) => [row.table, row.name])).toEqual([
+        ["payment", "payment_credential_binding_guard"],
         ["payment_event", "payment_event_append_only"],
         ["payment_event", "payment_event_no_truncate"],
       ]);
       for (const row of result.rows) {
         // Migration 0011 adds a statement-level BEFORE TRUNCATE trigger to each append-only table.
-        if (row.name.endsWith("_no_truncate")) {
+        if (row.name === "payment_credential_binding_guard") {
+          expect(row.definition).toContain("BEFORE INSERT OR UPDATE");
+          expect(row.definition).toContain("FOR EACH ROW");
+        } else if (row.name.endsWith("_no_truncate")) {
           expect(row.definition).toContain("BEFORE TRUNCATE");
           expect(row.definition).toContain("FOR EACH STATEMENT");
         } else {

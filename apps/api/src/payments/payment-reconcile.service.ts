@@ -23,7 +23,7 @@ import { callPaymentProvider, describePaymentCall } from "./payment-provider-cal
 import { PaymentRefundsService } from "./payment-refunds.service.js";
 import { refundWork, scheduleAfterPoll } from "./payment-schedule.js";
 import { PAYMENT_TIMINGS, PAYMENTS_CONFIG, type PaymentsConfig } from "./payments-config.js";
-import { PaymentProviderRegistry } from "./registry/index.js";
+import { PaymentProviders } from "./registry/payment-providers.js";
 
 /** What job 11 did for one due attempt (counted in the job result). */
 export type ReconcileAction =
@@ -74,13 +74,13 @@ export class PaymentReconcileService {
     @Inject(OrdersRepository) private readonly orders: OrdersRepository,
     @Inject(PaymentFactsService) private readonly facts: PaymentFactsService,
     @Inject(PaymentRefundsService) private readonly refunds: PaymentRefundsService,
-    @Inject(PaymentProviderRegistry) private readonly registry: PaymentProviderRegistry,
+    @Inject(PaymentProviders) private readonly registry: PaymentProviders,
     @Inject(PAYMENTS_CONFIG) private readonly config: PaymentsConfig,
   ) {}
 
-  /** Whether any provider is enabled (with none, job 11 does nothing: no attempt can exist). */
-  enabled(): boolean {
-    return this.registry.onlineEnabled();
+  /** Bound work remains eligible after all new payment providers are disabled. */
+  async enabled(): Promise<boolean> {
+    return this.registry.reconciliationEnabled();
   }
 
   listDue(now: Date, after: DueCursor | undefined, limit: number): Promise<DuePayment[]> {
@@ -105,7 +105,7 @@ export class PaymentReconcileService {
     ) {
       return { actions: [] };
     }
-    const provider = this.registry.get(row.providerCode);
+    const provider = await this.registry.forPayment(row);
     const status = paymentStatusOf(row.status);
     if (status === "creating") {
       return { actions: [await this.closeCrashedCreate(row.id, now, limits)] };
@@ -117,7 +117,7 @@ export class PaymentReconcileService {
       // A provider that is no longer enabled: its attempts wait by the backoff like a failed read (the order expiry
       // still runs to its cap), so they never fill the pages of every run; the schedule's end raises attention.
       this.logger.warn(
-        `Payment ${row.id}: provider ${row.providerCode} is not enabled; not reconciled`,
+        `Payment ${row.id}: credential_unavailable; provider ${row.providerCode}; not reconciled`,
       );
       await this.inTransaction(limits, async (tx) => {
         const locked = await this.lockWithOrder(tx, row.id);

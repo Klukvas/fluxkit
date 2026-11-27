@@ -18,3 +18,5 @@
 - `src/secrets-key.ts` — `parseSecretsKeyVariable` (`SECRETS_ENCRYPTION_KEY` and `SECRETS_ENCRYPTION_KEY_PREVIOUS`: `<key-id>:<canonical Base64 of 32 bytes>`), `secretsKeyPairProblem` (different id and bytes), `SecretsKey`, `SecretsKeyRing`; `loadEnv` validates both at startup and returns `secretsKeyRing` (`null` when unset). A problem never contains the value (ADR 0058).
 - `src/secrets-key.spec.ts` — accepted and refused forms, blank as unset, previous without current, equal ids or bytes, no value in messages.
 
+
+- `src/env.ts` — preserves `PAYMENT_PROVIDERS_ENABLED` presence as `paymentDelegated`; absent selects admin-managed payments, present blank stays env/off.

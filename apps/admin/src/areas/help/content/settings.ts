@@ -135,8 +135,8 @@ export const SETTINGS_ARTICLES: readonly HelpArticle[] = [
       {
         kind: "warning",
         text: {
-          uk: "Для пошти збережений ключ вмикають з цього екрана. Коли Resend і Brevo обидва в ланцюжку відправки, екран ділить нові листи порівну або починає з Resend; це стосується і ланцюжка, заданого на сервері. Лист чекає, поки стартовий сервіс на паузі, і переходить до іншого лише після точної відмови прийняти. Таймаут і відхилення лишаються на тому сервісі. Вимкнення зупиняє нові листи; ті, що вже в дорозі, можуть дійти. Ключі оплати й доставки вже можна зберегти та явно перевірити; активація з’явиться в наступному оновленні. Збереження або перевірка не вмикають сервіс.",
-          en: "For email, turn a saved key on from this screen. When Resend and Brevo are both in the send chain, the screen shares new mail evenly or starts with Resend; a chain set on the server follows the same choice. A message waits while its starting provider is cooling down and moves to the other only after a definite non-acceptance. A timeout or a rejection stays on that provider. Turning a key off stops new mail; mail already on its way can finish. Payment and delivery keys can already be saved and explicitly checked; activation arrives in the next update. Saving or checking a key never enables a provider.",
+          uk: "Для пошти збережений ключ вмикають з цього екрана. Коли Resend і Brevo обидва в ланцюжку відправки, екран ділить нові листи порівну або починає з Resend; це стосується і ланцюжка, заданого на сервері. Лист чекає, поки стартовий сервіс на паузі, і переходить до іншого лише після точної відмови прийняти. Таймаут і відхилення лишаються на тому сервісі. Вимкнення зупиняє нові листи; ті, що вже в дорозі, можуть дійти. Ключі оплати можна зберегти, перевірити й активувати з цього екрана. Заміна активного набору потребує окремої активації; вимкнення зупиняє нові платежі, але зберігає доступ для звірки та повернень попередніх платежів. Ключі доставки можна зберегти та перевірити; активація доставки з’явиться пізніше. Збереження або перевірка не вмикають сервіс.",
+          en: "For email, turn a saved key on from this screen. When Resend and Brevo are both in the send chain, the screen shares new mail evenly or starts with Resend; a chain set on the server follows the same choice. A message waits while its starting provider is cooling down and moves to the other only after a definite non-acceptance. A timeout or a rejection stays on that provider. Turning a key off stops new mail; mail already on its way can finish. Payment keys can be saved, checked and activated here. Replacing an active bundle requires explicit activation; disabling stops new payments while retaining access for reconciliation and refunds of earlier payments. Delivery keys can be saved and checked; delivery activation arrives later. Saving or checking a key never enables a provider.",
         },
       },
       {
@@ -151,6 +151,13 @@ export const SETTINGS_ARTICLES: readonly HelpArticle[] = [
         text: {
           uk: "Якщо сервіс пропонує середовища, виберіть його під час збереження ключа: зміна створює нову версію. Monobank не має такого перемикача. Для Nova Post потрібні також профіль і способи доставки; відстеження працює опитуванням без вебхуків. Попередні версії залишаються у списку: «Відкликати» зупиняє їх використання локально й може перервати пов’язані операції. Окремо відкличте ключ у кабінеті постачальника.",
           en: "If the service offers environments, select one while saving the key: a change creates a new version. Monobank has no such selector. Nova Post also needs a shipping profile and methods; tracking uses polling without webhooks. Retained versions remain listed: Revoke ends their local use and may interrupt bound work. Revoke the key in the provider's dashboard separately.",
+        },
+      },
+      {
+        kind: "warning",
+        text: {
+          uk: "Перше успішне збереження ключа Monobank назавжди закріплює продавця для цього магазину. Кожну заміну перевіряють без списання коштів: ключ іншого продавця не збережеться. Окремий секрет вебхука Monobank не потрібен. Вимкнення або відкликання ключа не скидає прив’язку продавця. LiqPay потребує публічного та приватного ключів одного магазину; безпечної онлайн-перевірки для нього поки немає, тому «Не перевірено» є очікуваним результатом.",
+          en: "The first successful Monobank key save permanently enrolls the merchant for this shop. Every replacement is checked without charging: a key from another merchant is refused. Monobank needs no separate webhook secret. Disabling or revoking a key never resets the merchant lock. LiqPay needs the public and private keys of the same shop; it has no supported harmless online check yet, so Unverified is expected.",
         },
       },
       { kind: "screen", route: "integrations" },

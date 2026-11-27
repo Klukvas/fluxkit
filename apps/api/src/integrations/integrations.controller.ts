@@ -58,8 +58,7 @@ function actorOf(principal: AdminPrincipal, request: Request): IntegrationActor 
 
 /**
  * Thin HTTP layer of the integration store. Every route needs `integrations.manage` (owner only); every change also
- * asks for the owner's current password. No route returns a secret. Activating email is the only change that makes a
- * stored key usable, and only when `EMAIL_PROVIDER` is absent.
+ * asks for the owner's current password. No route returns a secret. Activation makes a complete stored email/payment bundle usable in delegated mode; shipping remains unavailable.
  */
 @AdminController("integrations", INTEGRATIONS_ADMIN_PERMISSIONS)
 export class IntegrationsController {
@@ -169,9 +168,9 @@ export class IntegrationsController {
   @Post(":id/activate")
   @HttpCode(200)
   @ApiOperation({
-    summary: "Activate a stored email credential",
+    summary: "Activate a stored email or payment credential",
     description:
-      "Makes the stored outbound credential the one new mail uses, when `EMAIL_PROVIDER` is absent and `EMAIL_FROM` is set. Payment and shipping answer 409 `integration_runtime_not_ready`. Asks for the owner's current password. Other 409 rules: `integration_env_override`, `integration_storage_disabled`, `integration_sender_required`, `integration_route_unset`, `integration_not_activatable`, `integration_revision_stale`.",
+      "Selects a complete stored email/payment credential for new work when enablement is delegated. Email requires EMAIL_FROM; payment requires supported shop currency, a public storefront URL, merchant enrollment when declared, and no open legacy work. Shipping answers 409 integration_runtime_not_ready. Asks for the owner's current password. Other 409 rules: `integration_env_override`, `integration_storage_disabled`, `integration_sender_required`, `integration_route_unset`, `integration_not_activatable`, `integration_revision_stale`.",
   })
   @ApiParam(ID_PARAM)
   @ApiZodBody(integrationMutationSchema)

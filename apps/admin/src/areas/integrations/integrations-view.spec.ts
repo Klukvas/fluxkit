@@ -166,7 +166,7 @@ describe("secretView", () => {
 });
 
 describe("providerRuntime", () => {
-  it("offers turn on only for an email provider whose outbound key is a candidate", () => {
+  it("offers turn on for email and payment complete candidates; shipping stays unavailable", () => {
     const email = integration({
       secrets: [secret({ state: "set", ...stored })],
     });
@@ -177,14 +177,47 @@ describe("providerRuntime", () => {
       turnOff: true,
     });
     expect(providerRuntime({ ...email, kind: "payment" }, "ready")).toEqual({
+      turnOn: true,
+      turnOff: false,
+    });
+    expect(providerRuntime({ ...email, kind: "shipping" }, "ready")).toEqual({
       turnOn: false,
       turnOff: false,
+    });
+    expect(providerRuntime({ ...email, enabled: true, kind: "payment" }, "ready")).toEqual({
+      turnOn: true,
+      turnOff: true,
     });
     expect(
       providerRuntime(
         integration({ secrets: [secret({ state: "set", ...stored, versionState: "draining" })] }),
         "ready",
       ).turnOn,
+    ).toBe(false);
+  });
+});
+
+describe("payment rotation controls", () => {
+  it("offers replacement activation while enabled and re-enables an intact draining generation", () => {
+    const payment = integration({
+      kind: "payment",
+      enabled: true,
+      secrets: [secret({ state: "set", ...stored })],
+    });
+    expect(providerRuntime(payment, "ready").turnOn).toBe(true);
+    expect(
+      providerRuntime(
+        {
+          ...payment,
+          enabled: false,
+          secrets: [secret({ state: "set", ...stored, versionState: "draining" })],
+        },
+        "ready",
+      ).turnOn,
+    ).toBe(true);
+    expect(
+      providerRuntime({ ...payment, secrets: [secret({ state: "env", ...stored })] }, "ready")
+        .turnOn,
     ).toBe(false);
   });
 });

@@ -8,11 +8,12 @@ import {
   type ShopperPaymentView,
 } from "@fluxkit/core";
 import { CLOCK, type Clock } from "../../auth/clock.js";
+import { ProblemException } from "../../common/problem.js";
 import type { DbExecutor } from "../../common/transaction.js";
 import { paymentStatusOf } from "../attempts/payment-changes.js";
 import { PaymentsRepository, type PaymentRow } from "../attempts/payments.repository.js";
 import { PAYMENTS_CONFIG, type PaymentsConfig } from "../payments-config.js";
-import { PaymentProviderRegistry } from "../registry/index.js";
+import { PaymentProviders } from "../registry/payment-providers.js";
 
 /** What the payment views need of an order. */
 export interface PaymentOrderFacts {
@@ -27,6 +28,7 @@ export interface PaymentOrderFacts {
 /** The `payment` member of the store order views (ADR 0032 decision 18). */
 export interface StoreOrderPaymentView {
   readonly canPay: boolean;
+  readonly unavailableReason?: "payment_not_available";
   readonly providers: string[];
   readonly latest: {
     readonly paymentId: string;
@@ -45,6 +47,7 @@ export interface StorePaymentStatusView {
   readonly expiresAt: string;
   readonly orderStatus: OrderStatus;
   readonly canRetry: boolean;
+  readonly unavailableReason?: "payment_not_available";
 }
 
 function outcomeOf(value: string | null): PaymentOrderOutcome | null {
@@ -76,7 +79,7 @@ export function shopperViewOf(row: PaymentRow): ShopperPaymentView {
 export class StorePaymentViews {
   constructor(
     @Inject(PaymentsRepository) private readonly payments: PaymentsRepository,
-    @Inject(PaymentProviderRegistry) private readonly registry: PaymentProviderRegistry,
+    @Inject(PaymentProviders) private readonly registry: PaymentProviders,
     @Inject(PAYMENTS_CONFIG) private readonly config: PaymentsConfig,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
@@ -85,29 +88,56 @@ export class StorePaymentViews {
    * The enabled providers that take the currency. None without `STOREFRONT_PUBLIC_URL`: no return or webhook URL can be
    * built, so no attempt can be created (`payment_not_available`).
    */
-  providersFor(currency: string): string[] {
+  async providersFor(currency: string, db?: DbExecutor): Promise<string[]> {
     if (this.config.storefrontPublicUrl === null) {
       return [];
     }
-    return this.registry
-      .list()
-      .filter((provider) => provider.capabilities.currencies.includes(currency))
+    return (await this.registry.active(db))
+      .filter((provider) => provider.port.capabilities.currencies.includes(currency))
       .map((provider) => provider.code);
   }
 
   /** Whether the create route would start a new attempt now (no lock: a hint for the shopper's page). */
-  canPay(order: PaymentOrderFacts, attempts: readonly PaymentRow[]): boolean {
-    return decideNewPaymentAttempt({
-      orderStatus: order.status as OrderStatus,
-      orderTotal: order.totalAmount,
-      attempts: attempts.map((attempt) => ({
-        id: attempt.id,
-        status: paymentStatusOf(attempt.status),
-      })),
-      providerAvailable: this.providersFor(order.currency).length > 0,
-      now: this.clock.now(),
-      orderExpiresAt: order.expiresAt,
-    }).ok;
+  async canPay(
+    order: PaymentOrderFacts,
+    attempts: readonly PaymentRow[],
+    db?: DbExecutor,
+  ): Promise<boolean> {
+    return (await this.eligibility(order, attempts, db)).canPay;
+  }
+
+  /** Availability is advisory here; persisted payment facts stay readable during a new-work outage. */
+  private async eligibility(
+    order: PaymentOrderFacts,
+    attempts: readonly PaymentRow[],
+    db?: DbExecutor,
+  ): Promise<Pick<StoreOrderPaymentView, "canPay" | "providers" | "unavailableReason">> {
+    let providers: string[];
+    try {
+      // A failed SQL read aborts PostgreSQL's transaction. Roll back the savepoint BEFORE falling back,
+      // so checkout cannot acknowledge an order that COMMIT would silently roll back.
+      providers =
+        db === undefined
+          ? await this.providersFor(order.currency)
+          : await db.transaction((tx) => this.providersFor(order.currency, tx));
+    } catch (error) {
+      if (!(error instanceof ProblemException) || error.code !== "service_unavailable") throw error;
+      return { canPay: false, providers: [], unavailableReason: "payment_not_available" };
+    }
+    return {
+      providers,
+      canPay: decideNewPaymentAttempt({
+        orderStatus: order.status as OrderStatus,
+        orderTotal: order.totalAmount,
+        attempts: attempts.map((attempt) => ({
+          id: attempt.id,
+          status: paymentStatusOf(attempt.status),
+        })),
+        providerAvailable: providers.length > 0,
+        now: this.clock.now(),
+        orderExpiresAt: order.expiresAt,
+      }).ok,
+    };
   }
 
   /** The `payment` member of a store order view; `db` may be the caller's transaction. */
@@ -115,8 +145,7 @@ export class StorePaymentViews {
     const attempts = await this.payments.listAttemptsOfOrder(db, order.id);
     const latest = attempts.at(-1);
     return {
-      canPay: this.canPay(order, attempts),
-      providers: this.providersFor(order.currency),
+      ...(await this.eligibility(order, attempts, db)),
       latest:
         latest === undefined
           ? null
@@ -141,13 +170,17 @@ export class StorePaymentViews {
   ): Promise<StorePaymentStatusView> {
     const view = shopperViewOf(row);
     const attempts = await this.payments.listAttemptsOfOrder(db, order.id);
+    const eligibility = await this.eligibility(order, attempts, db);
     return {
       paymentId: row.id,
       status: view.status,
       failureCategory: view.failureCategory,
       expiresAt: row.expiresAt.toISOString(),
       orderStatus: order.status as OrderStatus,
-      canRetry: this.canPay(order, attempts),
+      canRetry: eligibility.canPay,
+      ...(eligibility.unavailableReason === undefined
+        ? {}
+        : { unavailableReason: eligibility.unavailableReason }),
     };
   }
 }

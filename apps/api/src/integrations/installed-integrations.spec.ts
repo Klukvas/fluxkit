@@ -15,6 +15,10 @@ describe("InstalledIntegrations", () => {
     environment: {},
     emailRouteDelegated: false,
     emailFromAddress: null,
+    paymentDelegated: false,
+    shopCurrency: "UAH",
+    orderPaymentTtlMinutes: 30,
+    storefrontPublicUrl: null,
     ...overrides,
   });
 

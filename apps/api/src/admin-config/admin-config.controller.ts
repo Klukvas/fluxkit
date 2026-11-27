@@ -7,7 +7,7 @@ import { LOCALE_CONFIG, type LocaleConfig } from "../common/locale.js";
 import { ApiZodResponse } from "../common/openapi.js";
 import { PRICING_CONFIG, type PricingConfig } from "../common/pricing-config.js";
 import { EmailProviderRegistry } from "../email/registry/index.js";
-import { PaymentProviderRegistry } from "../payments/registry/index.js";
+import { PaymentProviders } from "../payments/registry/payment-providers.js";
 import { MEDIA_CONFIG, type MediaConfig } from "../media/media-config.js";
 import { SEARCH_PORT, type SearchPort } from "../common/search-port.js";
 import { ENABLED_FEATURES, type EnabledFeatures } from "../features/enabled-features.js";
@@ -24,7 +24,7 @@ export class AdminConfigController {
     @Inject(PRICING_CONFIG) private readonly pricing: PricingConfig,
     @Inject(MEDIA_CONFIG) private readonly media: MediaConfig,
     @Inject(EmailProviderRegistry) private readonly email: EmailProviderRegistry,
-    @Inject(PaymentProviderRegistry) private readonly payments: PaymentProviderRegistry,
+    @Inject(PaymentProviders) private readonly payments: PaymentProviders,
     @Inject(SEARCH_PORT) private readonly search: SearchPort,
     @Inject(ENABLED_FEATURES) private readonly features: EnabledFeatures,
   ) {}
@@ -47,7 +47,7 @@ export class AdminConfigController {
       pricesIncludeTax: this.pricing.pricesIncludeTax,
       lowStockThreshold: this.pricing.lowStockThreshold,
       emailDelivery: this.email.deliveryEnabled(),
-      onlinePayment: this.payments.onlineEnabled(),
+      onlinePayment: await this.payments.onlineEnabled(),
       search: this.search.enabled,
       features: [...this.features],
       media: {

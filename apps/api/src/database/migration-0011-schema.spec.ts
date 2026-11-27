@@ -117,6 +117,7 @@ describe("migration 0011 (real Postgres): TRUNCATE refused on append-only tables
                 t.tgenabled as enabled
          from pg_trigger t join pg_class c on c.oid = t.tgrelid join pg_namespace n on n.oid = c.relnamespace
          where not t.tgisinternal and n.nspname = 'public' and (t.tgtype & 32) <> 0
+           and c.relname <> 'integration_merchant_baseline'
          order by 1`,
       );
       expect(truncate.rows.map((row) => row.table)).toEqual([...APPEND_ONLY_TABLES]);

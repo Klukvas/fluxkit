@@ -10,7 +10,7 @@ Additive extension of the provider package contracts in [config](config.md), [AD
 | `fluxkit.secrets` | Optional array of at most eight `{field, purpose, env}` entries. `field` matches `[a-z][a-z0-9_]{0,31}`; `purpose` is `outbound` or `webhook`; env names match `[A-Z][A-Z0-9_]{0,63}` and start with this provider's uppercase code plus `_`. Field and env names are unique. Several fields may share a purpose: all are required for a complete bundle. Absent/empty secrets means no credential integration. |
 | `fluxkit.environments` | Optional `{values: string[], default: string, env: string}`. One to eight distinct values, each matching the field-code bound; `default` belongs to `values`; `env` obeys the variable/prefix rule above. Absent means a fixed `default` environment without a selector. API metadata renames `env` to `envVariable`. |
 
-Listing a package or exporting a factory never enables it. PR 1 keeps payment/shipping activation unavailable until their binding and revocation safety paths are implemented. Existing env registries and configured-provider startup failures remain unchanged; no runtime marker or provider-name allowlist grants managed activation.
+Listing a package or exporting a factory never enables it. PR 2 enables managed payments with immutable resource bindings; shipping activation remains unavailable. Existing env registries and configured-provider startup failures remain unchanged; no runtime marker or provider-name allowlist grants managed activation.
 
 ## Entry exports
 
@@ -18,10 +18,10 @@ Type signatures below describe the extension point; construction is synchronous 
 
 | Export / type | Contract |
 |---|---|
-| `CreateOutboundClient<K>` / `createOutboundClient(secrets, context)` | Produces the existing port for the kind (`EmailProviderPort`, `PaymentProviderPort` or `ShippingProviderPort`). Email ports are validated at activation; payment/shipping activation is refused until their runtime ships. Email validation checks the returned code, required methods and capabilities. Existing one-argument email factories remain compatible. |
+| `CreateOutboundClient<K>` / `createOutboundClient(secrets, context)` | Produces the existing port for the kind (`EmailProviderPort`, `PaymentProviderPort` or `ShippingProviderPort`). Email and payment ports are validated at activation; shipping activation remains refused. Email validation checks the returned code, required methods and capabilities. Existing one-argument email factories remain compatible. |
 | `CheckCredentials` / `checkCredentials(secrets, context, signal)` | Optional async `CredentialCheckOutcome`: `{code, retryAfterSeconds?}`. `CredentialCheckCode` is `ok`, `invalid_credentials`, `unavailable`, `rate_limited`, `not_supported`; retry is an integer 0–86400. Missing hook means `not_supported`, never a fabricated success. |
-| `AccountIdentity` / `accountIdentity(secrets, context, signal)` | Optional async `AccountIdentityResult`: `{ok: true, identity: string}` or `{ok: false, code, retryAfterSeconds?}` with a check failure code. Identity is a canonical opaque UTF-8 value of 1–256 bytes, server-only. PR 1 declares this hook without enrolling payment merchants. |
-| `LocateWebhook` / `locateWebhook(input)` | Optional pure synchronous `PaymentWebhookInput` → `WebhookLocation` or null. Location has `reference?` and/or `providerPaymentId?`, at least one bounded validated identifier. It is a lookup hint, never signature verification or a payment fact. Managed payment adapters with webhooks require it when their runtime is enabled in a later PR. |
+| `AccountIdentity` / `accountIdentity(secrets, context, signal)` | Optional async `AccountIdentityResult`: `{ok: true, identity: string}` or `{ok: false, code, retryAfterSeconds?}` with a check failure code. Identity is a canonical opaque UTF-8 value of 1–256 bytes, server-only. PR 2 enrolls a permanent encrypted baseline on each outbound save for packages exporting this hook. |
+| `LocateWebhook` / `locateWebhook(input)` | Optional pure synchronous `PaymentWebhookInput` → `WebhookLocation` or null. Location has `reference?` and/or `providerPaymentId?`, at least one bounded validated identifier. It is a lookup hint, never signature verification or a payment fact. Managed payment adapters with webhooks require it in PR 2. |
 | `ManagedProviderExports<K>` | Kind-appropriate factory plus optional check, identity and locator hooks. Existing `validateIntegrationSecret(field, value)` stays synchronous and enforces format without disclosing the input. |
 
 Provider code must use no environment reads in managed factories. Optional hooks cannot return raw provider text/errors or silently select another credential. No live payment, refund, shipment or email send is a credential check.
@@ -33,7 +33,7 @@ Provider code must use no environment reads in managed factories. Optional hooks
 - The API checks authority under integration then credential-version `FOR SHARE` locks, invokes the thunk there, commits/releases the locks, and only then awaits `completion`. Every retry, page, JWT acquisition and public-key refresh needs its own gate. A cached client grants no authority.
 - A denial throws `CredentialAdmissionDenied`, an Error-shaped interface with `name: CredentialAdmissionDenied` and code `credential_revoked` or `credential_unavailable`; provider adapters preserve that code-only boundary. No HTTP status/body, request headers, credential or underlying cause crosses it.
 - Revoked is terminal. A revoke committed before transport admission prevents the thunk; an already-started request may finish. A transport started before a failed admission-transaction commit is ambiguous and must never be treated as definitely unsent.
-- PR 1 uses this authority for explicit saved-version checks. Implementing payment/shipping adapters and resource bindings is separate work; the contract does not claim those paths already use it.
+- Explicit saved-version checks and managed payment adapters use this authority; shipping runtime remains later work.
 
 ## Bundle identity and API
 
@@ -42,3 +42,13 @@ A save creates a new generation. It may clone retained declared fields only from
 Reads expose at most 20 recent non-retired versions with metadata only. Optional environment selection is on the existing secret PUT body; there are no new environment/history routes. Exact DTOs, check budgets, errors, lifecycle actions and best-effort owner alerts are in the [Integrations API](../api/integrations.md).
 
 A declared environment variable takes precedence whenever present, including blank (manifest default). Invalid values make the installed integration unavailable with a code-only log. Saves and checks must match the locked environment before step-up, decryption or network; reads expose `environmentSource` and effective `environment`, and the admin selector is locked for source `env`.
+
+## Payment bindings and merchant permanence
+
+The async API source exposes active `{code, versionId, port}` snapshots, online enablement, lookup by payment binding and transaction-aware new-work admission. Snapshot reuse requires a freshly read matching revision and age below five seconds; version clients have a separate bounded idle cache. Every transport still checks DB authority. A null binding never authorizes a DB credential; a non-null binding cannot change or be cleared (migration 0023).
+
+A package with `accountIdentity` enrolls a permanent `(kind, provider, environment)` merchant identity on a successful complete outbound bundle save; incomplete bundles remain unverified candidates. Identity is AES-GCM encrypted with separate length-prefixed `fluxkit.integration-merchant-baseline/v1` AAD. It is excluded from shopper exports, immutable and not deleted by disable/revoke. Saves compare identity before committing a replacement; activation requires the version's audited enrollment comparison and readable baseline, without repeating the remote read. A missing/expired proof requires a fresh save. Monobank uses merchantId only; LiqPay omits identity/check hooks.
+
+## Shopper payment availability (PR 2)
+
+- Persisted order/payment views remain readable when new managed admissions fail. Store order `payment` and guest/customer payment status responses add optional `unavailableReason: "payment_not_available"`; it accompanies `canPay: false` / `canRetry: false`. It describes new-work availability, not the persisted payment outcome. Admission remains fail-closed.

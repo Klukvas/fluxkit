@@ -30,6 +30,7 @@ export interface PaymentRowForTest {
   id: string;
   order_id: string;
   provider_code: string;
+  integration_credential_version_id: string | null;
   provider_payment_id: string | null;
   amount: number;
   currency: string;

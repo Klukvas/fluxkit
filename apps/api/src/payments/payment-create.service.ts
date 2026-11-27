@@ -25,7 +25,8 @@ import { moneyOf } from "./payment-facts.service.js";
 import { paymentDescription, snapshotText } from "./payment-messages.js";
 import { callPaymentProvider, describePaymentCall } from "./payment-provider-call.js";
 import { PAYMENT_TIMINGS, PAYMENTS_CONFIG, type PaymentsConfig } from "./payments-config.js";
-import { PaymentProviderRegistry } from "./registry/index.js";
+import { IntegrationUnavailableError } from "../integrations/installed-integrations.js";
+import { type ActivePaymentProvider, PaymentProviders } from "./registry/payment-providers.js";
 
 /** The shopper's view of an attempt the create flow answers (no provider id, no amount from the client). */
 export interface CreatedPaymentView {
@@ -117,16 +118,15 @@ export class PaymentCreateService {
     @Inject(PaymentsRepository) private readonly payments: PaymentsRepository,
     @Inject(PaymentChanges) private readonly changes: PaymentChanges,
     @Inject(OrdersRepository) private readonly orders: OrdersRepository,
-    @Inject(PaymentProviderRegistry) private readonly registry: PaymentProviderRegistry,
+    @Inject(PaymentProviders) private readonly registry: PaymentProviders,
     @Inject(PAYMENTS_CONFIG) private readonly config: PaymentsConfig,
     @Inject(LOCALE_CONFIG) private readonly locales: LocaleConfig,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
 
   async createPaymentForOrder(input: CreatePaymentInput): Promise<CreatePaymentResult> {
-    const provider = this.chooseProvider(input.providerCode ?? null);
     const now = this.clock.now();
-    const opened = await this.open(input, provider, now);
+    const opened = await this.open(input, now);
     if (opened.kind !== "opened") {
       return opened;
     }
@@ -155,7 +155,6 @@ export class PaymentCreateService {
   /** Step 1. Answers the new `creating` row and the provider request, or the final answer of a replay or refusal. */
   private async open(
     input: CreatePaymentInput,
-    provider: PaymentProviderPort | undefined,
     now: Date,
   ): Promise<
     | Exclude<CreatePaymentResult, { kind: "provider_unavailable" }>
@@ -182,6 +181,8 @@ export class PaymentCreateService {
             if (replayed !== undefined) {
               return this.replayOf(replayed, input);
             }
+            const selection = await this.chooseProvider(input.providerCode ?? null, tx);
+            const provider = selection?.port;
             const attempts = await this.payments.lockAttemptsOfOrder(tx, order.id);
             const decision = decideNewPaymentAttempt({
               orderStatus: order.status as OrderStatus,
@@ -203,6 +204,8 @@ export class PaymentCreateService {
             if (provider === undefined || this.config.storefrontPublicUrl === null) {
               throw new Error("unreachable: a provider was available");
             }
+            const versionId = await this.registry.admit(tx, provider.code);
+            if (versionId !== selection?.versionId) throw new IntegrationUnavailableError();
             await this.invalidateOpen(tx, attempts, decision.invalidate, now);
             const row = await this.changes.create(
               tx,
@@ -210,6 +213,7 @@ export class PaymentCreateService {
                 id: randomUUID(),
                 orderId: order.id,
                 providerCode: provider.code,
+                integrationCredentialVersionId: versionId,
                 amount: order.totalAmount,
                 currency: order.currency,
                 expiresAt: decision.expiresAt,
@@ -229,6 +233,8 @@ export class PaymentCreateService {
         (message) => this.logger.warn(message),
       );
     } catch (error) {
+      if (error instanceof IntegrationUnavailableError)
+        return { kind: "refused", rule: "payment_not_available" };
       // The order lock serializes creates, so these are a second guard: the one-live-attempt index and the key.
       if (isUniqueViolation(error, "payment_order_id_live_key")) {
         return { kind: "refused", rule: "payment_in_progress" };
@@ -437,11 +443,12 @@ export class PaymentCreateService {
     return result;
   }
 
-  private chooseProvider(code: string | null): PaymentProviderPort | undefined {
-    if (code !== null) {
-      return this.registry.get(code);
-    }
-    const providers = this.registry.list();
+  private async chooseProvider(
+    code: string | null,
+    tx: Transaction,
+  ): Promise<ActivePaymentProvider | undefined> {
+    const providers = await this.registry.active(tx);
+    if (code !== null) return providers.find((provider) => provider.code === code);
     return providers.length === 1 ? providers[0] : undefined;
   }
 }

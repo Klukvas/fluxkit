@@ -7,6 +7,7 @@ import { LiveRegion } from "@fluxkit/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useI18n } from "../../i18n/i18n-context";
 import { adminClient } from "../../lib/api";
+import { refreshAdminConfig } from "../../layout/config-refresh";
 import { useRefreshingResource } from "../../lib/use-refreshing-resource";
 import { useSession } from "../../session/session-context";
 import { PageHeader } from "../../views/status-views";
@@ -68,6 +69,8 @@ export function IntegrationsPage() {
   }
 
   function done(result: SecretDialogResult) {
+    if (result === "turnedOn" || result === "turnedOff" || result === "revoked")
+      refreshAdminConfig();
     setTarget(null);
     setNotice(result);
     resource.reload();

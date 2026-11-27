@@ -81,7 +81,7 @@ export class PersonalDataExportService {
       emailSuppressions: await this.reader.suppressionFacts(db, subject),
       sessions,
       cart: cartFacts,
-      processors: this.reader.processors(),
+      processors: await this.reader.processors(db),
     });
     const forbidden = findForbiddenExportKeys(document);
     if (forbidden.length > 0) {

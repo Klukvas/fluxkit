@@ -39,6 +39,33 @@ export const integrationTables: Inventory = {
     created_by: classified("staff", "D26", "excluded", "set_null", ACTOR_REASON),
   },
 
+  integration_merchant_baseline: {
+    ...none(
+      "D26",
+      "id",
+      "integration_id",
+      "kind",
+      "provider_code",
+      "environment",
+      "enrollment_source",
+      "created_at",
+    ),
+    created_by: classified("staff", "D26", "excluded", "set_null", ACTOR_REASON),
+    ...many(
+      classified(
+        "encrypted_secret",
+        "D26",
+        "excluded",
+        "out_of_scope",
+        "Permanent encrypted merchant identity of the shop; never exported or erased by shopper requests, and retained across provider lifecycle changes.",
+      ),
+      "key_id",
+      "nonce",
+      "ciphertext",
+      "tag",
+    ),
+  },
+
   integration_secret: {
     ...none("D26", "id", "version_id", "field", "created_at"),
     ...many(

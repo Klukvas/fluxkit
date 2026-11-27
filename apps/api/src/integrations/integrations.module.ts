@@ -1,3 +1,7 @@
+import { PaymentProviders } from "../payments/registry/payment-providers.js";
+import { PaymentActivationService } from "./payment-activation.service.js";
+import { MerchantBaselineCipher } from "./merchant-baseline-cipher.js";
+import { PaymentMerchantEnrollment } from "./payment-merchant-enrollment.js";
 import { Module, type DynamicModule } from "@nestjs/common";
 import { MANAGED_EMAIL_SOURCE } from "../email/registry/email-provider-registry.js";
 import { CandidateBundleWriter } from "./candidate-bundle-writer.js";
@@ -29,13 +33,24 @@ export class IntegrationsModule {
         InstalledIntegrations,
         IntegrationsRepository,
         IntegrationRuntime,
+        PaymentProviders,
+        MerchantBaselineCipher,
+        PaymentMerchantEnrollment,
+        PaymentActivationService,
         { provide: MANAGED_EMAIL_SOURCE, useExisting: IntegrationRuntime },
         IntegrationsService,
         IntegrationCheckService,
         IntegrationAlerts,
         CandidateBundleWriter,
       ],
-      exports: [IntegrationRuntime, MANAGED_EMAIL_SOURCE],
+      exports: [
+        IntegrationRuntime,
+        MANAGED_EMAIL_SOURCE,
+        PaymentProviders,
+        IntegrationsRepository,
+        InstalledIntegrations,
+        SecretCipher,
+      ],
     };
   }
 }

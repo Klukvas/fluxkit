@@ -5,10 +5,7 @@ import { PRICING_CONFIG, type PricingConfig } from "../../common/pricing-config.
 import { SEARCH_PORT, type SearchPort } from "../../common/search-port.js";
 import { ENABLED_FEATURES, type EnabledFeatures } from "../../features/enabled-features.js";
 import { EmailProviderRegistry, type EmailProviderSource } from "../../email/registry/index.js";
-import {
-  PaymentProviderRegistry,
-  type PaymentProviderSource,
-} from "../../payments/registry/index.js";
+import { PaymentProviders } from "../../payments/registry/payment-providers.js";
 import { toPage, type Page } from "../../common/pagination.js";
 import { notFound, validationFailed } from "../../common/problem.js";
 import {
@@ -106,7 +103,7 @@ export class StoreService {
     @Inject(LOCALE_CONFIG) private readonly config: LocaleConfig,
     @Inject(PRICING_CONFIG) private readonly pricing: PricingConfig,
     @Inject(EmailProviderRegistry) private readonly email: EmailProviderSource,
-    @Inject(PaymentProviderRegistry) private readonly payments: PaymentProviderSource,
+    @Inject(PaymentProviders) private readonly payments: PaymentProviders,
     @Inject(SEARCH_PORT) private readonly search: SearchPort,
     @Inject(ENABLED_FEATURES) private readonly features: EnabledFeatures,
   ) {}
@@ -121,7 +118,7 @@ export class StoreService {
       defaultLocale: this.config.defaultLocale,
       locales: [...this.config.locales],
       emailDelivery: this.email.deliveryEnabled(),
-      onlinePayment: this.payments.onlineEnabled(),
+      onlinePayment: await this.payments.onlineEnabled(),
       search: this.search.enabled,
       features: [...this.features],
     };

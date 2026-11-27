@@ -820,7 +820,7 @@ describe("admin integrations (real Postgres and Redis, session sign-in)", () => 
     });
   });
 
-  it("refuses to activate while EMAIL_PROVIDER is selected, and refuses payment", async () => {
+  it("refuses activation while email and payment enablement are env-owned", async () => {
     const session = await signIn();
     const testmail = await integrationOf(session, "testmail");
     const payment = await integrationOf(session, "testpay");
@@ -841,7 +841,7 @@ describe("admin integrations (real Postgres and Redis, session sign-in)", () => 
       { expectedRevision: revision, currentPassword: PASSWORD },
     );
     expect(online.status).toBe(409);
-    expect(online.body.rule).toBe("integration_runtime_not_ready");
+    expect(online.body.rule).toBe("integration_env_override");
     const audits = await db.execute(
       sql`select 1 from admin_audit_event where admin_user_id = ${session.user.id}::uuid and action = 'admin_user.step_up_failed'`,
     );

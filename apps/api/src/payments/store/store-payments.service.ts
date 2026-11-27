@@ -161,7 +161,7 @@ export class StorePaymentsService {
         const row = await this.attempt(result.payment.paymentId);
         const fresh = (await this.orders.findById(this.database, order.id)) ?? order;
         const attempts = await this.payments.listAttemptsOfOrder(this.database, order.id);
-        const canRetry = this.views.canPay(fresh, attempts);
+        const canRetry = await this.views.canPay(fresh, attempts);
         throw paymentProviderUnavailable(this.retryAfter(row, result.retryAfterSeconds, canRetry), {
           paymentId: row.id,
           status: shopperViewOf(row).status,

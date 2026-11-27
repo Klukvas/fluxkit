@@ -1,7 +1,8 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { sql } from "drizzle-orm";
 import { checkIntegrationSecretValue, type IntegrationSecretDeclaration } from "@fluxkit/core";
-import type { AdminPrincipal } from "../auth/admin-authenticator.js";
+import type { IntegrationActor } from "./integration-actor.js";
+export type { IntegrationActor } from "./integration-actor.js";
 import { CLOCK, type Clock } from "../auth/clock.js";
 import { AdminStepUpService, type VerifiedStepUp } from "../auth/step-up/admin-step-up.service.js";
 import {
@@ -23,17 +24,11 @@ import { INTEGRATIONS_CONFIG, type IntegrationsConfig } from "./integrations.con
 import { IntegrationRuntime } from "./integration-runtime.js";
 import { readEmailRouteMode } from "../email/outbox/email-route-policy.js";
 import { storedEmailActivationAllowed } from "./stored-email-route.js";
-import {
-  IntegrationsRepository,
-  type IntegrationRow,
-  type StoredSecretSummary,
-} from "./integrations.repository.js";
+import { IntegrationsRepository, type IntegrationRow } from "./integrations.repository.js";
 import type {
   IntegrationDetailResponse,
   IntegrationListResponse,
   IntegrationMutationBody,
-  IntegrationResponse,
-  IntegrationVersionResponse,
   PutIntegrationSecretBody,
   RetireIntegrationSecretBody,
   SetEmailRouteBody,
@@ -41,6 +36,12 @@ import type {
 import { IntegrationAlerts, type IntegrationAlertEvent } from "./integration-alerts.service.js";
 import { CandidateBundleWriter } from "./candidate-bundle-writer.js";
 import { SecretCipher } from "./secret-cipher.js";
+import { integrationResponseView } from "./integration-response-view.js";
+import { PaymentActivationService } from "./payment-activation.service.js";
+import {
+  PaymentMerchantEnrollment,
+  type MerchantEnrollment,
+} from "./payment-merchant-enrollment.js";
 
 const PERMISSION = "integrations.manage";
 
@@ -67,19 +68,10 @@ interface ResolvedIntegration {
   readonly installed: InstalledIntegration;
 }
 
-/** Who asks and from where; the address is only counted by the step-up limits. */
-export interface IntegrationActor {
-  readonly principal: AdminPrincipal;
-  readonly clientAddress: string;
-}
-
 /**
- * The integration store of the admin (ADR 0058, slice 1 of plan 2026-11-16-admin-integrations): which installed
- * providers can hold credentials, whether each secret is set, and saving or retiring a stored one. A saved credential
- * is a candidate only: nothing here hands a stored value to a provider, and no response or log line carries one.
- *
- * Every change: stateless checks first (so a typo costs no password attempt), then the password re-entry with its
- * strict limits, then one transaction that re-checks the owner, moves the revision (compare and set), writes and audits.
+ * Owner-only encrypted credentials and lifecycle management. Email and payment providers activate stored generations;
+ * shipping remains unavailable. Saves and lifecycle changes recheck step-up, CAS the revision, and audit atomically.
+ * Payment identity probes run before the save transaction; its permanent merchant comparison commits with the candidate.
  */
 @Injectable()
 export class IntegrationsService {
@@ -95,6 +87,8 @@ export class IntegrationsService {
     @Inject(IntegrationRuntime) private readonly runtime: IntegrationRuntime,
     @Inject(IntegrationAlerts) private readonly alerts: IntegrationAlerts,
     @Inject(CandidateBundleWriter) private readonly bundles: CandidateBundleWriter,
+    @Inject(PaymentActivationService) private readonly paymentActivation: PaymentActivationService,
+    @Inject(PaymentMerchantEnrollment) private readonly merchants: PaymentMerchantEnrollment,
   ) {}
 
   async list(): Promise<IntegrationListResponse> {
@@ -122,10 +116,12 @@ export class IntegrationsService {
       storage: this.storage(),
       emailRouteMode,
       items: resolved.map((entry) =>
-        this.view(
+        integrationResponseView(
           entry,
           stored,
           versions.filter((version) => version.integrationId === entry.row.id),
+          this.installed,
+          this.cipher,
         ),
       ),
     };
@@ -141,7 +137,7 @@ export class IntegrationsService {
     return {
       revision,
       storage: this.storage(),
-      integration: this.view(resolved, stored, versions),
+      integration: integrationResponseView(resolved, stored, versions, this.installed, this.cipher),
     };
   }
 
@@ -192,8 +188,16 @@ export class IntegrationsService {
       clientAddress: actor.clientAddress,
       operation: "integration.secret_changed",
     });
+    const enrollment = await this.merchants.prepare(
+      actor,
+      resolved.row,
+      resolved.installed,
+      declaration,
+      body,
+      verified,
+    );
     const event = await withTransaction(this.db, (transaction) =>
-      this.writeCandidate(transaction, resolved, declaration, body, verified),
+      this.writeCandidate(transaction, resolved, declaration, body, verified, enrollment),
     );
     this.runtime.drop();
     await this.alerts.notify(event);
@@ -443,6 +447,7 @@ export class IntegrationsService {
     declaration: IntegrationSecretDeclaration,
     body: PutIntegrationSecretBody,
     verified: VerifiedStepUp,
+    enrollment: MerchantEnrollment | undefined,
   ): Promise<IntegrationAlertEvent> {
     const now = this.clock.now();
     const { row } = resolved;
@@ -457,6 +462,8 @@ export class IntegrationsService {
       verified.userId,
       now,
     );
+    if (enrollment !== undefined)
+      await this.merchants.enroll(transaction, row, enrollment, verified.userId, now);
     const purpose = declaration.purpose;
     await this.repository.touch(transaction, row.id, verified.userId, now);
     const auditEventId = await this.audit.record(transaction, verified.userId, {
@@ -471,6 +478,7 @@ export class IntegrationsService {
         generation,
         version: versionId,
         replaced,
+        ...(enrollment === undefined ? {} : { enrollmentMatched: true }),
       },
     });
     return {
@@ -485,7 +493,11 @@ export class IntegrationsService {
 
   private async assertActivatable(resolved: ResolvedIntegration): Promise<void> {
     const { row, installed } = resolved;
-    if (row.kind !== "email") throw runtimeNotReady();
+    if (row.kind !== "email" && row.kind !== "payment") throw runtimeNotReady();
+    if (row.kind === "payment") {
+      await this.paymentActivation.assertActivatable(this.db, resolved);
+      return;
+    }
     if (!this.config.emailRouteDelegated) {
       throw ruleViolation(
         "EMAIL_PROVIDER is set on the server, so a stored credential cannot be activated.",
@@ -528,7 +540,15 @@ export class IntegrationsService {
     await this.stepUp.assertStillValid(transaction, verified, PERMISSION);
     await this.advanceRevision(transaction, body.expectedRevision, now);
     const locked = await this.repository.findByIdForUpdate(resolved.row.id, transaction);
-    if (locked === undefined || locked.kind !== "email") throw runtimeNotReady();
+    if (locked === undefined) throw runtimeNotReady();
+    if (locked.kind === "payment")
+      return this.paymentActivation.activate(
+        transaction,
+        { ...resolved, row: locked },
+        verified,
+        now,
+      );
+    if (locked.kind !== "email") throw runtimeNotReady();
     const outbound = resolved.installed.secrets.filter((entry) => entry.purpose === "outbound");
     if (
       !this.config.emailRouteDelegated ||
@@ -684,69 +704,6 @@ export class IntegrationsService {
     if ((await this.repository.advanceRevision(transaction, expected, now)) === undefined) {
       throw revisionStale();
     }
-  }
-
-  private view(
-    resolved: ResolvedIntegration,
-    stored: readonly StoredSecretSummary[],
-    versions: readonly IntegrationVersionResponse[],
-  ): IntegrationResponse {
-    const { row, installed } = resolved;
-    return {
-      id: row.id,
-      kind: installed.kind,
-      providerCode: row.providerCode,
-      enabled: row.enabled,
-      environmentSource:
-        this.installed.lockedEnvironment(installed) === undefined ? "store" : "env",
-      environment:
-        this.installed.lockedEnvironment(installed) ??
-        versions.find((version) => version.state === "candidate" && version.purpose === "outbound")
-          ?.environment ??
-        installed.environments?.default ??
-        "default",
-      versions: versions.map(
-        ({ id, purpose, generation, state, environment, createdAt, fields }) => ({
-          id,
-          purpose,
-          generation,
-          state,
-          environment,
-          createdAt,
-          fields,
-        }),
-      ),
-      ...(installed.environments === undefined
-        ? {}
-        : {
-            environments: { ...installed.environments, values: [...installed.environments.values] },
-          }),
-      updatedAt: row.updatedAt.toISOString(),
-      secrets: installed.secrets.map((declaration) => {
-        const saved = stored.find(
-          (entry) => entry.integrationId === row.id && entry.field === declaration.field,
-        );
-        const isInEnvironment = this.installed.isSetInEnvironment(declaration);
-        return {
-          field: declaration.field,
-          purpose: declaration.purpose,
-          envVariable: declaration.envVariable,
-          state: isInEnvironment ? "env" : saved === undefined ? "not_set" : "set",
-          last4: null,
-          versionId: saved?.versionId ?? null,
-          generation: saved?.generation ?? null,
-          savedAt: saved?.savedAt.toISOString() ?? null,
-          keyAvailable: saved === undefined ? null : this.cipher.hasKey(saved.keyId),
-          versionState:
-            saved?.state === "candidate" ||
-            saved?.state === "active" ||
-            saved?.state === "draining" ||
-            saved?.state === "revoked"
-              ? saved.state
-              : null,
-        };
-      }),
-    };
   }
 }
 

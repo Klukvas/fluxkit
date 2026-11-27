@@ -37,7 +37,7 @@ import {
   type RefundRow,
 } from "./attempts/payments.repository.js";
 import { scheduleAfterChange, scheduleAfterPoll } from "./payment-schedule.js";
-import { PaymentProviderRegistry } from "./registry/index.js";
+import { PaymentProviders } from "./registry/payment-providers.js";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -45,6 +45,8 @@ export type FactSource = "webhook" | "poll";
 
 export interface ApplyFactInput {
   readonly providerCode: string;
+  /** The exact client that verified a webhook; null is explicit env authority. */
+  readonly verifiedVersionId?: string | null;
   readonly fact: ProviderPaymentFact;
   readonly source: FactSource;
   /** `webhook:<sha256 of the raw body>`, or `undefined` for a poll (built here from the fact and the attempt). */
@@ -114,7 +116,7 @@ export class PaymentFactsService {
     @Inject(PaymentChanges) private readonly changes: PaymentChanges,
     @Inject(OrdersRepository) private readonly orderRows: OrdersRepository,
     @Inject(OrdersService) private readonly orders: OrdersService,
-    @Inject(PaymentProviderRegistry) private readonly registry: PaymentProviderRegistry,
+    @Inject(PaymentProviders) private readonly registry: PaymentProviders,
   ) {}
 
   /** Finds the attempt by the provider's id, else by our reference (which binds a `create_unknown` attempt). */
@@ -185,6 +187,9 @@ export class PaymentFactsService {
     let row = await this.payments.lockById(tx, paymentId);
     if (row === undefined) {
       throw new Error("A payment attempt disappeared under its order lock");
+    }
+    if (input.source === "webhook") {
+      await this.registry.assertFactAuthority(tx, row, input.verifiedVersionId ?? null);
     }
     const dedupeKey =
       input.source === "webhook"
@@ -372,7 +377,7 @@ export class PaymentFactsService {
     reason: "late_payment" | "duplicate_payment",
     now: Date,
   ): Promise<void> {
-    const provider = this.registry.get(row.providerCode);
+    const provider = await this.registry.forPayment(row, tx);
     const decision = decideRefund({
       payment: {
         status: "succeeded",

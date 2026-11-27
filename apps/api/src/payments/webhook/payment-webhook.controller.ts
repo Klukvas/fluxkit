@@ -20,7 +20,7 @@ import { RateLimit } from "../../rate-limit/rate-limit.decorator.js";
 import { PaymentFactsService } from "../payment-facts.service.js";
 import { callPaymentProvider, describePaymentCall } from "../payment-provider-call.js";
 import { PAYMENTS_CONFIG, type PaymentsConfig } from "../payments-config.js";
-import { PaymentProviderRegistry } from "../registry/index.js";
+import { PaymentProviders } from "../registry/payment-providers.js";
 import { RAW_WEBHOOK_BODY, type RequestWithRawWebhookBody } from "./webhook-raw-body.js";
 
 const JSON_CONTENT_TYPE = /^application\/json(\s*;.*)?$/i;
@@ -63,7 +63,7 @@ export class PaymentWebhookController {
   private readonly logger = new Logger("PaymentWebhook");
 
   constructor(
-    @Inject(PaymentProviderRegistry) private readonly registry: PaymentProviderRegistry,
+    @Inject(PaymentProviders) private readonly registry: PaymentProviders,
     @Inject(PaymentFactsService) private readonly facts: PaymentFactsService,
     @Inject(PAYMENTS_CONFIG) private readonly config: PaymentsConfig,
     @Inject(CLOCK) private readonly clock: Clock,
@@ -89,8 +89,10 @@ export class PaymentWebhookController {
     @Param("provider") code: string,
     @Req() request: RequestWithRawWebhookBody,
   ): Promise<void> {
-    const provider = this.registry.get(code);
-    if (provider === undefined) {
+    const rawBody = request[RAW_WEBHOOK_BODY] ?? Buffer.alloc(0);
+    const input = { headers: headersOf(request), rawBody: new Uint8Array(rawBody) };
+    const selected = await this.registry.webhook(code, input);
+    if (selected === undefined) {
       throw notFound("Payment provider");
     }
     if (!isAcceptedWebhookContentType(request.headers["content-type"])) {
@@ -100,13 +102,9 @@ export class PaymentWebhookController {
         detail: "The notification must be JSON or form-urlencoded.",
       });
     }
-    const rawBody = request[RAW_WEBHOOK_BODY] ?? Buffer.alloc(0);
+    const provider = selected.port;
     const verified = await callPaymentProvider<ProviderPaymentFact>(
-      (signal) =>
-        provider.verifyWebhook(
-          { headers: headersOf(request), rawBody: new Uint8Array(rawBody) },
-          signal,
-        ),
+      (signal) => provider.verifyWebhook(input, signal),
       this.config.providerTimeoutMs,
     );
     if (!verified.result.ok) {
@@ -134,6 +132,7 @@ export class PaymentWebhookController {
     try {
       const result = await this.facts.applyProviderFact({
         providerCode: provider.code,
+        verifiedVersionId: selected.versionId,
         fact,
         source: "webhook",
         webhookDedupeKey: dedupeKey,

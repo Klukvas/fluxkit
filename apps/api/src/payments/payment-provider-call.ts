@@ -49,7 +49,7 @@ export async function callPaymentProvider<T>(
     started = work(controller.signal);
   } catch (error) {
     clearTimeout(timer);
-    return unavailable("threw", errorNameOf(error));
+    return admissionFailure(error) ?? unavailable("threw", errorNameOf(error));
   }
   // A late rejection of an abandoned call must not become an unhandled rejection.
   started.catch(() => undefined);
@@ -79,7 +79,7 @@ export async function callPaymentProvider<T>(
     if (controller.signal.aborted) {
       return unavailable("timed_out");
     }
-    return unavailable("threw", errorNameOf(error));
+    return admissionFailure(error) ?? unavailable("threw", errorNameOf(error));
   } finally {
     clearTimeout(timer);
   }
@@ -100,4 +100,22 @@ export function describePaymentCall(outcome: PaymentCallOutcome<unknown>): strin
   return result.ok
     ? "ok"
     : `failed reason=${result.reason} codes=${result.providerCodes.join(",") || "none"}`;
+}
+
+/** Keep the typed safe boundary code, while preserving ambiguity for a multi-transport operation. */
+function admissionFailure(error: unknown): PaymentCallOutcome<never> | undefined {
+  if (
+    error !== null &&
+    typeof error === "object" &&
+    "name" in error &&
+    error.name === "CredentialAdmissionDenied" &&
+    "code" in error &&
+    (error.code === "credential_revoked" || error.code === "credential_unavailable")
+  ) {
+    return {
+      kind: "failed",
+      result: paymentProviderFailure("unavailable", { providerCodes: [error.code] }),
+    };
+  }
+  return undefined;
 }

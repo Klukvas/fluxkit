@@ -493,3 +493,19 @@ describe("rate limit store configuration", () => {
     expect(() => loadEnv({ ...base, RATE_LIMIT_STORE: store })).toThrow(/RATE_LIMIT_STORE/);
   });
 });
+
+describe("payment delegation", () => {
+  it("delegates only when the enablement variable is absent", () => {
+    expect(loadEnv({ DATABASE_URL: "postgres://x" })).toMatchObject({
+      paymentDelegated: true,
+      enabledPaymentProviders: [],
+    });
+    expect(loadEnv({ DATABASE_URL: "postgres://x", PAYMENT_PROVIDERS_ENABLED: "" })).toMatchObject({
+      paymentDelegated: false,
+      enabledPaymentProviders: [],
+    });
+    expect(
+      loadEnv({ DATABASE_URL: "postgres://x", PAYMENT_PROVIDERS_ENABLED: "monobank" }),
+    ).toMatchObject({ paymentDelegated: false, enabledPaymentProviders: ["monobank"] });
+  });
+});

@@ -37,7 +37,7 @@ export interface PaymentProviderSource {
   onlineEnabled(): boolean;
 }
 
-function implementsPort(value: unknown): value is PaymentProviderPort {
+export function implementsPort(value: unknown): value is PaymentProviderPort {
   if (typeof value !== "object" || value === null) {
     return false;
   }

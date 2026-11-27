@@ -14,6 +14,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { adminUser } from "./admin-auth.js";
+import { integrationCredentialVersion } from "./integrations.js";
 import { salesOrder } from "./orders.js";
 
 /**
@@ -99,6 +100,7 @@ export const payment = pgTable(
     id: id(),
     orderId: uuid("order_id").notNull(),
     providerCode: text("provider_code").notNull(),
+    integrationCredentialVersionId: uuid("integration_credential_version_id"),
     // The provider's invoice id (Monobank `invoiceId`); NULL until the create call answered or a fact bound it.
     providerPaymentId: text("provider_payment_id"),
     // Equal to the order total at creation; never changes (the refunds' composite foreign key keeps it).
@@ -137,6 +139,12 @@ export const payment = pgTable(
       columns: [t.orderId],
       foreignColumns: [salesOrder.id],
     }).onDelete("restrict"),
+    foreignKey({
+      name: "payment_integration_credential_version_id_fkey",
+      columns: [t.integrationCredentialVersionId],
+      foreignColumns: [integrationCredentialVersion.id],
+    }).onDelete("restrict"),
+    index("payment_integration_credential_version_id_idx").on(t.integrationCredentialVersionId),
     unique("payment_provider_code_provider_payment_id_key").on(t.providerCode, t.providerPaymentId),
     unique("payment_order_id_idempotency_key_key").on(t.orderId, t.idempotencyKey),
     // The target of the refunds' composite foreign key (a refund copies its payment's currency and amount).

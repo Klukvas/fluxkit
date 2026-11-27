@@ -352,6 +352,10 @@ export const shopperPaymentFailureCategorySchema = z
 
 /** The `payment` member of the store order views (ADR 0032 decision 18). */
 export const storeOrderPaymentSchema = z.object({
+  unavailableReason: z.literal("payment_not_available").optional().meta({
+    description:
+      "New payment admissions are unavailable; persisted payment details remain readable.",
+  }),
   canPay: z.boolean().meta({
     description:
       "Whether `POST .../payments` would start a new attempt now (the order awaits payment, an online provider takes its currency, no payment is in progress, enough time is left).",

@@ -75,6 +75,9 @@ export const storeCreatedPaymentSchema = z.object({
 });
 
 export const storePaymentStatusSchema = z.object({
+  unavailableReason: z.literal("payment_not_available").optional().meta({
+    description: "New payment admissions are unavailable; the stored status remains readable.",
+  }),
   paymentId: uuidSchema,
   status: shopperPaymentStatusSchema,
   failureCategory: shopperPaymentFailureCategorySchema,

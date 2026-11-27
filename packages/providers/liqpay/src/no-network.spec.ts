@@ -27,6 +27,7 @@ describe("no network in tests, and only www.liqpay.ua in the plugin", () => {
         "config.ts",
         "http.ts",
         "index.ts",
+        "managed.ts",
         "liqpay-provider.ts",
         "payload-money.ts",
         "payload.ts",

@@ -37,7 +37,7 @@ describe("MonobankHttp", () => {
 
   it("calls only the plugin's fixed routes", async () => {
     await expect(
-      http.call({ method: "GET", path: "/api/merchant/details" as MonobankPath }, live()),
+      http.call({ method: "GET", path: "/api/merchant/statement" as MonobankPath }, live()),
     ).rejects.toThrow(RangeError);
     expect(stub.requests).toHaveLength(0);
   });

@@ -310,6 +310,10 @@ describe("candidate bundles and explicit checks (real Postgres/Redis)", () => {
       environment: { BUNDLE_ENVIRONMENT: "invalid" },
       emailRouteDelegated: false,
       emailFromAddress: null,
+      paymentDelegated: false,
+      shopCurrency: "UAH",
+      orderPaymentTtlMinutes: 30,
+      storefrontPublicUrl: null,
     });
     expect(await installed.find("payment", "bundle")).toBeUndefined();
   });

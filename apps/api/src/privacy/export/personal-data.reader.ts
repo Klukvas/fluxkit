@@ -33,7 +33,7 @@ import {
   variant,
 } from "../../database/schema/index.js";
 import { EmailProviderRegistry } from "../../email/registry/index.js";
-import { PaymentProviderRegistry } from "../../payments/registry/index.js";
+import { PaymentProviders } from "../../payments/registry/payment-providers.js";
 import { ShippingProviderRegistry } from "../../shipping/registry/index.js";
 import {
   customerSubject,
@@ -104,7 +104,7 @@ export class PersonalDataReader {
   constructor(
     @Inject(LOCALE_CONFIG) private readonly locale: LocaleConfig,
     @Inject(EmailProviderRegistry) private readonly emailProviders: EmailProviderRegistry,
-    @Inject(PaymentProviderRegistry) private readonly paymentProviders: PaymentProviderRegistry,
+    @Inject(PaymentProviders) private readonly paymentProviders: PaymentProviders,
     @Inject(ShippingProviderRegistry) private readonly shippingProviders: ShippingProviderRegistry,
   ) {}
 
@@ -389,14 +389,14 @@ export class PersonalDataReader {
   }
 
   /** The providers the shop uses (codes); no legal role is stated (ADR 0033 decision 7). */
-  processors(): ExportProcessorFacts[] {
+  async processors(db: DbExecutor): Promise<ExportProcessorFacts[]> {
     const primary = this.emailProviders.get();
     const emails = this.emailProviders.list?.() ?? (primary === undefined ? [] : [primary]);
     return [
       ...emails.map((email) => ({ kind: "email" as const, name: email.code })),
-      ...this.paymentProviders.list().map((provider) => ({
+      ...(await this.paymentProviders.processorCodes(db)).map((code) => ({
         kind: "payment" as const,
-        name: provider.code,
+        name: code,
       })),
       ...this.shippingProviders.list().map((provider) => ({
         kind: "shipping" as const,

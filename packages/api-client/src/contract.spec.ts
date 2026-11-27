@@ -303,6 +303,7 @@ const shopperFailureCategory = {
 
 const orderPayment: Shape<OrderPayment> = {
   object: {
+    unavailableReason: { optional: { enum: ["payment_not_available"] } },
     canPay: "boolean",
     providers: { array: "string" },
     latest: {
@@ -330,6 +331,7 @@ const createdPayment: Shape<CreatedPayment> = {
 
 const paymentState: Shape<PaymentState> = {
   object: {
+    unavailableReason: { optional: { enum: ["payment_not_available"] } },
     paymentId: "string",
     status: shopperPaymentStatus,
     failureCategory: shopperFailureCategory,

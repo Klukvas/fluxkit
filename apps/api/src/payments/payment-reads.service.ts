@@ -13,7 +13,7 @@ import { PaymentsRepository, type PaymentRow } from "./attempts/payments.reposit
 import { PaymentFactsService } from "./payment-facts.service.js";
 import { callPaymentProvider, describePaymentCall } from "./payment-provider-call.js";
 import { PAYMENTS_CONFIG, type PaymentsConfig } from "./payments-config.js";
-import { PaymentProviderRegistry } from "./registry/index.js";
+import { PaymentProviders } from "./registry/payment-providers.js";
 
 export type PaymentReadResult =
   /** The provider answered; its fact went through `PaymentFactsService` (applied, ignored or a duplicate). */
@@ -45,7 +45,7 @@ export class PaymentReadsService {
     @Inject(DRIZZLE) private readonly database: Database,
     @Inject(PaymentsRepository) private readonly payments: PaymentsRepository,
     @Inject(PaymentFactsService) private readonly facts: PaymentFactsService,
-    @Inject(PaymentProviderRegistry) private readonly registry: PaymentProviderRegistry,
+    @Inject(PaymentProviders) private readonly registry: PaymentProviders,
     @Inject(PAYMENTS_CONFIG) private readonly config: PaymentsConfig,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
@@ -87,7 +87,7 @@ export class PaymentReadsService {
   }
 
   private async read(row: PaymentRow): Promise<PaymentReadResult> {
-    const provider = this.registry.get(row.providerCode);
+    const provider = await this.registry.forPayment(row);
     const providerPaymentId = row.providerPaymentId;
     if (provider === undefined) {
       return { kind: "provider_not_enabled" };

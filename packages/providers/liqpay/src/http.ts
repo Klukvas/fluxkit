@@ -1,4 +1,4 @@
-import type { ProviderAbortSignal } from "@fluxkit/core";
+import type { IntegrationTransportGate, ProviderAbortSignal } from "@fluxkit/core";
 import { LIQPAY_API_ORIGIN, LIQPAY_PATHS, type LiqPayPath } from "./config.js";
 import { encodeData, signData } from "./signature.js";
 
@@ -35,6 +35,7 @@ export type LiqPayExchange =
     };
 
 export interface LiqPayHttpOptions {
+  readonly transport?: IntegrationTransportGate;
   readonly publicKey: string;
   readonly privateKey: string;
   readonly origin?: string;
@@ -152,6 +153,7 @@ export class LiqPayHttp {
   readonly publicKey: string;
   readonly privateKey: string;
   private readonly origin: string;
+  private readonly transport: IntegrationTransportGate | undefined;
 
   constructor(options: LiqPayHttpOptions) {
     const origin = options.origin ?? LIQPAY_API_ORIGIN;
@@ -163,6 +165,7 @@ export class LiqPayHttp {
     this.publicKey = options.publicKey;
     this.privateKey = options.privateKey;
     this.origin = origin;
+    this.transport = options.transport;
   }
 
   buildSignedBody(params: Record<string, unknown>): { data: string; signature: string } {
@@ -180,23 +183,37 @@ export class LiqPayHttp {
       return { kind: "failed", code: "aborted_before_send" };
     }
     const url = new URL(request.path, this.origin);
-    const { data, signature } = this.buildSignedBody(request.params);
-    const body = new URLSearchParams({ data, signature }).toString();
     const { signal, release } = follow(callerSignal);
     try {
       let response: Response;
       try {
-        response = await fetch(url, {
-          method: "POST",
-          headers: {
-            accept: "application/json, */*",
-            "content-type": "application/x-www-form-urlencoded",
-          },
-          body,
-          redirect: "error",
-          signal,
-        });
-      } catch {
+        const begin = () => {
+          const { data, signature } = this.buildSignedBody(request.params);
+          const body = new URLSearchParams({ data, signature }).toString();
+          return {
+            completion: fetch(url, {
+              method: "POST",
+              headers: {
+                accept: "application/json, */*",
+                "content-type": "application/x-www-form-urlencoded",
+              },
+              body,
+              redirect: "error",
+              signal,
+            }),
+          };
+        };
+        response = await (this.transport === undefined
+          ? begin().completion
+          : this.transport.start(callerSignal, begin));
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          error.name === "CredentialAdmissionDenied" &&
+          "code" in error &&
+          (error.code === "credential_revoked" || error.code === "credential_unavailable")
+        )
+          throw error;
         return { kind: "failed", code: signal.aborted ? "timeout" : "network" };
       }
       const retryAfter = response.headers.get("retry-after");
