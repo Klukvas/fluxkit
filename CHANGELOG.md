@@ -25,6 +25,8 @@ One line per user-visible or schema change.
 
 ## Unreleased
 
+- Production images exclude checkout env files and their backups at any depth, including `infra/meilisearch.env`.
+
 - Payments (ADR 0059): LiqPay provider (`PAYMENT_PROVIDERS_ENABLED=liqpay`, `LIQPAY_PUBLIC_KEY`, `LIQPAY_PRIVATE_KEY`). Same-origin `/payment/handoff` auto-POSTs signed checkout fields; storefront CSP `form-action` always allows `https://www.liqpay.ua`. Payment webhooks accept JSON or `application/x-www-form-urlencoded` (inbound signature SHA3-256 or SHA-1). Store handoff routes (guest POST + order token; customer session); handoff reuses the create-time locale from the stored redirect URL. Status/refund parse direct JSON answers; HTTP 200 `payment_not_found` maps to `not_found`; `wait_accept`/`wait_compensation` settle as paid; amounts use integer major/minor conversion. Storefront Pay now asks the shopper to choose a provider when several are enabled. Stub-tested only; live S1 not run. No migration.
 
 - Production example: configurable API/storefront replicas, guarded rolling host deploys, HTTP drain before resource shutdown, one server GET/HEAD connection retry, shared media and edge hashing/retries (ADR 0057); the single edge still has a restart gap.

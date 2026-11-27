@@ -24,6 +24,7 @@ TAG=5a0e001
 NEXT_TAG=5a0e002
 BROKEN_TAG=5a0e003
 REQUEST_PID=
+MARKER_ENV_FILES=()
 PREFIX=fluxkit-smoke
 ORIGIN="https://${DOMAIN}:${HTTPS_PORT}"
 OWNER_EMAIL=owner@fluxkit.test
@@ -39,8 +40,21 @@ compose() {
   docker compose -p "$PROJECT" --env-file "$WORK/production.env" -f infra/docker-compose.prod.yml "$@"
 }
 
+remove_marker_env_files() {
+  local file
+  # Bash 3.2 treats an empty array as unset under set -u.
+  for file in ${MARKER_ENV_FILES[@]+"${MARKER_ENV_FILES[@]}"}; do
+    # An operator may have replaced the fixture while the images were building.
+    if [[ -f "$file" && ! -L "$file" ]] && cmp -s "$file" <(printf 'FLUXKIT_SMOKE_MARKER=%s\n' "$ENV_MARKER"); then
+      rm -f -- "$file" || return
+    fi
+  done
+  MARKER_ENV_FILES=()
+}
+
 cleanup() {
   local status=$?
+  remove_marker_env_files || status=1
   if [[ -n "$REQUEST_PID" ]]; then
     touch "$WORK/stop-requests"
     wait "$REQUEST_PID" || true
@@ -104,6 +118,19 @@ bash infra/docker/stop-linger.spec.sh
 pass "stop linger keeps a retiring replica in DNS (infra/docker/stop-linger.spec.sh)"
 
 # --- images ---
+ENV_MARKER=$(openssl rand -hex 32)
+# Use the paths operators use so a regression in the build context is visible in the images.
+for file in infra/meilisearch.env infra/production.env.pre-deploy infra/production.env~ apps/api/.env; do
+  [[ ! -e "$file" && ! -L "$file" ]] || continue
+  (set -o noclobber; printf 'FLUXKIT_SMOKE_MARKER=%s\n' "$ENV_MARKER" >"$file") || fail "could not create $file"
+  MARKER_ENV_FILES+=("$file")
+done
+# A configured checkout can already have all of these files.
+if [[ -z "${MARKER_ENV_FILES[0]:-}" ]]; then
+  file=$(mktemp infra/production.env.smoke.XXXXXXXX)
+  MARKER_ENV_FILES+=("$file")
+  printf 'FLUXKIT_SMOKE_MARKER=%s\n' "$ENV_MARKER" >"$file"
+fi
 read -r -a EXTRA_BUILD_ARGS <<<"${SMOKE_BUILD_ARGS:-}"
 for target in api storefront edge; do
   echo "building $target"
@@ -112,7 +139,25 @@ for target in api storefront edge; do
     --build-arg "STOREFRONT_IMAGE_HOSTS=${DOMAIN}" -t "${PREFIX}-${target}:${TAG}" . >/dev/null
   docker tag "${PREFIX}-${target}:${TAG}" "${PREFIX}-${target}:${NEXT_TAG}"
 done
+remove_marker_env_files
 pass "images built: ${PREFIX}-api, ${PREFIX}-storefront, ${PREFIX}-edge"
+
+for target in api storefront edge; do
+  if [[ "$target" == edge ]]; then
+    scan_paths=(/srv/fluxkit/site /etc/nginx/templates /etc/nginx/fluxkit /docker-entrypoint.d)
+  else
+    scan_paths=(/app /usr/local/bin/stop-linger)
+  fi
+  # Bypass the entrypoint and scan the copied paths as root so restrictive file modes cannot hide a match.
+  docker run --rm --network none --user 0 --entrypoint sh "${PREFIX}-${target}:${TAG}" -c '
+    marker=$1
+    shift
+    status=0
+    grep -rlF -- "$marker" "$@" || status=$?
+    [ "$status" -eq 1 ]
+  ' sh "$ENV_MARKER" "${scan_paths[@]}" || fail "env marker check failed for the $target image"
+done
+pass "checkout env file marker absent from the api, storefront and edge images"
 
 # Feature migrations ship in the API image (blog plan E1, ADR 0049): every journal entry of every feature with a drizzle/
 # folder has its migration and its hand-written .down.sql (the removal steps run it by hand); the blog must be among them.

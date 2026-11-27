@@ -48,6 +48,8 @@ volumes: postgres-data, meili-data, media (MEDIA_DIR), acme-webroot
 
 `cp infra/production.env.example infra/production.env`, fill it in, `chmod 600 infra/production.env`; likewise `cp infra/meilisearch.env.example infra/meilisearch.env` for the engine's master key (`FLUXKIT_MEILI_ENV_FILE` points elsewhere). The file is git-ignored. Compose reads it for the `${...}` values of `infra/docker-compose.prod.yml` (`--env-file`), and the `api` and `migrate` containers get all of it as their environment. The storefront and the edge get only their own variables. Nothing secret is built into an image.
 
+Docker excludes env files and their backups at any depth in the checkout, while keeping `.env.example` and `*.env.example` templates in the build context.
+
 Secrets (generate, store in a password manager, back up with the database where noted):
 
 | Variable | Generate | Note |
