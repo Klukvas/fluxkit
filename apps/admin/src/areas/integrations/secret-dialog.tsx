@@ -1,4 +1,8 @@
-import type { AdminIntegration, AdminIntegrationSecret } from "@fluxkit/api-client";
+import type {
+  AdminIntegration,
+  AdminIntegrationSecret,
+  AdminIntegrationVersion,
+} from "@fluxkit/api-client";
 import { useRef, useState } from "react";
 import { useI18n } from "../../i18n/i18n-context";
 import { adminClient } from "../../lib/api";
@@ -28,6 +32,7 @@ export interface SecretDialogTarget {
   integration: AdminIntegration;
   /** Null for turning a provider on or off: those actions name the provider, not one field. */
   secret: AdminIntegrationSecret | null;
+  version?: AdminIntegrationVersion;
 }
 
 /** How a dialog ended when it did not simply stay open with an error. */
@@ -68,6 +73,17 @@ export function SecretDialog({
   const session = useSession();
   const secrets = useSecretValues(BLANK, secretHolder(session.state), onClose);
   const [errors, setErrors] = useState<ShownErrors>(NO_ERRORS);
+  const [environment, setEnvironment] = useState(
+    () =>
+      (target.integration.environmentSource === "env"
+        ? target.integration.environment
+        : undefined) ??
+      target.integration.versions.find(
+        (version) => version.state === "candidate" && version.purpose === target.secret?.purpose,
+      )?.environment ??
+      target.integration.environments?.default ??
+      "default",
+  );
   const [busy, setBusy] = useState(false);
   const [flight] = useState(createSingleFlight);
   const formErrorRef = useRef<HTMLDivElement>(null);
@@ -96,7 +112,7 @@ export function SecretDialog({
     if (action === "remove" || action === "revoke") {
       const body = {
         expectedRevision: revision,
-        versionId: secret?.versionId ?? "",
+        versionId: target.version?.id ?? secret?.versionId ?? "",
         currentPassword: password,
       };
       return action === "remove"
@@ -112,6 +128,7 @@ export function SecretDialog({
     return adminClient.putIntegrationSecret(integration.id, secret?.field ?? "", {
       expectedRevision: revision,
       value: taken.value.trim(),
+      ...(integration.environments === undefined ? {} : { environment }),
       currentPassword: password,
     });
   }
@@ -159,8 +176,18 @@ export function SecretDialog({
     <SecretDialogView
       t={t}
       action={target.action}
-      field={target.secret === null ? "" : labelText(t, secretFieldLabel(target.secret.field))}
+      field={
+        target.version !== undefined
+          ? t("intg.version.title", { generation: target.version.generation })
+          : target.secret === null
+            ? ""
+            : labelText(t, secretFieldLabel(target.secret.field))
+      }
       provider={labelText(t, providerLabel(target.integration.providerCode))}
+      environments={target.integration.environments}
+      environment={environment}
+      environmentSource={target.integration.environmentSource}
+      onEnvironmentChange={setEnvironment}
       values={secrets.values}
       fieldErrors={errors.fields}
       formErrors={errors.form}

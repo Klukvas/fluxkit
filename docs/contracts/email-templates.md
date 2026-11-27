@@ -18,7 +18,7 @@ export class BackInStockTemplate {
 | Member | Rule |
 |---|---|
 | metadata | `EMAIL_TEMPLATE_METADATA` (`"fluxkit:email-template"`) with `emailTemplateMetadata(key, { override? })`; the key equals `template.key` |
-| `template.key` | `EMAIL_TEMPLATE_KEY_PATTERN` (`^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$`), at most 64 characters; a feature uses its own first segment |
+| `template.key` | `EMAIL_TEMPLATE_KEY_PATTERN` (`^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$`), at most 64 characters; a feature uses its own first segment. All built-in and custom keys, including `integration.security_alert`, follow this grammar |
 | `template.version` | whole number from 1; raise it whenever the output for the same variables changes (also after reformatting an `html` literal: Prettier changes its bytes). A queued mail renders only with the version it was enqueued with; a mail of another version fails `template_unavailable` (an admin resends it) |
 | `template.category` | `account` or `order`: chooses the footer text and the provider tag |
 | `template.variablesSchema` | an object with `safeParse` (a strict zod object fits); checked when the mail is enqueued and again when it is rendered |
@@ -42,11 +42,14 @@ export class BackInStockTemplate {
 | Key | Category | Variables | Link (`context.links.action`) | Sent when |
 |---|---|---|---|---|
 | `admin.test` | account | `{providerCode}` | none | the admin test send (plan step 9) |
+| `integration.security_alert` (v1) | account | `{action, kind, providerCode, generation, occurredAt}`; bounded operational metadata only | none | best effort after credential-change/activate/disable/revoke commits; once per active owner through the existing outbox |
 | `customer.password_reset` | account | `{tokenId}` (the token row id; never the token) | `{STOREFRONT_PUBLIC_URL}/{locale}/account/reset-password#t=<token>`, the token derived at render time | `POST /store/account/password-reset` for an active account (email plan step 7) |
 | `customer.password_changed` | account | `{}` | none | a successful reset confirmation |
 | `customer.verify_email` | account | `{tokenId}` | `{STOREFRONT_PUBLIC_URL}/{locale}/account/verify-email#t=<token>` | registration and `POST /store/account/verify-email/resend` |
 
 An override of `customer.password_reset` or `customer.verify_email` must print `context.links.action` (the page the token is for) and must not print `tokenId`. `admin.test` declares `providerCode` displayable; the `customer.*` templates declare nothing.
+
+The integration security alert has uk/en catalogs and uses configured `DEFAULT_LOCALE`. All five operational variables are allowlisted in `displayVariables`. Its recipient is an active owner read from the existing admin records (`recipientKind: admin`, `adminUserId`), never a request address. Dedupe derives from the inserted audit-row ID returned by `AdminAuditWriter.record` and owner ID, giving each owner one message. Email off creates no row; lookup/render/enqueue failure logs only `integration_alert_failed`, leaves the successful mutation unchanged and may lose the mail. Audit remains durable. No provider response, secret, merchant identity or actor address is a variable. There are ten built-in keys including this alert. The dotted alert key requires no email constraint change; migration 0022 never touches `email_message`.
 
 ### Order and shipment mails (email plan step 8)
 

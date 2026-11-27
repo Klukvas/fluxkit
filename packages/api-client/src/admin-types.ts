@@ -1012,6 +1012,38 @@ export interface AdminIntegrationSecret {
   versionState: "candidate" | "active" | "draining" | "revoked" | null;
 }
 
+export interface AdminIntegrationVersion {
+  id: string;
+  purpose: "outbound" | "webhook";
+  generation: number;
+  state: "candidate" | "active" | "draining" | "revoked";
+  environment: string;
+  createdAt: string;
+  /** Saved field names only; never values or suffixes. */
+  fields: string[];
+}
+
+export interface AdminIntegrationEnvironments {
+  values: string[];
+  default: string;
+  envVariable: string;
+}
+
+export type AdminIntegrationCheckCode =
+  "ok" | "invalid_credentials" | "unavailable" | "rate_limited" | "not_supported";
+
+export interface CheckAdminIntegrationBody {
+  expectedRevision: number;
+  versionId: string;
+}
+
+export interface AdminIntegrationCheck {
+  versionId: string;
+  code: AdminIntegrationCheckCode;
+  checkedAt: string;
+  retryAfterSeconds?: number;
+}
+
 export interface AdminIntegration {
   id: string;
   kind: AdminIntegrationKind;
@@ -1019,6 +1051,12 @@ export interface AdminIntegration {
   /** True when new mail uses the stored outbound credential. */
   enabled: boolean;
   secrets: AdminIntegrationSecret[];
+  /** At most 20 non-retired versions, including retained and revoked versions. */
+  versions: AdminIntegrationVersion[];
+  /** Absent means the fixed `default` environment, with no selector. */
+  environments?: AdminIntegrationEnvironments;
+  environmentSource: "env" | "store";
+  environment: string;
   updatedAt: string;
 }
 
@@ -1056,6 +1094,8 @@ export interface AdminIntegrationDetail {
 
 export interface PutAdminIntegrationSecretBody {
   expectedRevision: number;
+  /** Omitted: current candidate environment, otherwise the manifest default. */
+  environment?: string;
   /** The credential as the provider shows it. Stored encrypted; never returned. */
   value: string;
   /** The signed-in owner's current password, asked again for every change. */
@@ -1095,7 +1135,9 @@ export type AdminAuditAction =
   | "integration.activated"
   | "integration.disabled"
   | "integration.revoked"
-  | "integration.route_changed";
+  | "integration.route_changed"
+  | "integration.check_requested"
+  | "integration.check_completed";
 
 export type AdminAuditTargetKind =
   "customer" | "order" | "admin_user" | "privacy_request" | "email_suppression" | "integration";

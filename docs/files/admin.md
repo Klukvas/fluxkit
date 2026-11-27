@@ -239,16 +239,17 @@ Run, headers and conventions: `apps/admin/README.md`. Plan: `docs/plans/2026-10-
 
 - `src/areas/email/provider-usage-view.tsx` — ordered provider roles, shared cooldown/recovery state and UTC retained local all-account usage; clamps only visual bars, never edits limits or drives routing. `provider-usage.css` styles native progress tracks/fills with theme tokens; `provider-usage-view.spec.tsx` covers uk/en accessibility, over-cap values and off mode.
 
-## src/areas/integrations (ADR 0058 slice 1; one lazy chunk, `integrations.manage`, owner only)
+## src/areas/integrations (ADR 0058 and 0060; one lazy chunk, `integrations.manage`, owner only)
 
 - `src/areas/integrations/index.tsx` — the area module: `MESSAGE_FILES` (`integrations`) and `IntegrationsPage` (`/integrations`).
 - `src/areas/integrations/integrations-page.tsx` — reads the list, opens the save, remove, activate, disable or revoke dialog, saves the email route, reloads after every answer and shows the notice. Holds ids and names only, never a typed value.
-- `src/areas/integrations/integrations-list-view.tsx` — the encryption-key warning, providers by kind, one card per provider with its guide, its secrets (state, version, server variable, saved date, re-entry warning) and the email controls (Enter/Replace/Remove, turn on, turn off, revoke). Must NOT render a connection check or a DNS control.
+- `src/areas/integrations/integrations-list-view.tsx` — the encryption-key warning, providers by kind, one card per provider with its guide, its secrets (state, version, server variable, saved date, re-entry warning) and the email controls (Enter/Replace/Remove, turn on, turn off, revoke). Renders bounded version history with complete-bundle Check and retained-version Revoke; payment/shipping activation and DNS controls stay unavailable.
 - `src/areas/integrations/email-route-form.tsx` — the `equal` / `resend` choice and the current-password field. Markup only; the page sends the request. `email-route-form.spec.tsx` renders both languages and the sentinel keys.
+- `src/areas/integrations/integration-versions.tsx` — metadata-only version rows (saved/missing bundle fields, state, environment), explicit version/revision checks, code-only translated results and retained-version revoke. Results reset on edits/reloads; pending checks abort on unmount.
 - `src/areas/integrations/integrations-view.ts` — pure view model: kind order, provider and field labels (unknown codes shown as they are), `secretView` (state, tone, which controls exist, what is disabled without storage).
 - `src/areas/integrations/provider-guides.ts` — the typed table of guide steps (message keys) and external https addresses per shipped provider. The only place of the area with an external address; never the API and never a message file.
 - `src/areas/integrations/secret-dialog.tsx` — the mounted dialog: local checks, one request per submit through `runWrite`, values taken out of the state before the request, error mapping, focus after commit.
-- `src/areas/integrations/secret-dialog-view.tsx` — the dialog's markup: two `type="password"` inputs with `autoComplete="off"` and no `name`, field errors, form alert.
+- `src/areas/integrations/secret-dialog-view.tsx` — the dialog's markup: two `type="password"` inputs with `autoComplete="off"` and no `name`, optional manifest environment selector for key saves, field errors, form alert.
 - `src/areas/integrations/use-secret-values.ts` — `useSecretValues`: the only state a typed key or password lives in; wipes on submit (`take`), close, session expiry or a change of the signed-in admin (`secretHolder`), unmount, `pagehide` and a `pageshow` from the Back/Forward cache. Must NOT be replaced by a store, a URL parameter or browser storage.
 - `src/areas/integrations/integrations-errors.ts` — maps the API's answers to messages: wrong password (403 by `rule`) on the password field, `value` codes on the key field, 409 rules, 429 with the wait, 503 on the form; `localSecretErrors`.
 - `src/areas/integrations/integrations-permissions.ts` — `canManageIntegrations` from the two write operations.

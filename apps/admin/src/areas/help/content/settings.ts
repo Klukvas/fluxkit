@@ -135,8 +135,22 @@ export const SETTINGS_ARTICLES: readonly HelpArticle[] = [
       {
         kind: "warning",
         text: {
-          uk: "Для пошти збережений ключ вмикають з цього екрана. Коли Resend і Brevo обидва в ланцюжку відправки, екран ділить нові листи порівну або починає з Resend; це стосується і ланцюжка, заданого на сервері. Лист чекає, поки стартовий сервіс на паузі, і переходить до іншого лише після точної відмови прийняти. Таймаут і відхилення лишаються на тому сервісі. Вимкнення зупиняє нові листи; ті, що вже в дорозі, можуть дійти. Оплата та доставка й далі працюють із ключами, заданими на сервері.",
-          en: "For email, turn a saved key on from this screen. When Resend and Brevo are both in the send chain, the screen shares new mail evenly or starts with Resend; a chain set on the server follows the same choice. A message waits while its starting provider is cooling down and moves to the other only after a definite non-acceptance. A timeout or a rejection stays on that provider. Turning a key off stops new mail; mail already on its way can finish. Payment and delivery still use the keys set on the server.",
+          uk: "Для пошти збережений ключ вмикають з цього екрана. Коли Resend і Brevo обидва в ланцюжку відправки, екран ділить нові листи порівну або починає з Resend; це стосується і ланцюжка, заданого на сервері. Лист чекає, поки стартовий сервіс на паузі, і переходить до іншого лише після точної відмови прийняти. Таймаут і відхилення лишаються на тому сервісі. Вимкнення зупиняє нові листи; ті, що вже в дорозі, можуть дійти. Ключі оплати й доставки вже можна зберегти та явно перевірити; активація з’явиться в наступному оновленні. Збереження або перевірка не вмикають сервіс.",
+          en: "For email, turn a saved key on from this screen. When Resend and Brevo are both in the send chain, the screen shares new mail evenly or starts with Resend; a chain set on the server follows the same choice. A message waits while its starting provider is cooling down and moves to the other only after a definite non-acceptance. A timeout or a rejection stays on that provider. Turning a key off stops new mail; mail already on its way can finish. Payment and delivery keys can already be saved and explicitly checked; activation arrives in the next update. Saving or checking a key never enables a provider.",
+        },
+      },
+      {
+        kind: "paragraph",
+        text: {
+          uk: "Версії показують збережені й відсутні поля. Для LiqPay публічний і приватний ключі одного магазину складають один набір; збереження одного поля переносить решту з поточної версії. «Перевірити» доступно лише для повного набору й не створює платежу чи відправлення. «Не перевірено» означає відсутність підтримуваної перевірки, а не неправильний ключ. Результат стосується лише зазначеної версії та часу й очищається після редагування.",
+          en: "Versions show saved and missing fields. LiqPay's public and private keys from one shop form a single bundle; saving one field carries the others forward from the current version. Check is offered only for a complete bundle and creates no payment or shipment. Unverified means a supported check is unavailable, not that the key is invalid. A result applies only to that version and time and clears after editing.",
+        },
+      },
+      {
+        kind: "paragraph",
+        text: {
+          uk: "Якщо сервіс пропонує середовища, виберіть його під час збереження ключа: зміна створює нову версію. Monobank не має такого перемикача. Для Nova Post потрібні також профіль і способи доставки; відстеження працює опитуванням без вебхуків. Попередні версії залишаються у списку: «Відкликати» зупиняє їх використання локально й може перервати пов’язані операції. Окремо відкличте ключ у кабінеті постачальника.",
+          en: "If the service offers environments, select one while saving the key: a change creates a new version. Monobank has no such selector. Nova Post also needs a shipping profile and methods; tracking uses polling without webhooks. Retained versions remain listed: Revoke ends their local use and may interrupt bound work. Revoke the key in the provider's dashboard separately.",
         },
       },
       { kind: "screen", route: "integrations" },

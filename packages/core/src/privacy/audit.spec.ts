@@ -32,6 +32,8 @@ describe("the admin audit action list (ADR 0033 decision 9)", () => {
       "integration.disabled",
       "integration.revoked",
       "integration.route_changed",
+      "integration.check_requested",
+      "integration.check_completed",
     ]);
     expect(ADMIN_AUDIT_ACTIONS.some((action) => action.endsWith(".viewed"))).toBe(false);
     expect([...ADMIN_AUDIT_TARGET_KINDS]).toEqual([

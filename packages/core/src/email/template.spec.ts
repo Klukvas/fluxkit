@@ -68,7 +68,11 @@ const orderPaid: EmailTemplate<z.infer<typeof variablesSchema>> = {
 };
 
 describe("template contract constants", () => {
-  it("lists the nine built-in keys of ADR 0031 decision 14, each a valid key", () => {
+  it("keeps alert keys inside the existing dotted grammar", () => {
+    expect(isEmailTemplateKey("integration.security_alert")).toBe(true);
+    expect(isEmailTemplateKey("integration-security-alert")).toBe(false);
+  });
+  it("lists the built-in keys, each a valid dotted key", () => {
     expect([...EMAIL_TEMPLATE_KEYS]).toEqual([
       "customer.password_reset",
       "customer.password_changed",
@@ -79,6 +83,7 @@ describe("template contract constants", () => {
       "order.expired",
       "shipment.created",
       "admin.test",
+      "integration.security_alert",
     ]);
     for (const key of EMAIL_TEMPLATE_KEYS) {
       expect(isEmailTemplateKey(key), key).toBe(true);

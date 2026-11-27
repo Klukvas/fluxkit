@@ -29,6 +29,7 @@ export const EMAIL_TEMPLATE_KEYS = Object.freeze([
   "order.expired",
   "shipment.created",
   "admin.test",
+  "integration.security_alert",
 ] as const);
 
 export type BuiltInEmailTemplateKey = (typeof EMAIL_TEMPLATE_KEYS)[number];

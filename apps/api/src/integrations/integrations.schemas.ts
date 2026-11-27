@@ -1,5 +1,6 @@
 import {
   INTEGRATION_KINDS,
+  INTEGRATION_SECRET_FIELD_PATTERN,
   INTEGRATION_SECRET_MAX_BYTES,
   INTEGRATION_SECRET_PURPOSES,
 } from "@fluxkit/core";
@@ -28,6 +29,7 @@ const currentPassword = z.string().min(1).max(CURRENT_PASSWORD_MAX_LENGTH).meta(
 
 export const putIntegrationSecretSchema = z.strictObject({
   expectedRevision,
+  environment: z.string().regex(INTEGRATION_SECRET_FIELD_PATTERN).optional(),
   value: z.string().min(1).max(INTEGRATION_SECRET_MAX_BYTES).meta({
     writeOnly: true,
     format: "password",
@@ -89,6 +91,26 @@ export const integrationSecretSchema = z.object({
   }),
 });
 
+export const integrationVersionSchema = z.object({
+  id: uuidSchema,
+  purpose: z.enum(INTEGRATION_SECRET_PURPOSES),
+  generation: z.number().int().min(1),
+  state: z.enum(LISTED_CREDENTIAL_STATES),
+  environment: z.string().regex(INTEGRATION_SECRET_FIELD_PATTERN),
+  createdAt: timestampSchema,
+  fields: z.array(z.string()),
+});
+export type IntegrationVersionResponse = z.infer<typeof integrationVersionSchema>;
+export const checkIntegrationSchema = z.strictObject({ expectedRevision, versionId: uuidSchema });
+export type CheckIntegrationBody = z.infer<typeof checkIntegrationSchema>;
+export const integrationCheckResponseSchema = z.object({
+  versionId: uuidSchema,
+  code: z.enum(["ok", "invalid_credentials", "unavailable", "rate_limited", "not_supported"]),
+  checkedAt: timestampSchema,
+  retryAfterSeconds: z.number().int().min(0).max(86400).optional(),
+});
+export type IntegrationCheckResponse = z.infer<typeof integrationCheckResponseSchema>;
+
 export const integrationSchema = z.object({
   id: uuidSchema,
   kind: z.enum(INTEGRATION_KINDS),
@@ -98,6 +120,16 @@ export const integrationSchema = z.object({
       "True when new mail uses the stored outbound credential. Payment and shipping stay false until their safety checks exist.",
   }),
   secrets: z.array(integrationSecretSchema),
+  versions: z.array(integrationVersionSchema).max(20),
+  environmentSource: z.enum(["env", "store"]),
+  environment: z.string().regex(INTEGRATION_SECRET_FIELD_PATTERN),
+  environments: z
+    .object({
+      values: z.array(z.string()).min(1).max(8),
+      default: z.string(),
+      envVariable: z.string(),
+    })
+    .optional(),
   updatedAt: timestampSchema,
 });
 export type IntegrationResponse = z.infer<typeof integrationSchema>;

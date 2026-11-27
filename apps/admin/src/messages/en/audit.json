@@ -64,5 +64,7 @@
   "audit.action.integration.activated": "Integration activated",
   "audit.action.integration.disabled": "Integration turned off",
   "audit.action.integration.revoked": "Integration key revoked",
-  "audit.action.integration.route_changed": "Email sharing changed"
+  "audit.action.integration.route_changed": "Email sharing changed",
+  "audit.action.integration.check_requested": "Integration credential check requested",
+  "audit.action.integration.check_completed": "Integration credential check completed"
 }

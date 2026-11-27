@@ -1,8 +1,12 @@
 import { randomUUID } from "node:crypto";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { Logger } from "@nestjs/common";
+import { IntegrationRuntime } from "./integration-runtime.js";
+import { InstalledIntegrations } from "./installed-integrations.js";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { sql } from "drizzle-orm";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { DRIZZLE, type Database } from "../database/database.module.js";
 import { EmailOutbox } from "../email/outbox/email-outbox.service.js";
 import { EmailSender } from "../email/outbox/email-sender.js";
@@ -18,6 +22,9 @@ import {
 } from "../test/integration-provider-fixture.js";
 import { ensureMigrated } from "../test/migrate.js";
 import { withTransaction } from "../common/transaction.js";
+import { AdminStepUpService } from "../auth/step-up/admin-step-up.service.js";
+import { SecretCipher } from "./secret-cipher.js";
+import type { IntegrationDetailResponse } from "./integrations.schemas.js";
 
 const PASSWORD = "correct horse battery staple";
 const MAIL_KEY = "tm_SENTINELkey0123456789";
@@ -48,6 +55,7 @@ describe("stored email credential at runtime (real Postgres and Redis)", () => {
   let db: Database;
   let sentIds: () => string[];
   const userIds: string[] = [];
+  const environment: Record<string, string | undefined> = {};
   let addressCounter = 0;
 
   const nextAddress = (): string => {
@@ -93,6 +101,24 @@ describe("stored email credential at runtime (real Postgres and Redis)", () => {
   beforeAll(async () => {
     await ensureMigrated();
     fixture = await createIntegrationProviderFixture();
+    const manifestPath = join(fixture.dir, "testmail", "package.json");
+    const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as {
+      fluxkit: Record<string, unknown>;
+    };
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        ...manifest,
+        fluxkit: {
+          ...manifest.fluxkit,
+          environments: {
+            values: ["default", "sandbox", "production"],
+            default: "default",
+            env: "TESTMAIL_ENVIRONMENT",
+          },
+        },
+      }),
+    );
     const loaded = (await import(
       pathToFileURL(join(fixture.dir, "testmail", "index.js")).href
     )) as {
@@ -106,7 +132,7 @@ describe("stored email credential at runtime (real Postgres and Redis)", () => {
       trustProxy: 1,
       secretsKeyRing: testSecretsKeyRing("runtime-key"),
       integrationProvidersDir: fixture.dir,
-      integrationEnvironment: {},
+      integrationEnvironment: environment,
       emailRouteDelegated: true,
     });
     db = running.app.get<Database>(DRIZZLE);
@@ -114,6 +140,8 @@ describe("stored email credential at runtime (real Postgres and Redis)", () => {
   });
 
   afterEach(async () => {
+    vi.restoreAllMocks();
+    delete environment.TESTMAIL_ENVIRONMENT;
     await wipe();
     await deleteTestAdminUsers(db, userIds.splice(0));
   });
@@ -129,6 +157,128 @@ describe("stored email credential at runtime (real Postgres and Redis)", () => {
     return item;
   }
 
+  it.each([
+    ["locked elsewhere", "before step-up"],
+    ["locked elsewhere", "during step-up"],
+    ["absent from the manifest", "before step-up"],
+    ["absent from the manifest", "during step-up"],
+  ])(
+    "refuses activation when the candidate environment is %s %s without changing state",
+    async (restriction, timing) => {
+      const session = await signIn();
+      const item = await saveAndRead(session, "testmail");
+      const before = await listed(session);
+      const saved = await session.call<IntegrationDetailResponse>(
+        "PUT",
+        `/admin/integrations/${item.id}/secrets/api_key`,
+        {
+          expectedRevision: before.revision,
+          currentPassword: PASSWORD,
+          value: MAIL_KEY,
+          environment: "sandbox",
+        },
+      );
+      expect(saved.status).toBe(200);
+      expect(saved.body.integration.versions[0]).toMatchObject({
+        environment: "sandbox",
+        state: "candidate",
+      });
+      const installed = running.app.get(InstalledIntegrations);
+      const provider = await installed.find("email", "testmail");
+      if (provider?.environments === undefined) throw new Error("fixture_environments");
+      const values = [...provider.environments.values];
+      vi.spyOn(installed, "find").mockResolvedValue({
+        ...provider,
+        environments: { ...provider.environments, values },
+      });
+      const restrictEnvironment = (): void => {
+        if (restriction === "locked elsewhere") environment.TESTMAIL_ENVIRONMENT = "production";
+        else values.splice(values.indexOf("sandbox"), 1);
+      };
+      const stepUp = running.app.get(AdminStepUpService);
+      const verify = stepUp.verify.bind(stepUp);
+      const verified = vi.spyOn(stepUp, "verify");
+      if (timing === "before step-up") restrictEnvironment();
+      else
+        verified.mockImplementation(async (request) => {
+          const result = await verify(request);
+          restrictEnvironment();
+          return result;
+        });
+      const open = vi.spyOn(running.app.get(SecretCipher), "open");
+      const construct = vi.spyOn(running.app.get(IntegrationRuntime), "validateEmailCandidate");
+      const alertsBefore = await db.execute(sql`select id from email_message`);
+      const auditBefore = await db.execute(sql`select id from admin_audit_event`);
+      const refused = await session.call<ProblemBody>(
+        "POST",
+        `/admin/integrations/${item.id}/activate`,
+        { expectedRevision: saved.body.revision, currentPassword: PASSWORD },
+      );
+      expect(refused.status).toBe(409);
+      expect(refused.body.rule).toBe("integration_env_override");
+      if (timing === "before step-up") expect(verified).not.toHaveBeenCalled();
+      else expect(verified).toHaveBeenCalledOnce();
+      expect(open).not.toHaveBeenCalled();
+      expect(construct).not.toHaveBeenCalled();
+      const after = await session.call<IntegrationDetailResponse>(
+        "GET",
+        `/admin/integrations/${item.id}`,
+      );
+      expect(after.body.revision).toBe(saved.body.revision);
+      expect(after.body.integration.enabled).toBe(false);
+      expect(after.body.integration.versions).toEqual(saved.body.integration.versions);
+      const pointer = await db.execute<{ active_outbound_version_id: string | null }>(
+        sql`select active_outbound_version_id from integration where id=${item.id}::uuid`,
+      );
+      expect(pointer.rows[0]?.active_outbound_version_id).toBeNull();
+      expect((await db.execute(sql`select id from email_message`)).rows).toEqual(alertsBefore.rows);
+      expect((await db.execute(sql`select id from admin_audit_event`)).rows).toEqual(
+        auditBefore.rows,
+      );
+    },
+  );
+
+  it("observes a rejected async factory and logs only a code", async () => {
+    const dir = join(fixture.dir, "asyncfactory");
+    await mkdir(dir);
+    await writeFile(
+      join(dir, "index.js"),
+      `export const rejected = Promise.reject(new Error("FACTORY_SECRET_SENTINEL")); rejected.catch(()=>{}); export function createOutboundClient(){return rejected;}`,
+    );
+    const imported = (await import(pathToFileURL(join(dir, "index.js")).href)) as {
+      rejected: Promise<unknown>;
+    };
+    const observed = vi.spyOn(imported.rejected, "catch");
+    const log = vi.spyOn(Logger.prototype, "error");
+    const session = await signIn();
+    const item = await saveAndRead(session, "testmail");
+    const list = await listed(session);
+    const saved = await session.call<{
+      revision: number;
+      integration: { secrets: { versionId: string; generation: number }[] };
+    }>("PUT", `/admin/integrations/${item.id}/secrets/api_key`, {
+      expectedRevision: list.revision,
+      currentPassword: PASSWORD,
+      value: MAIL_KEY,
+    });
+    const version = saved.body.integration.secrets[0];
+    if (version === undefined) throw new Error("fixture_version");
+    const installed = await running.app.get(InstalledIntegrations).find("email", "testmail");
+    if (installed === undefined) throw new Error("fixture_package");
+    await expect(
+      running.app
+        .get(IntegrationRuntime)
+        .validateEmailCandidate(
+          item.id,
+          { ...installed, entryPath: join(dir, "index.js") },
+          { id: version.versionId, generation: version.generation, environment: "default" },
+          db,
+        ),
+    ).rejects.toThrow();
+    expect(observed).toHaveBeenCalledWith(expect.any(Function));
+    expect(JSON.stringify(log.mock.calls)).not.toContain("FACTORY_SECRET_SENTINEL");
+    vi.restoreAllMocks();
+  });
   it("sends with the activated stored key and records the version on the mail", async () => {
     const session = await signIn();
     const testmail = await saveAndRead(session, "testmail");
@@ -276,5 +426,29 @@ describe("stored email credential at runtime (real Postgres and Redis)", () => {
     );
     expect(missing.status).toBe(400);
     expect(missing.body.errors?.[0]?.path).toBe("currentPassword");
+  });
+  it("refuses activation when the complete candidate cannot be decrypted", async () => {
+    const session = await signIn();
+    const item = await saveAndRead(session, "testmail");
+    const saved = await session.call<DetailBody>(
+      "PUT",
+      `/admin/integrations/${item.id}/secrets/api_key`,
+      {
+        expectedRevision: (await listed(session)).revision,
+        value: MAIL_KEY,
+        currentPassword: PASSWORD,
+      },
+    );
+    expect(saved.status).toBe(200);
+    await db.execute(
+      sql`update integration_secret set tag=decode(repeat('00',16),'hex') where version_id in (select id from integration_credential_version where integration_id=${item.id}::uuid)`,
+    );
+    const answer = await session.call<ProblemBody>(
+      "POST",
+      `/admin/integrations/${item.id}/activate`,
+      { expectedRevision: saved.body.revision, currentPassword: PASSWORD },
+    );
+    expect(answer.status).toBe(409);
+    expect(answer.body.rule).toBe("integration_unavailable");
   });
 });

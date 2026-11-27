@@ -820,6 +820,8 @@ const auditEventList: Shape<Admin.AdminAuditEventList> = paginated({
         "integration.disabled",
         "integration.revoked",
         "integration.route_changed",
+        "integration.check_requested",
+        "integration.check_completed",
       ],
     },
     targetKind: {
@@ -856,6 +858,30 @@ const integration: Shape<Admin.AdminIntegration> = {
           savedAt: { nullable: "string" },
           keyAvailable: { nullable: "boolean" },
           versionState: { nullable: { enum: ["candidate", "active", "draining", "revoked"] } },
+        },
+      },
+    },
+    versions: {
+      array: {
+        object: {
+          id: "string",
+          purpose: { enum: ["outbound", "webhook"] },
+          generation: "integer",
+          state: { enum: ["candidate", "active", "draining", "revoked"] },
+          environment: "string",
+          createdAt: "string",
+          fields: { array: "string" },
+        },
+      },
+    },
+    environmentSource: { enum: ["env", "store"] },
+    environment: "string",
+    environments: {
+      optional: {
+        object: {
+          values: { array: "string" },
+          default: "string",
+          envVariable: "string",
         },
       },
     },
@@ -1453,8 +1479,16 @@ const body = {
     object: { locale: { optional: "string" } },
   } satisfies Shape<Admin.SendAdminTestEmailBody>,
   putIntegrationSecret: {
-    object: { expectedRevision: "integer", value: "string", currentPassword: "string" },
+    object: {
+      expectedRevision: "integer",
+      value: "string",
+      currentPassword: "string",
+      environment: { optional: "string" },
+    },
   } satisfies Shape<Admin.PutAdminIntegrationSecretBody>,
+  checkIntegration: {
+    object: { expectedRevision: "integer", versionId: "string" },
+  } satisfies Shape<Admin.CheckAdminIntegrationBody>,
   retireIntegrationSecret: {
     object: { expectedRevision: "integer", versionId: "string", currentPassword: "string" },
   } satisfies Shape<Admin.RetireAdminIntegrationSecretBody>,
@@ -1777,6 +1811,14 @@ const RESPONSE_SHAPES: { [N in AdminOperationName]: ResponseShapeOf<N> } = {
   listIntegrations: integrationList,
   setEmailRouteMode: emailRoute,
   getIntegration: integrationDetail,
+  checkIntegration: {
+    object: {
+      versionId: "string",
+      code: { enum: ["ok", "invalid_credentials", "unavailable", "rate_limited", "not_supported"] },
+      checkedAt: "string",
+      retryAfterSeconds: { optional: "integer" },
+    },
+  } satisfies Shape<Admin.AdminIntegrationCheck>,
   putIntegrationSecret: integrationDetail,
   retireIntegrationSecret: integrationDetail,
   activateIntegration: integrationDetail,
@@ -1925,6 +1967,7 @@ const REQUEST_SHAPES: { [N in AdminOperationName]: RequestShapeOf<N> } = {
   listIntegrations: null,
   setEmailRouteMode: body.setEmailRouteMode,
   getIntegration: null,
+  checkIntegration: body.checkIntegration,
   putIntegrationSecret: body.putIntegrationSecret,
   retireIntegrationSecret: body.retireIntegrationSecret,
   activateIntegration: body.activateIntegration,

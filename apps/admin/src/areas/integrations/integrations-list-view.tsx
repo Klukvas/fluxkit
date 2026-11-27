@@ -3,6 +3,7 @@ import type {
   AdminIntegrationList,
   AdminIntegrationSecret,
   AdminIntegrationStorage,
+  AdminIntegrationVersion,
 } from "@fluxkit/api-client";
 import { Alert, Button, EmptyState, StatusBadge, type Translator } from "@fluxkit/ui";
 import { formatDateTime } from "../../lib/format";
@@ -16,6 +17,7 @@ import {
   secretView,
   type Label,
 } from "./integrations-view";
+import { IntegrationVersions } from "./integration-versions";
 import { providerGuide, type ProviderGuide } from "./provider-guides";
 
 /** The server variable of the encryption key, named in the "storage is off" warning (a name, not a text). */
@@ -73,6 +75,7 @@ function SecretRow({
   secret,
   storage,
   hintKey,
+  showRevoke,
   canManage,
   busy,
   onAction,
@@ -83,6 +86,7 @@ function SecretRow({
   secret: AdminIntegrationSecret;
   storage: AdminIntegrationStorage;
   hintKey: string | undefined;
+  showRevoke: boolean;
   canManage: boolean;
   busy: boolean;
   onAction: (action: SecretAction) => void;
@@ -136,7 +140,7 @@ function SecretRow({
               {t("intg.action.remove")}
             </Button>
           )}
-          {view.revocableVersionId === null ? null : (
+          {!showRevoke || view.revocableVersionId === null ? null : (
             <Button
               variant="secondary"
               disabled={busy}
@@ -156,18 +160,26 @@ function ProviderCard({
   t,
   uiLocale,
   integration,
+  revision,
   storage,
   canManage,
   busy,
   onAction,
+  onReload,
 }: {
   t: Translator;
   uiLocale: string;
   integration: AdminIntegration;
+  revision: number;
   storage: AdminIntegrationStorage;
   canManage: boolean;
   busy: boolean;
-  onAction: (action: SecretAction, secret: AdminIntegrationSecret | null) => void;
+  onAction: (
+    action: SecretAction,
+    secret: AdminIntegrationSecret | null,
+    version?: AdminIntegrationVersion,
+  ) => void;
+  onReload: () => void;
 }) {
   const headingId = `intg-provider-${integration.id}`;
   const name = labelText(t, providerLabel(integration.providerCode));
@@ -206,6 +218,20 @@ function ProviderCard({
           ) : null}
         </div>
       ) : null}
+      {integration.versions.length === 0 ? null : (
+        <IntegrationVersions
+          key={`${revision}:${String(busy)}`}
+          t={t}
+          uiLocale={uiLocale}
+          integration={integration}
+          revision={revision}
+          canManage={canManage}
+          busy={busy}
+          storageReady={storage === "ready"}
+          onRevoke={(version) => onAction("revoke", null, version)}
+          onReload={onReload}
+        />
+      )}
       <ul className="flex flex-col gap-3">
         {integration.secrets.map((secret) => (
           <SecretRow
@@ -216,6 +242,7 @@ function ProviderCard({
             secret={secret}
             storage={storage}
             hintKey={guide?.fieldHintKeys[secret.field]}
+            showRevoke={integration.versions.length === 0}
             canManage={canManage}
             busy={busy}
             onAction={(action) => onAction(action, secret)}
@@ -250,6 +277,7 @@ export function IntegrationsListView({
     action: SecretAction,
     integration: AdminIntegration,
     secret: AdminIntegrationSecret | null,
+    version?: AdminIntegrationVersion,
   ) => void;
 }) {
   if (state.status !== "ready") return <ResourceFallback t={t} state={state} onRetry={onRetry} />;
@@ -283,9 +311,13 @@ export function IntegrationsListView({
                 uiLocale={uiLocale}
                 integration={integration}
                 storage={storage}
+                revision={state.data.revision}
+                onReload={onRetry}
                 canManage={canManage}
                 busy={busy}
-                onAction={(action, secret) => onAction(action, integration, secret)}
+                onAction={(action, secret, version) =>
+                  onAction(action, integration, secret, version)
+                }
               />
             ))}
           </section>

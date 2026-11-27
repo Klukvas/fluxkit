@@ -141,6 +141,7 @@ const INTEGRATIONS_ROUTES = [
   "PUT /admin/integrations/:id/secrets/:field",
   "POST /admin/integrations/:id/retire-secret",
   "POST /admin/integrations/:id/activate",
+  "POST /admin/integrations/:id/check",
   "POST /admin/integrations/:id/disable",
   "POST /admin/integrations/:id/revoke-secret",
 ];

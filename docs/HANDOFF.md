@@ -1,11 +1,13 @@
 # Handoff: current state and how we work
 
-Read this first (Claude Code, Codex or a human). Rules live in `AGENTS.md`; decisions in `docs/adr/` (0001 to 0058, index in `docs/adr/README.md`); plans in `docs/plans/`.
+Read this first (Claude Code, Codex or a human). Rules live in `AGENTS.md`; decisions in `docs/adr/` (0001 to 0060, index in `docs/adr/README.md`); plans in `docs/plans/`.
 The long per-step history that used to live here is archived verbatim in `docs/HISTORY.md` (not current). Update this file in every PR that changes project state; keep it short and keep "Last updated" to one line.
 
-Last updated: 2026-11-18, LiqPay admin Integrations guide/labels on `cursor/liqpay-provider-package-135a` (owner can paste public/private keys; still candidates — payments runtime stays env until integrations slice 2). Earlier the same day: LiqPay review fixes and green CI on PR 354.
+Last updated: 2026-11-27, integrations slice 2 part 1 (PR 368): shared provider contract, multi-field keys, checks, owner alerts.
 
 ## 1. Current state
+
+- **Admin integrations slice 2, part 1 (2026-11-27, PR 368):** design [plan](plans/2026-11-27-integrations-slice2-payments-shipping.md) (section 0 = decisions), [ADR 0060](adr/0060-managed-provider-runtime-contract.md). Provider-package contract for admin-managed keys (`createOutboundClient`, `checkCredentials`, `accountIdentity`, `locateWebhook`, final transport gate); a key may have several fields (LiqPay is listed again); per-version environment with `fluxkit.environments`; `POST /admin/integrations/{id}/check` (strict fail-closed limits, audited before and after); `versions` metadata; best-effort owner alert mails. Migration 0022. Payment and shipping activation still refused: parts 2 (payments, migration 0023) and 3 (shipping, 0024) follow, then slice 3 (rewrap, cleanup, retention counts).
 
 - **LiqPay payment provider (2026-11-18, branch `cursor/liqpay-provider-package-135a`, PR 354):** plan `docs/plans/2026-11-18-liqpay-payment-provider.md` approved; ADR 0059. Package `@fluxkit/provider-liqpay`; form handoff + urlencoded webhooks; dual-provider storefront choice. Second review: status/refund treat HTTP 200 `payment_not_found` as `not_found` (pre-submit poll); inbound webhook verify accepts SHA3-256 or SHA-1; `wait_accept`/`wait_compensation` → succeeded; handoff resigns with the locale from the attempt's stored redirect URL. **Stub-tested only; live S1 not run.** Fluxkit still requires `https` `redirect_url` / `STOREFRONT_PUBLIC_URL`.
 

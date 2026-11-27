@@ -104,6 +104,7 @@ export const integrationCredentialVersion = pgTable(
     // Rises by one per integration with every saved credential; never reused, also after a retirement.
     generation: integer("generation").notNull(),
     purpose: text("purpose").notNull(),
+    environment: text("environment").notNull().default("default"),
     state: text("state").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     createdBy: uuid("created_by"),
@@ -129,6 +130,10 @@ export const integrationCredentialVersion = pgTable(
     uniqueIndex("integration_credential_version_active_key")
       .on(t.integrationId, t.purpose)
       .where(sql`${t.state} = 'active'`),
+    check(
+      "integration_credential_version_environment_check",
+      sql`${t.environment} ~ ${sql.raw(`'${FIELD_PATTERN}'`)}`,
+    ),
     check("integration_credential_version_generation_check", sql`${t.generation} >= 1`),
     check(
       "integration_credential_version_purpose_check",

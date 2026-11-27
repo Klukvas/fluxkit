@@ -65,5 +65,9 @@
   "shipment.created.tracking_hint": "Use this number on the carrier's website or app to follow the parcel.",
   "shipment.created.button": "View your order",
   "shipment.created.link_hint": "If the button does not work, open this link:",
-  "shipment.created.note": "If something looks wrong, contact {shop}."
+  "shipment.created.note": "If something looks wrong, contact {shop}.",
+  "integration.security_alert.subject": "Integration security alert",
+  "integration.security_alert.heading": "Integration credentials changed",
+  "integration.security_alert.body": "Action: {action}. Kind: {kind}. Provider: {provider}. Generation: {generation}. Time: {occurredAt}.",
+  "integration.security_alert.note": "If you did not make this change, review the admin audit log and secure the owner accounts."
 }

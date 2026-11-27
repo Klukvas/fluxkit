@@ -45,6 +45,8 @@ import type {
   AdminEmailPreview,
   AdminEmailStatus,
   AdminEmailRoute,
+  AdminIntegrationCheck,
+  CheckAdminIntegrationBody,
   AdminIntegrationDetail,
   AdminIntegrationList,
   AdminEmailTemplateList,
@@ -482,6 +484,12 @@ export interface AdminClient {
    */
   setEmailRouteMode(body: SetAdminEmailRouteBody, options?: CallOptions): Result<AdminEmailRoute>;
   getIntegration(id: string, options?: CallOptions): Result<AdminIntegrationDetail>;
+  /** Explicit read-only probe of a complete saved version; no key/password accepted. */
+  checkIntegration(
+    id: string,
+    body: CheckAdminIntegrationBody,
+    options?: CallOptions,
+  ): Result<AdminIntegrationCheck>;
   /**
    * Stores a candidate value, not used at runtime yet. `403 forbidden` `current_password_incorrect`; `409 rule_violation`
    * `integration_storage_disabled`, `integration_env_override`, `integration_revision_stale`, `integration_unavailable`;
@@ -879,6 +887,8 @@ export function createAdminClient(options: AdminClientOptions): AdminClient {
     listIntegrations: (opts) => call("listIntegrations", { options: opts }),
     setEmailRouteMode: (body, opts) => call("setEmailRouteMode", { body, options: opts }),
     getIntegration: (id, opts) => call("getIntegration", { pathParams: { id }, options: opts }),
+    checkIntegration: (id, body, opts) =>
+      call("checkIntegration", { pathParams: { id }, body, options: opts }),
     putIntegrationSecret: (id, field, body, opts) =>
       call("putIntegrationSecret", { pathParams: { id, field }, body, options: opts }),
     retireIntegrationSecret: (id, body, opts) =>

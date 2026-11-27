@@ -423,6 +423,13 @@ export const ADMIN_OPERATIONS = {
     },
   ),
   getIntegration: operation("GET", "/admin/integrations/{id}", [200], "integrations.manage"),
+  checkIntegration: operation(
+    "POST",
+    "/admin/integrations/{id}/check",
+    [200],
+    "integrations.manage",
+    { body: "json" },
+  ),
   putIntegrationSecret: operation(
     "PUT",
     "/admin/integrations/{id}/secrets/{field}",

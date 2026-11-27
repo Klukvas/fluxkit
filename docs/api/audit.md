@@ -23,6 +23,8 @@ There is no write route: events are written by the services they audit, in the s
 | `admin_user.password_reset` | `POST /admin/users/{id}/reset-password` | `admin_user` | `{}` |
 | `admin_user.step_up_failed` | a refused password re-entry of a sensitive action (`docs/api/integrations.md`); written in its own transaction, so it stays when the action is refused | `admin_user` (the actor) | `{operation}` |
 | `integration.secret_changed`, `integration.secret_retired` | `PUT /admin/integrations/{id}/secrets/{field}`, `POST /admin/integrations/{id}/retire-secret` | `integration` | codes, ids and numbers (`docs/api/integrations.md`); never a value |
+| `integration.check_requested` | `POST /admin/integrations/{id}/check`, committed before decryption or hook | `integration` | `{kind, provider, version}`; failure refuses the call |
+| `integration.check_completed` | After the check, in its own transaction | `integration` | `{kind, provider, version, code}`; code-only outcome |
 | `integration.route_changed` | `PUT /admin/integrations/email-route` | `integration` | `{mode}` (`equal` or `resend`) |
 | `privacy.lookup`, `privacy.exported`, `privacy.erased`, `privacy.request_changed` | the privacy routes (`docs/api/privacy.md`, later steps) | `privacy_request` or `customer` | codes and counts |
 

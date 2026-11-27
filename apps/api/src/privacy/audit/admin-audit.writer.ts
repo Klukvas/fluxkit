@@ -26,13 +26,20 @@ export interface AdminAuditInput {
  */
 @Injectable()
 export class AdminAuditWriter {
-  async record(db: DbExecutor, actorAdminId: string | null, input: AdminAuditInput): Promise<void> {
+  async record(
+    db: DbExecutor,
+    actorAdminId: string | null,
+    input: AdminAuditInput,
+  ): Promise<string> {
     const event = buildAdminAuditEvent(input);
-    await db.execute(sql`
+    const result = await db.execute<{ id: string }>(sql`
       insert into "admin_audit_event" ("admin_user_id", "action", "target_kind", "target_id", "detail")
       values (
         (select "id" from "admin_user" where "id" = ${actorAdminId}::uuid),
         ${event.action}, ${event.targetKind}, ${event.targetId}::uuid, ${JSON.stringify(event.detail)}::jsonb
-      )`);
+      ) returning id`);
+    const id = result.rows[0]?.id;
+    if (id === undefined) throw new Error("admin_audit_insert_failed");
+    return id;
   }
 }

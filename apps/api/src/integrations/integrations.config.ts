@@ -9,7 +9,7 @@ export interface IntegrationsConfig {
   readonly providersDir: string;
   /** Test-only providers are not offered when true. */
   readonly isProduction: boolean;
-  /** The process environment as read at start: only whether a declared variable is set is ever looked at. */
+  /** The process environment as read at start: only declared credential presence and declared environment values are inspected. */
   readonly environment: Readonly<Record<string, string | undefined>>;
   /** True when `EMAIL_PROVIDER` is absent, so an activated stored credential may send. */
   readonly emailRouteDelegated: boolean;

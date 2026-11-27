@@ -65,5 +65,9 @@
   "shipment.created.tracking_hint": "Скористайтеся цим номером на сайті або в застосунку перевізника, щоб відстежити посилку.",
   "shipment.created.button": "Переглянути замовлення",
   "shipment.created.link_hint": "Якщо кнопка не працює, відкрийте це посилання:",
-  "shipment.created.note": "Якщо щось виглядає неправильно, зверніться до {shop}."
+  "shipment.created.note": "Якщо щось виглядає неправильно, зверніться до {shop}.",
+  "integration.security_alert.subject": "Сповіщення безпеки інтеграції",
+  "integration.security_alert.heading": "Облікові дані інтеграції змінено",
+  "integration.security_alert.body": "Дія: {action}. Тип: {kind}. Провайдер: {provider}. Покоління: {generation}. Час: {occurredAt}.",
+  "integration.security_alert.note": "Якщо ви не вносили цю зміну, перевірте журнал дій адміністратора та захистіть облікові записи власників."
 }

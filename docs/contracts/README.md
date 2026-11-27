@@ -7,6 +7,7 @@ Existing:
 - `branding.md` - the storefront brand config `apps/storefront/src/config/brand.ts` (fork-owned): logo, icons, theme colour, default social picture.
 - `card-registry.md` - storefront product card registry (fork-owned `cards/custom.ts`, `ProductCardModel`) and the `view` URL parameter (draft).
 - `config.md` - environment variables and the feature package contract.
+- [integrations.md](integrations.md) - provider manifest secrets/environments, complete credential bundles, pure runtime factories/hooks/context and final transport gate (ADR 0060; payment/shipping activation remains later).
 - "Feature extension points" below (ADR 0049) - the API kit, feature migrations, a feature's personal-data inventory, `features` on the config routes, the storefront slice of a feature, the admin feature slices (manifest, registry, gating).
 - `header-footer.md` - storefront header and footer composition: the fork-owned `config/header.ts` and `config/footer.ts` (blocks, order, controls, category count, link groups with headings, text lines) (draft; the plan `docs/plans/2026-11-08-design-changeability.md` calls it `layout-config.md`).
 - `home-sections.md` - storefront home sections: the per-section `width` and the `custom` kind with the fork-owned `config/custom-sections.ts` (draft).

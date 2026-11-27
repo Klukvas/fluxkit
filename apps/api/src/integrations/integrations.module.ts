@@ -1,6 +1,9 @@
 import { Module, type DynamicModule } from "@nestjs/common";
 import { MANAGED_EMAIL_SOURCE } from "../email/registry/email-provider-registry.js";
+import { CandidateBundleWriter } from "./candidate-bundle-writer.js";
 import { InstalledIntegrations } from "./installed-integrations.js";
+import { IntegrationAlerts } from "./integration-alerts.service.js";
+import { IntegrationCheckService } from "./integration-check.service.js";
 import { INTEGRATIONS_CONFIG, type IntegrationsConfig } from "./integrations.config.js";
 import { IntegrationRuntime } from "./integration-runtime.js";
 import { IntegrationsController } from "./integrations.controller.js";
@@ -28,6 +31,9 @@ export class IntegrationsModule {
         IntegrationRuntime,
         { provide: MANAGED_EMAIL_SOURCE, useExisting: IntegrationRuntime },
         IntegrationsService,
+        IntegrationCheckService,
+        IntegrationAlerts,
+        CandidateBundleWriter,
       ],
       exports: [IntegrationRuntime, MANAGED_EMAIL_SOURCE],
     };

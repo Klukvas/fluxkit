@@ -4,6 +4,7 @@ import {
   INTEGRATION_SECRET_MAX_BYTES,
   integrationSecretAad,
   parseIntegrationSecretDeclarations,
+  parseIntegrationEnvironments,
   type IntegrationSecretIdentity,
 } from "./secrets.js";
 
@@ -77,6 +78,21 @@ describe("parseIntegrationSecretDeclarations", () => {
     });
   });
 
+  it("accepts several fields in one purpose", () => {
+    expect(
+      parseIntegrationSecretDeclarations([
+        { field: "public_key", purpose: "outbound", env: "LIQPAY_PUBLIC_KEY" },
+        { field: "private_key", purpose: "outbound", env: "LIQPAY_PRIVATE_KEY" },
+      ]),
+    ).toEqual({
+      ok: true,
+      fields: [
+        { field: "public_key", purpose: "outbound", envVariable: "LIQPAY_PUBLIC_KEY" },
+        { field: "private_key", purpose: "outbound", envVariable: "LIQPAY_PRIVATE_KEY" },
+      ],
+    });
+  });
+
   it.each([
     ["not an array", { field: "a" }],
     ["a non-object entry", ["api_key"]],
@@ -88,13 +104,6 @@ describe("parseIntegrationSecretDeclarations", () => {
       [
         { field: "a", purpose: "outbound", env: "X" },
         { field: "a", purpose: "webhook", env: "Y" },
-      ],
-    ],
-    [
-      "a repeated purpose",
-      [
-        { field: "a", purpose: "outbound", env: "X" },
-        { field: "b", purpose: "outbound", env: "Y" },
       ],
     ],
     [
@@ -123,5 +132,45 @@ describe("checkIntegrationSecretValue", () => {
     ["ключ", "invalid_characters"],
   ])("refuses %j as %s", (value, problem) => {
     expect(checkIntegrationSecretValue(value)).toBe(problem);
+  });
+});
+
+describe("parseIntegrationEnvironments", () => {
+  it("uses a fixed default when absent", () => {
+    expect(parseIntegrationEnvironments(undefined, "demo")).toEqual({
+      ok: true,
+      environments: undefined,
+    });
+  });
+  it("reads distinct codes, a member default and an own-prefix selector", () => {
+    expect(
+      parseIntegrationEnvironments(
+        { values: ["sandbox", "production"], default: "sandbox", env: "DEMO_ENVIRONMENT" },
+        "demo",
+      ),
+    ).toEqual({
+      ok: true,
+      environments: {
+        values: ["sandbox", "production"],
+        default: "sandbox",
+        envVariable: "DEMO_ENVIRONMENT",
+      },
+    });
+  });
+  it.each([
+    null,
+    {},
+    { values: [], default: "default", env: "DEMO_ENV" },
+    { values: ["sandbox", "sandbox"], default: "sandbox", env: "DEMO_ENV" },
+    { values: ["Sandbox"], default: "Sandbox", env: "DEMO_ENV" },
+    { values: ["sandbox"], default: "production", env: "DEMO_ENV" },
+    { values: ["sandbox"], default: "sandbox", env: "OTHER_ENV" },
+    {
+      values: Array.from({ length: 9 }, (_, n) => `env${String(n)}`),
+      default: "env0",
+      env: "DEMO_ENV",
+    },
+  ])("refuses an invalid environment declaration %j", (raw) => {
+    expect(parseIntegrationEnvironments(raw, "demo").ok).toBe(false);
   });
 });
