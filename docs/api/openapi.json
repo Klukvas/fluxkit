@@ -22085,7 +22085,7 @@
         "x-fluxkit-permission": "shipping.manage"
       },
       "put": {
-        "description": "Records who saved them. Credentials never belong here: they are read from the environment, and a key named like a credential is refused. A bounded check first, then the provider's own rules (`validateSettings`): their issues are `400 validation_failed` at `settings.<path>`.",
+        "description": "Records who saved them. Credentials never belong here: they come from the server environment or Settings → Integrations, and a key named like a credential is refused. Managed sender profile changes are refused with `409 rule_violation` (`shipping_profile_work_open`) while open shipments depend on the profile. A bounded check first, then the provider's own rules (`validateSettings`): their issues are `400 validation_failed` at `settings.<path>`.",
         "operationId": "ShippingProvidersController_putSettings",
         "parameters": [
           {
@@ -22193,6 +22193,16 @@
           },
           "404": {
             "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -30483,7 +30493,7 @@
                           },
                           "enabled": {
                             "type": "boolean",
-                            "description": "True when new email/payment work uses the stored outbound credential. Shipping activation remains unavailable."
+                            "description": "True when new email, payment or shipping work uses the stored outbound credential."
                           },
                           "secrets": {
                             "type": "array",
@@ -30901,7 +30911,7 @@
                         },
                         "enabled": {
                           "type": "boolean",
-                          "description": "True when new email/payment work uses the stored outbound credential. Shipping activation remains unavailable."
+                          "description": "True when new email, payment or shipping work uses the stored outbound credential."
                         },
                         "secrets": {
                           "type": "array",
@@ -31248,7 +31258,7 @@
                         },
                         "enabled": {
                           "type": "boolean",
-                          "description": "True when new email/payment work uses the stored outbound credential. Shipping activation remains unavailable."
+                          "description": "True when new email, payment or shipping work uses the stored outbound credential."
                         },
                         "secrets": {
                           "type": "array",
@@ -31608,7 +31618,7 @@
                         },
                         "enabled": {
                           "type": "boolean",
-                          "description": "True when new email/payment work uses the stored outbound credential. Shipping activation remains unavailable."
+                          "description": "True when new email, payment or shipping work uses the stored outbound credential."
                         },
                         "secrets": {
                           "type": "array",
@@ -32051,7 +32061,7 @@
     },
     "/admin/integrations/{id}/activate": {
       "post": {
-        "description": "Selects a complete stored email/payment credential for new work when enablement is delegated. Email requires EMAIL_FROM; payment requires supported shop currency, a public storefront URL, merchant enrollment when declared, and no open legacy work. Shipping answers 409 integration_runtime_not_ready. Asks for the owner's current password. Other 409 rules: `integration_env_override`, `integration_storage_disabled`, `integration_sender_required`, `integration_route_unset`, `integration_not_activatable`, `integration_revision_stale`.",
+        "description": "Selects a complete stored email/payment/shipping credential for new work when enablement is delegated. Email requires EMAIL_FROM; payment requires supported shop currency, a public storefront URL, merchant enrollment when declared, and no open legacy work. Shipping requires a complete client and no open null-bound legacy shipments. Asks for the owner's current password. Other 409 rules: `integration_env_override`, `integration_storage_disabled`, `integration_sender_required`, `integration_route_unset`, `integration_not_activatable`, `integration_revision_stale`.",
         "operationId": "IntegrationsController_activate",
         "parameters": [
           {
@@ -32138,7 +32148,7 @@
                         },
                         "enabled": {
                           "type": "boolean",
-                          "description": "True when new email/payment work uses the stored outbound credential. Shipping activation remains unavailable."
+                          "description": "True when new email, payment or shipping work uses the stored outbound credential."
                         },
                         "secrets": {
                           "type": "array",
@@ -32399,7 +32409,7 @@
             }
           }
         },
-        "summary": "Activate a stored email or payment credential",
+        "summary": "Activate a stored email, payment or shipping credential",
         "tags": ["admin-integrations"],
         "x-fluxkit-permission": "integrations.manage"
       }
@@ -32493,7 +32503,7 @@
                         },
                         "enabled": {
                           "type": "boolean",
-                          "description": "True when new email/payment work uses the stored outbound credential. Shipping activation remains unavailable."
+                          "description": "True when new email, payment or shipping work uses the stored outbound credential."
                         },
                         "secrets": {
                           "type": "array",
@@ -32853,7 +32863,7 @@
                         },
                         "enabled": {
                           "type": "boolean",
-                          "description": "True when new email/payment work uses the stored outbound credential. Shipping activation remains unavailable."
+                          "description": "True when new email, payment or shipping work uses the stored outbound credential."
                         },
                         "secrets": {
                           "type": "array",

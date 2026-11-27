@@ -133,12 +133,12 @@ export function providerRuntime(
   storage: AdminIntegrationStorage,
 ): ProviderRuntime {
   const outbound = integration.secrets.filter((secret) => secret.purpose === "outbound");
-  const runtimeReady = integration.kind === "email" || integration.kind === "payment";
+  const runtimeReady = ["email", "payment", "shipping"].includes(integration.kind);
   const sameVersion = new Set(outbound.map((secret) => secret.versionId)).size === 1;
   return {
     turnOn:
       runtimeReady &&
-      (integration.kind === "payment" || !integration.enabled) &&
+      (integration.kind !== "email" || !integration.enabled) &&
       storage === "ready" &&
       outbound.length > 0 &&
       sameVersion &&
@@ -147,7 +147,7 @@ export function providerRuntime(
           secret.state === "set" &&
           secret.keyAvailable !== false &&
           (secret.versionState === "candidate" ||
-            (integration.kind === "payment" &&
+            (integration.kind !== "email" &&
               !integration.enabled &&
               secret.versionState === "draining")),
       ),

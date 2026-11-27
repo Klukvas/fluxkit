@@ -17,9 +17,9 @@ import {
   validationFailed,
   type FieldError,
 } from "../../common/problem.js";
-import { withTransaction } from "../../common/transaction.js";
+import { withTransaction, type DbExecutor } from "../../common/transaction.js";
 import { DRIZZLE, type Database } from "../../database/database.module.js";
-import { ShippingProviderRegistry } from "../registry/shipping-provider-registry.js";
+import { ShippingProviders } from "../registry/shipping-providers.js";
 import { toShippingMethodResponse } from "./shipping-methods.mapper.js";
 import {
   ShippingMethodsRepository,
@@ -43,7 +43,7 @@ interface MethodState {
 export class ShippingMethodsService {
   constructor(
     @Inject(ShippingMethodsRepository) private readonly methods: ShippingMethodsRepository,
-    @Inject(ShippingProviderRegistry) private readonly providers: ShippingProviderRegistry,
+    @Inject(ShippingProviders) private readonly providers: ShippingProviders,
     @Inject(LOCALE_CONFIG) private readonly locale: LocaleConfig,
     @Inject(PRICING_CONFIG) private readonly pricing: PricingConfig,
     @Inject(DRIZZLE) private readonly database: Database,
@@ -59,7 +59,7 @@ export class ShippingMethodsService {
       ...this.textErrors(body),
       ...stateErrors(state),
       // A new method is checked against the enabled providers in full: nothing it names may be unknown.
-      ...this.providerErrors(state),
+      ...(await this.providerErrors(state)),
     ];
     const pricing = this.validPricing(body.pricing, errors);
     if (errors.length > 0 || pricing === undefined) {
@@ -111,7 +111,7 @@ export class ShippingMethodsService {
         if (current === undefined) {
           throw notFound("Shipping method");
         }
-        const { changes, errors } = this.planUpdate(current, body);
+        const { changes, errors } = await this.planUpdate(current, body, tx);
         if (errors.length > 0) {
           throw validationFailed(errors);
         }
@@ -145,10 +145,11 @@ export class ShippingMethodsService {
   }
 
   /** The merged state of a patch, validated; the changes are only the fields the patch names. */
-  private planUpdate(
+  private async planUpdate(
     current: ShippingMethodRow,
     body: UpdateShippingMethodBody,
-  ): { changes: ShippingMethodChanges; errors: FieldError[] } {
+    executor: DbExecutor,
+  ): Promise<{ changes: ShippingMethodChanges; errors: FieldError[] }> {
     const state: MethodState = {
       kind: body.kind ?? (current.kind as ShippingMethodKind),
       providerCode: body.providerCode === undefined ? current.providerCode : body.providerCode,
@@ -164,7 +165,9 @@ export class ShippingMethodsService {
       ...stateErrors(state),
       // The enabled-provider check runs when the patch changes what the method points at, or switches the method on.
       // Anything else (a title, a price, switching it off) must still work after a provider was disabled.
-      ...(touchesProvider || body.isActive === true ? this.providerErrors(state) : []),
+      ...(touchesProvider || body.isActive === true
+        ? await this.providerErrors(state, executor)
+        : []),
     ];
     const changes: ShippingMethodChanges = {
       ...(body.title === undefined ? {} : { title: body.title }),
@@ -225,11 +228,11 @@ export class ShippingMethodsService {
   }
 
   /** The provider a method names must be one the shop runs (`SHIPPING_PROVIDERS_ENABLED`), and a pickup point needs one that lists points. */
-  private providerErrors(state: MethodState): FieldError[] {
+  private async providerErrors(state: MethodState, executor?: DbExecutor): Promise<FieldError[]> {
     if (state.providerCode === null) {
       return [];
     }
-    const provider = this.providers.get(state.providerCode);
+    const provider = await this.providers.get(state.providerCode, executor);
     if (provider === undefined) {
       return [{ path: "providerCode", code: "provider_not_enabled" }];
     }

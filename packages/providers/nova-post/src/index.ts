@@ -57,3 +57,5 @@ export {
 export class NovaPostShippingProviderModule {}
 
 export const providerModule = NovaPostShippingProviderModule;
+
+export { createOutboundClient, checkCredentials } from "./managed.js";

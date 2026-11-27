@@ -374,6 +374,12 @@ describe("migrations", () => {
       file === "0017_email_suppression.down.sql" ||
       file === "0018_email_provider_routing.down.sql"
     ) {
+      const managedShippingWhen = await journalWhen("0024_managed_shipping_credentials");
+      if ((await journalRowCount(managedShippingWhen)) > 0) {
+        await pool.query(
+          await readFile(`${migrationsFolder}/0024_managed_shipping_credentials.down.sql`, "utf8"),
+        );
+      }
       const managedPaymentWhen = await journalWhen("0023_managed_payment_credentials");
       if ((await journalRowCount(managedPaymentWhen)) > 0) {
         await pool.query(
@@ -434,6 +440,9 @@ describe("migrations", () => {
     );
     await pool.query(
       'alter table if exists "payment" drop constraint if exists "payment_integration_credential_version_id_fkey"',
+    );
+    await pool.query(
+      'alter table if exists "shipment" drop constraint if exists "shipment_integration_credential_version_id_fkey"',
     );
     for (const name of [...integrationTables].reverse()) {
       await pool.query(`drop table if exists "${name}"`);
@@ -517,7 +526,7 @@ describe("migrations", () => {
     const previousWhen = await journalWhen("0016_email_provider_pin");
     for (let pass = 1; pass <= 2; pass += 1) {
       await migrate(drizzle(pool), { migrationsFolder });
-      expect(await appliedMigrationCount(), `0017 pass ${pass}: up`).toBe(24);
+      expect(await appliedMigrationCount(), `0017 pass ${pass}: up`).toBe(25);
       expect(await journalRowCount(when), `0017 pass ${pass}: up journal`).toBe(1);
       for (const [table, columns] of [
         [
@@ -619,7 +628,7 @@ describe("migrations", () => {
         const beforeUp = await legacyRows();
         await migrate(drizzle(pool), { migrationsFolder });
         expect(await journalRowCount(when)).toBe(1);
-        expect(await appliedMigrationCount()).toBe(24);
+        expect(await appliedMigrationCount()).toBe(25);
         expect(await legacyRows()).toEqual(beforeUp);
         const row = await pool.query(
           "select pinned_provider_code, pinned_at from email_message where id = $1",
@@ -808,7 +817,7 @@ describe("migrations", () => {
         "allow_backorder",
         "track_inventory",
       ]);
-      expect(await appliedMigrationCount(), `round ${round}: up`).toBe(24);
+      expect(await appliedMigrationCount(), `round ${round}: up`).toBe(25);
       expect(await journalRowCount(cartCustomersOrdersWhen), `round ${round}: up`).toBe(1);
       expect(await existingMediaTables(), `round ${round}: up`).toEqual([...mediaTables]);
       expect(await journalRowCount(mediaWhen), `round ${round}: up`).toBe(1);
@@ -866,7 +875,7 @@ describe("migrations", () => {
         await migrate(drizzle(pool), { migrationsFolder });
         const reUp = `round ${round}: re-up 0013 (pass ${pass})`;
         expect(await optionGuidePageColumn(), reUp).toBe(true);
-        expect(await appliedMigrationCount(), reUp).toBe(24);
+        expect(await appliedMigrationCount(), reUp).toBe(25);
         const restored = await pool.query<{ page: string | null }>(
           `select "option_guide_page" as page from "product_type" where "code" = $1`,
           [typeCode],
@@ -921,7 +930,7 @@ describe("migrations", () => {
         expect(await existingBannerTables(), `round ${round}: re-up 0012 (pass ${pass})`).toEqual([
           ...bannerTables,
         ]);
-        expect(await appliedMigrationCount(), `round ${round}: re-up 0012 (pass ${pass})`).toBe(24);
+        expect(await appliedMigrationCount(), `round ${round}: re-up 0012 (pass ${pass})`).toBe(25);
       }
       await pool.query(`delete from "banner"`);
       await pool.query(`delete from "media_upload" where "id" = any($1)`, [uploadIds]);
@@ -958,7 +967,7 @@ describe("migrations", () => {
         expect(await paymentListIndexes(), `round ${round}: re-up 0011 (pass ${pass})`).toEqual(
           PAYMENT_LIST_INDEXES,
         );
-        expect(await appliedMigrationCount(), `round ${round}: re-up 0011 (pass ${pass})`).toBe(24);
+        expect(await appliedMigrationCount(), `round ${round}: re-up 0011 (pass ${pass})`).toBe(25);
         expect(
           await auditActions(auditTarget),
           `round ${round}: re-up 0011 (pass ${pass})`,
@@ -986,7 +995,7 @@ describe("migrations", () => {
       await migrate(drizzle(pool), { migrationsFolder });
       expect(await existingSearchTables(), `round ${round}: re-up 0010`).toEqual([...searchTables]);
       expect(await searchSequenceExists(), `round ${round}: re-up 0010`).toBe(true);
-      expect(await appliedMigrationCount(), `round ${round}: re-up 0010`).toBe(24);
+      expect(await appliedMigrationCount(), `round ${round}: re-up 0010`).toBe(25);
       expect(await journalRowCount(searchWhen), `round ${round}: re-up 0010`).toBe(1);
 
       // Down 0009 only: its tables, function, column and journal row are gone, the contact columns are NOT NULL again.
@@ -1017,7 +1026,7 @@ describe("migrations", () => {
         ...privacyTables,
       ]);
       expect(await orderContactShape(), `round ${round}: re-up 0009`).toEqual(NULLABLE_CONTACT);
-      expect(await appliedMigrationCount(), `round ${round}: re-up 0009`).toBe(24);
+      expect(await appliedMigrationCount(), `round ${round}: re-up 0009`).toBe(25);
       expect(await journalRowCount(privacyWhen), `round ${round}: re-up 0009`).toBe(1);
 
       // Down 0008 only: its tables, function and journal row are gone, everything else stays applied.
@@ -1054,7 +1063,7 @@ describe("migrations", () => {
       expect(await existingPaymentFunctions(), `round ${round}: re-up 0008`).toEqual([
         ...paymentFunctions,
       ]);
-      expect(await appliedMigrationCount(), `round ${round}: re-up 0008`).toBe(24);
+      expect(await appliedMigrationCount(), `round ${round}: re-up 0008`).toBe(25);
       expect(await journalRowCount(paymentWhen), `round ${round}: re-up 0008`).toBe(1);
 
       // Down 0007 (after 0008): its tables and journal row are gone, everything else stays applied.
@@ -1088,7 +1097,7 @@ describe("migrations", () => {
       // Up again: only 0007 and the later ones rolled back with it may run. This fails if the down script forgot its bookkeeping row.
       await migrate(drizzle(pool), { migrationsFolder });
       expect(await existingEmailTables(), `round ${round}: re-up 0007`).toEqual([...emailTables]);
-      expect(await appliedMigrationCount(), `round ${round}: re-up 0007`).toBe(24);
+      expect(await appliedMigrationCount(), `round ${round}: re-up 0007`).toBe(25);
       expect(await journalRowCount(emailWhen), `round ${round}: re-up 0007`).toBe(1);
 
       // Down 0006 (after 0007): its tables, functions and journal row are gone, everything else stays applied.
@@ -1124,7 +1133,7 @@ describe("migrations", () => {
       expect(await existingShippingFunctions(), `round ${round}: re-up 0006`).toEqual(
         [...shippingFunctions].sort(),
       );
-      expect(await appliedMigrationCount(), `round ${round}: re-up 0006`).toBe(24);
+      expect(await appliedMigrationCount(), `round ${round}: re-up 0006`).toBe(25);
       expect(await journalRowCount(shippingWhen), `round ${round}: re-up 0006`).toBe(1);
       expect(await existingEmailTables(), `round ${round}: re-up 0006`).toEqual([...emailTables]);
 
@@ -1158,7 +1167,7 @@ describe("migrations", () => {
       // Up again: only 0005, 0006 and 0007 may run. This fails if the down script forgot its bookkeeping row.
       await migrate(drizzle(pool), { migrationsFolder });
       expect(await existingMediaTables(), `round ${round}: re-up 0005`).toEqual([...mediaTables]);
-      expect(await appliedMigrationCount(), `round ${round}: re-up 0005`).toBe(24);
+      expect(await appliedMigrationCount(), `round ${round}: re-up 0005`).toBe(25);
       expect(await journalRowCount(mediaWhen), `round ${round}: re-up 0005`).toBe(1);
 
       // Down 0004 only: its tables and functions and its journal row are gone, the rest stays applied.
@@ -1189,7 +1198,7 @@ describe("migrations", () => {
       expect(await existingCartCustomersOrdersTables(), `round ${round}: re-up 0004`).toEqual([
         ...cartCustomersOrdersTables,
       ]);
-      expect(await appliedMigrationCount(), `round ${round}: re-up 0004`).toBe(24);
+      expect(await appliedMigrationCount(), `round ${round}: re-up 0004`).toBe(25);
 
       await rollback("0016_email_provider_pin.down.sql");
 
@@ -1231,7 +1240,7 @@ describe("migrations", () => {
       expect(await existingCartCustomersOrdersTables(), `round ${round}: re-up 0003`).toEqual([
         ...cartCustomersOrdersTables,
       ]);
-      expect(await appliedMigrationCount(), `round ${round}: re-up 0003`).toBe(24);
+      expect(await appliedMigrationCount(), `round ${round}: re-up 0003`).toBe(25);
 
       await rollback("0016_email_provider_pin.down.sql");
 
@@ -1267,7 +1276,7 @@ describe("migrations", () => {
       expect(await existingAdminAuthTables(), `round ${round}: re-up 0002`).toEqual([
         ...adminAuthTables,
       ]);
-      expect(await appliedMigrationCount(), `round ${round}: re-up 0002`).toBe(24);
+      expect(await appliedMigrationCount(), `round ${round}: re-up 0002`).toBe(25);
 
       await rollback("0016_email_provider_pin.down.sql");
 
@@ -1309,7 +1318,7 @@ describe("migrations", () => {
       expect(await existingCartCustomersOrdersTables(), `round ${round}: re-up 0001`).toEqual([
         ...cartCustomersOrdersTables,
       ]);
-      expect(await appliedMigrationCount(), `round ${round}: re-up 0001`).toBe(24);
+      expect(await appliedMigrationCount(), `round ${round}: re-up 0001`).toBe(25);
 
       await rollback("0016_email_provider_pin.down.sql");
 
@@ -1393,7 +1402,7 @@ describe("migrations", () => {
       expect(await existingCartCustomersOrdersFunctions()).toEqual(
         [...cartCustomersOrdersFunctions].sort(),
       );
-      expect(await appliedMigrationCount()).toBe(24);
+      expect(await appliedMigrationCount()).toBe(25);
     } finally {
       await pool.query('drop view if exists "orders_down_probe"');
     }
@@ -1424,7 +1433,7 @@ describe("migrations", () => {
         code: "2BP01",
       });
       expect(await existingMediaTables()).toEqual([...mediaTables]);
-      expect(await appliedMigrationCount()).toBe(24);
+      expect(await appliedMigrationCount()).toBe(25);
     } finally {
       await pool.query('drop view if exists "media_down_probe"');
     }
@@ -1456,7 +1465,7 @@ describe("migrations", () => {
       // One multi-statement query is atomic: the tables dropped before shipping_method are back, the journal row stays.
       expect(await existingShippingTables()).toEqual([...shippingTables]);
       expect(await existingShippingFunctions()).toEqual([...shippingFunctions].sort());
-      expect(await appliedMigrationCount()).toBe(24);
+      expect(await appliedMigrationCount()).toBe(25);
     } finally {
       await pool.query('drop view if exists "shipping_down_probe"');
     }
@@ -1585,7 +1594,7 @@ describe("migrations", () => {
       await expect(rollback("0012_banner.down.sql")).rejects.toMatchObject({ code: "2BP01" });
       // One multi-statement query is atomic: banner_image (dropped first) is back, the journal row stays.
       expect(await existingBannerTables()).toEqual([...bannerTables]);
-      expect(await appliedMigrationCount()).toBe(24);
+      expect(await appliedMigrationCount()).toBe(25);
     } finally {
       await pool.query('drop view if exists "banner_down_probe"');
     }
@@ -1623,7 +1632,7 @@ describe("migrations", () => {
       // One multi-statement query is atomic: search_synonym_group (dropped first) is back, the journal row stays.
       expect(await existingSearchTables()).toEqual([...searchTables]);
       expect(await searchSequenceExists()).toBe(true);
-      expect(await appliedMigrationCount()).toBe(24);
+      expect(await appliedMigrationCount()).toBe(25);
     } finally {
       await pool.query('drop view if exists "search_down_probe"');
     }
@@ -1688,7 +1697,7 @@ describe("migrations", () => {
 
     // The real migrator applies only 0009; the existing rows are untouched apart from the new NULL column.
     await migrate(drizzle(pool), { migrationsFolder });
-    expect(await appliedMigrationCount()).toBe(24);
+    expect(await appliedMigrationCount()).toBe(25);
     expect(await keptOrder()).toEqual({ ...before, contact_erased_at: null });
 
     // Anonymise one order and use the new tables.
@@ -1800,7 +1809,7 @@ describe("migrations", () => {
 
     // The real migrator applies 0008 and all later migrations; every legacy value is untouched.
     await migrate(drizzle(pool), { migrationsFolder });
-    expect(await appliedMigrationCount()).toBe(24);
+    expect(await appliedMigrationCount()).toBe(25);
     expect(await existingPaymentTables()).toEqual([...paymentTables]);
     expect(await ordersSnapshot()).toEqual(before);
     expect(
@@ -1927,7 +1936,7 @@ describe("migrations", () => {
 
     // The real migrator applies only 0007 and 0008; the existing rows are untouched.
     await migrate(drizzle(pool), { migrationsFolder });
-    expect(await appliedMigrationCount()).toBe(24);
+    expect(await appliedMigrationCount()).toBe(25);
     expect(await existingEmailTables()).toEqual([...emailTables]);
     expect(await accountsSnapshot()).toEqual(before);
 
@@ -2024,7 +2033,7 @@ describe("migrations", () => {
 
     // The real migrator applies only 0006 to 0008; the existing order rows are untouched.
     await migrate(drizzle(pool), { migrationsFolder });
-    expect(await appliedMigrationCount()).toBe(24);
+    expect(await appliedMigrationCount()).toBe(25);
     expect(await existingShippingTables()).toEqual([...shippingTables]);
     expect(await ordersSnapshot()).toEqual(before);
 
@@ -2147,7 +2156,7 @@ describe("migrations", () => {
 
     // The real migrator applies only 0004 to 0008 to this database.
     await migrate(drizzle(pool), { migrationsFolder });
-    expect(await appliedMigrationCount()).toBe(24);
+    expect(await appliedMigrationCount()).toBe(25);
     expect(await existingCartCustomersOrdersTables()).toEqual([...cartCustomersOrdersTables]);
     expect(await pricingInventorySnapshot()).toEqual(before);
 

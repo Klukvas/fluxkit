@@ -117,7 +117,7 @@ export const integrationSchema = z.object({
   providerCode: z.string(),
   enabled: z.boolean().meta({
     description:
-      "True when new email/payment work uses the stored outbound credential. Shipping activation remains unavailable.",
+      "True when new email, payment or shipping work uses the stored outbound credential.",
   }),
   secrets: z.array(integrationSecretSchema),
   versions: z.array(integrationVersionSchema).max(20),

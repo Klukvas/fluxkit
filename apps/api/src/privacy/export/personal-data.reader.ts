@@ -34,7 +34,7 @@ import {
 } from "../../database/schema/index.js";
 import { EmailProviderRegistry } from "../../email/registry/index.js";
 import { PaymentProviders } from "../../payments/registry/payment-providers.js";
-import { ShippingProviderRegistry } from "../../shipping/registry/index.js";
+import { ShippingProviders } from "../../shipping/registry/index.js";
 import {
   customerSubject,
   emailSubject,
@@ -105,7 +105,7 @@ export class PersonalDataReader {
     @Inject(LOCALE_CONFIG) private readonly locale: LocaleConfig,
     @Inject(EmailProviderRegistry) private readonly emailProviders: EmailProviderRegistry,
     @Inject(PaymentProviders) private readonly paymentProviders: PaymentProviders,
-    @Inject(ShippingProviderRegistry) private readonly shippingProviders: ShippingProviderRegistry,
+    @Inject(ShippingProviders) private readonly shippingProviders: ShippingProviders,
   ) {}
 
   /** The subject of an account id; undefined when the account does not exist. */
@@ -398,9 +398,9 @@ export class PersonalDataReader {
         kind: "payment" as const,
         name: code,
       })),
-      ...this.shippingProviders.list().map((provider) => ({
+      ...(await this.shippingProviders.processorCodes(db)).map((code) => ({
         kind: "shipping" as const,
-        name: provider.code,
+        name: code,
       })),
     ];
   }

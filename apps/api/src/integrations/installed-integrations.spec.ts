@@ -16,6 +16,7 @@ describe("InstalledIntegrations", () => {
     emailRouteDelegated: false,
     emailFromAddress: null,
     paymentDelegated: false,
+    shippingDelegated: false,
     shopCurrency: "UAH",
     orderPaymentTtlMinutes: 30,
     storefrontPublicUrl: null,

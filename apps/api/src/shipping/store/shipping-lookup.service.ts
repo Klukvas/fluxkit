@@ -27,7 +27,7 @@ export class ShippingLookupService {
   ) {}
 
   async cities(code: string, query: ShippingCitiesQuery): Promise<ShippingCityPage> {
-    const provider = this.provider(code);
+    const provider = await this.provider(code);
     const locale = this.store.resolveLocale(query.locale);
     const page = await this.unavailableAs503(() =>
       this.directory.searchCities(provider, query.q, locale.locale),
@@ -49,7 +49,7 @@ export class ShippingLookupService {
     code: string,
     query: ShippingPickupPointsQuery,
   ): Promise<ShippingPickupPointPage> {
-    const provider = this.provider(code);
+    const provider = await this.provider(code);
     if (!provider.capabilities.pickupPoints) {
       throw notFound("Shipping provider");
     }
@@ -83,8 +83,8 @@ export class ShippingLookupService {
     };
   }
 
-  private provider(code: string): ShippingProviderPort {
-    const provider = this.directory.provider(code);
+  private async provider(code: string): Promise<ShippingProviderPort> {
+    const provider = await this.directory.provider(code);
     if (provider === undefined) {
       throw notFound("Shipping provider");
     }

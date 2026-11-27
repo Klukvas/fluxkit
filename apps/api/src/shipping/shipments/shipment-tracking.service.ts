@@ -12,7 +12,7 @@ import { withJobTransaction, type JobLimits } from "../../common/job-limits.js";
 import { withTransaction, type Transaction } from "../../common/transaction.js";
 import { DRIZZLE, type Database } from "../../database/database.module.js";
 import type { ShipmentRow } from "../../orders/orders.repository.js";
-import { ShippingProviderRegistry } from "../registry/shipping-provider-registry.js";
+import { ShippingProviders } from "../registry/shipping-providers.js";
 import {
   SHIPMENT_CALL_TIMEOUTS,
   type ShipmentCallTimeouts,
@@ -85,21 +85,20 @@ export class ShipmentTrackingService {
     @Inject(DRIZZLE) private readonly database: Database,
     @Inject(ShipmentsRepository) private readonly shipments: ShipmentsRepository,
     @Inject(ShipmentChanges) private readonly changes: ShipmentChanges,
-    @Inject(ShippingProviderRegistry) private readonly registry: ShippingProviderRegistry,
+    @Inject(ShippingProviders) private readonly registry: ShippingProviders,
     @Inject(SHIPMENT_CALL_TIMEOUTS) private readonly timeouts: ShipmentCallTimeouts,
   ) {}
 
-  /** The loaded providers that offer tracking: the only ones the job polls. */
-  trackingProviders(): readonly ShippingProviderPort[] {
-    return this.registry.list().filter((provider) => provider.capabilities.tracking);
+  async providerFor(row: DueShipment): Promise<ShippingProviderPort | undefined> {
+    return this.registry.forShipment(row);
   }
-
   listDue(now: Date, after: TrackingCursor | undefined, limit: number): Promise<DueShipment[]> {
+    // Scan retained/disabled/revoked work too. Unavailable groups get their own backoff.
     return this.shipments.listDue(this.database, {
       now,
-      providerCodes: this.trackingProviders().map((provider) => provider.code),
       after,
       limit,
+      providerCodes: this.registry.legacyTrackingCodes(),
     });
   }
 

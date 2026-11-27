@@ -1,3 +1,4 @@
+import { ShippingActivationService } from "./shipping-activation.service.js";
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { sql } from "drizzle-orm";
 import { checkIntegrationSecretValue, type IntegrationSecretDeclaration } from "@fluxkit/core";
@@ -87,6 +88,8 @@ export class IntegrationsService {
     @Inject(IntegrationRuntime) private readonly runtime: IntegrationRuntime,
     @Inject(IntegrationAlerts) private readonly alerts: IntegrationAlerts,
     @Inject(CandidateBundleWriter) private readonly bundles: CandidateBundleWriter,
+    @Inject(ShippingActivationService)
+    private readonly shippingActivation: ShippingActivationService,
     @Inject(PaymentActivationService) private readonly paymentActivation: PaymentActivationService,
     @Inject(PaymentMerchantEnrollment) private readonly merchants: PaymentMerchantEnrollment,
   ) {}
@@ -493,7 +496,10 @@ export class IntegrationsService {
 
   private async assertActivatable(resolved: ResolvedIntegration): Promise<void> {
     const { row, installed } = resolved;
-    if (row.kind !== "email" && row.kind !== "payment") throw runtimeNotReady();
+    if (row.kind === "shipping") {
+      await this.shippingActivation.assertActivatable(this.db, resolved);
+      return;
+    }
     if (row.kind === "payment") {
       await this.paymentActivation.assertActivatable(this.db, resolved);
       return;
@@ -541,6 +547,13 @@ export class IntegrationsService {
     await this.advanceRevision(transaction, body.expectedRevision, now);
     const locked = await this.repository.findByIdForUpdate(resolved.row.id, transaction);
     if (locked === undefined) throw runtimeNotReady();
+    if (locked.kind === "shipping")
+      return this.shippingActivation.activate(
+        transaction,
+        { ...resolved, row: locked },
+        verified,
+        now,
+      );
     if (locked.kind === "payment")
       return this.paymentActivation.activate(
         transaction,

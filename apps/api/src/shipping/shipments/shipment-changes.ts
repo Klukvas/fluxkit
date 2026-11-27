@@ -5,6 +5,8 @@ import {
   shipmentEventTypeFor,
   type ShipmentStatus,
 } from "@fluxkit/core";
+import { eq } from "drizzle-orm";
+import { adminUser } from "../../database/schema/index.js";
 import type { Transaction } from "../../common/transaction.js";
 import { OrdersRepository, type ShipmentRow } from "../../orders/orders.repository.js";
 import { shipmentStatusOf } from "./shipment-view.js";
@@ -35,6 +37,17 @@ export class ShipmentChanges {
     @Inject(ShipmentsRepository) private readonly shipments: ShipmentsRepository,
     @Inject(OrdersRepository) private readonly orders: OrdersRepository,
   ) {}
+
+  /** Take the admin FK lock before any integration locks, matching owner step-up -> integration lifecycle writes. */
+  async lockActor(tx: Transaction, actor: ShipmentActorRef): Promise<void> {
+    if (actor.type === "admin" && actor.adminId !== null) {
+      await tx
+        .select({ id: adminUser.id })
+        .from(adminUser)
+        .where(eq(adminUser.id, actor.adminId))
+        .for("key share");
+    }
+  }
 
   /** Inserts a new shipment as `pending` (`null -> pending`, admins only) with its first journal row; no event yet. */
   async create(
@@ -71,6 +84,8 @@ export class ShipmentChanges {
     if (!decision.ok) {
       return { ok: false, reason: decision.reason };
     }
+    // The binding trigger locks integration/version before the journal takes its admin FK lock.
+    await this.lockActor(tx, actor);
     const row = await this.shipments.update(tx, current.id, {
       ...options.columns,
       status: to,

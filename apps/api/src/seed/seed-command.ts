@@ -171,7 +171,7 @@ export async function runSeedCommand(
   assertSeedAllowed(env, argv);
   const dataset = datasetOf(argv);
   const config = loadEnv(env);
-  // The enabled providers, as the API loads them: a demo method of a provider is created only when it is loaded.
+  // Deliberately env-only: seeding never activates stored shipping keys or contacts a managed provider.
   const shippingProviders = await loadShippingProviders({
     enabled: config.enabledShippingProviders,
     providersDir: DEFAULT_SHIPPING_PROVIDERS_DIR,

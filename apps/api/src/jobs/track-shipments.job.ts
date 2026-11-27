@@ -1,3 +1,4 @@
+import { ProblemException } from "../common/problem.js";
 import { Logger } from "@nestjs/common";
 import { summarizeError } from "../common/error-summary.js";
 import { DEFAULT_JOB_LIMITS, type JobLimits } from "../common/job-limits.js";
@@ -37,7 +38,7 @@ export interface TrackShipmentsResult {
 export interface TrackShipmentsDeps {
   tracking: Pick<
     ShipmentTrackingService,
-    "trackingProviders" | "listDue" | "poll" | "applyAnswer" | "applyFailure"
+    "providerFor" | "listDue" | "poll" | "applyAnswer" | "applyFailure"
   >;
 }
 
@@ -52,8 +53,8 @@ const logger = new Logger("Jobs");
 
 /**
  * Job 8 `track-shipments` (ADR 0029 decision 10, ADR 0025 bounds). Pages of due shipments (polled statuses, a waybill
- * number, `next_track_at <= now`, an enabled provider that offers tracking), oldest due first, continued by a
- * `(next_track_at, id)` cursor. Per page and provider ONE `track` call, outside any transaction and with the API's time
+ * number, `next_track_at <= now`, a retained version or an enabled legacy provider), oldest due first, continued by a
+ * `(next_track_at, id)` cursor. Per page and provider/version ONE `track` call, outside any transaction and with the API's time
  * limit; then one short transaction per shipment that locks only that row. An answered poll applies the status (as the
  * `system` actor) and sets the next poll by status; a failed one counts a try and backs off (5 min doubling, at most
  * 6 h), so a broken carrier does not take the pages of a working one. A row that cannot be written is reported in
@@ -68,9 +69,6 @@ export async function trackShipments(
   const limits = options.limits ?? TRACKING_LIMITS;
   assertBatchLimits(limits);
   const jobLimits = options.jobLimits ?? DEFAULT_JOB_LIMITS;
-  const providers = new Map(
-    deps.tracking.trackingProviders().map((provider) => [provider.code, provider]),
-  );
   const result: TrackShipmentsResult = {
     scanned: 0,
     changed: 0,
@@ -81,9 +79,6 @@ export async function trackShipments(
     failures: [],
     truncated: false,
   };
-  if (providers.size === 0) {
-    return result;
-  }
   let cursor: TrackingCursor | undefined;
   for (let page = 1; page <= limits.maxBatches; page += 1) {
     if (options.budget?.exhausted() === true) {
@@ -100,10 +95,8 @@ export async function trackShipments(
     }
     const byProvider = new Map<string, DueShipment[]>();
     for (const shipment of due) {
-      byProvider.set(shipment.providerCode, [
-        ...(byProvider.get(shipment.providerCode) ?? []),
-        shipment,
-      ]);
+      const key = `${shipment.providerCode}:${shipment.integrationCredentialVersionId ?? "legacy-null"}`;
+      byProvider.set(key, [...(byProvider.get(key) ?? []), shipment]);
     }
     let group = 0;
     for (const [code, shipments] of byProvider) {
@@ -113,15 +106,10 @@ export async function trackShipments(
       }
       group += 1;
       result.scanned += shipments.length;
-      const provider = providers.get(code);
-      if (provider === undefined) {
-        throw new Error(`A due shipment names provider ${code}, which does not track`);
-      }
-      const outcome = await deps.tracking.poll(
-        provider,
-        shipments.map((shipment) => shipment.trackingNumber),
-        shipments.map((shipment) => shipment.phone),
-      );
+      const first = shipments[0];
+      if (first === undefined) continue;
+      // Authority/package outages belong to this group; they cannot starve the rest of a page.
+      const outcome = await pollGroup(deps, first, shipments);
       if (outcome.kind !== "ok") {
         result.providerFailures += shipments.length;
         logger.warn(
@@ -178,5 +166,33 @@ function count(
     logger.warn(
       `Job track-shipments: shipment ${shipmentId} is still ${applied.row?.status ?? "unknown"} 30 days after its creation; it is no longer polled (refresh it by hand)`,
     );
+  }
+}
+
+async function pollGroup(
+  deps: TrackShipmentsDeps,
+  first: DueShipment,
+  shipments: readonly DueShipment[],
+) {
+  try {
+    const provider = await deps.tracking.providerFor(first);
+    if (provider === undefined || !provider.capabilities.tracking)
+      return {
+        kind: "failed" as const,
+        reason: "unavailable" as const,
+        providerCodes: ["credential_unavailable"],
+      };
+    return await deps.tracking.poll(
+      provider,
+      shipments.map((row) => row.trackingNumber),
+      shipments.map((row) => row.phone),
+    );
+  } catch (error) {
+    if (!(error instanceof ProblemException) || error.code !== "service_unavailable") throw error;
+    return {
+      kind: "failed" as const,
+      reason: "unavailable" as const,
+      providerCodes: ["credential_unavailable"],
+    };
   }
 }

@@ -1,3 +1,5 @@
+import { IntegrationUnavailableError } from "../../integrations/installed-integrations.js";
+import { lockShippingProfile } from "../registry/shipping-profile-lock.js";
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import {
   CARRIER_REFERENCE_PATTERN,
@@ -38,7 +40,7 @@ import {
 } from "../../orders/orders.repository.js";
 import { orderPickupPointSchema } from "../../orders/orders.schemas.js";
 import { OrdersService } from "../../orders/orders.service.js";
-import { ShippingProviderRegistry } from "../registry/shipping-provider-registry.js";
+import { ShippingProviders } from "../registry/shipping-providers.js";
 import {
   SHIPMENT_CALL_TIMEOUTS,
   type ShipmentCallTimeouts,
@@ -128,7 +130,7 @@ export class ShipmentsService {
     @Inject(ShipmentsRepository) private readonly shipments: ShipmentsRepository,
     @Inject(ShipmentChanges) private readonly changes: ShipmentChanges,
     @Inject(ShipmentTrackingService) private readonly tracking: ShipmentTrackingService,
-    @Inject(ShippingProviderRegistry) private readonly registry: ShippingProviderRegistry,
+    @Inject(ShippingProviders) private readonly registry: ShippingProviders,
     @Inject(SHIPMENT_CALL_TIMEOUTS) private readonly timeouts: ShipmentCallTimeouts,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
@@ -156,6 +158,11 @@ export class ShipmentsService {
     try {
       prepared = await this.inTransaction((tx) => this.prepare(tx, orderId, actor, body, now));
     } catch (error) {
+      if (error instanceof IntegrationUnavailableError)
+        throw ruleViolation(
+          "The carrier is not available for new shipments.",
+          "provider_not_enabled",
+        );
       if (isUniqueViolation(error, "shipment_order_id_active_key")) {
         throw activeShipmentExists();
       }
@@ -210,7 +217,7 @@ export class ShipmentsService {
         "shipment_not_unknown",
       );
     }
-    const provider = this.requireProvider(row.providerCode, "waybills");
+    const provider = await this.requireBoundProvider(row, "waybills");
     const lookup: WaybillLookup = {
       clientReference: row.clientReference,
       createdAfter: new Date(row.createdAt.getTime() - FIND_WAYBILL_MARGIN_MS).toISOString(),
@@ -255,7 +262,7 @@ export class ShipmentsService {
     if (!decideShipmentTransition(shipmentStatusOf(row.status), "cancelled", "admin").ok) {
       throw invalidShipmentTransition();
     }
-    const provider = this.requireProvider(row.providerCode, "cancelWaybill");
+    const provider = await this.requireBoundProvider(row, "cancelWaybill");
     if (row.providerRef === null) {
       throw new Error(`Shipment ${row.id} is ${row.status} without a provider ref`);
     }
@@ -297,7 +304,7 @@ export class ShipmentsService {
         "shipment_not_tracked",
       );
     }
-    const provider = this.requireProvider(row.providerCode, "tracking");
+    const provider = await this.requireBoundProvider(row, "tracking");
     const order = await this.orders.findById(this.database, orderId);
     if (order === undefined) {
       throw notFound("Order");
@@ -335,7 +342,7 @@ export class ShipmentsService {
         "label_not_available",
       );
     }
-    const provider = this.requireProvider(row.providerCode, "labels");
+    const provider = await this.requireBoundProvider(row, "labels");
     // The carrier is told the waybill both ways: Nova Post prints by number, others by their own id (plan step 7b).
     const { providerRef, trackingNumber } = row;
     const outcome = await callProvider(this.timeouts.labelMs, (signal) =>
@@ -388,7 +395,14 @@ export class ShipmentsService {
         "no_carrier",
       );
     }
-    const provider = this.requireProvider(snapshot.providerCode, "waybills");
+    await this.changes.lockActor(tx, actor);
+    await lockShippingProfile(tx, snapshot.providerCode);
+    const versionId = await this.registry.admit(tx, snapshot.providerCode);
+    const provider = await this.requireBoundProvider(
+      { providerCode: snapshot.providerCode, integrationCredentialVersionId: versionId },
+      "waybills",
+      tx,
+    );
     if (body.declaredValue !== undefined && body.declaredValue.currency !== order.currency) {
       throw validationFailed([
         {
@@ -429,6 +443,7 @@ export class ShipmentsService {
       {
         orderId: order.id,
         providerCode: provider.code,
+        integrationCredentialVersionId: versionId,
         providerService: snapshot.providerService,
         clientReference: order.number,
         declaredValueAmount: declaredValue.amount,
@@ -547,12 +562,18 @@ export class ShipmentsService {
   }
 
   /** The loaded provider of the shipment, offering `capability`; a provider switched off since is a 409, not a 500. */
-  private requireProvider(code: string, capability: ShippingCapability): ShippingProviderPort {
-    const provider = this.registry.get(code);
+  private async requireBoundProvider(
+    row: { providerCode: string; integrationCredentialVersionId: string | null },
+    capability: ShippingCapability,
+    executor: DbExecutor = this.database,
+  ): Promise<ShippingProviderPort> {
+    const provider = await this.registry.forShipment(row, executor);
     if (provider === undefined) {
       throw ruleViolation(
         "The carrier of this order is not enabled in this shop (SHIPPING_PROVIDERS_ENABLED).",
-        "provider_not_enabled",
+        row.integrationCredentialVersionId === null && !this.registry.delegated
+          ? "provider_not_enabled"
+          : "credential_unavailable",
       );
     }
     if (!provider.capabilities[capability]) {

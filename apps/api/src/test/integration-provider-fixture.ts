@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { SecretsKey, SecretsKeyRing } from "@fluxkit/config";
+import type { ManagedTestShippingProvider } from "./managed-shipping-provider.js";
 import type { ManagedTestPaymentProvider } from "./managed-payment-provider.js";
 
 /**
@@ -74,6 +75,39 @@ export async function createManagedPaymentFixture(): Promise<ManagedPaymentFixtu
     pair: await load("pairpay"),
     remove: () => rm(dir, { recursive: true, force: true }),
   };
+}
+
+export interface ManagedShippingFixture extends IntegrationProviderFixture {
+  readonly shipping: ManagedTestShippingProvider;
+}
+
+export async function createManagedShippingFixture(): Promise<ManagedShippingFixture> {
+  const dir = await mkdtemp(join(tmpdir(), "fluxkit-managed-shipping-"));
+  const helper = pathToFileURL(join(import.meta.dirname, "managed-shipping-provider.ts")).href;
+  await writePackage(
+    dir,
+    "testship",
+    {
+      provider: "testship",
+      kind: "shipping",
+      secrets: [{ field: "api_key", purpose: "outbound", env: "TESTSHIP_API_KEY" }],
+      environments: {
+        values: ["sandbox", "production"],
+        default: "sandbox",
+        env: "TESTSHIP_ENVIRONMENT",
+      },
+    },
+    `
+import { ManagedTestShippingProvider } from ${JSON.stringify(helper)};
+export const fixture = new ManagedTestShippingProvider();
+export const createOutboundClient = fixture.createOutboundClient;
+export const checkCredentials = fixture.checkCredentials;
+`,
+  );
+  const loaded = (await import(pathToFileURL(join(dir, "testship", "index.js")).href)) as {
+    fixture: ManagedTestShippingProvider;
+  };
+  return { dir, shipping: loaded.fixture, remove: () => rm(dir, { recursive: true, force: true }) };
 }
 
 const VALIDATOR = `

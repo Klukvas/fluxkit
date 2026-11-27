@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { dirname, join, relative } from "node:path";
+import { basename, dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { is } from "drizzle-orm";
 import { getTableConfig, PgTable } from "drizzle-orm/pg-core";
@@ -246,5 +246,22 @@ describe("the API sets only the documented cookies (ADR 0033 decision 11)", () =
       "fluxkit_cart",
       "fluxkit_customer_session",
     ]);
+  });
+});
+
+describe("core provider removal boundary", () => {
+  it("uses fixture packages in API specs instead of installed providers", () => {
+    const allowed = new Set([
+      "source-guards.spec.ts",
+      "feature-boundaries.spec.ts",
+      "email-fallback-packages.spec.ts",
+    ]);
+    const files = sourceFiles(join(ROOT, "apps/api/src"), /\.spec\.ts$/);
+    expect(files.length).toBeGreaterThan(100);
+    expect(
+      files
+        .filter((file) => !allowed.has(basename(file)) && text(file).includes("packages/providers"))
+        .map(rel),
+    ).toEqual([]);
   });
 });

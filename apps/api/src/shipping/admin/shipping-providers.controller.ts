@@ -53,12 +53,12 @@ export class ShippingProvidersController {
   @ApiOperation({
     summary: "Replace the non-secret settings of a shipping provider",
     description:
-      "Records who saved them. Credentials never belong here: they are read from the environment, and a key named like a credential is refused. A bounded check first, then the provider's own rules (`validateSettings`): their issues are `400 validation_failed` at `settings.<path>`.",
+      "Records who saved them. Credentials never belong here: they come from the server environment or Settings → Integrations, and a key named like a credential is refused. Managed sender profile changes are refused with `409 rule_violation` (`shipping_profile_work_open`) while open shipments depend on the profile. A bounded check first, then the provider's own rules (`validateSettings`): their issues are `400 validation_failed` at `settings.<path>`.",
   })
   @ApiParam(CODE_PARAM)
   @ApiZodBody(putProviderSettingsSchema)
   @ApiZodResponse(200, providerSettingsResponseSchema, "The saved settings.")
-  @ApiProblemResponses(400, 404)
+  @ApiProblemResponses(400, 404, 409)
   putSettings(
     @Param("code", providerCodeParam) code: string,
     @Body(new ZodValidationPipe(putProviderSettingsSchema)) body: PutProviderSettingsBody,

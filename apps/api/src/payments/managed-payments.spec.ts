@@ -6,6 +6,7 @@ import { startApp } from "../test/app.js";
 import { StorePaymentViews } from "./store/store-payment-views.js";
 import { PaymentCreateService } from "./payment-create.service.js";
 import { PaymentWorld } from "../test/payment-world.js";
+import { raceAdminRevocation } from "../test/admin-revocation-race.js";
 import {
   createManagedPaymentFixture,
   testSecretsKeyRing,
@@ -149,6 +150,44 @@ describe("managed payment bindings (real Postgres, fixture provider transport)",
     const invoice = fixture.payment.invoice(payment.providerPaymentId ?? "");
     return { placed, payment, invoice };
   }
+  it.each(["admin refund", "manual mark paid"])(
+    "takes the admin FK lock before integration locks for %s during owner revocation",
+    async (operation) => {
+      const version = await addVersion(integrationId, "testpay", { token: TOKEN_A });
+      await activate(integrationId, version);
+      const work = await created();
+      if (operation === "admin refund") {
+        fixture.payment.backend.setStatus(work.invoice.invoiceId, "succeeded");
+        const invoice = fixture.payment.invoice(work.invoice.invoiceId);
+        const received = await world.webhook(webhook(invoice, TOKEN_A), { provider: "testpay" });
+        expect(received.status).toBe(200);
+      }
+      const raced = await raceAdminRevocation(
+        world.pool,
+        world.orders.ownerId,
+        integrationId,
+        version,
+        async () => {
+          if (operation === "manual mark paid") {
+            expect((await world.orders.pay(work.placed)).status).toBe(200);
+            return;
+          }
+          const result = await world.refunds.requestAdminRefund({
+            orderId: work.placed.id,
+            paymentId: work.payment.id,
+            adminId: world.orders.ownerId,
+            amount: money(work.payment.amount, "UAH"),
+            note: "test",
+            idempotencyKey: randomUUID(),
+            now: new Date(),
+          });
+          expect(result.kind).toBe("requested");
+        },
+      );
+      expect(raced.revocationError).toBeUndefined();
+      await activate(integrationId, a);
+    },
+  );
   it.each(["checkout", "admin refund", "automatic refund", "privacy export"])(
     "completes %s with a one-connection payment pool",
     async (operation) => {

@@ -136,7 +136,7 @@ Purposes and legal bases are proposals taken from the plan. TODO(fluxkit): legal
 | `search_synonym_group` | `id`, `locale`, `terms`, `created_at`, `updated_at` | none | D24 | not_applicable | not_applicable |  |
 | `search_synonym_group` | `created_by_admin_id` | staff (S) | D24 | excluded | set_null | Admin actor id; admin ids are not exported. |
 | `shipment` | `next_track_at`, `tracking_attempts` | none | D13 | not_applicable | not_applicable |  |
-| `shipment` | `id`, `order_id`, `provider_ref` | pseudonymous (Q) | D13 | excluded | keep | Internal id or provider reference only the shop can use. |
+| `shipment` | `id`, `order_id`, `provider_ref`, `integration_credential_version_id` | pseudonymous (Q) | D13 | excluded | keep | Internal id or provider reference only the shop can use. |
 | `shipment` | `provider_code`, `provider_service`, `status`, `carrier_status_code`, `carrier_status_at`, `tracking_number`, `client_reference`, `declared_value_amount`, `currency`, `carrier_cost_amount`, `payer`, `weight_grams`, `length_mm`, `width_mm`, `height_mm`, `seats`, `created_at`, `updated_at`, `cancelled_at`, `delivered_at` | pseudonymous (Q) | D13 | included | keep | Accounting and delivery record (ADR 0017): never deleted, contains no contact data. |
 | `shipment` | `created_by` | staff (S) | D20 | excluded | set_null | Admin actor id; admin ids are not exported. |
 | `shipment_status_change` | `id`, `shipment_id` | pseudonymous (Q) | D13 | excluded | keep | Internal id or provider reference only the shop can use. |

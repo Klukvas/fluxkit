@@ -20,3 +20,5 @@
 
 
 - `src/env.ts` — preserves `PAYMENT_PROVIDERS_ENABLED` presence as `paymentDelegated`; absent selects admin-managed payments, present blank stays env/off.
+
+- `src/env.ts` — preserves shipping enablement presence as `shippingDelegated`: absent selects managed runtime, any present value selects the existing env registry.

@@ -13,7 +13,15 @@
         "purpose": "outbound",
         "env": "NOVA_POST_API_KEY"
       }
-    ]
+    ],
+    "environments": {
+      "values": [
+        "sandbox",
+        "production"
+      ],
+      "default": "sandbox",
+      "env": "NOVA_POST_ENVIRONMENT"
+    }
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

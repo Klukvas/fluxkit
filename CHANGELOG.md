@@ -25,6 +25,8 @@ One line per user-visible or schema change.
 
 ## Unreleased
 
+- Shipping: with `SHIPPING_PROVIDERS_ENABLED` absent, Nova Post keys saved in Settings → Integrations can be checked and turned on for sandbox or production; each shipment keeps its key version for reconcile, tracking, cancellation and labels. Disable stops new shipments only; revoke stops every later carrier call. Sender profile edits are refused while shipments depend on it. Migration `0024_managed_shipping_credentials`. With the variable set (even blank) nothing changes.
+
 - Payments: with `PAYMENT_PROVIDERS_ENABLED` absent, Monobank and LiqPay keys saved in Settings → Integrations can be checked and turned on; each payment stays bound to the key version it was created with (refunds, reconcile, webhooks), disable stops new payments only, revoke stops every later call. Monobank locks the shop to the first verified merchant. Migration `0023_managed_payment_credentials`. With the variable set (even blank) nothing changes.
 
 - Integrations (ADR 0060): a provider key may have several fields (LiqPay is listed again), keys carry an environment (`fluxkit.environments`), `POST /admin/integrations/{id}/check` runs an explicit read-only connection check, responses list recent key versions, and active owners get a best-effort alert mail after key changes. Migration `0022_integration_credential_environment`.

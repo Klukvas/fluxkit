@@ -39,6 +39,7 @@ export interface TrackingCursor {
 export interface DueShipment {
   readonly id: string;
   readonly providerCode: string;
+  readonly integrationCredentialVersionId: string | null;
   readonly trackingNumber: string;
   readonly nextTrackAt: Date;
   readonly phone: string;
@@ -127,14 +128,11 @@ export class ShipmentsRepository {
     db: DbExecutor,
     input: {
       readonly now: Date;
-      readonly providerCodes: readonly string[];
+      readonly providerCodes?: readonly string[];
       readonly after: TrackingCursor | undefined;
       readonly limit: number;
     },
   ): Promise<DueShipment[]> {
-    if (input.providerCodes.length === 0) {
-      return [];
-    }
     const after =
       input.after === undefined
         ? undefined
@@ -146,6 +144,7 @@ export class ShipmentsRepository {
       .select({
         id: shipment.id,
         providerCode: shipment.providerCode,
+        integrationCredentialVersionId: shipment.integrationCredentialVersionId,
         trackingNumber: shipment.trackingNumber,
         nextTrackAt: shipment.nextTrackAt,
         phone: sql<string>`coalesce(${salesOrder.shippingAddress} ->> 'recipientPhone', ${salesOrder.phone})`,
@@ -158,7 +157,12 @@ export class ShipmentsRepository {
           inArray(shipment.status, [...TRACKED_STATUSES] as ShipmentStatus[]),
           lte(shipment.nextTrackAt, input.now),
           isNotNull(shipment.trackingNumber),
-          inArray(shipment.providerCode, [...input.providerCodes]),
+          input.providerCodes === undefined
+            ? undefined
+            : or(
+                isNotNull(shipment.integrationCredentialVersionId),
+                inArray(shipment.providerCode, [...input.providerCodes]),
+              ),
           after,
         ),
       )
@@ -171,6 +175,7 @@ export class ShipmentsRepository {
       return {
         id: row.id,
         providerCode: row.providerCode,
+        integrationCredentialVersionId: row.integrationCredentialVersionId,
         trackingNumber: row.trackingNumber,
         nextTrackAt: row.nextTrackAt,
         phone: row.phone,

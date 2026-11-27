@@ -164,6 +164,9 @@ describe("credential environment and immutable lifecycle migration 0022 (real Po
     await pool.query("delete from integration_credential_version where id=$1", [id]);
     for (let pass = 0; pass < 2; pass += 1) {
       await pool.query(
+        await readFile(`${folder}/0024_managed_shipping_credentials.down.sql`, "utf8"),
+      );
+      await pool.query(
         await readFile(`${folder}/0023_managed_payment_credentials.down.sql`, "utf8"),
       );
       await pool.query(down);
