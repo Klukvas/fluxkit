@@ -1,13 +1,20 @@
-import { generateKeyPairSync, randomUUID, sign, type KeyObject } from "node:crypto";
-import { fileURLToPath } from "node:url";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { type PaymentWebhookInput } from "@fluxkit/core";
+import { createHmac, randomUUID } from "node:crypto";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { type CreatePaymentInput, type PaymentWebhookInput } from "@fluxkit/core";
 import { moneyOf as money } from "./payment-facts.service.js";
 import { startApp } from "../test/app.js";
 import { StorePaymentViews } from "./store/store-payment-views.js";
 import { PaymentCreateService } from "./payment-create.service.js";
 import { PaymentWorld } from "../test/payment-world.js";
-import { testSecretsKeyRing } from "../test/integration-provider-fixture.js";
+import {
+  createManagedPaymentFixture,
+  testSecretsKeyRing,
+  type ManagedPaymentFixture,
+} from "../test/integration-provider-fixture.js";
+import {
+  TEST_PAYMENT_SIGNATURE_HEADER,
+  type TestPaymentWebhookBody,
+} from "../test/test-payment-provider.js";
 import { ensureMigrated } from "../test/migrate.js";
 import { DISABLED_INTEGRATIONS_CONFIG } from "../integrations/integrations.config.js";
 import { IntegrationsRepository } from "../integrations/integrations.repository.js";
@@ -32,101 +39,47 @@ import { CUSTOMER_SESSION_COOKIE_NAME } from "../customers/auth/customer-session
 
 const TOKEN_A = "test_managed_A_0123456789";
 const TOKEN_B = "test_managed_B_0123456789";
-const keys: Record<string, { publicKey: KeyObject; privateKey: KeyObject }> = {
-  [TOKEN_A]: generateKeyPairSync("ec", { namedCurve: "prime256v1" }),
-  [TOKEN_B]: generateKeyPairSync("ec", { namedCurve: "prime256v1" }),
-};
-type Invoice = {
-  invoiceId: string;
-  reference: string;
-  amount: number;
-  ccy: number;
-  status: string;
-  modifiedDate: string;
-  createdDate: string;
-  finalAmount: number;
-};
-describe("managed payment bindings (real Postgres, provider HTTP only is fake)", () => {
+type Invoice = TestPaymentWebhookBody;
+describe("managed payment bindings (real Postgres, fixture provider transport)", () => {
   let world: PaymentWorld;
+  let fixture: ManagedPaymentFixture;
   let integrationId: string;
   let a: string;
   let b: string;
   const ring = testSecretsKeyRing();
   const cipher = new SecretCipher(ring);
-  const invoices = new Map<string, Invoice>();
-  const calls: { path: string; token: string }[] = [];
+  let calls: ManagedPaymentFixture["payment"]["calls"];
   let bindingObserved: string | null = null;
-  const actualFetch = globalThis.fetch;
   beforeAll(async () => {
     await ensureMigrated([], { reset: true });
+    fixture = await createManagedPaymentFixture();
+    calls = fixture.payment.calls;
     world = await PaymentWorld.start({
       paymentDelegated: true,
       secretsKeyRing: ring,
-      integrationProvidersDir: fileURLToPath(
-        new URL("../../../../packages/providers", import.meta.url),
-      ),
+      integrationProvidersDir: fixture.dir,
       paymentCallTimeoutMs: 3_000,
     });
     integrationId = randomUUID();
     await world.pool.query(
-      "insert into integration(id,kind,provider_code) values($1,'payment','monobank')",
+      "insert into integration(id,kind,provider_code) values($1,'payment','testpay')",
       [integrationId],
     );
-    a = await addVersion(integrationId, "monobank", { token: TOKEN_A });
+    a = await addVersion(integrationId, "testpay", { token: TOKEN_A });
     await activate(integrationId, a);
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
-      const url = new URL(
-        typeof input === "string" ? input : input instanceof URL ? input.href : input.url,
+    fixture.payment.onRequest = async (request, input) => {
+      if (request.operation !== "create") return;
+      const payment = input as CreatePaymentInput;
+      const binding = await world.pool.query<{ integration_credential_version_id: string }>(
+        "select integration_credential_version_id from payment where id=$1",
+        [payment.paymentId],
       );
-      if (url.hostname !== "api.monobank.ua") return actualFetch(input, init);
-      const token = new Headers(init?.headers).get("X-Token") ?? "";
-      calls.push({ path: url.pathname, token });
-      if (url.pathname.endsWith("/pubkey")) {
-        const key = keys[token];
-        if (key === undefined) return Response.json({}, { status: 403 });
-        const pem = key.publicKey.export({ type: "spki", format: "pem" });
-        return Response.json({ key: Buffer.from(pem).toString("base64") });
-      }
-      const body =
-        typeof init?.body === "string"
-          ? (JSON.parse(init.body) as {
-              amount: number;
-              merchantPaymInfo: { reference: string };
-              invoiceId: string;
-            })
-          : undefined;
-      if (url.pathname.endsWith("/create") && body !== undefined) {
-        const binding = await world.pool.query<{ integration_credential_version_id: string }>(
-          "select integration_credential_version_id from payment where id=$1",
-          [body.merchantPaymInfo.reference],
-        );
-        bindingObserved = binding.rows[0]?.integration_credential_version_id ?? null;
-        const id = `invoice_${randomUUID()}`;
-        const now = new Date().toISOString();
-        invoices.set(id, {
-          invoiceId: id,
-          reference: body.merchantPaymInfo.reference,
-          amount: body.amount,
-          ccy: 980,
-          status: "created",
-          createdDate: now,
-          modifiedDate: now,
-          finalAmount: body.amount,
-        });
-        return Response.json({ invoiceId: id, pageUrl: `https://pay.mbnk.biz/${id}` });
-      }
-      if (url.pathname.endsWith("/status"))
-        return Response.json(invoices.get(url.searchParams.get("invoiceId") ?? "") ?? {}, {
-          status: 200,
-        });
-      if (url.pathname.endsWith("/cancel")) return Response.json({ status: "success" });
-      if (url.pathname.endsWith("/remove")) return Response.json({});
-      throw new Error("unexpected_test_http");
-    });
+      bindingObserved = binding.rows[0]?.integration_credential_version_id ?? null;
+    };
   });
   afterAll(async () => {
-    vi.restoreAllMocks();
     if (world !== undefined) await world.stop();
+    if (fixture !== undefined) await fixture.remove();
     await ensureMigrated([], { reset: true });
   });
   async function addVersion(owner: string, code: string, values: Readonly<Record<string, string>>) {
@@ -174,13 +127,11 @@ describe("managed payment bindings (real Postgres, provider HTTP only is fake)",
   }
   function webhook(invoice: Invoice, token: string): PaymentWebhookInput {
     const rawBody = Buffer.from(JSON.stringify(invoice));
-    const key = keys[token];
-    if (key === undefined) throw new Error("missing_test_key");
     return {
       rawBody,
       headers: {
         "content-type": "application/json",
-        "x-sign": sign("SHA256", rawBody, key.privateKey).toString("base64"),
+        [TEST_PAYMENT_SIGNATURE_HEADER]: createHmac("sha256", token).update(rawBody).digest("hex"),
       },
     };
   }
@@ -190,13 +141,12 @@ describe("managed payment bindings (real Postgres, provider HTTP only is fake)",
       orderId: placed.id,
       idempotencyKey: randomUUID(),
       createdBy: "guest",
-      providerCode: "monobank",
+      providerCode: "testpay",
     });
     expect(result.kind).toBe("created");
     if (result.kind !== "created") throw new Error("not_created");
     const payment = await row(result.payment.paymentId);
-    const invoice = invoices.get(payment.providerPaymentId ?? "");
-    if (invoice === undefined) throw new Error("no_test_invoice");
+    const invoice = fixture.payment.invoice(payment.providerPaymentId ?? "");
     return { placed, payment, invoice };
   }
   it.each(["checkout", "admin refund", "automatic refund", "privacy export"])(
@@ -204,10 +154,11 @@ describe("managed payment bindings (real Postgres, provider HTTP only is fake)",
     async (operation) => {
       const work = operation === "checkout" ? undefined : await created();
       if (work !== undefined && operation === "admin refund") {
+        fixture.payment.backend.setStatus(work.invoice.invoiceId, "succeeded");
         expect(
           (
-            await world.webhook(webhook({ ...work.invoice, status: "success" }, TOKEN_A), {
-              provider: "monobank",
+            await world.webhook(webhook(fixture.payment.invoice(work.invoice.invoiceId), TOKEN_A), {
+              provider: "testpay",
             })
           ).status,
         ).toBe(200);
@@ -244,12 +195,13 @@ describe("managed payment bindings (real Postgres, provider HTTP only is fake)",
           if (refund.kind === "requested")
             expect(await world.refunds.sendRefund(refund.refund.id, new Date())).toMatchObject({
               kind: "answered",
+              status: "succeeded",
             });
         } else if (operation === "automatic refund") {
           expect(
             (
               await world.webhook(webhook({ ...work.invoice, status: "success" }, TOKEN_A), {
-                provider: "monobank",
+                provider: "testpay",
               })
             ).status,
           ).toBe(200);
@@ -265,7 +217,7 @@ describe("managed payment bindings (real Postgres, provider HTTP only is fake)",
           });
           expect(exported.document.processors).toContainEqual({
             kind: "payment",
-            name: "monobank",
+            name: "testpay",
           });
         }
       } finally {
@@ -285,10 +237,8 @@ describe("managed payment bindings (real Postgres, provider HTTP only is fake)",
     const restarted = await startApp({
       paymentDelegated: true,
       secretsKeyRing: ring,
-      integrationProvidersDir: fileURLToPath(
-        new URL("../../../../packages/providers", import.meta.url),
-      ),
-      integrationEnvironment: failure === "env shadow" ? { MONOBANK_TOKEN: TOKEN_B } : {},
+      integrationProvidersDir: fixture.dir,
+      integrationEnvironment: failure === "env shadow" ? { TESTPAY_TOKEN: TOKEN_B } : {},
     });
     const account = await createTestCustomer(world.orders.db, {
       password: "test password for status",
@@ -308,14 +258,13 @@ describe("managed payment bindings (real Postgres, provider HTTP only is fake)",
           orderId: placed.id,
           idempotencyKey: randomUUID(),
           createdBy: route === "guest" ? "guest" : "customer",
-          providerCode: "monobank",
+          providerCode: "testpay",
         });
         if (result.kind !== "created") throw new Error("not_created");
         const payment = await row(result.payment.paymentId);
-        const invoice = invoices.get(payment.providerPaymentId ?? "");
-        if (invoice === undefined) throw new Error("no_test_invoice");
+        const invoice = fixture.payment.invoice(payment.providerPaymentId ?? "");
         expect(
-          (await world.webhook(webhook({ ...invoice, status }, TOKEN_A), { provider: "monobank" }))
+          (await world.webhook(webhook({ ...invoice, status }, TOKEN_A), { provider: "testpay" }))
             .status,
         ).toBe(200);
         const revision = await world.pool.query<{ revision: string }>(
@@ -369,7 +318,7 @@ describe("managed payment bindings (real Postgres, provider HTTP only is fake)",
           if (failure !== "snapshot error")
             await expect(
               withTransaction(world.orders.db, (tx) =>
-                restarted.app.get(PaymentProviders).admit(tx, "monobank"),
+                restarted.app.get(PaymentProviders).admit(tx, "testpay"),
               ),
             ).rejects.toBeDefined();
           if (status === "failure") {
@@ -379,7 +328,7 @@ describe("managed payment bindings (real Postgres, provider HTTP only is fake)",
                     body: {
                       number: placed.number,
                       accessToken: placed.accessToken,
-                      provider: "monobank",
+                      provider: "testpay",
                     },
                     headers: { "idempotency-key": randomUUID() },
                   })
@@ -388,7 +337,7 @@ describe("managed payment bindings (real Postgres, provider HTTP only is fake)",
                     "POST",
                     `/store/account/orders/${placed.number}/payments`,
                     {
-                      body: { provider: "monobank" },
+                      body: { provider: "testpay" },
                       headers: { cookie, "idempotency-key": randomUUID() },
                     },
                   );
@@ -415,16 +364,14 @@ describe("managed payment bindings (real Postgres, provider HTTP only is fake)",
     const legacyId = randomUUID();
     const invoiceId = `legacy_${randomUUID()}`;
     await world.pool.query(
-      "insert into payment(id,order_id,provider_code,provider_payment_id,amount,currency,status,expires_at,created_by,idempotency_key) values($1,$2,'monobank',$3,$4,'UAH','failed',now()+interval '30 minutes','guest',$5)",
+      "insert into payment(id,order_id,provider_code,provider_payment_id,amount,currency,status,expires_at,created_by,idempotency_key) values($1,$2,'testpay',$3,$4,'UAH','failed',now()+interval '30 minutes','guest',$5)",
       [legacyId, placed.id, invoiceId, placed.total, randomUUID()],
     );
     const disabled = await startApp({
       paymentDelegated: false,
       extraPaymentProviders: [],
       secretsKeyRing: ring,
-      integrationProvidersDir: fileURLToPath(
-        new URL("../../../../packages/providers", import.meta.url),
-      ),
+      integrationProvidersDir: fixture.dir,
       integrationEnvironment: { PAYMENT_PROVIDERS_ENABLED: "" },
     });
     try {
@@ -433,17 +380,19 @@ describe("managed payment bindings (real Postgres, provider HTTP only is fake)",
         invoiceId,
         reference: legacyId,
         amount: placed.total,
-        ccy: 980,
+        ccy: "UAH",
         status: "created",
-        createdDate: now,
         modifiedDate: now,
         finalAmount: placed.total,
+        errCode: null,
+        cancelList: [],
+        paymentInfo: null,
       };
       const before = calls.length;
       expect(
         (
           await world.webhook(webhook(invoice, TOKEN_A), {
-            provider: "monobank",
+            provider: "testpay",
             running: disabled,
           })
         ).status,
@@ -457,15 +406,15 @@ describe("managed payment bindings (real Postgres, provider HTTP only is fake)",
       expect(
         (
           await world.webhook(webhook(retained.invoice, TOKEN_A), {
-            provider: "monobank",
+            provider: "testpay",
             running: disabled,
           })
         ).status,
       ).toBe(503);
-      expect(calls.slice(before).filter((call) => call.path.endsWith("/pubkey"))).toEqual([]);
+      expect(calls.slice(before).filter((call) => call.operation === "verify")).toEqual([]);
     } finally {
       // The next tests use a fresh active version; revoked A stays a terminal tombstone.
-      a = await addVersion(integrationId, "monobank", { token: TOKEN_A });
+      a = await addVersion(integrationId, "testpay", { token: TOKEN_A });
       await activate(integrationId, a);
       await disabled.app.close();
     }
@@ -477,12 +426,12 @@ describe("managed payment bindings (real Postgres, provider HTTP only is fake)",
       orderId: placed.id,
       idempotencyKey: key,
       createdBy: "guest",
-      providerCode: "monobank",
+      providerCode: "testpay",
     });
     expect(result.kind).toBe("created");
     if (result.kind !== "created") throw new Error("not_created");
     expect(bindingObserved).toBe(a);
-    b = await addVersion(integrationId, "monobank", { token: TOKEN_B });
+    b = await addVersion(integrationId, "testpay", { token: TOKEN_B });
     await activate(integrationId, b);
     const count = calls.length;
     expect(
@@ -490,7 +439,7 @@ describe("managed payment bindings (real Postgres, provider HTTP only is fake)",
         orderId: placed.id,
         idempotencyKey: key,
         createdBy: "guest",
-        providerCode: "monobank",
+        providerCode: "testpay",
       }),
     ).toMatchObject({
       kind: "created",
@@ -520,18 +469,12 @@ describe("managed payment bindings (real Postgres, provider HTTP only is fake)",
         orderId: (await world.place()).id,
         idempotencyKey: randomUUID(),
         createdBy: "guest",
-        providerCode: "monobank",
+        providerCode: "testpay",
       }),
     ).toMatchObject({ kind: "refused", rule: "payment_not_available" });
-    const paid = {
-      ...work.invoice,
-      status: "success",
-      modifiedDate: new Date(Date.now() + 1000).toISOString(),
-    };
-    invoices.set(paid.invoiceId, paid);
-    expect((await world.webhook(webhook(paid, TOKEN_A), { provider: "monobank" })).status).toBe(
-      200,
-    );
+    fixture.payment.backend.setStatus(work.invoice.invoiceId, "succeeded");
+    const paid = fixture.payment.invoice(work.invoice.invoiceId);
+    expect((await world.webhook(webhook(paid, TOKEN_A), { provider: "testpay" })).status).toBe(200);
     const refund = await world.refunds.requestAdminRefund({
       orderId: work.placed.id,
       paymentId: work.payment.id,
@@ -546,6 +489,9 @@ describe("managed payment bindings (real Postgres, provider HTTP only is fake)",
     // Job 11 must scan retained work even with no currently active payment provider.
     await world.pool.query("update payment set next_check_at=now() where id=$1", [work.payment.id]);
     expect((await world.job11(new Date(Date.now() + 2000))).scanned).toBeGreaterThan(0);
+    expect(calls.slice(start).map((call) => call.operation)).toEqual(
+      expect.arrayContaining(["status", "verify", "refund"]),
+    );
     expect(calls.slice(start).every((call) => call.token === TOKEN_A)).toBe(true);
     await activate(integrationId, a);
     const unpaid = await created();
@@ -556,19 +502,17 @@ describe("managed payment bindings (real Postgres, provider HTTP only is fake)",
       "test cancellation",
     );
     await world.job11(new Date(Date.now() + 1000));
-    expect(calls.some((call) => call.path.endsWith("/remove") && call.token === TOKEN_A)).toBe(
-      true,
-    );
+    expect(calls.some((call) => call.operation === "remove" && call.token === TOKEN_A)).toBe(true);
   });
   it("verifies A-bound webhooks with A only and unknown webhooks with the active key only", async () => {
     await activate(integrationId, a);
     const work = await created();
     await activate(integrationId, b);
     expect(
-      (await world.webhook(webhook(work.invoice, TOKEN_B), { provider: "monobank" })).status,
+      (await world.webhook(webhook(work.invoice, TOKEN_B), { provider: "testpay" })).status,
     ).toBe(401);
     expect(
-      (await world.webhook(webhook(work.invoice, TOKEN_A), { provider: "monobank" })).status,
+      (await world.webhook(webhook(work.invoice, TOKEN_A), { provider: "testpay" })).status,
     ).toBe(200);
     const unknown = {
       ...work.invoice,
@@ -576,11 +520,12 @@ describe("managed payment bindings (real Postgres, provider HTTP only is fake)",
       reference: randomUUID(),
     };
     const start = calls.length;
-    expect((await world.webhook(webhook(unknown, TOKEN_A), { provider: "monobank" })).status).toBe(
+    expect((await world.webhook(webhook(unknown, TOKEN_A), { provider: "testpay" })).status).toBe(
       401,
     );
+    expect(calls.length).toBeGreaterThan(start);
     expect(calls.slice(start).every((call) => call.token === TOKEN_B)).toBe(true);
-    expect((await world.webhook(webhook(unknown, TOKEN_B), { provider: "monobank" })).status).toBe(
+    expect((await world.webhook(webhook(unknown, TOKEN_B), { provider: "testpay" })).status).toBe(
       200,
     );
   });
@@ -590,7 +535,7 @@ describe("managed payment bindings (real Postgres, provider HTTP only is fake)",
     await activate(integrationId, b);
     // Prime A's verifier before taking the order barrier.
     expect(
-      (await world.webhook(webhook(work.invoice, TOKEN_A), { provider: "monobank" })).status,
+      (await world.webhook(webhook(work.invoice, TOKEN_A), { provider: "testpay" })).status,
     ).toBe(200);
     const before = await world.eventsOf(work.payment.id);
     const blocker = await world.pool.connect();
@@ -605,7 +550,7 @@ describe("managed payment bindings (real Postgres, provider HTTP only is fake)",
         },
         TOKEN_A,
       ),
-      { provider: "monobank" },
+      { provider: "testpay" },
     );
     try {
       await world.waitForLockWaiters(1);
@@ -628,8 +573,8 @@ describe("managed payment bindings (real Postgres, provider HTTP only is fake)",
       paymentDelegated: true,
       shopCurrency: "UAH",
       storefrontPublicUrl: "https://shop.example.com",
-      providersDir: fileURLToPath(new URL("../../../../packages/providers", import.meta.url)),
-      environment: { MONOBANK_TOKEN: "env_override_test_0123456789" },
+      providersDir: fixture.dir,
+      environment: { TESTPAY_TOKEN: "env_override_test_0123456789" },
     };
     const source = new PaymentProviders(
       world.orders.db,
@@ -641,10 +586,10 @@ describe("managed payment bindings (real Postgres, provider HTTP only is fake)",
     );
     await expect(source.active()).rejects.toBeDefined();
     await expect(
-      withTransaction(world.orders.db, (tx) => source.admit(tx, "monobank")),
+      withTransaction(world.orders.db, (tx) => source.admit(tx, "testpay")),
     ).rejects.toBeDefined();
     expect(
-      await source.forPayment({ providerCode: "monobank", integrationCredentialVersionId: b }),
+      await source.forPayment({ providerCode: "testpay", integrationCredentialVersionId: b }),
     ).toBeDefined();
   });
   it("retains UAH-bound work after the shop currency changes on restart", async () => {
@@ -654,7 +599,7 @@ describe("managed payment bindings (real Postgres, provider HTTP only is fake)",
       paymentDelegated: true,
       shopCurrency: "USD",
       storefrontPublicUrl: "https://shop.example.com",
-      providersDir: fileURLToPath(new URL("../../../../packages/providers", import.meta.url)),
+      providersDir: fixture.dir,
     };
     const source = new PaymentProviders(
       world.orders.db,
@@ -665,10 +610,10 @@ describe("managed payment bindings (real Postgres, provider HTTP only is fake)",
       cipher,
     );
     const retained = await source.forPayment({
-      providerCode: "monobank",
+      providerCode: "testpay",
       integrationCredentialVersionId: b ?? a,
     });
-    expect(retained?.code).toBe("monobank");
+    expect(retained?.code).toBe("testpay");
     expect(retained?.capabilities.currencies).toContain("UAH");
     expect(await source.active()).toEqual([]);
   });
@@ -679,7 +624,7 @@ describe("managed payment bindings (real Postgres, provider HTTP only is fake)",
       orderId: placed.id,
       idempotencyKey: key,
       createdBy: "guest" as const,
-      providerCode: "monobank",
+      providerCode: "testpay",
     };
     const created = await world.createService.createPaymentForOrder(input);
     expect(created.kind).toBe("created");
@@ -687,13 +632,11 @@ describe("managed payment bindings (real Postgres, provider HTTP only is fake)",
     const common = {
       paymentDelegated: true,
       secretsKeyRing: ring,
-      integrationProvidersDir: fileURLToPath(
-        new URL("../../../../packages/providers", import.meta.url),
-      ),
+      integrationProvidersDir: fixture.dir,
     };
     const restarted = await startApp({
       ...common,
-      integrationEnvironment: { MONOBANK_TOKEN: "env_override_test_0123456789" },
+      integrationEnvironment: { TESTPAY_TOKEN: "env_override_test_0123456789" },
     });
     const otherCurrency = await startApp({ ...common, shopCurrency: "USD" });
     try {
@@ -722,10 +665,10 @@ describe("managed payment bindings (real Postgres, provider HTTP only is fake)",
       await otherCurrency.app.close();
     }
   });
-  it("a cached A client refuses every later transport after revoke with zero HTTP", async () => {
+  it("a cached bound client refuses every later transport after revoke with zero simulated requests", async () => {
     const source = world.app.app.get(PaymentProviders);
     const port = await source.forPayment({
-      providerCode: "monobank",
+      providerCode: "testpay",
       integrationCredentialVersionId: b ?? a,
     });
     expect(port).toBeDefined();
@@ -759,13 +702,13 @@ describe("managed payment bindings (real Postgres, provider HTTP only is fake)",
     );
     await world.pool.query("update integration_revision set revision=revision+1");
   });
-  it("LiqPay handoff keeps its bound pair after rotation and refuses signing after revoke", async () => {
+  it("LiqPay-style fixture handoff keeps its bound pair after rotation and refuses signing after revoke", async () => {
     const owner = randomUUID();
     await world.pool.query(
-      "insert into integration(id,kind,provider_code) values($1,'payment','liqpay')",
+      "insert into integration(id,kind,provider_code) values($1,'payment','pairpay')",
       [owner],
     );
-    const first = await addVersion(owner, "liqpay", {
+    const first = await addVersion(owner, "pairpay", {
       public_key: "sandbox_testpublicA",
       private_key: "test_private_key_A_0123456789",
     });
@@ -775,11 +718,11 @@ describe("managed payment bindings (real Postgres, provider HTTP only is fake)",
       orderId: placed.id,
       idempotencyKey: randomUUID(),
       createdBy: "guest",
-      providerCode: "liqpay",
+      providerCode: "pairpay",
     });
     expect(result.kind).toBe("created");
     if (result.kind !== "created") throw new Error("not_created");
-    const second = await addVersion(owner, "liqpay", {
+    const second = await addVersion(owner, "pairpay", {
       public_key: "sandbox_testpublicB",
       private_key: "test_private_key_B_0123456789",
     });
@@ -791,10 +734,27 @@ describe("managed payment bindings (real Postgres, provider HTTP only is fake)",
     expect(
       JSON.parse(Buffer.from(handoff.fields.data ?? "", "base64").toString("utf8")),
     ).toMatchObject({ public_key: "sandbox_testpublicA" });
+    expect(handoff.fields.signature).toBe(
+      createHmac("sha256", "test_private_key_A_0123456789")
+        .update(handoff.fields.data ?? "")
+        .digest("hex"),
+    );
+    const cached = await world.app.app.get(PaymentProviders).forPayment({
+      providerCode: "pairpay",
+      integrationCredentialVersionId: first,
+    });
+    if (cached === undefined) throw new Error("missing_bound_pair");
+    const input = fixture.pair.backend.creates[0];
+    if (input === undefined) throw new Error("missing_pair_create");
+    const signed = fixture.pair.calls.length;
     await world.pool.query(
       "update integration_credential_version set state='revoked',revoked_at=now() where id=$1",
       [first],
     );
     await expect(service.handoffForAttempt(order, result.payment.paymentId)).rejects.toBeDefined();
+    await expect(
+      cached.buildCheckoutHandoff(input, new AbortController().signal),
+    ).rejects.toMatchObject({ code: "credential_revoked" });
+    expect(fixture.pair.calls).toHaveLength(signed);
   });
 });

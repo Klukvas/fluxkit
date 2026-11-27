@@ -121,7 +121,7 @@ const FROM_RAW_REFUND: Readonly<Record<string, ProviderRefundStatus>> = Object.f
 );
 
 /** The webhook body: the status answer as the provider would send it (no card number, only system and last 4). */
-interface WebhookBody {
+export interface TestPaymentWebhookBody {
   invoiceId: string;
   reference: string;
   status: string;
@@ -158,7 +158,7 @@ function signatureMatches(headers: Readonly<Record<string, string>>, rawBody: Ui
   return timingSafeEqual(Buffer.from(given, "hex"), Buffer.from(signTestWebhook(rawBody), "hex"));
 }
 
-function bodyOf(fact: ProviderPaymentFact): WebhookBody {
+function bodyOf(fact: ProviderPaymentFact): TestPaymentWebhookBody {
   return {
     invoiceId: fact.providerPaymentId,
     reference: fact.reference,
@@ -179,7 +179,7 @@ function bodyOf(fact: ProviderPaymentFact): WebhookBody {
   };
 }
 
-function parseWebhookBody(input: PaymentWebhookInput): WebhookBody {
+function parseWebhookBody(input: PaymentWebhookInput): TestPaymentWebhookBody {
   const text = new TextDecoder().decode(input.rawBody);
   const contentType = input.headers["content-type"] ?? "";
   if (contentType.includes("application/x-www-form-urlencoded")) {
@@ -187,12 +187,12 @@ function parseWebhookBody(input: PaymentWebhookInput): WebhookBody {
     if (data === null || data === "") {
       throw new SyntaxError("missing data");
     }
-    return JSON.parse(Buffer.from(data, "base64").toString("utf8")) as WebhookBody;
+    return JSON.parse(Buffer.from(data, "base64").toString("utf8")) as TestPaymentWebhookBody;
   }
-  return JSON.parse(text) as WebhookBody;
+  return JSON.parse(text) as TestPaymentWebhookBody;
 }
 
-function factOfBody(body: WebhookBody): ProviderPaymentFact {
+function factOfBody(body: TestPaymentWebhookBody): ProviderPaymentFact {
   const currency = body.ccy as Money["currency"];
   return {
     providerPaymentId: body.invoiceId,

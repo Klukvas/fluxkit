@@ -2,14 +2,16 @@ import { randomBytes } from "node:crypto";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import type { SecretsKey, SecretsKeyRing } from "@fluxkit/config";
+import type { ManagedTestPaymentProvider } from "./managed-payment-provider.js";
 
 /**
  * Provider packages for the integration store specs, written to a temporary folder: no real package under
  * packages/providers is read, so the specs pass with every provider package deleted.
  *
  * - `testmail` (email): `api_key` and `webhook_secret`, with a format rule (`tm_` / `tmwh_` prefix).
- * - `testpay` (payment): `token`, no format rule of its own.
+ * - `testpay` (payment): `token`, managed transport, no format rule or online-check hook of its own.
  * - `brokenmail` (email): declares a secret but its entry file is missing.
  * - `fake` (email): a test-only code, hidden in production.
  * - `baddecl` (email): a malformed declaration, never offered.
@@ -20,6 +22,58 @@ import type { SecretsKey, SecretsKeyRing } from "@fluxkit/config";
 export interface IntegrationProviderFixture {
   readonly dir: string;
   remove(): Promise<void>;
+}
+
+const MANAGED_PAYMENT_HELPER = pathToFileURL(
+  join(import.meta.dirname, "managed-payment-provider.ts"),
+).href;
+
+function managedPaymentEntry(code: string, formHandoff = false): string {
+  return `
+import { ManagedTestPaymentProvider } from ${JSON.stringify(MANAGED_PAYMENT_HELPER)};
+export const fixture = new ManagedTestPaymentProvider(${JSON.stringify(code)}, ${formHandoff});
+export const createOutboundClient = fixture.createOutboundClient;
+export const locateWebhook = fixture.locateWebhook;
+`;
+}
+
+export interface ManagedPaymentFixture extends IntegrationProviderFixture {
+  readonly payment: ManagedTestPaymentProvider;
+  readonly pair: ManagedTestPaymentProvider;
+}
+
+/** Only invented managed payment packages; no installed provider directory is consulted. */
+export async function createManagedPaymentFixture(): Promise<ManagedPaymentFixture> {
+  const dir = await mkdtemp(join(tmpdir(), "fluxkit-managed-payments-"));
+  for (const code of ["testpay", "pairpay"]) {
+    const fields = code === "testpay" ? ["token"] : ["public_key", "private_key"];
+    await writePackage(
+      dir,
+      code,
+      {
+        provider: code,
+        kind: "payment",
+        secrets: fields.map((field) => ({
+          field,
+          purpose: "outbound",
+          env: `${code.toUpperCase()}_${field.toUpperCase()}`,
+        })),
+      },
+      managedPaymentEntry(code, code === "pairpay"),
+    );
+  }
+  const load = async (code: string): Promise<ManagedTestPaymentProvider> => {
+    const loaded = (await import(pathToFileURL(join(dir, code, "index.js")).href)) as {
+      fixture: ManagedTestPaymentProvider;
+    };
+    return loaded.fixture;
+  };
+  return {
+    dir,
+    payment: await load("testpay"),
+    pair: await load("pairpay"),
+    remove: () => rm(dir, { recursive: true, force: true }),
+  };
 }
 
 const VALIDATOR = `
@@ -86,7 +140,7 @@ export async function createIntegrationProviderFixture(): Promise<IntegrationPro
       kind: "payment",
       secrets: [{ field: "token", purpose: "outbound", env: "TESTPAY_TOKEN" }],
     },
-    "export const nothing = true;\n",
+    managedPaymentEntry("testpay"),
   );
   await writePackage(dir, "brokenmail", {
     provider: "brokenmail",

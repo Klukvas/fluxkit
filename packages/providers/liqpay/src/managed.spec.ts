@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { checkPaymentProviderContract, type ManagedProviderContext } from "@fluxkit/core";
 import * as managed from "./index.js";
+import { signatureValid } from "./signature.js";
 import { aborted, createInput, live, NOW, PAYMENT_ID, REFUND_ID } from "./test-support/fixtures.js";
 import {
   startStubLiqPay,
@@ -99,6 +100,29 @@ describe("managed LiqPay", () => {
         name: "CredentialAdmissionDenied",
         code: "credential_revoked",
       });
+    }
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it("keeps the saved public/private pair isolated when another managed client is constructed", async () => {
+    const first = managed.createOutboundClient(secrets, context());
+    const replacement = {
+      public_key: "sandbox_replacement_public",
+      private_key: "replacement_private_key_0123456789",
+    };
+    const second = managed.createOutboundClient(replacement, { ...context(), versionId: "second" });
+    for (const [provider, bundle, other] of [
+      [first, secrets, replacement],
+      [second, replacement, secrets],
+    ] as const) {
+      const handoff = await provider.buildCheckoutHandoff(createInput(), live());
+      if (!handoff.ok) throw new Error("handoff refused");
+      const { data = "", signature = "" } = handoff.value.fields;
+      expect(JSON.parse(Buffer.from(data, "base64").toString("utf8"))).toMatchObject({
+        public_key: bundle.public_key,
+      });
+      expect(signatureValid(data, signature, bundle.private_key)).toBe(true);
+      expect(signatureValid(data, signature, other.private_key)).toBe(false);
     }
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
