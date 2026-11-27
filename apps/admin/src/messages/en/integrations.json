@@ -159,5 +159,11 @@
   "intg.refusal.integration_legacy_work_open": "Existing payments or shipments still need the server key. Finish or reconcile them before switching to stored credentials.",
   "intg.refusal.integration_currency_unsupported": "This provider does not support the shop currency.",
   "intg.refusal.integration_public_url_required": "Set a public storefront URL on the server before activating payments.",
-  "intg.refusal.integration_payment_window_too_short": "The order payment window must be at least 8 minutes before online payments can be activated. Ask the developer to update the server settings."
+  "intg.refusal.integration_payment_window_too_short": "The order payment window must be at least 8 minutes before online payments can be activated. Ask the developer to update the server settings.",
+  "intg.dependents.payments": "Payments: {open} open of {total} total (including refunds in flight).",
+  "intg.dependents.shipments": "Shipments: {open} open of {total} total.",
+  "intg.dependents.emails": "Email: {pending} pending of {total} total.",
+  "intg.dependents.oldestOpen": "Oldest open work created {date}.",
+  "intg.dependents.noneOpen": "No open work is currently bound to this version.",
+  "intg.dependents.retention": "Counts support retention review. Only unused candidates can be removed. Owner-approved service windows do not exist yet; active, draining and revoked versions cannot be retired, even with zero open work."
 }

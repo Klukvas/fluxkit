@@ -74,7 +74,7 @@ const ROW_FACTS: Readonly<Record<string, { purpose: string; retention: string }>
   D26: {
     purpose: "Provider credentials of the shop (C, LI)",
     retention:
-      "Credential envelopes until eligible retirement; version rows and permanent encrypted merchant baselines stay (ADR 0058, ADR 0060)",
+      "Credential envelopes until eligible candidate retirement (unused candidates strictly older than 90 days: bounded system cleanup); version tombstones and permanent encrypted merchant baselines stay. Rewrap preserves identities; dependency counts expose no shopper data (ADR 0058, ADR 0060)",
   },
 };
 

@@ -29,6 +29,7 @@ import { PRIVACY_CONFIG, type PrivacyConfig } from "../privacy/privacy-config.js
 import { PrivacyRetentionService } from "../privacy/retention/privacy-retention.service.js";
 import { anonymiseOrders } from "./anonymise-orders.job.js";
 import { SearchIndexer } from "../search/indexer/index.js";
+import { retireStaleCandidates } from "./retire-stale-candidates.job.js";
 import { rebuildSearchIndex, syncSearchIndex } from "./search-index.jobs.js";
 
 /** The jobs in the order a tick runs them. The order matters (see `JobsRunner.runAll`). */
@@ -47,6 +48,7 @@ export const JOB_NAMES = [
   "anonymise-orders",
   "sync-search-index",
   "rebuild-search-index",
+  "retire-stale-candidates",
 ] as const;
 
 export type JobName = (typeof JOB_NAMES)[number];
@@ -96,9 +98,9 @@ export class JobsRunner {
    * (provider calls too: after everything else, so a slow payment provider delays no mail; a fact it applies may write
    * `order.paid`, delivered by the next tick, and a deferral of job 1 made its attempts due for this run), and after it job 12
    * (`anonymise-orders`, ADR 0033: off without `ORDER_CONTACT_RETENTION_DAYS`; destructive, so it never delays anything
-   * time-critical), and last the search index jobs 13 `sync-search-index` and 14 `rebuild-search-index` (ADR 0034: calls to
+   * time-critical), then the search index jobs 13 `sync-search-index` and 14 `rebuild-search-index` (ADR 0034: calls to
    * the search engine; off with `SEARCH_ENABLED=false`; the index is derived data, so a slow engine delays nothing that
-   * matters, and a change marked in this tick is synced in the same tick). Every job gets its
+   * matters, and a change marked in this tick is synced in the same tick), then job 15 retires unused stale credential candidates. Every job gets its
    * own time budget (`budgetMs`, default `DEFAULT_JOB_BUDGET_MS`) and stops starting new work when it is used up, so no
    * job can hold the tick, and with it the lock, for hours; what is left waits for the next tick. One failing job never
    * stops the next and never throws out of here: its error is logged and returned.
@@ -192,6 +194,9 @@ export class JobsRunner {
     );
     await run("rebuild-search-index", (budget) =>
       rebuildSearchIndex({ indexer: this.searchIndexer }, now, { budget }),
+    );
+    await run("retire-stale-candidates", (budget) =>
+      retireStaleCandidates({ database }, now, { budget }),
     );
     return reports;
   }

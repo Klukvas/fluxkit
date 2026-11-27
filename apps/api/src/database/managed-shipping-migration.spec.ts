@@ -121,6 +121,9 @@ describe("managed shipping migration 0024", () => {
     )?.when;
     expect(when).toBeTypeOf("number");
     for (let pass = 0; pass < 2; pass++) {
+      await pool.query(
+        await readFile(`${folder}/0025_integration_baseline_rewrap.down.sql`, "utf8"),
+      );
       await pool.query(down);
       expect(
         (

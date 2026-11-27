@@ -534,3 +534,10 @@ Core, no flag. Self-contained: no other module imports it; it must NOT import th
 
 - `src/test/managed-shipping-provider.ts`, `src/test/integration-provider-fixture.ts` — temporary managed shipping packages backed by the in-repo test carrier; token exchange and every simulated request pass through the runtime transport gate, without installed provider packages.
 - `src/test/admin-revocation-race.ts` — real-Postgres admin/lifecycle lock race with an explicit `pg_blocking_pids` barrier; shared by shipment and payment regressions.
+
+- `src/integrations/rewrap.ts`, `rewrap-command.ts`, `rewrap-envelopes.ts` — standalone root-env operator entry, code-only validation/output, dedicated advisory lock, bounded resumable keyset pages, envelope CAS and authenticated byte-equal baseline replacement; no app/provider bootstrap. `rewrap.integration.spec.ts` — real-DB rotation, tamper, dry-run, resume, lock and CAS regressions.
+- `src/integrations/version-dependents.ts`, `version-dependents.integration.spec.ts` — grouped exact-binding retention counts for all displayed versions; no customer fields/N+1. Repository/history and response schemas expose kind-specific counts.
+- `src/jobs/retire-stale-candidates.job.ts`, `.spec.ts` — 90-day/100-row candidate-only cleanup, lifecycle lock order, defensive binding checks, shared retire path and atomic null-actor audit; runner schedules it after search rebuild.
+- `drizzle/0025_integration_baseline_rewrap.sql`, `.down.sql`, `src/database/integration-baseline-rewrap-migration.spec.ts` — transaction-flag envelope guard, strict rollback/journal restoration and up/down cycles; no new columns or inventory classes.
+
+- `src/privacy/inventory/tables-integrations.ts`, `data-inventory-doc.spec.ts` — retain the existing classifications; describe candidate auto-retirement/rewrap in the inventory source and its generated retention document.

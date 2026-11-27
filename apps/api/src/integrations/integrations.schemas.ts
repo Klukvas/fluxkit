@@ -91,6 +91,19 @@ export const integrationSecretSchema = z.object({
   }),
 });
 
+const resourceDependentsSchema = z.object({
+  open: z.number().int().min(0),
+  total: z.number().int().min(0),
+  oldestOpenAt: timestampSchema.nullable(),
+});
+const versionDependentsSchema = z.union([
+  z.strictObject({ payments: resourceDependentsSchema }),
+  z.strictObject({ shipments: resourceDependentsSchema }),
+  z.strictObject({
+    emails: z.object({ pending: z.number().int().min(0), total: z.number().int().min(0) }),
+  }),
+]);
+
 export const integrationVersionSchema = z.object({
   id: uuidSchema,
   purpose: z.enum(INTEGRATION_SECRET_PURPOSES),
@@ -99,6 +112,7 @@ export const integrationVersionSchema = z.object({
   environment: z.string().regex(INTEGRATION_SECRET_FIELD_PATTERN),
   createdAt: timestampSchema,
   fields: z.array(z.string()),
+  dependents: versionDependentsSchema,
 });
 export type IntegrationVersionResponse = z.infer<typeof integrationVersionSchema>;
 export const checkIntegrationSchema = z.strictObject({ expectedRevision, versionId: uuidSchema });

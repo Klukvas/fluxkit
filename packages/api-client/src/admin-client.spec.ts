@@ -793,6 +793,7 @@ describe("integrations (ADR 0058)", () => {
             state: "candidate",
             environment: "sandbox",
             createdAt: "2026-11-27T12:00:00.000Z",
+            dependents: { payments: { open: 0, total: 0, oldestOpenAt: null } },
             fields: ["api_key"],
           },
         ],

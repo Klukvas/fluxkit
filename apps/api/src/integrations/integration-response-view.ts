@@ -24,7 +24,7 @@ export function integrationResponseView(
       installed.environments?.default ??
       "default",
     versions: versions.map(
-      ({ id, purpose, generation, state, environment, createdAt, fields }) => ({
+      ({ id, purpose, generation, state, environment, createdAt, fields, dependents }) => ({
         id,
         purpose,
         generation,
@@ -32,6 +32,7 @@ export function integrationResponseView(
         environment,
         createdAt,
         fields,
+        dependents,
       }),
     ),
     ...(installed.environments === undefined

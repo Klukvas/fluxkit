@@ -15,6 +15,7 @@ import {
   integrationSecret,
 } from "../database/schema/index.js";
 import type { IntegrationVersionResponse } from "./integrations.schemas.js";
+import { versionDependents } from "./version-dependents.js";
 import type { SealedSecret } from "./secret-cipher.js";
 
 export type IntegrationRow = typeof integration.$inferSelect;
@@ -161,13 +162,29 @@ export class IntegrationsRepository {
       environment: string;
       createdAt: Date;
       fields: string[];
+      kind: string;
     }>(sql`
-      select v.id, v.integration_id as "integrationId", v.purpose, v.generation, v.state, v.environment,
+      select i.kind, v.id, v.integration_id as "integrationId", v.purpose, v.generation, v.state, v.environment,
         v.created_at as "createdAt", coalesce((select array_agg(s.field order by s.field) from integration_secret s where s.version_id=v.id), '{}') as fields
       from (select *, row_number() over (partition by integration_id order by generation desc) as rank
         from integration_credential_version where ${inArray(integrationCredentialVersion.integrationId, [...integrationIds])}
-        and state <> 'retired') v where v.rank <= 20 order by v.generation desc`);
-    return result.rows.map((row) => ({ ...row, createdAt: new Date(row.createdAt).toISOString() }));
+        and state <> 'retired') v join integration i on i.id=v.integration_id where v.rank <= 20 order by v.generation desc`);
+    const dependents = await versionDependents(executor, result.rows);
+    return result.rows.map((row) => {
+      const counts = dependents.get(row.id);
+      if (counts === undefined) throw new Error("integration_kind_invalid");
+      return {
+        id: row.id,
+        integrationId: row.integrationId,
+        purpose: row.purpose,
+        generation: row.generation,
+        state: row.state,
+        environment: row.environment,
+        fields: row.fields,
+        dependents: counts,
+        createdAt: new Date(row.createdAt).toISOString(),
+      };
+    });
   }
 
   async nextGeneration(transaction: DbExecutor, integrationId: string): Promise<number> {
@@ -218,6 +235,16 @@ export class IntegrationsRepository {
       .where(eq(integrationCredentialVersion.id, versionId))
       .for("update");
     return row;
+  }
+
+  /** Defensive check even for candidates: no lifecycle cleanup may strand a durable binding. */
+  async isVersionReferenced(transaction: DbExecutor, versionId: string): Promise<boolean> {
+    const result = await transaction.execute<{ referenced: boolean }>(sql`
+      select exists(select 1 from integration where active_outbound_version_id=${versionId}::uuid)
+        or exists(select 1 from email_message where integration_credential_version_id=${versionId}::uuid)
+        or exists(select 1 from payment where integration_credential_version_id=${versionId}::uuid)
+        or exists(select 1 from shipment where integration_credential_version_id=${versionId}::uuid) as referenced`);
+    return result.rows[0]?.referenced !== false;
   }
 
   /** The envelope goes, the version stays as a tombstone, so its generation is never reused. */

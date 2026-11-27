@@ -622,6 +622,13 @@ describe("candidate bundles and explicit checks (real Postgres/Redis)", () => {
     expect(result.status).toBe(200);
     expect(result.body.integration.versions).toHaveLength(20);
     expect(result.body.integration.versions[0]?.generation).toBe(24);
+    expect(
+      result.body.integration.versions.every(
+        (v) =>
+          JSON.stringify(v.dependents) ===
+          JSON.stringify({ payments: { open: 0, total: 0, oldestOpenAt: null } }),
+      ),
+    ).toBe(true);
     expect(result.body.integration.versions[19]?.generation).toBe(5);
     expect((await list(owner)).items.find((row) => row.id === item.id)?.versions).toEqual(
       result.body.integration.versions,

@@ -30604,6 +30604,94 @@
                                   "items": {
                                     "type": "string"
                                   }
+                                },
+                                "dependents": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "payments": {
+                                          "type": "object",
+                                          "properties": {
+                                            "open": {
+                                              "type": "integer",
+                                              "minimum": 0,
+                                              "maximum": 9007199254740991
+                                            },
+                                            "total": {
+                                              "type": "integer",
+                                              "minimum": 0,
+                                              "maximum": 9007199254740991
+                                            },
+                                            "oldestOpenAt": {
+                                              "nullable": true,
+                                              "type": "string",
+                                              "format": "date-time",
+                                              "description": "ISO 8601, UTC."
+                                            }
+                                          },
+                                          "required": ["open", "total", "oldestOpenAt"],
+                                          "additionalProperties": false
+                                        }
+                                      },
+                                      "required": ["payments"],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "shipments": {
+                                          "type": "object",
+                                          "properties": {
+                                            "open": {
+                                              "type": "integer",
+                                              "minimum": 0,
+                                              "maximum": 9007199254740991
+                                            },
+                                            "total": {
+                                              "type": "integer",
+                                              "minimum": 0,
+                                              "maximum": 9007199254740991
+                                            },
+                                            "oldestOpenAt": {
+                                              "nullable": true,
+                                              "type": "string",
+                                              "format": "date-time",
+                                              "description": "ISO 8601, UTC."
+                                            }
+                                          },
+                                          "required": ["open", "total", "oldestOpenAt"],
+                                          "additionalProperties": false
+                                        }
+                                      },
+                                      "required": ["shipments"],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "emails": {
+                                          "type": "object",
+                                          "properties": {
+                                            "pending": {
+                                              "type": "integer",
+                                              "minimum": 0,
+                                              "maximum": 9007199254740991
+                                            },
+                                            "total": {
+                                              "type": "integer",
+                                              "minimum": 0,
+                                              "maximum": 9007199254740991
+                                            }
+                                          },
+                                          "required": ["pending", "total"],
+                                          "additionalProperties": false
+                                        }
+                                      },
+                                      "required": ["emails"],
+                                      "additionalProperties": false
+                                    }
+                                  ]
                                 }
                               },
                               "required": [
@@ -30613,7 +30701,8 @@
                                 "state",
                                 "environment",
                                 "createdAt",
-                                "fields"
+                                "fields",
+                                "dependents"
                               ],
                               "additionalProperties": false
                             }
@@ -31022,6 +31111,94 @@
                                 "items": {
                                   "type": "string"
                                 }
+                              },
+                              "dependents": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "payments": {
+                                        "type": "object",
+                                        "properties": {
+                                          "open": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          },
+                                          "total": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          },
+                                          "oldestOpenAt": {
+                                            "nullable": true,
+                                            "type": "string",
+                                            "format": "date-time",
+                                            "description": "ISO 8601, UTC."
+                                          }
+                                        },
+                                        "required": ["open", "total", "oldestOpenAt"],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": ["payments"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "shipments": {
+                                        "type": "object",
+                                        "properties": {
+                                          "open": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          },
+                                          "total": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          },
+                                          "oldestOpenAt": {
+                                            "nullable": true,
+                                            "type": "string",
+                                            "format": "date-time",
+                                            "description": "ISO 8601, UTC."
+                                          }
+                                        },
+                                        "required": ["open", "total", "oldestOpenAt"],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": ["shipments"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "emails": {
+                                        "type": "object",
+                                        "properties": {
+                                          "pending": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          },
+                                          "total": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          }
+                                        },
+                                        "required": ["pending", "total"],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": ["emails"],
+                                    "additionalProperties": false
+                                  }
+                                ]
                               }
                             },
                             "required": [
@@ -31031,7 +31208,8 @@
                               "state",
                               "environment",
                               "createdAt",
-                              "fields"
+                              "fields",
+                              "dependents"
                             ],
                             "additionalProperties": false
                           }
@@ -31369,6 +31547,94 @@
                                 "items": {
                                   "type": "string"
                                 }
+                              },
+                              "dependents": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "payments": {
+                                        "type": "object",
+                                        "properties": {
+                                          "open": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          },
+                                          "total": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          },
+                                          "oldestOpenAt": {
+                                            "nullable": true,
+                                            "type": "string",
+                                            "format": "date-time",
+                                            "description": "ISO 8601, UTC."
+                                          }
+                                        },
+                                        "required": ["open", "total", "oldestOpenAt"],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": ["payments"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "shipments": {
+                                        "type": "object",
+                                        "properties": {
+                                          "open": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          },
+                                          "total": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          },
+                                          "oldestOpenAt": {
+                                            "nullable": true,
+                                            "type": "string",
+                                            "format": "date-time",
+                                            "description": "ISO 8601, UTC."
+                                          }
+                                        },
+                                        "required": ["open", "total", "oldestOpenAt"],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": ["shipments"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "emails": {
+                                        "type": "object",
+                                        "properties": {
+                                          "pending": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          },
+                                          "total": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          }
+                                        },
+                                        "required": ["pending", "total"],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": ["emails"],
+                                    "additionalProperties": false
+                                  }
+                                ]
                               }
                             },
                             "required": [
@@ -31378,7 +31644,8 @@
                               "state",
                               "environment",
                               "createdAt",
-                              "fields"
+                              "fields",
+                              "dependents"
                             ],
                             "additionalProperties": false
                           }
@@ -31729,6 +31996,94 @@
                                 "items": {
                                   "type": "string"
                                 }
+                              },
+                              "dependents": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "payments": {
+                                        "type": "object",
+                                        "properties": {
+                                          "open": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          },
+                                          "total": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          },
+                                          "oldestOpenAt": {
+                                            "nullable": true,
+                                            "type": "string",
+                                            "format": "date-time",
+                                            "description": "ISO 8601, UTC."
+                                          }
+                                        },
+                                        "required": ["open", "total", "oldestOpenAt"],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": ["payments"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "shipments": {
+                                        "type": "object",
+                                        "properties": {
+                                          "open": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          },
+                                          "total": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          },
+                                          "oldestOpenAt": {
+                                            "nullable": true,
+                                            "type": "string",
+                                            "format": "date-time",
+                                            "description": "ISO 8601, UTC."
+                                          }
+                                        },
+                                        "required": ["open", "total", "oldestOpenAt"],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": ["shipments"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "emails": {
+                                        "type": "object",
+                                        "properties": {
+                                          "pending": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          },
+                                          "total": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          }
+                                        },
+                                        "required": ["pending", "total"],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": ["emails"],
+                                    "additionalProperties": false
+                                  }
+                                ]
                               }
                             },
                             "required": [
@@ -31738,7 +32093,8 @@
                               "state",
                               "environment",
                               "createdAt",
-                              "fields"
+                              "fields",
+                              "dependents"
                             ],
                             "additionalProperties": false
                           }
@@ -32259,6 +32615,94 @@
                                 "items": {
                                   "type": "string"
                                 }
+                              },
+                              "dependents": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "payments": {
+                                        "type": "object",
+                                        "properties": {
+                                          "open": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          },
+                                          "total": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          },
+                                          "oldestOpenAt": {
+                                            "nullable": true,
+                                            "type": "string",
+                                            "format": "date-time",
+                                            "description": "ISO 8601, UTC."
+                                          }
+                                        },
+                                        "required": ["open", "total", "oldestOpenAt"],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": ["payments"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "shipments": {
+                                        "type": "object",
+                                        "properties": {
+                                          "open": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          },
+                                          "total": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          },
+                                          "oldestOpenAt": {
+                                            "nullable": true,
+                                            "type": "string",
+                                            "format": "date-time",
+                                            "description": "ISO 8601, UTC."
+                                          }
+                                        },
+                                        "required": ["open", "total", "oldestOpenAt"],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": ["shipments"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "emails": {
+                                        "type": "object",
+                                        "properties": {
+                                          "pending": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          },
+                                          "total": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          }
+                                        },
+                                        "required": ["pending", "total"],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": ["emails"],
+                                    "additionalProperties": false
+                                  }
+                                ]
                               }
                             },
                             "required": [
@@ -32268,7 +32712,8 @@
                               "state",
                               "environment",
                               "createdAt",
-                              "fields"
+                              "fields",
+                              "dependents"
                             ],
                             "additionalProperties": false
                           }
@@ -32614,6 +33059,94 @@
                                 "items": {
                                   "type": "string"
                                 }
+                              },
+                              "dependents": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "payments": {
+                                        "type": "object",
+                                        "properties": {
+                                          "open": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          },
+                                          "total": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          },
+                                          "oldestOpenAt": {
+                                            "nullable": true,
+                                            "type": "string",
+                                            "format": "date-time",
+                                            "description": "ISO 8601, UTC."
+                                          }
+                                        },
+                                        "required": ["open", "total", "oldestOpenAt"],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": ["payments"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "shipments": {
+                                        "type": "object",
+                                        "properties": {
+                                          "open": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          },
+                                          "total": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          },
+                                          "oldestOpenAt": {
+                                            "nullable": true,
+                                            "type": "string",
+                                            "format": "date-time",
+                                            "description": "ISO 8601, UTC."
+                                          }
+                                        },
+                                        "required": ["open", "total", "oldestOpenAt"],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": ["shipments"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "emails": {
+                                        "type": "object",
+                                        "properties": {
+                                          "pending": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          },
+                                          "total": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          }
+                                        },
+                                        "required": ["pending", "total"],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": ["emails"],
+                                    "additionalProperties": false
+                                  }
+                                ]
                               }
                             },
                             "required": [
@@ -32623,7 +33156,8 @@
                               "state",
                               "environment",
                               "createdAt",
-                              "fields"
+                              "fields",
+                              "dependents"
                             ],
                             "additionalProperties": false
                           }
@@ -32974,6 +33508,94 @@
                                 "items": {
                                   "type": "string"
                                 }
+                              },
+                              "dependents": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "payments": {
+                                        "type": "object",
+                                        "properties": {
+                                          "open": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          },
+                                          "total": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          },
+                                          "oldestOpenAt": {
+                                            "nullable": true,
+                                            "type": "string",
+                                            "format": "date-time",
+                                            "description": "ISO 8601, UTC."
+                                          }
+                                        },
+                                        "required": ["open", "total", "oldestOpenAt"],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": ["payments"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "shipments": {
+                                        "type": "object",
+                                        "properties": {
+                                          "open": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          },
+                                          "total": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          },
+                                          "oldestOpenAt": {
+                                            "nullable": true,
+                                            "type": "string",
+                                            "format": "date-time",
+                                            "description": "ISO 8601, UTC."
+                                          }
+                                        },
+                                        "required": ["open", "total", "oldestOpenAt"],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": ["shipments"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "emails": {
+                                        "type": "object",
+                                        "properties": {
+                                          "pending": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          },
+                                          "total": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          }
+                                        },
+                                        "required": ["pending", "total"],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": ["emails"],
+                                    "additionalProperties": false
+                                  }
+                                ]
                               }
                             },
                             "required": [
@@ -32983,7 +33605,8 @@
                               "state",
                               "environment",
                               "createdAt",
-                              "fields"
+                              "fields",
+                              "dependents"
                             ],
                             "additionalProperties": false
                           }

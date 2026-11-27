@@ -176,6 +176,13 @@
       "when": 1795800130582,
       "tag": "0024_managed_shipping_credentials",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1795808000000,
+      "tag": "0025_integration_baseline_rewrap",
+      "breakpoints": true
     }
   ]
 }

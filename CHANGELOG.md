@@ -25,6 +25,9 @@ One line per user-visible or schema change.
 
 ## Unreleased
 
+- Integrations operations: `pnpm integrations:rewrap [--dry-run]` rotates master-key envelopes with resumable batches and an advisory lock, preserving bound credential versions and permanent merchant identity. Migration `0025_integration_baseline_rewrap` permits envelope-only baseline updates under a transaction flag; rollback restores the strict guard.
+- Integrations retention: scheduled cleanup retires at most 100 unused candidates older than 90 days with a system audit event. Admin version metadata shows payment/refund, shipment and email dependency counts/oldest open work; non-candidate retirement stays unavailable pending owner-approved service windows.
+
 - Shipping: with `SHIPPING_PROVIDERS_ENABLED` absent, Nova Post keys saved in Settings → Integrations can be checked and turned on for sandbox or production; each shipment keeps its key version for reconcile, tracking, cancellation and labels. Disable stops new shipments only; revoke stops every later carrier call. Sender profile edits are refused while shipments depend on it. Migration `0024_managed_shipping_credentials`. With the variable set (even blank) nothing changes.
 
 - Payments: with `PAYMENT_PROVIDERS_ENABLED` absent, Monobank and LiqPay keys saved in Settings → Integrations can be checked and turned on; each payment stays bound to the key version it was created with (refunds, reconcile, webhooks), disable stops new payments only, revoke stops every later call. Monobank locks the shop to the first verified merchant. Migration `0023_managed_payment_credentials`. With the variable set (even blank) nothing changes.
