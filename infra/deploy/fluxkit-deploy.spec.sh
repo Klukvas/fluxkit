@@ -7,9 +7,44 @@ SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 # Read only the real helper functions; do not execute the script's host mutations or command-line entry point.
 eval "$(sed -n '/^release_digest()/,/^# Under the forced command/p' "$SCRIPT_DIR/fluxkit-deploy")"
 
+(
+  fixture=$(mktemp -d)
+  trap 'rm -rf "$fixture"' EXIT
+  summary_file="$fixture/summary"
+  result=0
+  (
+    log 'running migrations to completion'
+    printf 'private migration output\n'
+    fail 'release failed'
+  ) > "$fixture/detail" 2>&1 || result=$?
+  [[ "$result" == 1 ]] || { echo 'FAIL: deploy failure must exit 1'; exit 1; }
+  printf 'fluxkit deploy: running migrations to completion\nfluxkit deploy: release failed\n' > "$fixture/expected"
+  cmp "$fixture/expected" "$summary_file"
+  grep -qx 'private migration output' "$fixture/detail"
+)
+echo 'ok   summary carries status and failure lines without detailed command output'
+
 log() { :; }
 fail() { echo "FAIL: $*" >&2; exit 1; }
 export WAIT_SECONDS=1 MIGRATE_WAIT_SECONDS=600
+
+(
+  LOG_DIR=$(mktemp -d)
+  trap 'rm -rf "$LOG_DIR"' EXIT
+  for sequence in $(seq 1 21); do
+    printf -v log_file '%s/fluxkit-deploy-20261127T1200%02d000000000Z-123abcd-AbC123.log' "$LOG_DIR" "$sequence"
+    touch "$log_file" "$log_file.summary" "$log_file.status"
+  done
+  deploy_log=$log_file
+  oldest="$LOG_DIR/fluxkit-deploy-20261127T120001000000000Z-123abcd-AbC123.log"
+  unrelated="$LOG_DIR/fluxkit-deploy-operator-notes.log"
+  touch "$unrelated"
+  prune_deploy_logs
+  [[ ! -e "$oldest" && ! -e "$oldest.summary" && ! -e "$oldest.status" ]] || fail 'oldest deploy log or sidecar was kept'
+  set -- "$LOG_DIR"/*.log
+  [[ $# == 21 && -f "$deploy_log" && -f "$unrelated" ]] || fail 'log retention did not keep 20 deploy logs and the unrelated log'
+)
+echo 'ok   log retention keeps 20 deploy logs and leaves unrelated files alone'
 
 (
   # shellcheck disable=SC2329 # The evaluated backup helper calls this logger indirectly.
@@ -39,6 +74,22 @@ export WAIT_SECONDS=1 MIGRATE_WAIT_SECONDS=600
   [[ "$backup_enabled" == true ]] || fail 'executable backup command will not run'
 )
 echo 'ok   deploy requires an executable backup command unless the opt-out is exactly 1'
+
+(
+  fixture=$(mktemp -d)
+  trap 'rm -rf "$fixture"' EXIT
+  mkdir -p "$fixture/infra"
+  head -c 3000 /dev/urandom > "$fixture/infra/docker-compose.prod.yml"
+  printf 'b\n' > "$fixture/infra/second"
+  tar -cf "$fixture/whole.tar" -C "$fixture" infra
+  check_archive_complete "$fixture/whole.tar" || fail 'a complete archive was refused'
+  # Cut after the first member (header + 3000 bytes padded to 3072): a boundary tar itself accepts.
+  head -c 3584 "$fixture/whole.tar" > "$fixture/cut.tar"
+  if check_archive_complete "$fixture/cut.tar"; then fail 'an archive cut at a member boundary was accepted'; fi
+  head -c 100 "$fixture/whole.tar" > "$fixture/short.tar"
+  if check_archive_complete "$fixture/short.tar"; then fail 'a short archive was accepted'; fi
+)
+echo 'ok   an upload cut before the end-of-archive marker is refused'
 
 # shellcheck disable=SC2329 # The evaluated real Compose helper calls these Docker/timeout boundaries indirectly.
 (

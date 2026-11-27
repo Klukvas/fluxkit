@@ -528,7 +528,7 @@ host_deploy() {
   FLUXKIT_ROOT="$HOST_ROOT" FLUXKIT_ENV_FILE="$(pwd)/$WORK/production.env" \
     FLUXKIT_MEILI_ENV_FILE="$(pwd)/$WORK/meilisearch.env" \
     FLUXKIT_DEPLOY_BACKUP="$HOST_ROOT/backup" FLUXKIT_DEPLOY_PRUNE="$HOST_ROOT/no-prune" \
-    FLUXKIT_DEPLOY_LOCK="$HOST_ROOT/deploy.lock" FLUXKIT_DEPLOY_SKIP_PULL=1 \
+    FLUXKIT_DEPLOY_LOCK="$HOST_ROOT/deploy.lock" FLUXKIT_DEPLOY_LOG_DIR="$HOST_ROOT/logs" FLUXKIT_DEPLOY_SKIP_PULL=1 \
     bash infra/deploy/fluxkit-deploy deploy "$1" <"$WORK/infra.tar"
 }
 
@@ -602,10 +602,19 @@ mv "$WORK/roll-requests.log" "$WORK/successful-roll-requests.log"
 rm "$WORK/stop-requests"
 request_loop &
 REQUEST_PID=$!
-if host_deploy "$BROKEN_TAG"; then fail "the broken API release succeeded"; fi
+BROKEN_STATUS=0
+host_deploy "$BROKEN_TAG" >"$WORK/broken-deploy.out" 2>&1 || BROKEN_STATUS=$?
+[[ "$BROKEN_STATUS" == 1 ]] || fail "the broken API release returned $BROKEN_STATUS instead of 1"
 touch "$WORK/stop-requests"
 wait "$REQUEST_PID"
 REQUEST_PID=
+if grep -qv '^fluxkit deploy: ' "$WORK/broken-deploy.out"; then fail "the client received detailed deployment output"; fi
+BROKEN_LOG=$(sed -n 's/^fluxkit deploy: detailed log: //p' "$WORK/broken-deploy.out")
+[[ "$BROKEN_LOG" == "$HOST_ROOT/logs/"*.log && -f "$BROKEN_LOG" ]] || fail "the client did not name the detailed log"
+[[ "$(stat -c %a "$HOST_ROOT/logs") $(stat -c %a "$BROKEN_LOG") $(stat -c %a "$BROKEN_LOG.summary")" == "700 600 600" ]] ||
+  fail "the deploy log directory or files are not private"
+grep -Eq '^(api|migrate)-[0-9]+[[:space:]]*\|' "$BROKEN_LOG" || fail "container output is missing from the detailed log"
+cat "$WORK/broken-deploy.out"
 assert_roll_traffic "failed release" false
 [[ "$(compose ps -q api | sort)" == "$PREVIOUS_API_IDS" ]] || fail "rollback recreated the old serving api replicas"
 assert_replicas api "$NEXT_TAG"
@@ -615,5 +624,21 @@ grep -qx "FLUXKIT_IMAGE_TAG=$NEXT_TAG" "$WORK/production.env" || fail "rollback 
 request GET /store/config
 expect_status 200 "GET /store/config after the failed release"
 pass "broken release fails, removes new replicas, preserves both serving old api containers and restores env/current"
+
+# Reuse the first image tag and leave the output pipe after the first worker status line.
+(set +o pipefail; host_deploy "$TAG" | head -n 1) >"$WORK/disconnected-deploy.out"
+DISCONNECTED_LOG=$(sed -n 's/^fluxkit deploy: detailed log: //p' "$WORK/disconnected-deploy.out")
+[[ "$DISCONNECTED_LOG" == "$HOST_ROOT/logs/"*.log ]] || fail "the disconnect test did not reach the worker"
+flock -w 600 "$HOST_ROOT/deploy.lock" true || fail "the disconnected deployment did not release the lock"
+grep -qx 0 "$DISCONNECTED_LOG.status" || fail "the disconnected deployment did not succeed"
+grep -qx "FLUXKIT_IMAGE_TAG=$TAG" "$WORK/production.env" || fail "the disconnected deployment did not switch the env tag"
+[[ "$(readlink "$HOST_ROOT/current")" == "$HOST_ROOT/releases/$TAG" ]] || fail "the disconnected deployment did not switch current"
+assert_replicas api "$TAG"
+assert_replicas storefront "$TAG"
+request GET /store/config
+expect_status 200 "GET /store/config after the disconnected release"
+request GET /uk
+expect_status 200 "GET /uk after the disconnected release"
+pass "the worker completes the release and both applications serve after the client disconnects"
 
 echo "deploy smoke test passed"
