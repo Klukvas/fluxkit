@@ -140,7 +140,7 @@ export const customerTables: Inventory = {
       "D16",
       "excluded",
       "delete_row",
-      "Order lines, totals and a tracking number for rendering; no rendered body is stored.",
+      "Order lines, totals and a tracking number for rendering; integration.security_alert uses action/kind/provider/generation/time metadata only. No rendered body is stored.",
     ),
     ...many(
       classified("pseudonymous", "D16", "included", "delete_row"),

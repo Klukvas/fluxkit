@@ -2760,7 +2760,9 @@
                 "integration.activated",
                 "integration.disabled",
                 "integration.revoked",
-                "integration.route_changed"
+                "integration.route_changed",
+                "integration.check_requested",
+                "integration.check_completed"
               ]
             }
           },
@@ -2837,7 +2839,9 @@
                               "integration.activated",
                               "integration.disabled",
                               "integration.revoked",
-                              "integration.route_changed"
+                              "integration.route_changed",
+                              "integration.check_requested",
+                              "integration.check_completed"
                             ]
                           },
                           "targetKind": {
@@ -30513,6 +30517,86 @@
                               "additionalProperties": false
                             }
                           },
+                          "versions": {
+                            "maxItems": 20,
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "purpose": {
+                                  "type": "string",
+                                  "enum": ["outbound", "webhook"]
+                                },
+                                "generation": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 9007199254740991
+                                },
+                                "state": {
+                                  "type": "string",
+                                  "enum": ["candidate", "active", "draining", "revoked"]
+                                },
+                                "environment": {
+                                  "type": "string",
+                                  "pattern": "^[a-z][a-z0-9_]{0,31}$"
+                                },
+                                "createdAt": {
+                                  "type": "string",
+                                  "format": "date-time",
+                                  "description": "ISO 8601, UTC."
+                                },
+                                "fields": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "purpose",
+                                "generation",
+                                "state",
+                                "environment",
+                                "createdAt",
+                                "fields"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "environmentSource": {
+                            "type": "string",
+                            "enum": ["env", "store"]
+                          },
+                          "environment": {
+                            "type": "string",
+                            "pattern": "^[a-z][a-z0-9_]{0,31}$"
+                          },
+                          "environments": {
+                            "type": "object",
+                            "properties": {
+                              "values": {
+                                "minItems": 1,
+                                "maxItems": 8,
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "default": {
+                                "type": "string"
+                              },
+                              "envVariable": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["values", "default", "envVariable"],
+                            "additionalProperties": false
+                          },
                           "updatedAt": {
                             "type": "string",
                             "format": "date-time",
@@ -30525,6 +30609,9 @@
                           "providerCode",
                           "enabled",
                           "secrets",
+                          "versions",
+                          "environmentSource",
+                          "environment",
                           "updatedAt"
                         ],
                         "additionalProperties": false
@@ -30848,13 +30935,103 @@
                             "additionalProperties": false
                           }
                         },
+                        "versions": {
+                          "maxItems": 20,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "purpose": {
+                                "type": "string",
+                                "enum": ["outbound", "webhook"]
+                              },
+                              "generation": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 9007199254740991
+                              },
+                              "state": {
+                                "type": "string",
+                                "enum": ["candidate", "active", "draining", "revoked"]
+                              },
+                              "environment": {
+                                "type": "string",
+                                "pattern": "^[a-z][a-z0-9_]{0,31}$"
+                              },
+                              "createdAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "ISO 8601, UTC."
+                              },
+                              "fields": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "purpose",
+                              "generation",
+                              "state",
+                              "environment",
+                              "createdAt",
+                              "fields"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "environmentSource": {
+                          "type": "string",
+                          "enum": ["env", "store"]
+                        },
+                        "environment": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]{0,31}$"
+                        },
+                        "environments": {
+                          "type": "object",
+                          "properties": {
+                            "values": {
+                              "minItems": 1,
+                              "maxItems": 8,
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "default": {
+                              "type": "string"
+                            },
+                            "envVariable": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["values", "default", "envVariable"],
+                          "additionalProperties": false
+                        },
                         "updatedAt": {
                           "type": "string",
                           "format": "date-time",
                           "description": "ISO 8601, UTC."
                         }
                       },
-                      "required": ["id", "kind", "providerCode", "enabled", "secrets", "updatedAt"],
+                      "required": [
+                        "id",
+                        "kind",
+                        "providerCode",
+                        "enabled",
+                        "secrets",
+                        "versions",
+                        "environmentSource",
+                        "environment",
+                        "updatedAt"
+                      ],
                       "additionalProperties": false
                     }
                   },
@@ -30968,6 +31145,10 @@
                     "minimum": 0,
                     "maximum": 9007199254740991,
                     "description": "The `revision` of the last read. Another change since then answers 409 (`rule: integration_revision_stale`)."
+                  },
+                  "environment": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_]{0,31}$"
                   },
                   "value": {
                     "type": "string",
@@ -31101,13 +31282,103 @@
                             "additionalProperties": false
                           }
                         },
+                        "versions": {
+                          "maxItems": 20,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "purpose": {
+                                "type": "string",
+                                "enum": ["outbound", "webhook"]
+                              },
+                              "generation": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 9007199254740991
+                              },
+                              "state": {
+                                "type": "string",
+                                "enum": ["candidate", "active", "draining", "revoked"]
+                              },
+                              "environment": {
+                                "type": "string",
+                                "pattern": "^[a-z][a-z0-9_]{0,31}$"
+                              },
+                              "createdAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "ISO 8601, UTC."
+                              },
+                              "fields": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "purpose",
+                              "generation",
+                              "state",
+                              "environment",
+                              "createdAt",
+                              "fields"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "environmentSource": {
+                          "type": "string",
+                          "enum": ["env", "store"]
+                        },
+                        "environment": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]{0,31}$"
+                        },
+                        "environments": {
+                          "type": "object",
+                          "properties": {
+                            "values": {
+                              "minItems": 1,
+                              "maxItems": 8,
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "default": {
+                              "type": "string"
+                            },
+                            "envVariable": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["values", "default", "envVariable"],
+                          "additionalProperties": false
+                        },
                         "updatedAt": {
                           "type": "string",
                           "format": "date-time",
                           "description": "ISO 8601, UTC."
                         }
                       },
-                      "required": ["id", "kind", "providerCode", "enabled", "secrets", "updatedAt"],
+                      "required": [
+                        "id",
+                        "kind",
+                        "providerCode",
+                        "enabled",
+                        "secrets",
+                        "versions",
+                        "environmentSource",
+                        "environment",
+                        "updatedAt"
+                      ],
                       "additionalProperties": false
                     }
                   },
@@ -31371,13 +31642,103 @@
                             "additionalProperties": false
                           }
                         },
+                        "versions": {
+                          "maxItems": 20,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "purpose": {
+                                "type": "string",
+                                "enum": ["outbound", "webhook"]
+                              },
+                              "generation": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 9007199254740991
+                              },
+                              "state": {
+                                "type": "string",
+                                "enum": ["candidate", "active", "draining", "revoked"]
+                              },
+                              "environment": {
+                                "type": "string",
+                                "pattern": "^[a-z][a-z0-9_]{0,31}$"
+                              },
+                              "createdAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "ISO 8601, UTC."
+                              },
+                              "fields": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "purpose",
+                              "generation",
+                              "state",
+                              "environment",
+                              "createdAt",
+                              "fields"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "environmentSource": {
+                          "type": "string",
+                          "enum": ["env", "store"]
+                        },
+                        "environment": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]{0,31}$"
+                        },
+                        "environments": {
+                          "type": "object",
+                          "properties": {
+                            "values": {
+                              "minItems": 1,
+                              "maxItems": 8,
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "default": {
+                              "type": "string"
+                            },
+                            "envVariable": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["values", "default", "envVariable"],
+                          "additionalProperties": false
+                        },
                         "updatedAt": {
                           "type": "string",
                           "format": "date-time",
                           "description": "ISO 8601, UTC."
                         }
                       },
-                      "required": ["id", "kind", "providerCode", "enabled", "secrets", "updatedAt"],
+                      "required": [
+                        "id",
+                        "kind",
+                        "providerCode",
+                        "enabled",
+                        "secrets",
+                        "versions",
+                        "environmentSource",
+                        "environment",
+                        "updatedAt"
+                      ],
                       "additionalProperties": false
                     }
                   },
@@ -31469,6 +31830,181 @@
           }
         },
         "summary": "Remove a stored provider credential",
+        "tags": ["admin-integrations"],
+        "x-fluxkit-permission": "integrations.manage"
+      }
+    },
+    "/admin/integrations/{id}/check": {
+      "post": {
+        "description": "Owner-only explicit read, without a current password. Strict limits: 10/min/admin, 30/min/IP, 30/min/provider together; 503 check_unavailable if Redis is unavailable. Candidate, active or draining only; env override 409. No hook returns not_supported; provider failures return unavailable. Ten-second timeout; code-only audit after the call.",
+        "operationId": "IntegrationsController_check",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Integration id from `GET /admin/integrations`.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "expectedRevision": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "The `revision` of the last read. Another change since then answers 409 (`rule: integration_revision_stale`)."
+                  },
+                  "versionId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": ["expectedRevision", "versionId"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The code-only check outcome.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "versionId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "ok",
+                        "invalid_credentials",
+                        "unavailable",
+                        "rate_limited",
+                        "not_supported"
+                      ]
+                    },
+                    "checkedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "retryAfterSeconds": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 86400
+                    }
+                  },
+                  "required": ["versionId", "code", "checkedAt"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable: a transient failure, try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Check a complete saved credential version",
         "tags": ["admin-integrations"],
         "x-fluxkit-permission": "integrations.manage"
       }
@@ -31636,13 +32172,103 @@
                             "additionalProperties": false
                           }
                         },
+                        "versions": {
+                          "maxItems": 20,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "purpose": {
+                                "type": "string",
+                                "enum": ["outbound", "webhook"]
+                              },
+                              "generation": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 9007199254740991
+                              },
+                              "state": {
+                                "type": "string",
+                                "enum": ["candidate", "active", "draining", "revoked"]
+                              },
+                              "environment": {
+                                "type": "string",
+                                "pattern": "^[a-z][a-z0-9_]{0,31}$"
+                              },
+                              "createdAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "ISO 8601, UTC."
+                              },
+                              "fields": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "purpose",
+                              "generation",
+                              "state",
+                              "environment",
+                              "createdAt",
+                              "fields"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "environmentSource": {
+                          "type": "string",
+                          "enum": ["env", "store"]
+                        },
+                        "environment": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]{0,31}$"
+                        },
+                        "environments": {
+                          "type": "object",
+                          "properties": {
+                            "values": {
+                              "minItems": 1,
+                              "maxItems": 8,
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "default": {
+                              "type": "string"
+                            },
+                            "envVariable": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["values", "default", "envVariable"],
+                          "additionalProperties": false
+                        },
                         "updatedAt": {
                           "type": "string",
                           "format": "date-time",
                           "description": "ISO 8601, UTC."
                         }
                       },
-                      "required": ["id", "kind", "providerCode", "enabled", "secrets", "updatedAt"],
+                      "required": [
+                        "id",
+                        "kind",
+                        "providerCode",
+                        "enabled",
+                        "secrets",
+                        "versions",
+                        "environmentSource",
+                        "environment",
+                        "updatedAt"
+                      ],
                       "additionalProperties": false
                     }
                   },
@@ -31901,13 +32527,103 @@
                             "additionalProperties": false
                           }
                         },
+                        "versions": {
+                          "maxItems": 20,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "purpose": {
+                                "type": "string",
+                                "enum": ["outbound", "webhook"]
+                              },
+                              "generation": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 9007199254740991
+                              },
+                              "state": {
+                                "type": "string",
+                                "enum": ["candidate", "active", "draining", "revoked"]
+                              },
+                              "environment": {
+                                "type": "string",
+                                "pattern": "^[a-z][a-z0-9_]{0,31}$"
+                              },
+                              "createdAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "ISO 8601, UTC."
+                              },
+                              "fields": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "purpose",
+                              "generation",
+                              "state",
+                              "environment",
+                              "createdAt",
+                              "fields"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "environmentSource": {
+                          "type": "string",
+                          "enum": ["env", "store"]
+                        },
+                        "environment": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]{0,31}$"
+                        },
+                        "environments": {
+                          "type": "object",
+                          "properties": {
+                            "values": {
+                              "minItems": 1,
+                              "maxItems": 8,
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "default": {
+                              "type": "string"
+                            },
+                            "envVariable": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["values", "default", "envVariable"],
+                          "additionalProperties": false
+                        },
                         "updatedAt": {
                           "type": "string",
                           "format": "date-time",
                           "description": "ISO 8601, UTC."
                         }
                       },
-                      "required": ["id", "kind", "providerCode", "enabled", "secrets", "updatedAt"],
+                      "required": [
+                        "id",
+                        "kind",
+                        "providerCode",
+                        "enabled",
+                        "secrets",
+                        "versions",
+                        "environmentSource",
+                        "environment",
+                        "updatedAt"
+                      ],
                       "additionalProperties": false
                     }
                   },
@@ -32171,13 +32887,103 @@
                             "additionalProperties": false
                           }
                         },
+                        "versions": {
+                          "maxItems": 20,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "purpose": {
+                                "type": "string",
+                                "enum": ["outbound", "webhook"]
+                              },
+                              "generation": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 9007199254740991
+                              },
+                              "state": {
+                                "type": "string",
+                                "enum": ["candidate", "active", "draining", "revoked"]
+                              },
+                              "environment": {
+                                "type": "string",
+                                "pattern": "^[a-z][a-z0-9_]{0,31}$"
+                              },
+                              "createdAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "ISO 8601, UTC."
+                              },
+                              "fields": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "purpose",
+                              "generation",
+                              "state",
+                              "environment",
+                              "createdAt",
+                              "fields"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "environmentSource": {
+                          "type": "string",
+                          "enum": ["env", "store"]
+                        },
+                        "environment": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]{0,31}$"
+                        },
+                        "environments": {
+                          "type": "object",
+                          "properties": {
+                            "values": {
+                              "minItems": 1,
+                              "maxItems": 8,
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "default": {
+                              "type": "string"
+                            },
+                            "envVariable": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["values", "default", "envVariable"],
+                          "additionalProperties": false
+                        },
                         "updatedAt": {
                           "type": "string",
                           "format": "date-time",
                           "description": "ISO 8601, UTC."
                         }
                       },
-                      "required": ["id", "kind", "providerCode", "enabled", "secrets", "updatedAt"],
+                      "required": [
+                        "id",
+                        "kind",
+                        "providerCode",
+                        "enabled",
+                        "secrets",
+                        "versions",
+                        "environmentSource",
+                        "environment",
+                        "updatedAt"
+                      ],
                       "additionalProperties": false
                     }
                   },

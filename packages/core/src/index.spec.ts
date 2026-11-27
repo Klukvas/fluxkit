@@ -200,7 +200,7 @@ describe("public entry point", () => {
     expect(core.EMAIL_PROVIDER_PACKAGE_KIND).toBe("email");
     expect(core.EMAIL_TEMPLATE_METADATA).toBe("fluxkit:email-template");
     expect(core.EMAIL_MESSAGE_STATUSES).toHaveLength(6);
-    expect(core.EMAIL_TEMPLATE_KEYS).toHaveLength(9);
+    expect(core.EMAIL_TEMPLATE_KEYS).toHaveLength(10);
     expect(core.EMAIL_LIMITS.subjectMaxLength).toBe(200);
     expect(core.EMAIL_DEADLINE_HOURS).toBe(12);
     expect(core.EMAIL_SEND_TIMEOUT_MS).toBe(10_000);

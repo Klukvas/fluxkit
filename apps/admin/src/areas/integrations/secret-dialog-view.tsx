@@ -1,4 +1,5 @@
-import { Alert, Button, Dialog, Field, Input, type Translator } from "@fluxkit/ui";
+import type { AdminIntegrationEnvironments } from "@fluxkit/api-client";
+import { Alert, Button, Dialog, Field, Input, Select, type Translator } from "@fluxkit/ui";
 import type { FormEvent, Ref } from "react";
 import type { MessageDescriptor } from "../../lib/problem-messages";
 import type { SecretFormField } from "./integrations-errors";
@@ -17,6 +18,10 @@ export interface SecretDialogViewProps {
   /** Translated names of what the dialog changes. */
   field: string;
   provider: string;
+  environments?: AdminIntegrationEnvironments;
+  environment?: string;
+  environmentSource?: "env" | "store";
+  onEnvironmentChange?: (environment: string) => void;
   values: Record<SecretFormField, string>;
   fieldErrors: Partial<Record<SecretFormField, MessageDescriptor>>;
   formErrors: readonly MessageDescriptor[];
@@ -38,6 +43,10 @@ export function SecretDialogView({
   field,
   provider,
   values,
+  environments,
+  environment,
+  environmentSource,
+  onEnvironmentChange,
   fieldErrors,
   formErrors,
   busy,
@@ -80,6 +89,32 @@ export function SecretDialogView({
               </ul>
             </Alert>
           </div>
+        )}
+        {passwordOnly || environments === undefined ? null : (
+          <Field
+            id="intg-secret-environment"
+            label={t("intg.dialog.environment")}
+            hint={t(
+              environmentSource === "env"
+                ? "intg.dialog.environmentLocked"
+                : "intg.dialog.environmentHint",
+            )}
+          >
+            {(control) => (
+              <Select
+                {...control}
+                value={environment ?? environments.default}
+                disabled={busy || environmentSource === "env"}
+                onChange={(event) => onEnvironmentChange?.(event.target.value)}
+              >
+                {environments.values.map((value) => (
+                  <option key={value} value={value}>
+                    {value}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
         )}
         {passwordOnly ? null : (
           <Field

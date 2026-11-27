@@ -38,6 +38,8 @@ const ACTION_VERBS = {
     "disabled",
     "revoked",
     "route_changed",
+    "check_requested",
+    "check_completed",
   ],
 } as const;
 

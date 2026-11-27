@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   createIntegrationProviderFixture,
@@ -38,6 +39,15 @@ describe("InstalledIntegrations", () => {
       { field: "api_key", purpose: "outbound", envVariable: "TESTMAIL_API_KEY" },
       { field: "webhook_secret", purpose: "webhook", envVariable: "TESTMAIL_WEBHOOK_SECRET" },
     ]);
+  });
+
+  it("lists the real installed LiqPay manifest with both outbound fields", async () => {
+    const providersDir = fileURLToPath(new URL("../../../../packages/providers", import.meta.url));
+    const listed = await new InstalledIntegrations(configOf({ providersDir })).find(
+      "payment",
+      "liqpay",
+    );
+    expect(listed?.secrets.map(({ field }) => field)).toEqual(["public_key", "private_key"]);
   });
 
   it("does not offer a test-only provider in production", async () => {

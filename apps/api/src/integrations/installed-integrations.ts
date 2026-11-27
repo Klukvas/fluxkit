@@ -11,11 +11,14 @@ import {
   EMAIL_PROVIDER_CODE_PATTERN,
   isIntegrationKind,
   parseIntegrationSecretDeclarations,
+  parseIntegrationEnvironments,
+  type IntegrationEnvironments,
   PAYMENT_PROVIDER_CODE_PATTERN,
   SHIPPING_PROVIDER_CODE_PATTERN,
   type IntegrationKind,
   type IntegrationSecretDeclaration,
 } from "@fluxkit/core";
+import { ruleViolation } from "../common/problem.js";
 import { summarizeError } from "../common/error-summary.js";
 import { INTEGRATIONS_CONFIG, type IntegrationsConfig } from "./integrations.config.js";
 
@@ -24,6 +27,7 @@ export interface InstalledIntegration {
   readonly kind: IntegrationKind;
   readonly providerCode: string;
   readonly secrets: readonly IntegrationSecretDeclaration[];
+  readonly environments?: IntegrationEnvironments;
   /** Absolute path of the package entry, for the plugin's own format rule. */
   readonly entryPath: string;
 }
@@ -53,7 +57,7 @@ const TEST_ONLY: Readonly<Record<IntegrationKind, readonly string[]>> = {
 
 interface Manifest {
   main?: unknown;
-  fluxkit?: { provider?: unknown; kind?: unknown; secrets?: unknown };
+  fluxkit?: { provider?: unknown; kind?: unknown; secrets?: unknown; environments?: unknown };
 }
 
 function isMissing(error: unknown): boolean {
@@ -103,6 +107,25 @@ export class InstalledIntegrations {
     return (this.config.environment[declaration.envVariable] ?? "").trim() !== "";
   }
 
+  /** Presence locks the environment, including a blank value selecting the manifest default. */
+  lockedEnvironment(integration: InstalledIntegration): string | undefined {
+    const declaration = integration.environments;
+    if (
+      declaration === undefined ||
+      !Object.hasOwn(this.config.environment, declaration.envVariable)
+    )
+      return undefined;
+    const value = this.config.environment[declaration.envVariable]?.trim() || declaration.default;
+    if (!declaration.values.includes(value)) throw new IntegrationUnavailableError();
+    return value;
+  }
+
+  assertEnvironmentAllowed(integration: InstalledIntegration, environment: string): void {
+    const locked = this.lockedEnvironment(integration);
+    if (locked !== undefined && locked !== environment)
+      throw ruleViolation("This environment is set on the server.", "integration_env_override");
+  }
+
   /** The plugin's own format rule: a problem text (never the value) or `undefined`. A plugin without one accepts. */
   async validateSecret(
     integration: InstalledIntegration,
@@ -121,12 +144,16 @@ export class InstalledIntegrations {
     const validator = imported.validateIntegrationSecret;
     if (validator === undefined) return undefined;
     if (typeof validator !== "function") throw new IntegrationUnavailableError();
-    const problem: unknown = (validator as SecretValidator)(field, value);
-    if (problem === undefined || typeof problem === "string") return problem;
-    // A promise or any other answer is not a verdict: never read it as "accepted".
-    this.logger.error(
-      `Provider ${integration.kind}/${integration.providerCode}: validateIntegrationSecret must return a string or undefined.`,
-    );
+    try {
+      const problem: unknown = (validator as SecretValidator)(field, value);
+      if (problem === undefined || typeof problem === "string") return problem;
+      if (problem instanceof Promise)
+        void problem.catch(() => this.logger.error("integration_validator_failed"));
+    } catch {
+      this.logger.error("integration_validator_failed");
+      throw new IntegrationUnavailableError();
+    }
+    this.logger.error("integration_validator_invalid_result");
     throw new IntegrationUnavailableError();
   }
 
@@ -188,12 +215,34 @@ export class InstalledIntegrations {
       );
       return undefined;
     }
+    const environments = parseIntegrationEnvironments(manifest.fluxkit?.environments, providerCode);
+    if (!environments.ok) {
+      this.logger.error(`Provider ${kind}/${providerCode}: invalid_environments.`);
+      return undefined;
+    }
+    if (environments.environments !== undefined) {
+      const declaration = environments.environments;
+      const configured =
+        this.config.environment[declaration.envVariable]?.trim() || declaration.default;
+      if (!declaration.values.includes(configured)) {
+        this.logger.error("integration_environment_invalid");
+        return undefined;
+      }
+    }
     const main = typeof manifest.main === "string" ? manifest.main : "dist/index.js";
     const entryPath = resolve(dir, main);
     if (!staysInside(dir, entryPath)) {
       this.logger.error(`Provider ${kind}/${providerCode}: "main" must stay inside its package.`);
       return undefined;
     }
-    return { kind, providerCode, secrets: declared.fields, entryPath };
+    return {
+      kind,
+      providerCode,
+      secrets: declared.fields,
+      entryPath,
+      ...(environments.environments === undefined
+        ? {}
+        : { environments: environments.environments }),
+    };
   }
 }

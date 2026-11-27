@@ -74,7 +74,7 @@ function parseDeclaration(entry: unknown): IntegrationSecretDeclaration | string
 
 /**
  * Reads `fluxkit.secrets` of a provider manifest: `[{ "field", "purpose", "env" }]`. Absent means the provider has no
- * managed secret. One version holds one purpose, so a purpose may be declared once per provider.
+ * managed secret. A version holds every declared field of its purpose.
  */
 export function parseIntegrationSecretDeclarations(
   raw: unknown,
@@ -93,9 +93,6 @@ export function parseIntegrationSecretDeclarations(
     if (typeof parsed === "string") return { ok: false, problem: parsed };
     if (fields.some((known) => known.field === parsed.field)) {
       return { ok: false, problem: `the field "${parsed.field}" is declared twice` };
-    }
-    if (fields.some((known) => known.purpose === parsed.purpose)) {
-      return { ok: false, problem: `the purpose "${parsed.purpose}" is declared twice` };
     }
     if (fields.some((known) => known.envVariable === parsed.envVariable)) {
       return { ok: false, problem: `the variable "${parsed.envVariable}" is declared twice` };
@@ -168,4 +165,52 @@ export function integrationSecretAad(identity: IntegrationSecretIdentity): Uint8
     String(identity.generation),
     identity.keyId,
   ]);
+}
+
+export interface IntegrationEnvironments {
+  readonly values: readonly string[];
+  readonly default: string;
+  readonly envVariable: string;
+}
+
+export type IntegrationEnvironmentsResult =
+  | { readonly ok: true; readonly environments: IntegrationEnvironments | undefined }
+  | { readonly ok: false; readonly problem: string };
+
+/** No declaration means the fixed `default` environment, without an admin selector. */
+export function parseIntegrationEnvironments(
+  raw: unknown,
+  providerCode: string,
+): IntegrationEnvironmentsResult {
+  if (raw === undefined) return { ok: true, environments: undefined };
+  if (!isRecord(raw)) return { ok: false, problem: '"fluxkit.environments" must be an object' };
+  const { values, default: defaultValue, env } = raw;
+  if (
+    !Array.isArray(values) ||
+    values.length < 1 ||
+    values.length > 8 ||
+    !values.every(
+      (value: unknown) => typeof value === "string" && INTEGRATION_SECRET_FIELD_PATTERN.test(value),
+    ) ||
+    new Set(values).size !== values.length
+  )
+    return { ok: false, problem: "environments must contain 1 to 8 unique bounded codes" };
+  if (typeof defaultValue !== "string" || !values.includes(defaultValue)) {
+    return { ok: false, problem: "the default environment must be a declared value" };
+  }
+  if (
+    typeof env !== "string" ||
+    !INTEGRATION_ENV_VARIABLE_PATTERN.test(env) ||
+    !env.startsWith(`${providerCode.toUpperCase()}_`)
+  ) {
+    return { ok: false, problem: "the environment selector must use the provider's own prefix" };
+  }
+  return {
+    ok: true,
+    environments: Object.freeze({
+      values: Object.freeze([...values] as string[]),
+      default: defaultValue,
+      envVariable: env,
+    }),
+  };
 }

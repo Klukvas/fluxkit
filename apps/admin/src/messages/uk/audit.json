@@ -64,5 +64,7 @@
   "audit.action.integration.activated": "Інтеграцію ввімкнено",
   "audit.action.integration.disabled": "Інтеграцію вимкнено",
   "audit.action.integration.revoked": "Ключ інтеграції відкликано",
-  "audit.action.integration.route_changed": "Поділ пошти змінено"
+  "audit.action.integration.route_changed": "Поділ пошти змінено",
+  "audit.action.integration.check_requested": "Запитано перевірку ключа інтеграції",
+  "audit.action.integration.check_completed": "Перевірку облікових даних інтеграції завершено"
 }

@@ -52,7 +52,7 @@ Purposes and legal bases are proposals taken from the plan. TODO(fluxkit): legal
 | `domain_event` | `aggregate_id`, `payload` | pseudonymous (Q) | D17 | excluded | keep | Ids only, by rule (docs/contracts/events.md); deleted by job 4 seven days after dispatch. |
 | `email_message` | `id`, `template_version`, `attempts`, `next_attempt_at`, `lease_until`, `deadline_at`, `provider_code`, `route_provider_code`, `assigned_provider_code`, `pinned_provider_code`, `pinned_at`, `integration_credential_version_id`, `last_error_code`, `resend_of`, `updated_at` | none | D16 | not_applicable | not_applicable |  |
 | `email_message` | `to_address` | personal (P) | D16 | excluded | delete_row | The account email is exported once; the mail export lists template key, status and times only. |
-| `email_message` | `variables` | personal (P) | D16 | excluded | delete_row | Order lines, totals and a tracking number for rendering; no rendered body is stored. |
+| `email_message` | `variables` | personal (P) | D16 | excluded | delete_row | Order lines, totals and a tracking number for rendering; integration.security_alert uses action/kind/provider/generation/time metadata only. No rendered body is stored. |
 | `email_message` | `template_key`, `locale`, `recipient_kind`, `status`, `created_at`, `sent_at` | pseudonymous (Q) | D16 | included | delete_row |  |
 | `email_message` | `customer_id`, `order_id`, `dedupe_key`, `provider_message_id` | pseudonymous (Q) | D16 | excluded | delete_row | Internal id or provider reference only the shop can use. |
 | `email_message` | `admin_user_id`, `created_by_admin_id` | staff (S) | D20 | excluded | set_null | Admin actor id; admin ids are not exported. |
@@ -66,7 +66,7 @@ Purposes and legal bases are proposals taken from the plan. TODO(fluxkit): legal
 | `health_check` | all 2 columns | none | D24 | not_applicable | not_applicable | |
 | `integration` | `id`, `kind`, `provider_code`, `enabled`, `active_outbound_version_id`, `created_at`, `updated_at` | none | D26 | not_applicable | not_applicable |  |
 | `integration` | `updated_by` | staff (S) | D26 | excluded | set_null | Admin actor id; admin ids are not exported. |
-| `integration_credential_version` | `id`, `integration_id`, `generation`, `purpose`, `state`, `created_at`, `retired_at`, `revoked_at` | none | D26 | not_applicable | not_applicable |  |
+| `integration_credential_version` | `id`, `integration_id`, `generation`, `purpose`, `environment`, `state`, `created_at`, `retired_at`, `revoked_at` | none | D26 | not_applicable | not_applicable |  |
 | `integration_credential_version` | `created_by` | staff (S) | D26 | excluded | set_null | Admin actor id; admin ids are not exported. |
 | `integration_revision` | all 3 columns | none | D26 | not_applicable | not_applicable | |
 | `integration_secret` | `id`, `version_id`, `field`, `created_at` | none | D26 | not_applicable | not_applicable |  |

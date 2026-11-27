@@ -775,6 +775,63 @@ describe("integrations (ADR 0058)", () => {
     expect(JSON.parse(post?.init.body as string)).toEqual(retire);
   });
 
+  it("sends an optional environment in the secret body and keeps metadata intact", async () => {
+    const enriched = {
+      ...detail,
+      integration: {
+        ...integration,
+        environments: {
+          values: ["sandbox", "production"],
+          default: "sandbox",
+          envVariable: "ACME_ENVIRONMENT",
+        },
+        versions: [
+          {
+            id: VERSION,
+            purpose: "outbound",
+            generation: 1,
+            state: "candidate",
+            environment: "sandbox",
+            createdAt: "2026-11-27T12:00:00.000Z",
+            fields: ["api_key"],
+          },
+        ],
+      },
+    };
+    const stub = fakeFetch(() => jsonOk(enriched));
+    const client = createAdminClient({ baseUrl: BASE, fetch: stub.fetch });
+    const body = {
+      expectedRevision: 4,
+      value: "test_fixture",
+      currentPassword: "pw",
+      environment: "sandbox",
+    };
+    const result = await client.putIntegrationSecret(ID, "api_key", body);
+    expect(result.ok && result.data).toEqual(enriched);
+    expect(JSON.parse(stub.calls[0]?.init.body as string)).toEqual(body);
+  });
+
+  it("checks one saved version without accepting a secret or password", async () => {
+    const checked = {
+      versionId: VERSION,
+      code: "not_supported",
+      checkedAt: "2026-11-27T12:00:00.000Z",
+    };
+    const stub = fakeFetch(() => jsonOk(checked));
+    const client = createAdminClient({ baseUrl: BASE, fetch: stub.fetch });
+    const body = { expectedRevision: 4, versionId: VERSION };
+    const result = await client.checkIntegration(ID, body);
+    expect(result.ok && result.data).toEqual(checked);
+    expect(stub.calls).toHaveLength(1);
+    const call = stub.calls[0];
+    expect([call?.init.method, call?.url]).toEqual([
+      "POST",
+      `${BASE}/admin/integrations/${ID}/check`,
+    ]);
+    expect(call?.init.headers.get(CSRF_HEADER)).toBe("1");
+    expect(JSON.parse(call?.init.body as string)).toEqual(body);
+  });
+
   it("hands a wrong password back as a 403 problem with its rule, and the wait of a 429", async () => {
     const answers = [
       problemResponse(403, { code: "forbidden", rule: "current_password_incorrect" }),

@@ -30,6 +30,7 @@ export const integrationTables: Inventory = {
       "integration_id",
       "generation",
       "purpose",
+      "environment",
       "state",
       "created_at",
       "retired_at",

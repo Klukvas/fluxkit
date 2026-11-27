@@ -1,4 +1,8 @@
-import type { AdminIntegration, AdminIntegrationSecret } from "@fluxkit/api-client";
+import type {
+  AdminIntegration,
+  AdminIntegrationSecret,
+  AdminIntegrationVersion,
+} from "@fluxkit/api-client";
 import { LiveRegion } from "@fluxkit/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useI18n } from "../../i18n/i18n-context";
@@ -49,10 +53,11 @@ export function IntegrationsPage() {
     action: SecretAction,
     integration: AdminIntegration,
     secret: AdminIntegrationSecret | null,
+    version?: AdminIntegrationVersion,
   ) {
     if (!canManage || resource.refreshing) return;
     setNotice(null);
-    setTarget({ action, integration, secret });
+    setTarget({ action, integration, secret, version });
   }
 
   const close = useCallback(() => setTarget(null), []);

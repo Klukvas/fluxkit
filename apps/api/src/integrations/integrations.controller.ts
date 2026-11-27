@@ -11,6 +11,10 @@ import { ZodValidationPipe } from "../common/zod-validation.pipe.js";
 import { INTEGRATIONS_ADMIN_PERMISSIONS } from "./integrations.permissions.js";
 import {
   emailRouteResponseSchema,
+  checkIntegrationSchema,
+  integrationCheckResponseSchema,
+  type CheckIntegrationBody,
+  type IntegrationCheckResponse,
   integrationDetailResponseSchema,
   integrationListResponseSchema,
   integrationMutationSchema,
@@ -26,6 +30,8 @@ import {
   type SetEmailRouteBody,
 } from "./integrations.schemas.js";
 import { IntegrationsService, type IntegrationActor } from "./integrations.service.js";
+
+import { IntegrationCheckService } from "./integration-check.service.js";
 
 const ID_PARAM = {
   name: "id",
@@ -57,7 +63,10 @@ function actorOf(principal: AdminPrincipal, request: Request): IntegrationActor 
  */
 @AdminController("integrations", INTEGRATIONS_ADMIN_PERMISSIONS)
 export class IntegrationsController {
-  constructor(@Inject(IntegrationsService) private readonly integrations: IntegrationsService) {}
+  constructor(
+    @Inject(IntegrationsService) private readonly integrations: IntegrationsService,
+    @Inject(IntegrationCheckService) private readonly checks: IntegrationCheckService,
+  ) {}
 
   @Get()
   @ApiOperation({
@@ -135,6 +144,26 @@ export class IntegrationsController {
     @Req() request: Request,
   ): Promise<IntegrationDetailResponse> {
     return this.integrations.retireSecret(actorOf(admin, request), id, body);
+  }
+
+  @Post(":id/check")
+  @HttpCode(200)
+  @ApiOperation({
+    summary: "Check a complete saved credential version",
+    description:
+      "Owner-only explicit read, without a current password. Strict limits: 10/min/admin, 30/min/IP, 30/min/provider together; 503 check_unavailable if Redis is unavailable. Candidate, active or draining only; env override 409. No hook returns not_supported; provider failures return unavailable. Ten-second timeout; code-only audit after the call.",
+  })
+  @ApiParam(ID_PARAM)
+  @ApiZodBody(checkIntegrationSchema)
+  @ApiZodResponse(200, integrationCheckResponseSchema, "The code-only check outcome.")
+  @ApiProblemResponses(400, 403, 404, 409, 429, 503)
+  check(
+    @Param("id", idParam) id: string,
+    @Body(new ZodValidationPipe(checkIntegrationSchema)) body: CheckIntegrationBody,
+    @CurrentAdmin() admin: AdminPrincipal,
+    @Req() request: Request,
+  ): Promise<IntegrationCheckResponse> {
+    return this.checks.check(actorOf(admin, request), id, body);
   }
 
   @Post(":id/activate")

@@ -85,6 +85,8 @@ export class AuthModule implements NestModule {
         ADMIN_AUTH_CONFIG,
         CLOCK,
         PasswordHasher,
+        AdminUserRepository,
+        SessionRepository,
         SessionService,
         AdminGuard,
         AdminStepUpService,

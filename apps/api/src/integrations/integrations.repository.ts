@@ -14,6 +14,7 @@ import {
   integrationRevision,
   integrationSecret,
 } from "../database/schema/index.js";
+import type { IntegrationVersionResponse } from "./integrations.schemas.js";
 import type { SealedSecret } from "./secret-cipher.js";
 
 export type IntegrationRow = typeof integration.$inferSelect;
@@ -139,6 +140,29 @@ export class IntegrationsRepository {
       );
   }
 
+  async versionHistory(
+    integrationIds: readonly string[],
+    executor: DbExecutor = this.db,
+  ): Promise<(IntegrationVersionResponse & { integrationId: string })[]> {
+    if (integrationIds.length === 0) return [];
+    const result = await executor.execute<{
+      id: string;
+      integrationId: string;
+      purpose: IntegrationSecretPurpose;
+      generation: number;
+      state: IntegrationVersionResponse["state"];
+      environment: string;
+      createdAt: Date;
+      fields: string[];
+    }>(sql`
+      select v.id, v.integration_id as "integrationId", v.purpose, v.generation, v.state, v.environment,
+        v.created_at as "createdAt", coalesce((select array_agg(s.field order by s.field) from integration_secret s where s.version_id=v.id), '{}') as fields
+      from (select *, row_number() over (partition by integration_id order by generation desc) as rank
+        from integration_credential_version where ${inArray(integrationCredentialVersion.integrationId, [...integrationIds])}
+        and state <> 'retired') v where v.rank <= 20 order by v.generation desc`);
+    return result.rows.map((row) => ({ ...row, createdAt: new Date(row.createdAt).toISOString() }));
+  }
+
   async nextGeneration(transaction: DbExecutor, integrationId: string): Promise<number> {
     const [row] = await transaction
       .select({ latest: sql<number>`coalesce(max(${integrationCredentialVersion.generation}), 0)` })
@@ -205,31 +229,35 @@ export class IntegrationsRepository {
       integrationId: string;
       generation: number;
       purpose: IntegrationSecretPurpose;
+      environment: string;
       createdBy: string;
       createdAt: Date;
     },
-    secret: { id: string; field: string; sealed: SealedSecret },
+    secrets: readonly { id: string; field: string; sealed: SealedSecret }[],
   ): Promise<void> {
     await transaction.insert(integrationCredentialVersion).values({
       id: version.id,
       integrationId: version.integrationId,
       generation: version.generation,
       purpose: version.purpose,
+      environment: version.environment,
       state: "candidate",
       createdAt: version.createdAt,
       // The same NULL the foreign key leaves for a deleted admin (only test principals have no row).
       createdBy: sql`(select "id" from "admin_user" where "id" = ${version.createdBy}::uuid)`,
     });
-    await transaction.insert(integrationSecret).values({
-      id: secret.id,
-      versionId: version.id,
-      field: secret.field,
-      keyId: secret.sealed.keyId,
-      nonce: secret.sealed.nonce,
-      ciphertext: secret.sealed.ciphertext,
-      tag: secret.sealed.tag,
-      createdAt: version.createdAt,
-    });
+    await transaction.insert(integrationSecret).values(
+      secrets.map((secret) => ({
+        id: secret.id,
+        versionId: version.id,
+        field: secret.field,
+        keyId: secret.sealed.keyId,
+        nonce: secret.sealed.nonce,
+        ciphertext: secret.sealed.ciphertext,
+        tag: secret.sealed.tag,
+        createdAt: version.createdAt,
+      })),
+    );
   }
 
   async lockEnabled(transaction: DbExecutor, kind: IntegrationKind): Promise<IntegrationRow[]> {

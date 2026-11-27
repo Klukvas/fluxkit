@@ -1,11 +1,6 @@
-import { randomUUID } from "node:crypto";
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
 import { sql } from "drizzle-orm";
-import {
-  checkIntegrationSecretValue,
-  type IntegrationSecretDeclaration,
-  type IntegrationSecretPurpose,
-} from "@fluxkit/core";
+import { checkIntegrationSecretValue, type IntegrationSecretDeclaration } from "@fluxkit/core";
 import type { AdminPrincipal } from "../auth/admin-authenticator.js";
 import { CLOCK, type Clock } from "../auth/clock.js";
 import { AdminStepUpService, type VerifiedStepUp } from "../auth/step-up/admin-step-up.service.js";
@@ -38,10 +33,13 @@ import type {
   IntegrationListResponse,
   IntegrationMutationBody,
   IntegrationResponse,
+  IntegrationVersionResponse,
   PutIntegrationSecretBody,
   RetireIntegrationSecretBody,
   SetEmailRouteBody,
 } from "./integrations.schemas.js";
+import { IntegrationAlerts, type IntegrationAlertEvent } from "./integration-alerts.service.js";
+import { CandidateBundleWriter } from "./candidate-bundle-writer.js";
 import { SecretCipher } from "./secret-cipher.js";
 
 const PERMISSION = "integrations.manage";
@@ -95,6 +93,8 @@ export class IntegrationsService {
     @Inject(AdminAuditWriter) private readonly audit: AdminAuditWriter,
     @Inject(INTEGRATIONS_CONFIG) private readonly config: IntegrationsConfig,
     @Inject(IntegrationRuntime) private readonly runtime: IntegrationRuntime,
+    @Inject(IntegrationAlerts) private readonly alerts: IntegrationAlerts,
+    @Inject(CandidateBundleWriter) private readonly bundles: CandidateBundleWriter,
   ) {}
 
   async list(): Promise<IntegrationListResponse> {
@@ -112,22 +112,37 @@ export class IntegrationsService {
       // A row of a package that is no longer installed is kept in the database and not offered.
       return match === undefined ? [] : [{ row, installed: match }];
     });
-    const stored = await this.repository.storedSecrets(resolved.map((entry) => entry.row.id));
+    const ids = resolved.map((entry) => entry.row.id);
+    const [stored, versions] = await Promise.all([
+      this.repository.storedSecrets(ids),
+      this.repository.versionHistory(ids),
+    ]);
     return {
       revision,
       storage: this.storage(),
       emailRouteMode,
-      items: resolved.map((entry) => this.view(entry, stored)),
+      items: resolved.map((entry) =>
+        this.view(
+          entry,
+          stored,
+          versions.filter((version) => version.integrationId === entry.row.id),
+        ),
+      ),
     };
   }
 
   async get(id: string): Promise<IntegrationDetailResponse> {
     const resolved = await this.resolve(id);
-    const [revision, stored] = await Promise.all([
+    const [revision, stored, versions] = await Promise.all([
       this.repository.currentRevision(),
       this.repository.storedSecrets([resolved.row.id]),
+      this.repository.versionHistory([resolved.row.id]),
     ]);
-    return { revision, storage: this.storage(), integration: this.view(resolved, stored) };
+    return {
+      revision,
+      storage: this.storage(),
+      integration: this.view(resolved, stored, versions),
+    };
   }
 
   async putSecret(
@@ -151,18 +166,37 @@ export class IntegrationsService {
         INTEGRATION_RULES.envOverride,
       );
     }
+    const candidate = await this.repository.findCandidateForUpdate(
+      this.db,
+      id,
+      declaration.purpose,
+    );
+    this.installed.assertEnvironmentAllowed(
+      resolved.installed,
+      body.environment ??
+        candidate?.environment ??
+        resolved.installed.environments?.default ??
+        "default",
+    );
     await this.assertValueAccepted(resolved.installed, field, body.value);
     await this.assertRevisionFresh(body.expectedRevision);
+    if (
+      body.environment !== undefined &&
+      !(resolved.installed.environments?.values ?? ["default"]).includes(body.environment)
+    ) {
+      throw validationFailed([{ path: "environment", code: "invalid_value" }]);
+    }
     const verified = await this.stepUp.verify({
       principal: actor.principal,
       currentPassword: body.currentPassword,
       clientAddress: actor.clientAddress,
       operation: "integration.secret_changed",
     });
-    await withTransaction(this.db, (transaction) =>
+    const event = await withTransaction(this.db, (transaction) =>
       this.writeCandidate(transaction, resolved, declaration, body, verified),
     );
     this.runtime.drop();
+    await this.alerts.notify(event);
     return this.get(id);
   }
 
@@ -220,6 +254,8 @@ export class IntegrationsService {
       const now = this.clock.now();
       await this.stepUp.assertStillValid(transaction, verified, PERMISSION);
       await this.advanceRevision(transaction, body.expectedRevision, now);
+      if ((await this.repository.findByIdForUpdate(resolved.row.id, transaction)) === undefined)
+        throw notFound("Integration");
       const locked = await this.repository.findVersionForUpdate(transaction, version.id);
       if (locked === undefined || locked.state !== "candidate") throw notRetirable();
       await this.repository.retire(transaction, locked.id, now);
@@ -255,10 +291,11 @@ export class IntegrationsService {
       clientAddress: actor.clientAddress,
       operation: "integration.activated",
     });
-    await withTransaction(this.db, (transaction) =>
+    const event = await withTransaction(this.db, (transaction) =>
       this.writeActivation(transaction, resolved, body, verified),
     );
     this.runtime.drop();
+    await this.alerts.notify(event);
     return this.get(id);
   }
 
@@ -276,7 +313,7 @@ export class IntegrationsService {
       clientAddress: actor.clientAddress,
       operation: "integration.disabled",
     });
-    await withTransaction(this.db, async (transaction) => {
+    const event = await withTransaction(this.db, async (transaction) => {
       const now = this.clock.now();
       await this.stepUp.assertStillValid(transaction, verified, PERMISSION);
       await this.advanceRevision(transaction, body.expectedRevision, now);
@@ -288,7 +325,8 @@ export class IntegrationsService {
         transaction,
         locked.activeOutboundVersionId,
       );
-      if (current?.state === "active") {
+      if (current === undefined) throw notActive();
+      if (current.state === "active") {
         await this.repository.setCredentialState(transaction, current.id, "draining", now);
       }
       await this.repository.setOutboundPointer(
@@ -298,7 +336,7 @@ export class IntegrationsService {
         verified.userId,
         now,
       );
-      await this.audit.record(transaction, verified.userId, {
+      const auditEventId = await this.audit.record(transaction, verified.userId, {
         action: "integration.disabled",
         targetKind: "integration",
         targetId: locked.id,
@@ -308,8 +346,17 @@ export class IntegrationsService {
           version: locked.activeOutboundVersionId,
         },
       });
+      return {
+        auditEventId,
+        action: "integration.disabled" as const,
+        kind: resolved.installed.kind,
+        providerCode: locked.providerCode,
+        generation: current.generation,
+        occurredAt: now,
+      };
     });
     this.runtime.drop();
+    await this.alerts.notify(event);
     return this.get(id);
   }
 
@@ -337,7 +384,7 @@ export class IntegrationsService {
       clientAddress: actor.clientAddress,
       operation: "integration.revoked",
     });
-    await withTransaction(this.db, async (transaction) => {
+    const event = await withTransaction(this.db, async (transaction) => {
       const now = this.clock.now();
       await this.stepUp.assertStillValid(transaction, verified, PERMISSION);
       await this.advanceRevision(transaction, body.expectedRevision, now);
@@ -364,7 +411,7 @@ export class IntegrationsService {
       } else {
         await this.repository.touch(transaction, locked.id, verified.userId, now);
       }
-      await this.audit.record(transaction, verified.userId, {
+      const auditEventId = await this.audit.record(transaction, verified.userId, {
         action: "integration.revoked",
         targetKind: "integration",
         targetId: locked.id,
@@ -376,8 +423,17 @@ export class IntegrationsService {
           version: current.id,
         },
       });
+      return {
+        auditEventId,
+        action: "integration.revoked" as const,
+        kind: resolved.installed.kind,
+        providerCode: locked.providerCode,
+        generation: current.generation,
+        occurredAt: now,
+      };
     });
     this.runtime.drop();
+    await this.alerts.notify(event);
     return this.get(id);
   }
 
@@ -387,48 +443,23 @@ export class IntegrationsService {
     declaration: IntegrationSecretDeclaration,
     body: PutIntegrationSecretBody,
     verified: VerifiedStepUp,
-  ): Promise<void> {
+  ): Promise<IntegrationAlertEvent> {
     const now = this.clock.now();
     const { row } = resolved;
     await this.stepUp.assertStillValid(transaction, verified, PERMISSION);
     await this.advanceRevision(transaction, body.expectedRevision, now);
-    if ((await this.repository.findByIdForUpdate(row.id, transaction)) === undefined) {
-      throw notFound("Integration");
-    }
-    const purpose: IntegrationSecretPurpose = declaration.purpose;
-    const replaced = await this.repository.findCandidateForUpdate(transaction, row.id, purpose);
-    if (replaced !== undefined) {
-      await this.repository.retire(transaction, replaced.id, now);
-    }
-    const generation = await this.repository.nextGeneration(transaction, row.id);
-    const versionId = randomUUID();
-    const secretId = randomUUID();
-    // The ids exist before the insert, so the envelope is bound to the very row it is stored in.
-    const sealed = this.cipher.seal(
-      {
-        secretId,
-        integrationId: row.id,
-        kind: resolved.installed.kind,
-        providerCode: row.providerCode,
-        field: declaration.field,
-        generation,
-      },
-      body.value,
-    );
-    await this.repository.insertCandidate(
+    const { versionId, generation, replaced } = await this.bundles.write(
       transaction,
-      {
-        id: versionId,
-        integrationId: row.id,
-        generation,
-        purpose,
-        createdBy: verified.userId,
-        createdAt: now,
-      },
-      { id: secretId, field: declaration.field, sealed },
+      row,
+      resolved.installed,
+      declaration,
+      body,
+      verified.userId,
+      now,
     );
+    const purpose = declaration.purpose;
     await this.repository.touch(transaction, row.id, verified.userId, now);
-    await this.audit.record(transaction, verified.userId, {
+    const auditEventId = await this.audit.record(transaction, verified.userId, {
       action: "integration.secret_changed",
       targetKind: "integration",
       targetId: row.id,
@@ -439,9 +470,17 @@ export class IntegrationsService {
         purpose,
         generation,
         version: versionId,
-        replaced: replaced !== undefined,
+        replaced,
       },
     });
+    return {
+      auditEventId,
+      action: "integration.secret_changed",
+      kind: resolved.installed.kind,
+      providerCode: row.providerCode,
+      generation: generation,
+      occurredAt: now,
+    };
   }
 
   private async assertActivatable(resolved: ResolvedIntegration): Promise<void> {
@@ -469,6 +508,7 @@ export class IntegrationsService {
     if (this.config.emailFromAddress === null) throw senderRequired();
     const candidate = await this.repository.findCandidateForUpdate(this.db, row.id, "outbound");
     if (candidate === undefined) throw notActivatable();
+    this.assertCandidateEnvironment(installed, candidate.environment);
     const fields = await this.repository.secretFields(this.db, candidate.id);
     if (!outbound.every((entry) => fields.includes(entry.field))) throw notActivatable();
     const enabled = await this.repository.lockEnabled(this.db, "email");
@@ -483,7 +523,7 @@ export class IntegrationsService {
     resolved: ResolvedIntegration,
     body: IntegrationMutationBody,
     verified: VerifiedStepUp,
-  ): Promise<void> {
+  ): Promise<IntegrationAlertEvent> {
     const now = this.clock.now();
     await this.stepUp.assertStillValid(transaction, verified, PERMISSION);
     await this.advanceRevision(transaction, body.expectedRevision, now);
@@ -511,8 +551,21 @@ export class IntegrationsService {
       "outbound",
     );
     if (candidate === undefined) throw notActivatable();
+    this.assertCandidateEnvironment(resolved.installed, candidate.environment);
     const fields = await this.repository.secretFields(transaction, candidate.id);
     if (!outbound.every((entry) => fields.includes(entry.field))) throw notActivatable();
+    try {
+      await this.runtime.validateEmailCandidate(
+        locked.id,
+        resolved.installed,
+        candidate,
+        transaction,
+      );
+    } catch {
+      new Logger(IntegrationsService.name).error("integration_activation_validation_failed");
+      throw ruleViolation("This credential cannot be used.", INTEGRATION_RULES.unavailable);
+    }
+
     if (
       locked.activeOutboundVersionId !== null &&
       locked.activeOutboundVersionId !== candidate.id
@@ -533,7 +586,7 @@ export class IntegrationsService {
       verified.userId,
       now,
     );
-    await this.audit.record(transaction, verified.userId, {
+    const auditEventId = await this.audit.record(transaction, verified.userId, {
       action: "integration.activated",
       targetKind: "integration",
       targetId: locked.id,
@@ -545,6 +598,24 @@ export class IntegrationsService {
         version: candidate.id,
       },
     });
+    return {
+      auditEventId,
+      action: "integration.activated",
+      kind: resolved.installed.kind,
+      providerCode: locked.providerCode,
+      generation: candidate.generation,
+      occurredAt: now,
+    };
+  }
+
+  private assertCandidateEnvironment(installed: InstalledIntegration, environment: string): void {
+    this.installed.assertEnvironmentAllowed(installed, environment);
+    if (!(installed.environments?.values ?? ["default"]).includes(environment)) {
+      throw ruleViolation(
+        "This credential's environment is not available for this provider.",
+        INTEGRATION_RULES.envOverride,
+      );
+    }
   }
 
   private emailRouteMode(): Promise<"equal" | "resend"> {
@@ -590,7 +661,13 @@ export class IntegrationsService {
       throw error;
     }
     if (problem !== undefined) {
-      throw validationFailed([{ path: "value", code: "invalid_format", message: problem }]);
+      throw validationFailed([
+        {
+          path: "value",
+          code: "invalid_format",
+          message: "The credential format is invalid; the value is not shown.",
+        },
+      ]);
     }
   }
 
@@ -612,6 +689,7 @@ export class IntegrationsService {
   private view(
     resolved: ResolvedIntegration,
     stored: readonly StoredSecretSummary[],
+    versions: readonly IntegrationVersionResponse[],
   ): IntegrationResponse {
     const { row, installed } = resolved;
     return {
@@ -619,6 +697,30 @@ export class IntegrationsService {
       kind: installed.kind,
       providerCode: row.providerCode,
       enabled: row.enabled,
+      environmentSource:
+        this.installed.lockedEnvironment(installed) === undefined ? "store" : "env",
+      environment:
+        this.installed.lockedEnvironment(installed) ??
+        versions.find((version) => version.state === "candidate" && version.purpose === "outbound")
+          ?.environment ??
+        installed.environments?.default ??
+        "default",
+      versions: versions.map(
+        ({ id, purpose, generation, state, environment, createdAt, fields }) => ({
+          id,
+          purpose,
+          generation,
+          state,
+          environment,
+          createdAt,
+          fields,
+        }),
+      ),
+      ...(installed.environments === undefined
+        ? {}
+        : {
+            environments: { ...installed.environments, values: [...installed.environments.values] },
+          }),
       updatedAt: row.updatedAt.toISOString(),
       secrets: installed.secrets.map((declaration) => {
         const saved = stored.find(

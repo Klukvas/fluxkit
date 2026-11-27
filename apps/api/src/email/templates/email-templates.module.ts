@@ -1,3 +1,4 @@
+import { IntegrationSecurityAlertEmailTemplate } from "./integration-security-alert.template.js";
 import { Module } from "@nestjs/common";
 import { DiscoveryModule } from "@nestjs/core";
 import { AdminTestEmailTemplate } from "./admin-test.template.js";
@@ -20,6 +21,7 @@ import { ShipmentCreatedEmailTemplate } from "./shipment-created.template.js";
   imports: [DiscoveryModule],
   providers: [
     AdminTestEmailTemplate,
+    IntegrationSecurityAlertEmailTemplate,
     PasswordResetEmailTemplate,
     PasswordChangedEmailTemplate,
     VerifyEmailEmailTemplate,

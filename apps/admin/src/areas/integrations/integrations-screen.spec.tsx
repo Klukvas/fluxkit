@@ -1,4 +1,8 @@
-import type { AdminIntegration, AdminIntegrationSecret } from "@fluxkit/api-client";
+import type {
+  AdminIntegration,
+  AdminIntegrationCheck,
+  AdminIntegrationSecret,
+} from "@fluxkit/api-client";
 import { createTranslator, locales } from "@fluxkit/ui";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -16,6 +20,7 @@ import {
   type IntegrationsState,
 } from "./integrations-list-view";
 import { INTEGRATION_KINDS, KNOWN_PROVIDER_CODES, KNOWN_SECRET_FIELDS } from "./integrations-view";
+import { IntegrationCheckResult } from "./integration-versions";
 import { GUIDED_PROVIDER_CODES, providerGuide } from "./provider-guides";
 import { SecretDialogView, type SecretDialogViewProps } from "./secret-dialog-view";
 
@@ -44,6 +49,9 @@ const resend: AdminIntegration = {
   kind: "email",
   providerCode: "resend",
   enabled: false,
+  versions: [],
+  environmentSource: "store",
+  environment: "default",
   secrets: [
     secret({
       state: "set",
@@ -67,6 +75,9 @@ const monobank: AdminIntegration = {
   kind: "payment",
   providerCode: "monobank",
   enabled: false,
+  versions: [],
+  environmentSource: "store",
+  environment: "default",
   secrets: [secret({ field: "token", envVariable: "MONOBANK_TOKEN" })],
   updatedAt: "2026-11-16T10:00:00.000Z",
 };
@@ -75,6 +86,9 @@ const unknown: AdminIntegration = {
   kind: "shipping",
   providerCode: "acme_ship",
   enabled: false,
+  versions: [],
+  environmentSource: "store",
+  environment: "default",
   secrets: [secret({ field: "merchant_code", envVariable: "ACME_SHIP_MERCHANT_CODE" })],
   updatedAt: "2026-11-16T10:00:00.000Z",
 };
@@ -134,6 +148,133 @@ describe("the Integrations list", () => {
     expect(html).not.toContain("§intg.storageDisabled.title");
   });
 
+  it("groups both LiqPay fields under one candidate and exposes only complete versions to Check", () => {
+    const liqpay: AdminIntegration = {
+      ...monobank,
+      providerCode: "liqpay",
+      secrets: [secret({ field: "public_key" }), secret({ field: "private_key" })],
+      versions: [
+        {
+          id: VERSION,
+          purpose: "outbound",
+          generation: 2,
+          state: "candidate",
+          environment: "default",
+          createdAt: "2026-11-27T12:00:00.000Z",
+          fields: ["public_key"],
+        },
+      ],
+    };
+    const incomplete = list(ready([liqpay]));
+    expect(incomplete).toContain("§intg.version.title");
+    expect(incomplete).toContain("§intg.version.fieldSaved");
+    expect(incomplete).toContain("§intg.version.fieldMissing");
+    expect(incomplete).not.toContain("§intg.check.action");
+    const complete = list(
+      ready([
+        {
+          ...liqpay,
+          versions: [
+            {
+              ...{
+                id: VERSION,
+                purpose: "outbound" as const,
+                generation: 2,
+                state: "candidate" as const,
+                environment: "default",
+                createdAt: "2026-11-27T12:00:00.000Z",
+              },
+              fields: ["public_key", "private_key"],
+            },
+          ],
+        },
+      ]),
+    );
+    expect(complete).toContain("§intg.check.action");
+    expect(complete).not.toContain("§intg.version.fieldMissing");
+    expect(complete).not.toContain("§intg.action.turnOnLabel");
+  });
+
+  it("renders an unknown plugin's fields and environments without a provider switch", async () => {
+    const plugin: AdminIntegration = {
+      ...unknown,
+      providerCode: "custom<carrier>",
+      secrets: [secret({ field: "merchant<code>" }), secret({ field: "signing_key" })],
+      environments: {
+        values: ["trial", "live"],
+        default: "trial",
+        envVariable: "CUSTOM_ENVIRONMENT",
+      },
+      versions: [
+        {
+          id: VERSION,
+          purpose: "outbound",
+          generation: 4,
+          state: "active",
+          environment: "trial<region>",
+          createdAt: "2026-11-27T12:00:00.000Z",
+          fields: ["merchant<code>", "signing_key"],
+        },
+      ],
+    };
+    const t = createTranslator(
+      {
+        ...(await messagesForArea("en", MESSAGE_FILES)),
+        "intg.version.environment": "{environment}",
+        "intg.version.fieldSaved": "{field}",
+        "intg.check.action": "§intg.check.action",
+      },
+      "en",
+    );
+    const html = renderToStaticMarkup(
+      <IntegrationsListView
+        t={t}
+        uiLocale="en"
+        state={ready([plugin])}
+        canManage
+        busy={false}
+        onRetry={noop}
+        onAction={noop}
+      />,
+    );
+    expect(html).toContain("custom&lt;carrier&gt;");
+    expect(html).toContain("merchant&lt;code&gt;");
+    expect(html).toContain("trial&lt;region&gt;");
+    expect(html).toContain("§intg.check.action");
+    expect(html).not.toContain("<carrier>");
+  });
+
+  it("keeps older draining versions revocable and revoked versions terminal", () => {
+    const retained: AdminIntegration = {
+      ...monobank,
+      versions: [
+        {
+          id: VERSION,
+          purpose: "outbound",
+          generation: 1,
+          state: "draining",
+          environment: "default",
+          createdAt: "2026-11-27T12:00:00.000Z",
+          fields: ["token"],
+        },
+        {
+          id: "revoked",
+          purpose: "outbound",
+          generation: 2,
+          state: "revoked",
+          environment: "default",
+          createdAt: "2026-11-27T12:00:00.000Z",
+          fields: ["token"],
+        },
+      ],
+    };
+    const html = list(ready([retained]));
+    expect(
+      textAttributes(html).filter((label) => label === "§intg.version.revokeLabel"),
+    ).toHaveLength(1);
+    expect(html.match(/§intg.check.action/g)).toHaveLength(1);
+  });
+
   it("groups the providers by kind under translated names, an unknown provider and field under their codes", () => {
     const html = list(ready([unknown, monobank, resend]));
     const order = ["§intg.kind.email", "§intg.kind.payment", "§intg.kind.shipping"].map((key) =>
@@ -169,7 +310,7 @@ describe("the Integrations list", () => {
     expect(buttons(html)).toHaveLength(4);
   });
 
-  it("offers turn on for a saved email key and no connection check or DNS control", () => {
+  it("offers turn on for a saved email key and no payment activation or DNS control", () => {
     const html = list(ready([resend, monobank, unknown]));
     expect(html).toContain("§intg.action.turnOnLabel");
     expect(html).not.toMatch(/dns/i);
@@ -188,6 +329,9 @@ describe("the Integrations list", () => {
   it("warns that a stored value must be entered again when the server cannot decrypt it", () => {
     const lost: AdminIntegration = {
       ...monobank,
+      versions: [],
+      environmentSource: "store",
+      environment: "default",
       secrets: [
         secret({
           field: "token",
@@ -258,6 +402,51 @@ describe("the Integrations list", () => {
   });
 });
 
+describe("credential check outcomes", () => {
+  it("never renders arbitrary provider text as a check outcome", () => {
+    const result = {
+      versionId: VERSION,
+      code: "hostile_provider_message",
+      checkedAt: "2026-11-27T12:00:00.000Z",
+    } as unknown as AdminIntegrationCheck;
+    const html = renderToStaticMarkup(
+      <IntegrationCheckResult t={sentinel} uiLocale="en" result={result} />,
+    );
+    expect(html).toContain("§intg.check.failed");
+    expect(html).not.toContain("hostile_provider_message");
+  });
+
+  it("renders only translated code outcomes, the check time and bounded wait", async () => {
+    for (const locale of locales) {
+      const messages = await messagesForArea(locale, MESSAGE_FILES);
+      const t = createTranslator(messages, locale);
+      for (const code of [
+        "ok",
+        "invalid_credentials",
+        "unavailable",
+        "rate_limited",
+        "not_supported",
+      ] as const) {
+        const html = renderToStaticMarkup(
+          <IntegrationCheckResult
+            t={t}
+            uiLocale={locale}
+            result={{
+              versionId: VERSION,
+              code,
+              checkedAt: "2026-11-27T12:00:00.000Z",
+              retryAfterSeconds: 60,
+            }}
+          />,
+        );
+        expect(html).toContain(messages[`intg.check.${code}`]);
+        expect(html).not.toContain("intg.");
+        expect(html).toContain("60");
+      }
+    }
+  });
+});
+
 describe("the save and remove dialog", () => {
   it("asks for the key and the password in two password inputs that no browser store may fill or keep", () => {
     const fields = inputs(dialog());
@@ -268,6 +457,30 @@ describe("the save and remove dialog", () => {
       expect(field).not.toMatch(/\sname=/);
       expect(field).toContain('value=""');
     }
+  });
+
+  it("offers only declared environments when saving and none for a password-only action", () => {
+    const environment = {
+      values: ["sandbox", "production"],
+      default: "sandbox",
+      envVariable: "CUSTOM_ENVIRONMENT",
+    };
+    const html = dialog({
+      environments: environment,
+      environment: "sandbox",
+      onEnvironmentChange: noop,
+    });
+    expect(html).toContain("§intg.dialog.environment");
+    expect(html).toContain('value="sandbox" selected=""');
+    expect(html).toContain('value="production"');
+    expect(
+      dialog({
+        action: "revoke",
+        environments: environment,
+        environment: "sandbox",
+        onEnvironmentChange: noop,
+      }),
+    ).not.toContain("<select");
   });
 
   it("asks only for the password to remove, on a danger button", () => {
@@ -411,4 +624,29 @@ describe("the provider guides", () => {
     expect(providerGuide("constructor")).toBeNull();
     expect(providerGuide("__proto__")).toBeNull();
   });
+});
+
+it("locks the environment selector when the server owns its value", () => {
+  const props = {
+    t: sentinel,
+    action: "enter" as const,
+    field: "token",
+    provider: "fixture",
+    environments: {
+      values: ["default", "sandbox"],
+      default: "default",
+      envVariable: "FIXTURE_ENVIRONMENT",
+    },
+    environment: "sandbox",
+    environmentSource: "env" as const,
+    values: { value: "", currentPassword: "" },
+    fieldErrors: {},
+    formErrors: [],
+    busy: false,
+    onChange: noop,
+    onSubmit: noop,
+    onClose: noop,
+  };
+  const markup = renderToStaticMarkup(<SecretDialogView {...props} />);
+  expect(markup).toMatch(/<select[^>]*disabled=""/);
 });

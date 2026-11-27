@@ -249,7 +249,7 @@ describe("the layout and the texts", () => {
     expect(Object.keys(BUILT_IN_EMAIL_CATALOGS).sort()).toEqual(["en", "uk"]);
     for (const key of uk) {
       expect(key).toMatch(
-        /^(layout|admin\.test|customer\.password_reset|customer\.password_changed|customer\.verify_email|order\.placed|order\.paid|order\.cancelled|order\.expired|shipment\.created)\.[a-z0-9_.]+$/,
+        /^(layout|integration.security_alert|admin\.test|customer\.password_reset|customer\.password_changed|customer\.verify_email|order\.placed|order\.paid|order\.cancelled|order\.expired|shipment\.created)\.[a-z0-9_.]+$/,
       );
     }
     for (const catalog of Object.values(BUILT_IN_EMAIL_CATALOGS)) {
