@@ -11,6 +11,35 @@ log() { :; }
 fail() { echo "FAIL: $*" >&2; exit 1; }
 export WAIT_SECONDS=1 MIGRATE_WAIT_SECONDS=600
 
+(
+  # shellcheck disable=SC2329 # The evaluated backup helper calls this logger indirectly.
+  log() { echo "$*"; }
+  fixture=$(mktemp -d)
+  BACKUP_COMMAND="$fixture/backup"
+  backup_enabled=''
+  trap 'rm -f "$BACKUP_COMMAND"; rmdir "$fixture"' EXIT
+  unset FLUXKIT_DEPLOY_ALLOW_NO_BACKUP
+
+  if message=$(check_backup_command 2>&1); then fail 'missing backup command was allowed'; fi
+  [[ "$message" == *"$BACKUP_COMMAND"*FLUXKIT_DEPLOY_ALLOW_NO_BACKUP=1* ]] || fail "unexpected backup refusal: $message"
+
+  export FLUXKIT_DEPLOY_ALLOW_NO_BACKUP=1
+  message=$(check_backup_command 2>&1 && [[ "$backup_enabled" == false ]]) || fail 'backup opt-out did not allow deployment'
+  [[ "$message" == *WARNING*"$BACKUP_COMMAND"* ]] || fail "missing backup opt-out warning: $message"
+
+  export FLUXKIT_DEPLOY_ALLOW_NO_BACKUP=true
+  if (check_backup_command) 2>/dev/null; then fail 'backup opt-out accepted a value other than 1'; fi
+
+  unset FLUXKIT_DEPLOY_ALLOW_NO_BACKUP
+  if (BACKUP_COMMAND=backup check_backup_command) 2>/dev/null; then fail 'relative backup command was allowed'; fi
+  printf '#!/bin/sh\nexit 0\n' > "$BACKUP_COMMAND"
+  if (check_backup_command) 2>/dev/null; then fail 'non-executable backup command was allowed'; fi
+  chmod +x "$BACKUP_COMMAND"
+  check_backup_command
+  [[ "$backup_enabled" == true ]] || fail 'executable backup command will not run'
+)
+echo 'ok   deploy requires an executable backup command unless the opt-out is exactly 1'
+
 # shellcheck disable=SC2329 # The evaluated real Compose helper calls these Docker/timeout boundaries indirectly.
 (
   fixture=$(mktemp -d)

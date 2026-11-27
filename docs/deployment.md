@@ -244,9 +244,10 @@ and any commit on `main` by hand (Actions -> Deploy -> Run workflow). It is skip
 
 1. **Images** (GitHub runner, `linux/amd64`): the `api`, `storefront` and `edge` targets, pushed as
    `<DOCKERHUB_USERNAME>/fluxkit-{api,storefront,edge}:<first 7 characters of the commit>`. The host builds nothing.
-2. **Host**: `git archive <commit> infra` goes over SSH to `infra/deploy/fluxkit-deploy`, which locks, unpacks the files into
-   `/opt/fluxkit/releases/<tag>`, pulls every image (a missing one changes nothing), runs the backup command, writes the tag into
-   `FLUXKIT_IMAGE_TAG`, points `/opt/fluxkit/current` at the release, starts infrastructure and waits up to 600 s for `migrate` to exit 0. It then
+2. **Host**: `git archive <commit> infra` goes over SSH to `infra/deploy/fluxkit-deploy`, which locks and requires an executable backup
+   command before unpacking files or pulling images. It unpacks the files into `/opt/fluxkit/releases/<tag>`, pulls every image,
+   runs the backup command, writes the tag into `FLUXKIT_IMAGE_TAG`, points `/opt/fluxkit/current` at the release, starts
+   infrastructure and waits up to 600 s for `migrate` to exit 0. It then
    rolls API and storefront in order: remove non-running service containers, compare release digests/counts, stage N replacements next to the old replicas one at a time,
    requiring the expected release-digest label and waiting for health after each addition (up to 5 minutes), then drain/stop/remove old replicas individually. The API and storefront images stay in Docker DNS for 5 s after the process stops accepting (`FLUXKIT_STOP_LINGER_SECONDS`, `infra/docker/stop-linger.sh`; the migrator does not), so nginx can refuse that address, retry a live replica and mark it down before the address leaves DNS and nginx rebuilds the peer list. Docker DNS
    publishes unready containers too: staging avoids two unready addresses defeating the edge's two attempts. DNS refresh waits before retiring and between
@@ -271,11 +272,12 @@ Set up once:
 | Repository variable | `DEPLOY_PUBLIC_URL` | `https://<domain>`, checked after the deployment |
 | Repository variable | `STOREFRONT_IMAGE_HOSTS`, `STOREFRONT_REQUIRE_LEGAL_TEXT` | Storefront build arguments (Configuration, TLS) |
 | Host | `/usr/local/sbin/fluxkit-deploy` | `install -m 0755 infra/deploy/fluxkit-deploy /usr/local/sbin/` (update it by hand when the file changes) |
+| Host | `/usr/local/sbin/fluxkit-backup` | Install an executable backup command (see "Backups"). Set `FLUXKIT_DEPLOY_BACKUP` in the deploy script's environment to use another path |
 | Host | `~/.ssh/authorized_keys` of `DEPLOY_USER` | `command="/usr/local/sbin/fluxkit-deploy",restrict <public key> fluxkit-deploy`: the key can run nothing else |
 | Host | `FLUXKIT_IMAGE_PREFIX` in the env file | `<DOCKERHUB_USERNAME>/fluxkit`; `FLUXKIT_IMAGE_TAG` present (the running tag) |
 
 The script's paths are the test server's layout and can be changed with variables at its top (`FLUXKIT_ROOT`, the env files, the
-backup and image cleanup commands; it runs them when they exist). The deploy user needs Docker (root, or the `docker` group,
+backup and image cleanup commands). The deploy user needs Docker (root, or the `docker` group,
 which is root-equivalent), and Linux tools `flock`, GNU `sed`, `sha256sum` and coreutils `timeout`.
 
 Notes:
@@ -286,6 +288,7 @@ Notes:
 - **Reinstall the host script once after this change:** `install -m 0755 infra/deploy/fluxkit-deploy /usr/local/sbin/fluxkit-deploy`. Its installed copy is outside the release archive and is not updated automatically; the old copy still deploys with downtime. Then set the replica counts after checking host memory.
 - HTTP drains before Nest lifecycle hooks close the scheduler, database and Redis, for SIGTERM and `createApp` callers using `app.close()`; while draining every answer carries `Connection: close`, so the edge's keep-alive connections end and it moves to another replica. API/storefront get 30 s stop grace; requests exceeding that can be killed. Server-side API GET/HEAD reads retry one connection failure before an answer (refused/reset/unreachable/socket closed), sharing the original abort/timeout budget. The retry is best-effort: a second direct DNS lookup can still select the same unavailable API address. Writes, HTTP statuses, timeouts and aborts are never retried by the storefront wrapper.
 - The edge is still **one container** and its tag changes each release. Recreating it leaves a brief gap (connections refused or TLS handshakes cut off for a few seconds; no HTTP request reaches the shop in that gap); this is not uninterrupted edge availability. A second edge/host load balancer is a later step. Infrastructure recreation can also interrupt service; rolling application replacement does not make database or Redis upgrades highly available.
+- On a throwaway host only, set `FLUXKIT_DEPLOY_ALLOW_NO_BACKUP=1` in the deploy script's environment to proceed with a warning when the backup command is missing or non-executable.
 - `FLUXKIT_DEPLOY_SKIP_PULL=1` is **test-only**, for the smoke test against local image tags. Never set it on a deploy host.
 
 ## Backups

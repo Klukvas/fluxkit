@@ -510,7 +510,7 @@ for _ in $(seq 1 30); do
 done
 [[ "$EDGE_STATUS" == "200" ]] || fail "the edge did not route to the restarted api ($EDGE_STATUS)"
 
-# --- real host deployment: new image tags, same locally built images; no registry, backup or prune ---
+# --- real host deployment: new image tags, same locally built images; stub backup, no registry or prune ---
 command -v flock >/dev/null || fail "the host deploy check needs flock (the deploy host is Linux)"
 HOST_ROOT="$(pwd)/$WORK/host"
 mkdir -p "$HOST_ROOT/releases/$TAG"
@@ -518,11 +518,16 @@ mkdir -p "$HOST_ROOT/releases/$TAG"
 tar --exclude=infra/.smoke -cf "$WORK/infra.tar" infra
 tar -xf "$WORK/infra.tar" -C "$HOST_ROOT/releases/$TAG"
 ln -s "$HOST_ROOT/releases/$TAG" "$HOST_ROOT/current"
+cat >"$HOST_ROOT/backup" <<'SH'
+#!/bin/sh
+touch "${0%/*}/backup-ran"
+SH
+chmod +x "$HOST_ROOT/backup"
 
 host_deploy() {
   FLUXKIT_ROOT="$HOST_ROOT" FLUXKIT_ENV_FILE="$(pwd)/$WORK/production.env" \
     FLUXKIT_MEILI_ENV_FILE="$(pwd)/$WORK/meilisearch.env" \
-    FLUXKIT_DEPLOY_BACKUP="$HOST_ROOT/no-backup" FLUXKIT_DEPLOY_PRUNE="$HOST_ROOT/no-prune" \
+    FLUXKIT_DEPLOY_BACKUP="$HOST_ROOT/backup" FLUXKIT_DEPLOY_PRUNE="$HOST_ROOT/no-prune" \
     FLUXKIT_DEPLOY_LOCK="$HOST_ROOT/deploy.lock" FLUXKIT_DEPLOY_SKIP_PULL=1 \
     bash infra/deploy/fluxkit-deploy deploy "$1" <"$WORK/infra.tar"
 }
@@ -546,6 +551,7 @@ if ! host_deploy "$NEXT_TAG"; then fail "rolling deploy of the second tag failed
 touch "$WORK/stop-requests"
 wait "$REQUEST_PID"
 REQUEST_PID=
+[[ -f "$HOST_ROOT/backup-ran" ]] || fail "the successful release did not run the backup command"
 assert_roll_traffic() {
   # curl 7 (refused) and 35 (TLS handshake cut off while nginx quits) are the single edge's restart: no HTTP request was
   # sent. Cold missing products must answer 404, never 5xx.
