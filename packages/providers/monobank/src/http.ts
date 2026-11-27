@@ -1,4 +1,4 @@
-import type { ProviderAbortSignal } from "@fluxkit/core";
+import type { IntegrationTransportGate, ProviderAbortSignal } from "@fluxkit/core";
 import {
   MONOBANK_API_ORIGIN,
   MONOBANK_PATHS,
@@ -54,6 +54,7 @@ export type MonobankExchange =
     };
 
 export interface MonobankHttpOptions {
+  readonly transport?: IntegrationTransportGate;
   readonly token: string;
   /** TEST ONLY: a local stub origin on 127.0.0.1. Production code never passes it (the module factory does not). */
   readonly origin?: string;
@@ -138,6 +139,7 @@ export interface MonobankRequest {
 export class MonobankHttp {
   private readonly token: string;
   private readonly origin: string;
+  private readonly transport: IntegrationTransportGate | undefined;
 
   constructor(options: MonobankHttpOptions) {
     const origin = options.origin ?? MONOBANK_API_ORIGIN;
@@ -148,6 +150,7 @@ export class MonobankHttp {
     }
     this.token = options.token;
     this.origin = origin;
+    this.transport = options.transport;
   }
 
   /**
@@ -179,14 +182,26 @@ export class MonobankHttp {
     try {
       let response: Response;
       try {
-        response = await fetch(url, {
-          method: request.method,
-          headers,
-          ...(request.body === undefined ? {} : { body: request.body }),
-          redirect: "error",
-          signal,
+        const begin = () => ({
+          completion: fetch(url, {
+            method: request.method,
+            headers,
+            ...(request.body === undefined ? {} : { body: request.body }),
+            redirect: "error",
+            signal,
+          }),
         });
-      } catch {
+        response = await (this.transport === undefined
+          ? begin().completion
+          : this.transport.start(callerSignal, begin));
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          error.name === "CredentialAdmissionDenied" &&
+          "code" in error &&
+          (error.code === "credential_revoked" || error.code === "credential_unavailable")
+        )
+          throw error;
         // The error's text is not kept (it may name the URL); only its kind.
         return { kind: "failed", code: signal.aborted ? "timeout" : "network" };
       }

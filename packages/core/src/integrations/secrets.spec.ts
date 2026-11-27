@@ -3,6 +3,8 @@ import {
   checkIntegrationSecretValue,
   INTEGRATION_SECRET_MAX_BYTES,
   integrationSecretAad,
+  integrationMerchantBaselineAad,
+  type IntegrationMerchantBaselineIdentity,
   parseIntegrationSecretDeclarations,
   parseIntegrationEnvironments,
   type IntegrationSecretIdentity,
@@ -172,5 +174,56 @@ describe("parseIntegrationEnvironments", () => {
     },
   ])("refuses an invalid environment declaration %j", (raw) => {
     expect(parseIntegrationEnvironments(raw, "demo").ok).toBe(false);
+  });
+});
+
+describe("integrationMerchantBaselineAad", () => {
+  const identity: IntegrationMerchantBaselineIdentity = {
+    baselineId: "11111111-1111-4111-8111-111111111111",
+    integrationId: "22222222-2222-4222-8222-222222222222",
+    kind: "payment",
+    providerCode: "monobank",
+    environment: "default",
+    keyId: "k1",
+  };
+  it("uses its own length-prefixed v1 domain and complete identity", () => {
+    const aad = integrationMerchantBaselineAad(identity);
+    const parts: string[] = [];
+    for (let offset = 0; offset < aad.length;) {
+      const length = new DataView(aad.buffer).getUint32(offset, false);
+      parts.push(String.fromCharCode(...aad.subarray(offset + 4, offset + 4 + length)));
+      offset += 4 + length;
+    }
+    expect(parts).toEqual([
+      "fluxkit.integration-merchant-baseline/v1",
+      identity.baselineId,
+      identity.integrationId,
+      "payment",
+      "monobank",
+      "default",
+      "k1",
+    ]);
+  });
+  it.each([
+    { baselineId: "other" },
+    { integrationId: "other" },
+    { kind: "shipping" as const },
+    { providerCode: "other" },
+    { environment: "sandbox" },
+    { keyId: "k2" },
+  ])("binds every identity component %j", (change) => {
+    expect(hex(integrationMerchantBaselineAad({ ...identity, ...change }))).not.toBe(
+      hex(integrationMerchantBaselineAad(identity)),
+    );
+  });
+  it("separates adjacent components and rejects non-ASCII identity", () => {
+    expect(
+      hex(integrationMerchantBaselineAad({ ...identity, providerCode: "ab", environment: "c" })),
+    ).not.toBe(
+      hex(integrationMerchantBaselineAad({ ...identity, providerCode: "a", environment: "bc" })),
+    );
+    expect(() => integrationMerchantBaselineAad({ ...identity, environment: "місто" })).toThrow(
+      /ASCII/,
+    );
   });
 });

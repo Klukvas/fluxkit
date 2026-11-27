@@ -45,8 +45,12 @@ describe("catalog schema (real Postgres)", () => {
     await pool.query(
       'alter table if exists "integration" drop constraint if exists "integration_active_outbound_version_id_fkey"',
     );
+    await pool.query(
+      'alter table if exists "payment" drop constraint if exists "payment_integration_credential_version_id_fkey"',
+    );
     // Reverse dependency order, no CASCADE (same reasoning as migrations.spec.ts).
     for (const name of [
+      "integration_merchant_baseline",
       "integration_secret",
       "integration_credential_version",
       "integration",
@@ -1490,7 +1494,7 @@ describe("catalog schema (real Postgres)", () => {
           'customer', 'customer_session', 'cart', 'cart_item', 'sales_order', 'order_item',
           'order_adjustment', 'order_status_change', 'order_item_reservation', 'domain_event',
           'media_upload', 'shipping_method', 'shipping_provider_setting', 'order_shipping', 'shipment',
-          'shipment_status_change', 'customer_auth_token', 'email_message', 'email_suppression', 'email_webhook_receipt', 'email_route_setting', 'email_provider_state', 'integration_revision', 'integration', 'integration_credential_version', 'integration_secret', 'payment', 'payment_event',
+          'shipment_status_change', 'customer_auth_token', 'email_message', 'email_suppression', 'email_webhook_receipt', 'email_route_setting', 'email_provider_state', 'integration_revision', 'integration', 'integration_credential_version', 'integration_secret', 'integration_merchant_baseline', 'payment', 'payment_event',
           'payment_refund', 'privacy_request', 'admin_audit_event',
           'search_sync_queue', 'search_index_state', 'search_synonym_group', 'banner', 'banner_image'
         )
@@ -1515,7 +1519,7 @@ describe("catalog schema (real Postgres)", () => {
           'customer', 'customer_session', 'cart', 'cart_item', 'sales_order', 'order_item',
           'order_adjustment', 'order_status_change', 'order_item_reservation', 'domain_event',
           'media_upload', 'shipping_method', 'shipping_provider_setting', 'order_shipping', 'shipment',
-          'shipment_status_change', 'customer_auth_token', 'email_message', 'email_suppression', 'email_webhook_receipt', 'email_route_setting', 'email_provider_state', 'integration_revision', 'integration', 'integration_credential_version', 'integration_secret', 'payment', 'payment_event',
+          'shipment_status_change', 'customer_auth_token', 'email_message', 'email_suppression', 'email_webhook_receipt', 'email_route_setting', 'email_provider_state', 'integration_revision', 'integration', 'integration_credential_version', 'integration_secret', 'integration_merchant_baseline', 'payment', 'payment_event',
           'payment_refund', 'privacy_request', 'admin_audit_event',
           'search_sync_queue', 'search_index_state', 'search_synonym_group', 'banner', 'banner_image'
         )

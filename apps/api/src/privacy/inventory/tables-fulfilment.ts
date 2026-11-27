@@ -63,7 +63,14 @@ export const fulfilmentTables: Inventory = {
 
   payment: {
     ...none("D14", "check_attempts", "next_check_at", "needs_attention", "attention_code"),
-    ...many(paymentInternal, "id", "order_id", "provider_payment_id", "idempotency_key"),
+    ...many(
+      paymentInternal,
+      "id",
+      "order_id",
+      "provider_payment_id",
+      "idempotency_key",
+      "integration_credential_version_id",
+    ),
     redirect_url: classified(
       "pseudonymous",
       "D14",

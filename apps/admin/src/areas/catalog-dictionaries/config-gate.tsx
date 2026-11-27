@@ -1,6 +1,7 @@
 import type { AdminConfig } from "@fluxkit/api-client";
 import type { Translator } from "@fluxkit/ui";
-import { createContext, useContext, type ReactNode } from "react";
+import { createContext, useContext, useEffect, type ReactNode } from "react";
+import { ADMIN_CONFIG_REFRESH } from "../../layout/config-refresh";
 import { useI18n } from "../../i18n/i18n-context";
 import { adminClient } from "../../lib/api";
 import { useResource } from "../../lib/use-resource";
@@ -57,6 +58,10 @@ export function ConfigGateView({
 export function ConfigGate({ children }: { children: ReactNode }) {
   const { t } = useI18n();
   const config = useResource((signal) => adminClient.getConfig({ signal }), []);
+  useEffect(() => {
+    window.addEventListener(ADMIN_CONFIG_REFRESH, config.reload);
+    return () => window.removeEventListener(ADMIN_CONFIG_REFRESH, config.reload);
+  }, [config.reload]);
   return (
     <ConfigGateView
       t={t}

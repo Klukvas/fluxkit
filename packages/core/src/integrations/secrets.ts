@@ -214,3 +214,27 @@ export function parseIntegrationEnvironments(
     }),
   };
 }
+
+export interface IntegrationMerchantBaselineIdentity {
+  readonly baselineId: string;
+  readonly integrationId: string;
+  readonly kind: IntegrationKind;
+  readonly providerCode: string;
+  readonly environment: string;
+  readonly keyId: string;
+}
+
+/** A permanent merchant identity has a separate authenticated domain from replaceable credential envelopes. */
+export function integrationMerchantBaselineAad(
+  identity: IntegrationMerchantBaselineIdentity,
+): Uint8Array {
+  return lengthPrefixed([
+    "fluxkit.integration-merchant-baseline/v1",
+    identity.baselineId,
+    identity.integrationId,
+    identity.kind,
+    identity.providerCode,
+    identity.environment,
+    identity.keyId,
+  ]);
+}

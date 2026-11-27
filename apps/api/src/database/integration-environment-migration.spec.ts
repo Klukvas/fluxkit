@@ -163,6 +163,9 @@ describe("credential environment and immutable lifecycle migration 0022 (real Po
     }
     await pool.query("delete from integration_credential_version where id=$1", [id]);
     for (let pass = 0; pass < 2; pass += 1) {
+      await pool.query(
+        await readFile(`${folder}/0023_managed_payment_credentials.down.sql`, "utf8"),
+      );
       await pool.query(down);
       expect(
         (await pool.query("select 1 from drizzle.__drizzle_migrations where created_at=$1", [when]))

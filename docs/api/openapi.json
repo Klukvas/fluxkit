@@ -10887,6 +10887,11 @@
                         "payment": {
                           "type": "object",
                           "properties": {
+                            "unavailableReason": {
+                              "description": "New payment admissions are unavailable; persisted payment details remain readable.",
+                              "type": "string",
+                              "enum": ["payment_not_available"]
+                            },
                             "canPay": {
                               "type": "boolean",
                               "description": "Whether `POST .../payments` would start a new attempt now (the order awaits payment, an online provider takes its currency, no payment is in progress, enough time is left)."
@@ -11509,6 +11514,11 @@
                         "payment": {
                           "type": "object",
                           "properties": {
+                            "unavailableReason": {
+                              "description": "New payment admissions are unavailable; persisted payment details remain readable.",
+                              "type": "string",
+                              "enum": ["payment_not_available"]
+                            },
                             "canPay": {
                               "type": "boolean",
                               "description": "Whether `POST .../payments` would start a new attempt now (the order awaits payment, an online provider takes its currency, no payment is in progress, enough time is left)."
@@ -12240,6 +12250,11 @@
                     "payment": {
                       "type": "object",
                       "properties": {
+                        "unavailableReason": {
+                          "description": "New payment admissions are unavailable; persisted payment details remain readable.",
+                          "type": "string",
+                          "enum": ["payment_not_available"]
+                        },
                         "canPay": {
                           "type": "boolean",
                           "description": "Whether `POST .../payments` would start a new attempt now (the order awaits payment, an online provider takes its currency, no payment is in progress, enough time is left)."
@@ -12953,6 +12968,11 @@
                     "payment": {
                       "type": "object",
                       "properties": {
+                        "unavailableReason": {
+                          "description": "New payment admissions are unavailable; persisted payment details remain readable.",
+                          "type": "string",
+                          "enum": ["payment_not_available"]
+                        },
                         "canPay": {
                           "type": "boolean",
                           "description": "Whether `POST .../payments` would start a new attempt now (the order awaits payment, an online provider takes its currency, no payment is in progress, enough time is left)."
@@ -13814,6 +13834,11 @@
                     "payment": {
                       "type": "object",
                       "properties": {
+                        "unavailableReason": {
+                          "description": "New payment admissions are unavailable; persisted payment details remain readable.",
+                          "type": "string",
+                          "enum": ["payment_not_available"]
+                        },
                         "canPay": {
                           "type": "boolean",
                           "description": "Whether `POST .../payments` would start a new attempt now (the order awaits payment, an online provider takes its currency, no payment is in progress, enough time is left)."
@@ -14504,6 +14529,11 @@
                     "payment": {
                       "type": "object",
                       "properties": {
+                        "unavailableReason": {
+                          "description": "New payment admissions are unavailable; persisted payment details remain readable.",
+                          "type": "string",
+                          "enum": ["payment_not_available"]
+                        },
                         "canPay": {
                           "type": "boolean",
                           "description": "Whether `POST .../payments` would start a new attempt now (the order awaits payment, an online provider takes its currency, no payment is in progress, enough time is left)."
@@ -24646,6 +24676,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "unavailableReason": {
+                      "description": "New payment admissions are unavailable; the stored status remains readable.",
+                      "type": "string",
+                      "enum": ["payment_not_available"]
+                    },
                     "paymentId": {
                       "type": "string",
                       "format": "uuid"
@@ -25133,6 +25168,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "unavailableReason": {
+                      "description": "New payment admissions are unavailable; the stored status remains readable.",
+                      "type": "string",
+                      "enum": ["payment_not_available"]
+                    },
                     "paymentId": {
                       "type": "string",
                       "format": "uuid"
@@ -30443,7 +30483,7 @@
                           },
                           "enabled": {
                             "type": "boolean",
-                            "description": "True when new mail uses the stored outbound credential. Payment and shipping stay false until their safety checks exist."
+                            "description": "True when new email/payment work uses the stored outbound credential. Shipping activation remains unavailable."
                           },
                           "secrets": {
                             "type": "array",
@@ -30497,7 +30537,7 @@
                                 },
                                 "versionState": {
                                   "nullable": true,
-                                  "description": "`candidate`: saved, not used. `active`: new mail uses it. `draining`: turned off, mail already bound to it can finish. `revoked`: unusable. Null when nothing is stored.",
+                                  "description": "`candidate`: saved, not used. `active`: new work uses it. `draining`: bound work can finish. `revoked`: unusable. Null when nothing is stored.",
                                   "type": "string",
                                   "enum": ["candidate", "active", "draining", "revoked"]
                                 }
@@ -30861,7 +30901,7 @@
                         },
                         "enabled": {
                           "type": "boolean",
-                          "description": "True when new mail uses the stored outbound credential. Payment and shipping stay false until their safety checks exist."
+                          "description": "True when new email/payment work uses the stored outbound credential. Shipping activation remains unavailable."
                         },
                         "secrets": {
                           "type": "array",
@@ -30915,7 +30955,7 @@
                               },
                               "versionState": {
                                 "nullable": true,
-                                "description": "`candidate`: saved, not used. `active`: new mail uses it. `draining`: turned off, mail already bound to it can finish. `revoked`: unusable. Null when nothing is stored.",
+                                "description": "`candidate`: saved, not used. `active`: new work uses it. `draining`: bound work can finish. `revoked`: unusable. Null when nothing is stored.",
                                 "type": "string",
                                 "enum": ["candidate", "active", "draining", "revoked"]
                               }
@@ -31208,7 +31248,7 @@
                         },
                         "enabled": {
                           "type": "boolean",
-                          "description": "True when new mail uses the stored outbound credential. Payment and shipping stay false until their safety checks exist."
+                          "description": "True when new email/payment work uses the stored outbound credential. Shipping activation remains unavailable."
                         },
                         "secrets": {
                           "type": "array",
@@ -31262,7 +31302,7 @@
                               },
                               "versionState": {
                                 "nullable": true,
-                                "description": "`candidate`: saved, not used. `active`: new mail uses it. `draining`: turned off, mail already bound to it can finish. `revoked`: unusable. Null when nothing is stored.",
+                                "description": "`candidate`: saved, not used. `active`: new work uses it. `draining`: bound work can finish. `revoked`: unusable. Null when nothing is stored.",
                                 "type": "string",
                                 "enum": ["candidate", "active", "draining", "revoked"]
                               }
@@ -31568,7 +31608,7 @@
                         },
                         "enabled": {
                           "type": "boolean",
-                          "description": "True when new mail uses the stored outbound credential. Payment and shipping stay false until their safety checks exist."
+                          "description": "True when new email/payment work uses the stored outbound credential. Shipping activation remains unavailable."
                         },
                         "secrets": {
                           "type": "array",
@@ -31622,7 +31662,7 @@
                               },
                               "versionState": {
                                 "nullable": true,
-                                "description": "`candidate`: saved, not used. `active`: new mail uses it. `draining`: turned off, mail already bound to it can finish. `revoked`: unusable. Null when nothing is stored.",
+                                "description": "`candidate`: saved, not used. `active`: new work uses it. `draining`: bound work can finish. `revoked`: unusable. Null when nothing is stored.",
                                 "type": "string",
                                 "enum": ["candidate", "active", "draining", "revoked"]
                               }
@@ -32011,7 +32051,7 @@
     },
     "/admin/integrations/{id}/activate": {
       "post": {
-        "description": "Makes the stored outbound credential the one new mail uses, when `EMAIL_PROVIDER` is absent and `EMAIL_FROM` is set. Payment and shipping answer 409 `integration_runtime_not_ready`. Asks for the owner's current password. Other 409 rules: `integration_env_override`, `integration_storage_disabled`, `integration_sender_required`, `integration_route_unset`, `integration_not_activatable`, `integration_revision_stale`.",
+        "description": "Selects a complete stored email/payment credential for new work when enablement is delegated. Email requires EMAIL_FROM; payment requires supported shop currency, a public storefront URL, merchant enrollment when declared, and no open legacy work. Shipping answers 409 integration_runtime_not_ready. Asks for the owner's current password. Other 409 rules: `integration_env_override`, `integration_storage_disabled`, `integration_sender_required`, `integration_route_unset`, `integration_not_activatable`, `integration_revision_stale`.",
         "operationId": "IntegrationsController_activate",
         "parameters": [
           {
@@ -32098,7 +32138,7 @@
                         },
                         "enabled": {
                           "type": "boolean",
-                          "description": "True when new mail uses the stored outbound credential. Payment and shipping stay false until their safety checks exist."
+                          "description": "True when new email/payment work uses the stored outbound credential. Shipping activation remains unavailable."
                         },
                         "secrets": {
                           "type": "array",
@@ -32152,7 +32192,7 @@
                               },
                               "versionState": {
                                 "nullable": true,
-                                "description": "`candidate`: saved, not used. `active`: new mail uses it. `draining`: turned off, mail already bound to it can finish. `revoked`: unusable. Null when nothing is stored.",
+                                "description": "`candidate`: saved, not used. `active`: new work uses it. `draining`: bound work can finish. `revoked`: unusable. Null when nothing is stored.",
                                 "type": "string",
                                 "enum": ["candidate", "active", "draining", "revoked"]
                               }
@@ -32359,7 +32399,7 @@
             }
           }
         },
-        "summary": "Activate a stored email credential",
+        "summary": "Activate a stored email or payment credential",
         "tags": ["admin-integrations"],
         "x-fluxkit-permission": "integrations.manage"
       }
@@ -32453,7 +32493,7 @@
                         },
                         "enabled": {
                           "type": "boolean",
-                          "description": "True when new mail uses the stored outbound credential. Payment and shipping stay false until their safety checks exist."
+                          "description": "True when new email/payment work uses the stored outbound credential. Shipping activation remains unavailable."
                         },
                         "secrets": {
                           "type": "array",
@@ -32507,7 +32547,7 @@
                               },
                               "versionState": {
                                 "nullable": true,
-                                "description": "`candidate`: saved, not used. `active`: new mail uses it. `draining`: turned off, mail already bound to it can finish. `revoked`: unusable. Null when nothing is stored.",
+                                "description": "`candidate`: saved, not used. `active`: new work uses it. `draining`: bound work can finish. `revoked`: unusable. Null when nothing is stored.",
                                 "type": "string",
                                 "enum": ["candidate", "active", "draining", "revoked"]
                               }
@@ -32813,7 +32853,7 @@
                         },
                         "enabled": {
                           "type": "boolean",
-                          "description": "True when new mail uses the stored outbound credential. Payment and shipping stay false until their safety checks exist."
+                          "description": "True when new email/payment work uses the stored outbound credential. Shipping activation remains unavailable."
                         },
                         "secrets": {
                           "type": "array",
@@ -32867,7 +32907,7 @@
                               },
                               "versionState": {
                                 "nullable": true,
-                                "description": "`candidate`: saved, not used. `active`: new mail uses it. `draining`: turned off, mail already bound to it can finish. `revoked`: unusable. Null when nothing is stored.",
+                                "description": "`candidate`: saved, not used. `active`: new work uses it. `draining`: bound work can finish. `revoked`: unusable. Null when nothing is stored.",
                                 "type": "string",
                                 "enum": ["candidate", "active", "draining", "revoked"]
                               }

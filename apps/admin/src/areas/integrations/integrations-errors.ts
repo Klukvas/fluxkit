@@ -33,6 +33,14 @@ export const INTEGRATION_REFUSAL_RULES = [
   "integration_not_enabled",
   "integration_version_not_revocable",
   "step_up_unavailable",
+  "integration_credential_check_unavailable",
+  "invalid_credentials",
+  "integration_merchant_mismatch",
+  "integration_merchant_not_enrolled",
+  "integration_legacy_work_open",
+  "integration_currency_unsupported",
+  "integration_public_url_required",
+  "integration_payment_window_too_short",
 ] as const;
 
 /** The codes of a `value` error with a message of their own. */

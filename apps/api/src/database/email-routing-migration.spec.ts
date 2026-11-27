@@ -77,6 +77,9 @@ describe("email routing migration 0018 (real disposable Postgres)", () => {
     for (let pass = 0; pass < 2; pass += 1) {
       // The newer migration goes first: the migrator re-applies only what follows the newest journal row.
       await pool.query(
+        await readFile(`${folder}/0023_managed_payment_credentials.down.sql`, "utf8"),
+      );
+      await pool.query(
         await readFile(`${folder}/0022_integration_credential_environment.down.sql`, "utf8"),
       );
       await pool.query(routeDown);

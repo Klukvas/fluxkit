@@ -86,9 +86,9 @@ export interface SecretView {
 }
 
 export interface ProviderRuntime {
-  /** Email, off, with every outbound field saved as a candidate and storage ready. */
+  /** A complete candidate, or a disabled payment provider with its retained generation. */
   turnOn: boolean;
-  /** Email that new mail is using. */
+  /** An enabled email or payment provider. */
   turnOff: boolean;
 }
 
@@ -127,19 +127,30 @@ export function secretView(
   };
 }
 
-/** Whether this provider can be turned on or off from the screen. Payment and delivery cannot. */
+/** Payment activation and rotation use the same owner-confirmed lifecycle as email. Shipping is not ready yet. */
 export function providerRuntime(
   integration: AdminIntegration,
   storage: AdminIntegrationStorage,
 ): ProviderRuntime {
   const outbound = integration.secrets.filter((secret) => secret.purpose === "outbound");
+  const runtimeReady = integration.kind === "email" || integration.kind === "payment";
+  const sameVersion = new Set(outbound.map((secret) => secret.versionId)).size === 1;
   return {
     turnOn:
-      integration.kind === "email" &&
-      !integration.enabled &&
+      runtimeReady &&
+      (integration.kind === "payment" || !integration.enabled) &&
       storage === "ready" &&
       outbound.length > 0 &&
-      outbound.every((secret) => secret.versionState === "candidate" && secret.state === "set"),
-    turnOff: integration.kind === "email" && integration.enabled,
+      sameVersion &&
+      outbound.every(
+        (secret) =>
+          secret.state === "set" &&
+          secret.keyAvailable !== false &&
+          (secret.versionState === "candidate" ||
+            (integration.kind === "payment" &&
+              !integration.enabled &&
+              secret.versionState === "draining")),
+      ),
+    turnOff: runtimeReady && integration.enabled,
   };
 }

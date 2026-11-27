@@ -130,6 +130,7 @@ export interface StartAppOptions {
   integrationEnvironment?: Readonly<Record<string, string | undefined>>;
   /** `EMAIL_PROVIDER` is absent: an activated stored credential may send. Defaults to the env-selected provider. */
   emailRouteDelegated?: boolean;
+  paymentDelegated?: boolean;
 }
 
 export async function startApp(options: StartAppOptions = {}): Promise<RunningApp> {
@@ -154,6 +155,7 @@ export async function startApp(options: StartAppOptions = {}): Promise<RunningAp
       orderTokenSecret: options.orderTokenSecret ?? TEST_ORDER_TOKEN_SECRET,
       secretsKeyRing: options.secretsKeyRing ?? null,
       emailProviderDelegated: options.emailRouteDelegated ?? false,
+      paymentDelegated: options.paymentDelegated ?? false,
       emailFrom: options.emailFrom === null ? undefined : (options.emailFrom ?? TEST_EMAIL_FROM),
       emailReplyTo: options.emailReplyTo ?? undefined,
       storefrontPublicUrl:

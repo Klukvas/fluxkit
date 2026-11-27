@@ -21,6 +21,10 @@ describe("final transport gate (real Postgres)", () => {
     environment: {},
     emailRouteDelegated: false,
     emailFromAddress: null,
+    paymentDelegated: false,
+    shopCurrency: "UAH",
+    orderPaymentTtlMinutes: 30,
+    storefrontPublicUrl: null,
   });
   const runtime = new IntegrationRuntime(db, repository, installed, new SecretCipher(null));
   beforeAll(async () => {

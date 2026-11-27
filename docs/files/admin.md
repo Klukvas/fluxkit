@@ -260,3 +260,6 @@ Run, headers and conventions: `apps/admin/README.md`. Plan: `docs/plans/2026-10-
 - `e2e/support/env.ts` — also `SECRETS_ENCRYPTION_KEY` (id `e2e`) and `FAKE_EMAIL_WEBHOOK_SECRET`, generated per run with `node:crypto` and reused by the child processes of the same start; `FAKE_EMAIL_API_KEY` is removed.
 - `e2e/support/step-up-limits.ts` — deletes the password re-entry limit keys of the e2e database's Redis namespace (`fluxkit:<database>:strict:*`) with the API's existing `ioredis`; called by `global-setup.ts`. Must NOT touch another namespace.
 - `e2e/tests/integrations.e2e.ts` — the browser scenarios: save, wrong password, invalid format, a server-set value, remove, no value in the page or in any answer after a reload, manager and viewer refused, a stale revision, session expiry while a key is typed. Each scenario uses an owner of its own (five password re-entries per admin in 15 minutes).
+
+- `src/layout/config-refresh.ts`, `src/areas/catalog-dictionaries/config-gate.tsx` — invalidate and reload admin config hints after integration activation/disable; API admission remains authoritative.
+- `src/areas/integrations/`, `src/areas/help/content/settings.ts` — payment lifecycle actions, code-only uk/en refusals, permanent Monobank merchant enrollment and paired LiqPay setup guidance; shipping activation remains refused.

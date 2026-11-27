@@ -15,6 +15,7 @@ export const MONOBANK_PATHS = Object.freeze({
   cancel: "/api/merchant/invoice/cancel",
   remove: "/api/merchant/invoice/remove",
   pubkey: "/api/merchant/pubkey",
+  details: "/api/merchant/details",
 } as const);
 
 export type MonobankPath = (typeof MONOBANK_PATHS)[keyof typeof MONOBANK_PATHS];

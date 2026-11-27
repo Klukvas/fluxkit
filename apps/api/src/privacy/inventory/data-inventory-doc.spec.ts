@@ -73,7 +73,8 @@ const ROW_FACTS: Readonly<Record<string, { purpose: string; retention: string }>
   },
   D26: {
     purpose: "Provider credentials of the shop (C, LI)",
-    retention: "Encrypted value until the owner retires it; version rows and ids stay (ADR 0058)",
+    retention:
+      "Credential envelopes until eligible retirement; version rows and permanent encrypted merchant baselines stay (ADR 0058, ADR 0060)",
   },
 };
 

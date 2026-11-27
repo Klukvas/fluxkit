@@ -32,6 +32,7 @@ describe("no network in tests, and only api.monobank.ua in the plugin", () => {
         "config.ts",
         "http.ts",
         "index.ts",
+        "managed.ts",
         "invoice.ts",
         "monobank-provider.ts",
         "signature.ts",

@@ -20,6 +20,14 @@ LiqPay (PrivatBank) payment provider, code `liqpay`, kind `payment` (ADR 0059; p
 
 Origins are constants (`LIQPAY_API_ORIGIN`). `SHOP_CURRENCY` must be `UAH`. Nothing is sent at startup.
 
+## Managed saved credentials
+
+- `createOutboundClient(secrets, context)` constructs the existing payment port from one complete `{public_key, private_key}` bundle without reading the environment or making a request. The existing env Nest module is unchanged.
+- Every status/refund request begins synchronously under `context.transport.start`, including signing the request. Local create, invalidate, signature verification and signed form handoff also enter this gate. A cached client cannot bypass revocation; admission denial preserves the API's code-only `CredentialAdmissionDenied` boundary.
+- `locateWebhook` accepts at most 64 KiB of urlencoded input, strictly decodes the base64 UTF-8 JSON `data` field and returns validated `order_id` as both lookup identifiers. It performs no I/O or signature verification and does not return a payment fact.
+- No `checkCredentials` or `accountIdentity` hook is exported: there is no established harmless credential probe. A check never creates a checkout or refund.
+- The API owns binding, activation, environment precedence and revocation (`docs/contracts/integrations.md`). These exports do not enable a provider by themselves. Managed behavior remains stub-tested only.
+
 ## Operations
 
 | Port method            | Behaviour                                                                                                                                                                                                  |

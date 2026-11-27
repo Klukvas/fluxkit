@@ -191,3 +191,66 @@ export const integrationSecret = pgTable(
     ),
   ],
 );
+
+/** Permanent encrypted account identity; lifecycle changes never erase merchant enrollment. */
+export const integrationMerchantBaseline = pgTable(
+  "integration_merchant_baseline",
+  {
+    id: uuid("id").primaryKey(),
+    integrationId: uuid("integration_id").notNull(),
+    kind: text("kind").notNull(),
+    providerCode: text("provider_code").notNull(),
+    environment: text("environment").notNull(),
+    enrollmentSource: text("enrollment_source").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    createdBy: uuid("created_by"),
+    keyId: text("key_id").notNull(),
+    nonce: bytea("nonce").notNull(),
+    ciphertext: bytea("ciphertext").notNull(),
+    tag: bytea("tag").notNull(),
+  },
+  (t) => [
+    foreignKey({
+      name: "integration_merchant_baseline_integration_id_fkey",
+      columns: [t.integrationId],
+      foreignColumns: [integration.id],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "integration_merchant_baseline_created_by_fkey",
+      columns: [t.createdBy],
+      foreignColumns: [adminUser.id],
+    }).onDelete("set null"),
+    uniqueIndex("integration_merchant_baseline_kind_provider_environment_key").on(
+      t.kind,
+      t.providerCode,
+      t.environment,
+    ),
+    uniqueIndex("integration_merchant_baseline_integration_environment_key").on(
+      t.integrationId,
+      t.environment,
+    ),
+    check("integration_merchant_baseline_kind_check", sql`${t.kind} IN (${sql.raw(KIND_LIST)})`),
+    check(
+      "integration_merchant_baseline_provider_code_check",
+      sql`${t.providerCode} ~ ${sql.raw(`'${PROVIDER_CODE_PATTERN}'`)}`,
+    ),
+    check(
+      "integration_merchant_baseline_environment_check",
+      sql`${t.environment} ~ ${sql.raw(`'${FIELD_PATTERN}'`)}`,
+    ),
+    check(
+      "integration_merchant_baseline_enrollment_source_check",
+      sql`${t.enrollmentSource} = 'first_save'`,
+    ),
+    check(
+      "integration_merchant_baseline_key_id_check",
+      sql`${t.keyId} ~ ${sql.raw(`'${KEY_ID_PATTERN}'`)}`,
+    ),
+    check("integration_merchant_baseline_nonce_check", sql`octet_length(${t.nonce}) = 12`),
+    check("integration_merchant_baseline_tag_check", sql`octet_length(${t.tag}) = 16`),
+    check(
+      "integration_merchant_baseline_ciphertext_check",
+      sql`octet_length(${t.ciphertext}) BETWEEN 1 AND 256`,
+    ),
+  ],
+);

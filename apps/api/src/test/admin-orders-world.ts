@@ -4,6 +4,7 @@ import type { AdminRole } from "@fluxkit/core";
 import type { AdminAuthenticator } from "../auth/admin-authenticator.js";
 import { DRIZZLE, type Database } from "../database/database.module.js";
 import type { ProblemBody } from "../common/problem.filter.js";
+import type { StoreOrder } from "../orders/orders.schemas.js";
 import type { AdminOrderDetail, AdminOrderSummary } from "../orders/admin/admin-orders.schemas.js";
 import { startApp, type RunningApp, type StartAppOptions } from "./app.js";
 import { testPrincipal } from "./allow-all-admin-authenticator.js";
@@ -43,6 +44,7 @@ export interface PlacedForAdmin {
   total: number;
   email: string;
   accessToken: string;
+  payment: StoreOrder["payment"] | undefined;
   lines: { variantId: string; productId: string; quantity: number }[];
 }
 
@@ -144,6 +146,7 @@ export class AdminOrdersWorld {
       total,
       email: typeof body["email"] === "string" ? body["email"] : email,
       accessToken: result.body.accessToken ?? "",
+      payment: result.body.order?.payment,
       lines: made,
     };
   }

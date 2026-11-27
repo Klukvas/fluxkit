@@ -20,7 +20,7 @@ import { moneyOf } from "./payment-facts.service.js";
 import { paymentDescription, snapshotText } from "./payment-messages.js";
 import { callPaymentProvider, describePaymentCall } from "./payment-provider-call.js";
 import { PAYMENTS_CONFIG, type PaymentsConfig } from "./payments-config.js";
-import { PaymentProviderRegistry } from "./registry/index.js";
+import { PaymentProviders } from "./registry/payment-providers.js";
 
 /** Allowed `actionUrl` hosts for form handoff (ADR 0059). */
 const HANDOFF_ACTION_HOSTS = Object.freeze(["www.liqpay.ua"]);
@@ -40,7 +40,7 @@ export class PaymentHandoffService {
     @Inject(DRIZZLE) private readonly database: Database,
     @Inject(OrdersRepository) private readonly orders: OrdersRepository,
     @Inject(PaymentsRepository) private readonly payments: PaymentsRepository,
-    @Inject(PaymentProviderRegistry) private readonly registry: PaymentProviderRegistry,
+    @Inject(PaymentProviders) private readonly registry: PaymentProviders,
     @Inject(PAYMENTS_CONFIG) private readonly config: PaymentsConfig,
     @Inject(LOCALE_CONFIG) private readonly locales: LocaleConfig,
   ) {}
@@ -53,7 +53,7 @@ export class PaymentHandoffService {
     if (row.status !== "awaiting_customer") {
       throw ruleViolation("This payment is not waiting for the shopper.", "payment_not_waiting");
     }
-    const provider = this.registry.get(row.providerCode);
+    const provider = await this.registry.forPayment(row);
     if (provider === undefined || !provider.capabilities.formHandoff) {
       throw ruleViolation("Form checkout handoff is not available.", "handoff_unavailable");
     }

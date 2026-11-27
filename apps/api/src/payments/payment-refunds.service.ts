@@ -27,7 +27,7 @@ import { moneyOf } from "./payment-facts.service.js";
 import { callPaymentProvider, describePaymentCall } from "./payment-provider-call.js";
 import { scheduleAfterChange } from "./payment-schedule.js";
 import { PAYMENT_TIMINGS, PAYMENTS_CONFIG, type PaymentsConfig } from "./payments-config.js";
-import { PaymentProviderRegistry } from "./registry/index.js";
+import { PaymentProviders } from "./registry/payment-providers.js";
 
 export type AdminRefundResult =
   | { readonly kind: "requested"; readonly replay: boolean; readonly refund: RefundRow }
@@ -67,7 +67,7 @@ export class PaymentRefundsService {
     @Inject(DRIZZLE) private readonly database: Database,
     @Inject(PaymentsRepository) private readonly payments: PaymentsRepository,
     @Inject(PaymentChanges) private readonly changes: PaymentChanges,
-    @Inject(PaymentProviderRegistry) private readonly registry: PaymentProviderRegistry,
+    @Inject(PaymentProviders) private readonly registry: PaymentProviders,
     @Inject(PAYMENTS_CONFIG) private readonly config: PaymentsConfig,
   ) {}
 
@@ -105,7 +105,7 @@ export class PaymentRefundsService {
               : { kind: "idempotency_key_reused" as const };
           }
           const refunds = await this.payments.lockRefundsOfPayment(tx, row.id);
-          const provider = this.registry.get(row.providerCode);
+          const provider = await this.registry.forPayment(row, tx);
           const decision = decideRefund({
             payment: {
               status: paymentStatusOf(row.status),
@@ -151,7 +151,7 @@ export class PaymentRefundsService {
       return claimed.result;
     }
     const { row, refund, attempt } = claimed;
-    const provider = this.registry.get(row.providerCode);
+    const provider = await this.registry.forPayment(row);
     const providerPaymentId = row.providerPaymentId;
     const call =
       provider === undefined || providerPaymentId === null

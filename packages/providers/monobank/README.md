@@ -18,6 +18,15 @@ Monobank acquiring ("Plata by mono") payment provider, code `monobank`, kind `pa
 
 There is no URL variable: the origin `https://api.monobank.ua` is a constant (`MONOBANK_API_ORIGIN`). `SHOP_CURRENCY` must be `UAH` (the registry refuses the startup otherwise: `capabilities.currencies` is `["UAH"]`). Nothing is sent to Monobank at startup; the webhook key is fetched on the first webhook.
 
+## Managed saved credentials
+
+- `createOutboundClient(secrets, context)` constructs the existing payment port from the complete `{token}` bundle without reading the environment or making a request. The existing env Nest module is unchanged.
+- Every HTTP request, including pubkey refreshes, starts synchronously inside `context.transport.start`. Signature verification also enters the gate when a public key is cached. Admission denials preserve only the API's `CredentialAdmissionDenied` boundary.
+- The P-256 key cache belongs to each constructed client/version. It is memory-only and never shared between saved versions. A denied key load clears its single flight without consuming the refresh interval.
+- `accountIdentity` and `checkCredentials` use only read-only `GET /api/merchant/details` ([official acquiring documentation](https://api.monobank.ua/docs/acquiring.html)). Only bounded `merchantId` supplies account identity; merchant name and EDRPOU are ignored. Checks expose safe outcome codes and bounded integer Retry-After only. No invoice/refund is a probe.
+- `locateWebhook` parses at most 64 KiB of strict UTF-8 JSON and returns validated invoice/reference lookup hints. It performs no I/O, signature verification or payment-state mapping; the selected bound client verifies the raw bytes afterwards.
+- The API owns binding, activation, environment precedence and revocation (`docs/contracts/integrations.md`). These exports do not enable a provider by themselves. Merchant details and managed runtime remain stub-tested only.
+
 ## What it calls
 
 | Port operation | Request | Body / query |
@@ -26,6 +35,7 @@ There is no URL variable: the origin `https://api.monobank.ua` is a constant (`M
 | `getPayment` | `GET /api/merchant/invoice/status?invoiceId=<id>` | the id is the only query value |
 | `invalidatePayment` | `POST /api/merchant/invoice/remove` | `{invoiceId}` |
 | `refund` | `POST /api/merchant/invoice/cancel` | `{invoiceId, extRef: <our refund id>, amount}` |
+| `accountIdentity` / `checkCredentials` | `GET /api/merchant/details` | no body or query; only `merchantId` is retained |
 | `verifyWebhook` (key) | `GET /api/merchant/pubkey` | only when no key is cached, or after a failed verification at most once per 60 s |
 
 - Every request carries `X-Token` and `accept: application/json`; a `POST` also `content-type: application/json`. No `X-Cms` header (white-label), no `comment`, `customerEmails` or card-saving member (no personal data leaves the shop).

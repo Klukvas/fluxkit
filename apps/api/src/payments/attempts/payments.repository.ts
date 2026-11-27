@@ -42,6 +42,7 @@ export type PaymentColumns = Partial<
     | "status"
     | "orderId"
     | "providerCode"
+    | "integrationCredentialVersionId"
     | "amount"
     | "currency"
     | "idempotencyKey"

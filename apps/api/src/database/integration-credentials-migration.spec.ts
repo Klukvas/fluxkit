@@ -246,6 +246,9 @@ describe("integration credentials migration 0019 (real disposable Postgres)", ()
     const routeDown = await readFile(`${folder}/0021_email_route_mode.down.sql`, "utf8");
     for (let pass = 0; pass < 2; pass += 1) {
       await pool.query(
+        await readFile(`${folder}/0023_managed_payment_credentials.down.sql`, "utf8"),
+      );
+      await pool.query(
         await readFile(`${folder}/0022_integration_credential_environment.down.sql`, "utf8"),
       );
       await pool.query(routeDown);

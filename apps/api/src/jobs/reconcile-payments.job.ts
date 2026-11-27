@@ -89,7 +89,7 @@ export async function reconcilePayments(
     failures: [],
     truncated: false,
   };
-  if (!deps.reconcile.enabled()) {
+  if (!(await deps.reconcile.enabled())) {
     return result;
   }
   const paused = new Set<string>();

@@ -162,6 +162,13 @@
       "when": 1795789606187,
       "tag": "0022_integration_credential_environment",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1795794376041,
+      "tag": "0023_managed_payment_credentials",
+      "breakpoints": true
     }
   ]
 }

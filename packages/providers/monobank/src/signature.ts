@@ -102,14 +102,23 @@ export class MonobankKeyCache {
 
   private fetchKey(load: () => Promise<KeyLoad>): Promise<KeyLoad> {
     if (this.inFlight === undefined) {
+      const previousFetchAt = this.lastFetchAt;
       this.lastFetchAt = this.nowMs();
-      this.inFlight = load().then((result) => {
-        this.inFlight = undefined;
-        if (result.ok) {
-          this.current = result.key;
-        }
-        return result;
-      });
+      this.inFlight = load()
+        .then((result) => {
+          if (result.ok) {
+            this.current = result.key;
+          }
+          return result;
+        })
+        .catch((error: unknown) => {
+          // Admission denial did not fetch a key and must not poison this client's single flight.
+          this.lastFetchAt = previousFetchAt;
+          throw error;
+        })
+        .finally(() => {
+          this.inFlight = undefined;
+        });
     }
     return this.inFlight;
   }

@@ -68,6 +68,9 @@ Purposes and legal bases are proposals taken from the plan. TODO(fluxkit): legal
 | `integration` | `updated_by` | staff (S) | D26 | excluded | set_null | Admin actor id; admin ids are not exported. |
 | `integration_credential_version` | `id`, `integration_id`, `generation`, `purpose`, `environment`, `state`, `created_at`, `retired_at`, `revoked_at` | none | D26 | not_applicable | not_applicable |  |
 | `integration_credential_version` | `created_by` | staff (S) | D26 | excluded | set_null | Admin actor id; admin ids are not exported. |
+| `integration_merchant_baseline` | `id`, `integration_id`, `kind`, `provider_code`, `environment`, `enrollment_source`, `created_at` | none | D26 | not_applicable | not_applicable |  |
+| `integration_merchant_baseline` | `created_by` | staff (S) | D26 | excluded | set_null | Admin actor id; admin ids are not exported. |
+| `integration_merchant_baseline` | `key_id`, `nonce`, `ciphertext`, `tag` | encrypted secret (E) | D26 | excluded | out_of_scope | Permanent encrypted merchant identity of the shop; never exported or erased by shopper requests, and retained across provider lifecycle changes. |
 | `integration_revision` | all 3 columns | none | D26 | not_applicable | not_applicable | |
 | `integration_secret` | `id`, `version_id`, `field`, `created_at` | none | D26 | not_applicable | not_applicable |  |
 | `integration_secret` | `key_id`, `nonce`, `ciphertext`, `tag` | encrypted secret (E) | D26 | excluded | out_of_scope | An encrypted credential of the shop's own provider account (ADR 0058): no shopper's data, never exported or returned by any API, removed only when the owner retires it. |
@@ -91,7 +94,7 @@ Purposes and legal bases are proposals taken from the plan. TODO(fluxkit): legal
 | `order_status_change` | `actor_admin_id` | staff (S) | D20 | excluded | set_null | Admin actor id; admin ids are not exported. |
 | `order_status_change` | `reason` | free text (F) | D12 | included | keep | Append-only journal (ADR 0019); admins are told not to type personal data in reasons. TODO(fluxkit): privacy plan step 3 checks which writers fill it. |
 | `payment` | `check_attempts`, `next_check_at`, `needs_attention`, `attention_code` | none | D14 | not_applicable | not_applicable |  |
-| `payment` | `id`, `order_id`, `provider_payment_id`, `idempotency_key` | pseudonymous (Q) | D14 | excluded | keep | Internal id or provider reference only the shop can use. |
+| `payment` | `id`, `order_id`, `provider_payment_id`, `idempotency_key`, `integration_credential_version_id` | pseudonymous (Q) | D14 | excluded | keep | Internal id or provider reference only the shop can use. |
 | `payment` | `redirect_url` | pseudonymous (Q) | D14 | excluded | keep | The provider's hosted payment page address, kept only while the attempt is live; a capability link, never exported. |
 | `payment` | `provider_code`, `amount`, `currency`, `status`, `provider_status`, `provider_modified_at`, `final_amount`, `refunded_amount`, `expires_at`, `order_outcome`, `failure_code`, `card_system`, `card_last4`, `created_at`, `updated_at` | pseudonymous (Q) | D14 | included | keep | Accounting and delivery record (ADR 0017): never deleted, contains no contact data. |
 | `payment` | `created_by` | staff (S) | D20 | excluded | set_null | Admin actor id; admin ids are not exported. |
@@ -179,4 +182,4 @@ Purposes and legal bases are proposals taken from the plan. TODO(fluxkit): legal
 | D23 | Catalog images | Job 7 removes abandoned uploads |
 | D24 | No personal data (catalog, pricing, inventory, shipping methods, search, health) | Not applicable |
 | D25 | Accountability (L, LI) | Requests 1095 days after completion, audit events 365 days; only when `ORDER_CONTACT_RETENTION_DAYS` is set (job 12) |
-| D26 | Provider credentials of the shop (C, LI) | Encrypted value until the owner retires it; version rows and ids stay (ADR 0058) |
+| D26 | Provider credentials of the shop (C, LI) | Credential envelopes until eligible retirement; version rows and permanent encrypted merchant baselines stay (ADR 0058, ADR 0060) |

@@ -15,6 +15,10 @@ export interface IntegrationsConfig {
   readonly emailRouteDelegated: boolean;
   /** The effective `EMAIL_FROM` address. Email cannot be activated without one. */
   readonly emailFromAddress: string | null;
+  readonly paymentDelegated: boolean;
+  readonly shopCurrency: string;
+  readonly orderPaymentTtlMinutes: number;
+  readonly storefrontPublicUrl: string | null;
 }
 
 /** A caller without an environment (the OpenAPI export, the commands): nothing installed is offered, nothing is stored. */
@@ -25,4 +29,8 @@ export const DISABLED_INTEGRATIONS_CONFIG: IntegrationsConfig = Object.freeze({
   environment: Object.freeze({}),
   emailRouteDelegated: false,
   emailFromAddress: null,
+  paymentDelegated: false,
+  shopCurrency: "UAH",
+  orderPaymentTtlMinutes: 30,
+  storefrontPublicUrl: null,
 });

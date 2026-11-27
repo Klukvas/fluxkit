@@ -86,3 +86,5 @@ export {
 export class LiqPayPaymentProviderModule {}
 
 export const providerModule = LiqPayPaymentProviderModule;
+
+export { createOutboundClient, locateWebhook } from "./managed.js";

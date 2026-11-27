@@ -87,7 +87,7 @@ export const integrationSecretSchema = z.object({
   }),
   versionState: z.enum(LISTED_CREDENTIAL_STATES).nullable().meta({
     description:
-      "`candidate`: saved, not used. `active`: new mail uses it. `draining`: turned off, mail already bound to it can finish. `revoked`: unusable. Null when nothing is stored.",
+      "`candidate`: saved, not used. `active`: new work uses it. `draining`: bound work can finish. `revoked`: unusable. Null when nothing is stored.",
   }),
 });
 
@@ -117,7 +117,7 @@ export const integrationSchema = z.object({
   providerCode: z.string(),
   enabled: z.boolean().meta({
     description:
-      "True when new mail uses the stored outbound credential. Payment and shipping stay false until their safety checks exist.",
+      "True when new email/payment work uses the stored outbound credential. Shipping activation remains unavailable.",
   }),
   secrets: z.array(integrationSecretSchema),
   versions: z.array(integrationVersionSchema).max(20),

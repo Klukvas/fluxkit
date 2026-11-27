@@ -320,6 +320,8 @@ export type ShopperPaymentStatus = "waiting" | "processing" | "paid" | "failed" 
 export type ShopperPaymentFailureCategory = "declined" | "expired" | "technical" | "not_accepted";
 
 export interface OrderPayment {
+  /** New payment admissions are unavailable; persisted details remain readable. */
+  unavailableReason?: "payment_not_available";
   /** Whether `createOrderPayment` / `createAccountOrderPayment` would start a new attempt now. */
   canPay: boolean;
   /** Enabled providers that take the order currency; empty when online payment is off. */
@@ -369,6 +371,8 @@ export interface CreatedPayment {
 }
 
 export interface PaymentState {
+  /** New payment admissions are unavailable; persisted status remains readable. */
+  unavailableReason?: "payment_not_available";
   paymentId: string;
   status: ShopperPaymentStatus;
   failureCategory: ShopperPaymentFailureCategory | null;

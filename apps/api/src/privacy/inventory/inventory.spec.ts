@@ -82,6 +82,15 @@ describe("the core inventory against the Drizzle schema", () => {
     expect(entryOf("sales_order", "cancellation_reason").erasure).toBe("anonymise");
   });
 
+  it("retains payment credential bindings as excluded pseudonymous accounting references", () => {
+    expect(entryOf("payment", "integration_credential_version_id")).toMatchObject({
+      class: "pseudonymous",
+      ref: "D14",
+      export: "excluded",
+      erasure: "keep",
+    });
+  });
+
   it("never exports a hash", () => {
     for (const [table, columns] of Object.entries(coreInventory)) {
       for (const [column, entry] of Object.entries(columns)) {
