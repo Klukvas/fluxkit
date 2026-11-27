@@ -168,7 +168,7 @@ export class IntegrationsController {
   @Post(":id/activate")
   @HttpCode(200)
   @ApiOperation({
-    summary: "Activate a stored email or payment credential",
+    summary: "Activate a stored email, payment or shipping credential",
     description:
       "Selects a complete stored email/payment/shipping credential for new work when enablement is delegated. Email requires EMAIL_FROM; payment requires supported shop currency, a public storefront URL, merchant enrollment when declared, and no open legacy work. Shipping requires a complete client and no open null-bound legacy shipments. Asks for the owner's current password. Other 409 rules: `integration_env_override`, `integration_storage_disabled`, `integration_sender_required`, `integration_route_unset`, `integration_not_activatable`, `integration_revision_stale`.",
   })

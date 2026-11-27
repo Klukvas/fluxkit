@@ -44,7 +44,7 @@ Timeouts: the API's signal plus a per-request ceiling from `SHIPPING_PROVIDER_TI
 ## Tests
 `pnpm --filter @fluxkit/provider-nova-post test`: a local stub carrier on `127.0.0.1` (`src/test-support/stub-carrier.ts`, invented data only) and a no-network guard (`src/test-support/no-network.ts`) that fails a spec file on any request to another host. The stub refuses what production refused (a create body without a required field or with a one-word contact name, a print without `type=marking`, settlements without upper-case `countryCodes[]`; `src/stub-carrier.spec.ts`), and a spec that does not import the guard checks it is wired for every file (`src/no-network-wired.spec.ts`). Specs cover the verified request shapes, the JWT cache, error and size mapping, `findWaybill` paging, the status table, secrets in logs, the module's startup refusal and the core provider contract check.
 
-How to remove: delete `packages/providers/nova-post`, remove `nova_post` from `SHIPPING_PROVIDERS_ENABLED` and the two variables from the environment. Nothing in core or `apps/api` references it (CI: `scripts/feature-matrix.sh providers-deleted`). Orders and shipments already made keep their snapshot; their shipment actions answer `409 provider_not_enabled`.
+How to remove: delete `packages/providers/nova-post`, remove `nova_post` from `SHIPPING_PROVIDERS_ENABLED` and the two variables from the environment. Nothing in core or `apps/api` references it (CI: `scripts/feature-matrix.sh providers-deleted`). Orders and shipments already made keep their snapshot; env-bound shipment actions answer `409 provider_not_enabled`; managed bindings answer `409 credential_unavailable` because the bound provider package is missing.
 
 ## Managed credentials (PR 3)
 

@@ -3,9 +3,11 @@
 Read this first (Claude Code, Codex or a human). Rules live in `AGENTS.md`; decisions in `docs/adr/` (0001 to 0060, index in `docs/adr/README.md`); plans in `docs/plans/`.
 The long per-step history that used to live here is archived verbatim in `docs/HISTORY.md` (not current). Update this file in every PR that changes project state; keep it short and keep "Last updated" to one line.
 
-Last updated: 2026-11-27, integrations slice 2 part 2: admin-managed Monobank and LiqPay keys.
+Last updated: 2026-11-27, integrations slice 2 part 3: admin-managed Nova Post keys (slice 2 complete).
 
 ## 1. Current state
+
+- **Admin integrations slice 2, part 3 (2026-11-27):** with `SHIPPING_PROVIDERS_ENABLED` absent, Nova Post runs from keys activated in Settings → Integrations; the key version carries its environment (sandbox/production, locked by `NOVA_POST_ENVIRONMENT` when set). A new waybill binds the active version before the first carrier call (incl. the JWT exchange); cancel, labels, refresh and tracking use the bound version; tracking batches per (provider, version); directory caches are keyed by version and environment. Sender profile edits are refused while dependent shipments are open (`shipping_profile_work_open`). Activation is refused while env-bound shipments are open. Migration 0024. Env mode unchanged. Not verified live (stub-tested only). Next: slice 3 (rewrap command, bounded candidate cleanup, retention counts).
 
 - **Admin integrations slice 2, part 2 (2026-11-27):** with `PAYMENT_PROVIDERS_ENABLED` absent, Monobank and LiqPay run from keys activated in Settings → Integrations. A new payment binds the active credential version before the first provider call; reads, refunds, reconcile, LiqPay handoff and webhooks use the bound version through the final revocation gate; disable stops new payments only, revoke stops every later call. Monobank: the first saved key locks the shop to its merchant (`GET /api/merchant/details`), a key of another merchant is refused. Activation is refused while env-bound payments of that provider are still open (`integration_legacy_work_open`; switch procedure in `docs/deployment.md`). Keep `SECRETS_ENCRYPTION_KEY_PREVIOUS` installed until the slice 3 rewrap command exists. Migration 0023. Env mode unchanged. Not verified live (stub-tested only).
 

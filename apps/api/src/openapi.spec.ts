@@ -4,6 +4,16 @@ import { buildOpenApiDocument, createApp, OPENAPI_SEARCH_ENV } from "./app.facto
 
 // Fails when docs/api/openapi.json is stale. Regenerate with: pnpm --filter @fluxkit/api build && pnpm --filter @fluxkit/api openapi:export
 describe("OpenAPI document", () => {
+  it("documents shipping profile conflicts and both credential sources", async () => {
+    const document = JSON.parse(
+      await readFile(new URL("../../../docs/api/openapi.json", import.meta.url), "utf8"),
+    ) as { paths: Record<string, { put?: OperationDoc & { description?: string } }> };
+    const operation = document.paths["/admin/shipping/providers/{code}/settings"]?.put;
+    expect(operation?.responses["409"]?.content?.["application/problem+json"]).toBeDefined();
+    expect(operation?.description).toContain("shipping_profile_work_open");
+    expect(operation?.description).toContain("Integrations");
+  });
+
   it("matches the committed docs/api/openapi.json (core routes only)", async () => {
     const app = await createApp({
       databaseUrl: "postgres://openapi-export:unused@127.0.0.1:1/unused",

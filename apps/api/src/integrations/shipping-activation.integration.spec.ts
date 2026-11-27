@@ -2,16 +2,19 @@ import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
-import { fileURLToPath } from "node:url";
 import { sql } from "drizzle-orm";
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { DRIZZLE, type Database } from "../database/database.module.js";
 import { startApp, type RunningApp, type StartAppOptions } from "../test/app.js";
 import { createTestAdminUser } from "../test/admin-user-fixtures.js";
 import { sessionCookieOf } from "../test/auth-http.js";
 import { requireEnv } from "../test/env.js";
 import { http } from "../test/http.js";
-import { testSecretsKeyRing } from "../test/integration-provider-fixture.js";
+import {
+  createManagedShippingFixture,
+  type ManagedShippingFixture,
+  testSecretsKeyRing,
+} from "../test/integration-provider-fixture.js";
 import { ensureMigrated } from "../test/migrate.js";
 import type { IntegrationResponse } from "./integrations.schemas.js";
 
@@ -19,11 +22,16 @@ const PASSWORD = "correct horse battery staple";
 type Detail = { revision: number; integration: IntegrationResponse; rule?: string };
 describe("managed shipping activation (real Postgres and Redis)", () => {
   const apps: RunningApp[] = [];
+  let fixture: ManagedShippingFixture;
+  beforeAll(async () => {
+    fixture = await createManagedShippingFixture();
+  });
   beforeEach(async () => {
     await ensureMigrated([], { reset: true });
   });
   afterAll(async () => {
     for (const app of apps) await app.app.close();
+    await fixture.remove();
     await ensureMigrated([], { reset: true });
   });
   async function actor(options: StartAppOptions = {}) {
@@ -34,9 +42,7 @@ describe("managed shipping activation (real Postgres and Redis)", () => {
       rateLimitKeyPrefix: `shipping_${randomUUID()}`,
       secretsKeyRing: testSecretsKeyRing(),
       shippingDelegated: true,
-      integrationProvidersDir: fileURLToPath(
-        new URL("../../../../packages/providers", import.meta.url),
-      ),
+      integrationProvidersDir: fixture.dir,
       ...options,
     });
     apps.push(app);
@@ -53,8 +59,8 @@ describe("managed shipping activation (real Postgres and Redis)", () => {
       "GET",
       "/admin/integrations",
     );
-    const item = list.body.items.find((row) => row.providerCode === "nova_post");
-    if (!item) throw new Error("nova_post_not_listed");
+    const item = list.body.items.find((row) => row.providerCode === "testship");
+    if (!item) throw new Error("testship_not_listed");
     const revision = async () =>
       (await call<{ revision: number }>("GET", "/admin/integrations")).body.revision;
     return {
@@ -66,7 +72,7 @@ describe("managed shipping activation (real Postgres and Redis)", () => {
         call<Detail>("PUT", `/admin/integrations/${item.id}/secrets/api_key`, {
           expectedRevision: await revision(),
           currentPassword: PASSWORD,
-          value: "invented-nova-post-key",
+          value: "invented-testship-key",
           environment,
         }),
       change: async (action: string, extra: Record<string, unknown> = {}) =>
@@ -92,9 +98,29 @@ describe("managed shipping activation (real Postgres and Redis)", () => {
     expect(revoked.status).toBe(200);
     expect(revoked.body.integration.enabled).toBe(false);
   });
+  it("checks a candidate through gated simulated token exchange and carrier read", async () => {
+    const owner = await actor();
+    const saved = await owner.save();
+    expect(saved.status).toBe(200);
+    const start = fixture.shipping.calls.length;
+    const result = await owner.call<{ code: string }>(
+      "POST",
+      `/admin/integrations/${owner.item.id}/check`,
+      {
+        expectedRevision: await owner.revision(),
+        versionId: saved.body.integration.versions[0]?.id,
+      },
+    );
+    expect(result.status).toBe(200);
+    expect(result.body.code).toBe("ok");
+    expect(fixture.shipping.calls.slice(start).map((call) => call.operation)).toEqual([
+      "authorization",
+      "checkConnection",
+    ]);
+  });
   it.each([
     { shippingDelegated: false },
-    { integrationEnvironment: { NOVA_POST_API_KEY: "invented-env-key" } },
+    { integrationEnvironment: { TESTSHIP_API_KEY: "invented-env-key" } },
   ])("refuses activation under server enablement or key override %j", async (options) => {
     const owner = await actor(options);
     if (options.shippingDelegated === false) expect((await owner.save()).status).toBe(200);
@@ -103,7 +129,7 @@ describe("managed shipping activation (real Postgres and Redis)", () => {
     expect(result.body.rule).toBe("integration_env_override");
   });
   it("locks a blank environment override to sandbox and saves a switch as a new version", async () => {
-    const owner = await actor({ integrationEnvironment: { NOVA_POST_ENVIRONMENT: "" } });
+    const owner = await actor({ integrationEnvironment: { TESTSHIP_ENVIRONMENT: "" } });
     expect((await owner.save("production")).body.rule).toBe("integration_env_override");
     expect((await owner.save("sandbox")).status).toBe(200);
     const other = await actor();
@@ -116,7 +142,7 @@ describe("managed shipping activation (real Postgres and Redis)", () => {
   it("refuses an environment-locked candidate at activation", async () => {
     const initial = await actor();
     expect((await initial.save("production")).status).toBe(200);
-    const locked = await actor({ integrationEnvironment: { NOVA_POST_ENVIRONMENT: "sandbox" } });
+    const locked = await actor({ integrationEnvironment: { TESTSHIP_ENVIRONMENT: "sandbox" } });
     const result = await locked.change("activate");
     expect(result.status).toBe(409);
     expect(result.body.rule).toBe("integration_env_override");
@@ -124,7 +150,7 @@ describe("managed shipping activation (real Postgres and Redis)", () => {
   it("refuses a malformed managed shipping port through the shared registry validator", async () => {
     const root = await mkdtemp(join(tmpdir(), "fluxkit-shipping-factory-"));
     try {
-      const folder = join(root, "nova-post");
+      const folder = join(root, "testship");
       await mkdir(folder);
       await writeFile(
         join(folder, "package.json"),
@@ -133,20 +159,20 @@ describe("managed shipping activation (real Postgres and Redis)", () => {
           type: "module",
           main: "index.js",
           fluxkit: {
-            provider: "nova_post",
+            provider: "testship",
             kind: "shipping",
-            secrets: [{ field: "api_key", purpose: "outbound", env: "NOVA_POST_API_KEY" }],
+            secrets: [{ field: "api_key", purpose: "outbound", env: "TESTSHIP_API_KEY" }],
             environments: {
               values: ["sandbox", "production"],
               default: "sandbox",
-              env: "NOVA_POST_ENVIRONMENT",
+              env: "TESTSHIP_ENVIRONMENT",
             },
           },
         }),
       );
       await writeFile(
         join(folder, "index.js"),
-        `export function createOutboundClient(){return {code:"nova_post",capabilities:{pickupPoints:true,estimate:true,waybills:true,cancelWaybill:true,tracking:true,labels:true}};}`,
+        `export function createOutboundClient(){return {code:"testship",capabilities:{pickupPoints:true,estimate:true,waybills:true,cancelWaybill:true,tracking:true,labels:true}};}`,
       );
       const owner = await actor({ integrationProvidersDir: root });
       expect((await owner.save()).status).toBe(200);
@@ -167,7 +193,7 @@ describe("managed shipping activation (real Postgres and Redis)", () => {
       values(${order}::uuid,'01D1-W0RK','paid','uk','UAH',100,0,0,0,100,now(),gen_random_uuid(),repeat('a',64),now()+interval '1 hour')`);
     await owner.db
       .execute(sql`insert into shipment(id,order_id,provider_code,status,client_reference,declared_value_amount,currency,payer,weight_grams,length_mm,width_mm,height_mm,seats)
-      values(${shipment}::uuid,${order}::uuid,'nova_post','pending','01D1-W0RK',100,'UAH','sender',1,1,1,1,1)`);
+      values(${shipment}::uuid,${order}::uuid,'testship','pending','01D1-W0RK',100,'UAH','sender',1,1,1,1,1)`);
     const result = await owner.change("activate");
     expect(result.status).toBe(409);
     expect(result.body.rule).toBe("integration_legacy_work_open");

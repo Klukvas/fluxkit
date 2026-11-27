@@ -1,4 +1,3 @@
-import { loadShippingProviders } from "./registry/shipping-provider-loader.js";
 import { startApp } from "../test/app.js";
 import { PersonalDataReader } from "../privacy/export/personal-data.reader.js";
 import { Shopper } from "../test/shopper.js";
@@ -10,11 +9,15 @@ import {
   type EstimateQuery,
 } from "./store/shipping-directory.service.js";
 import { randomUUID } from "node:crypto";
-import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { ensureMigrated } from "../test/migrate.js";
 import { ShipmentWorld } from "../test/shipment-world.js";
-import { testSecretsKeyRing } from "../test/integration-provider-fixture.js";
+import { raceAdminRevocation } from "../test/admin-revocation-race.js";
+import {
+  createManagedShippingFixture,
+  type ManagedShippingFixture,
+  testSecretsKeyRing,
+} from "../test/integration-provider-fixture.js";
 import { SecretCipher } from "../integrations/secret-cipher.js";
 import { ShippingProviders } from "./registry/shipping-providers.js";
 import { http } from "../test/http.js";
@@ -23,19 +26,15 @@ import { trackShipments } from "../jobs/track-shipments.job.js";
 
 const KEY_A = "invented-shipping-key-A";
 const KEY_B = "invented-shipping-key-B";
-describe("managed shipping bindings (real Postgres, fake carrier HTTP)", () => {
+describe("managed shipping bindings (real Postgres, fixture carrier transport)", () => {
   let world: ShipmentWorld;
   const ring = testSecretsKeyRing();
   const cipher = new SecretCipher(ring);
   const owner = randomUUID();
   let a: string;
   let methodCode: string;
-  let sequence = 100000;
-  const calls: { path: string; key: string; host: string; numbers: string[] }[] = [];
-  const actualFetch = globalThis.fetch;
-  let loseCreateResponse = false;
-  const remoteWaybills: { id: string; number: string; clientOrder: string; createdAt: string }[] =
-    [];
+  let fixture: ManagedShippingFixture;
+  let calls: ManagedShippingFixture["shipping"]["calls"];
   let holdCities: (() => void)[] | undefined;
   let citiesStarted: (() => void) | undefined;
   let observedBinding: string | null = null;
@@ -43,22 +42,24 @@ describe("managed shipping bindings (real Postgres, fake carrier HTTP)", () => {
   const bindingsAtHttpStart: (string | null)[] = [];
   beforeAll(async () => {
     await ensureMigrated([], { reset: true });
+    fixture = await createManagedShippingFixture();
+    calls = fixture.shipping.calls;
+    fixture.shipping.estimateAmounts.set(KEY_A, 100);
+    fixture.shipping.estimateAmounts.set(KEY_B, 200);
     world = await ShipmentWorld.start({
       shippingDelegated: true,
       secretsKeyRing: ring,
-      integrationProvidersDir: fileURLToPath(
-        new URL("../../../../packages/providers", import.meta.url),
-      ),
+      integrationProvidersDir: fixture.dir,
       shipmentCallTimeouts: { waybillMs: 3000, trackingMs: 3000, labelMs: 3000 },
     });
     await world.pool.query(
-      "insert into integration(id,kind,provider_code) values($1,'shipping','nova_post')",
+      "insert into integration(id,kind,provider_code) values($1,'shipping','testship')",
       [owner],
     );
     a = await version(KEY_A);
     await activate(a);
     await world.pool.query(
-      "insert into shipping_provider_setting(provider_code,settings) values('nova_post',$1)",
+      "insert into shipping_provider_setting(provider_code,settings) values('testship',$1)",
       [
         JSON.stringify({
           senderName: "Test Sender",
@@ -71,15 +72,12 @@ describe("managed shipping bindings (real Postgres, fake carrier HTTP)", () => {
     );
     const method = await world.methods.create({
       kind: "pickup_point",
-      providerCode: "nova_post",
+      providerCode: "testship",
       pricing: { type: "flat", amount: 0 },
     });
     methodCode = method.code;
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
-      const url = new URL(
-        typeof input === "string" ? input : input instanceof URL ? input.href : input.url,
-      );
-      if (!url.hostname.endsWith("novapost.com")) return actualFetch(input, init);
+    fixture.shipping.backend.now = () => world.clock.now();
+    fixture.shipping.onRequest = async (call, input) => {
       if (creatingOrder !== undefined) {
         const pending = await world.pool.query<{ binding: string }>(
           "select integration_credential_version_id as binding from shipment where order_id=$1 and status='pending'",
@@ -87,92 +85,26 @@ describe("managed shipping bindings (real Postgres, fake carrier HTTP)", () => {
         );
         bindingsAtHttpStart.push(pending.rows[0]?.binding ?? null);
       }
-      const key =
-        url.searchParams.get("apiKey") ?? new Headers(init?.headers).get("authorization") ?? "";
-      calls.push({
-        path: url.pathname,
-        key,
-        host: url.hostname,
-        numbers: url.searchParams.getAll("numbers[]"),
-      });
-      if (url.pathname.endsWith("/authorization")) return Response.json({ jwt: key });
-      if (url.pathname.endsWith("/settlements") && holdCities !== undefined) {
-        return new Promise<Response>((resolve) => {
-          holdCities?.push(() =>
-            resolve(Response.json({ items: [], current_page: 1, last_page: 1, total: 0 })),
-          );
+      if (call.operation === "searchCities" && holdCities !== undefined) {
+        await new Promise<void>((resolve) => {
+          holdCities?.push(resolve);
           if (holdCities?.length === 3) citiesStarted?.();
         });
       }
-      if (url.pathname.endsWith("/settlements"))
-        return Response.json({ items: [], current_page: 1, last_page: 1, per_page: 100, total: 0 });
-      if (url.pathname.endsWith("/divisions") && url.searchParams.get("ids[]") === "799999")
-        return Response.json({ items: [], current_page: 1, last_page: 1, total: 0 });
-      if (url.pathname.endsWith("/divisions"))
-        return Response.json({
-          current_page: 1,
-          last_page: 1,
-          per_page: 100,
-          total: 1,
-          items: [
-            {
-              id: 700005,
-              name: "Test point",
-              number: "1",
-              address: "Test address",
-              settlement: { id: 123, name: "Test city" },
-              countryCode: "UA",
-              divisionCategory: "PostBranch",
-              isActive: true,
-              availableServices: { receiving: true, issuing: true },
-            },
-          ],
-        });
-      if (url.pathname.endsWith("/shipments") && init?.method === "POST") {
-        const body = JSON.parse(String(init.body)) as { clientOrder: string };
-        const rows = await world.pool.query<{ integration_credential_version_id: string }>(
-          "select integration_credential_version_id from shipment where client_reference=$1",
-          [body.clientOrder],
+      if (call.operation === "createWaybill") {
+        const request = input as WaybillRequest;
+        const rows = await world.pool.query<{ binding: string }>(
+          "select integration_credential_version_id as binding from shipment where client_reference=$1",
+          [request.clientReference],
         );
-        observedBinding = rows.rows[0]?.integration_credential_version_id ?? null;
-        const waybill = {
-          id: randomUUID(),
-          number: String(++sequence),
-          clientOrder: body.clientOrder,
-          createdAt: world.clock.now().toISOString(),
-        };
-        remoteWaybills.push(waybill);
-        if (loseCreateResponse) {
-          loseCreateResponse = false;
-          throw new TypeError("test_lost_response");
-        }
-        return Response.json(waybill, { status: 201 });
+        observedBinding = rows.rows[0]?.binding ?? null;
       }
-      if (url.pathname.endsWith("/shipments") && init?.method === "GET")
-        return Response.json({
-          items: remoteWaybills.slice().reverse(),
-          current_page: 1,
-          last_page: 1,
-          total: remoteWaybills.length,
-        });
-      if (url.pathname.endsWith("/calculations"))
-        return Response.json({ services: [{ cost: key === KEY_A ? 1 : 2 }] });
-      if (url.pathname.endsWith("/tracking"))
-        return Response.json({
-          items: url.searchParams
-            .getAll("numbers[]")
-            .map((number) => ({ currentStatus: { number, statusCode: 1 } })),
-        });
-      if (url.pathname.endsWith("/print"))
-        return new Response("%PDF-test", { headers: { "content-type": "application/pdf" } });
-      if (init?.method === "DELETE") return new Response(null, { status: 204 });
-      throw new Error("unexpected_test_http");
-    });
+    };
   });
   afterAll(async () => {
     vi.restoreAllMocks();
-    vi.unstubAllEnvs();
     if (world) await world.stop();
+    if (fixture) await fixture.remove();
     await ensureMigrated([], { reset: true });
   });
   async function version(key: string, environment = "sandbox") {
@@ -192,7 +124,7 @@ describe("managed shipping bindings (real Postgres, fake carrier HTTP)", () => {
         secretId,
         integrationId: owner,
         kind: "shipping",
-        providerCode: "nova_post",
+        providerCode: "testship",
         field: "api_key",
         generation,
       },
@@ -221,11 +153,72 @@ describe("managed shipping bindings (real Postgres, fake carrier HTTP)", () => {
   async function paid() {
     const placed = await world.orders.place([{ quantity: 1 }], {
       shippingAddress: undefined,
-      shipping: { methodCode, pickupPointRef: "700005" },
+      shipping: { methodCode, pickupPointRef: "test-city-kyiv-point-1" },
     });
     expect((await world.orders.pay(placed)).status).toBe(200);
     return placed;
   }
+  it.each(
+    ["prepare", "cancel", "reconcile", "refresh"].flatMap((operation) =>
+      ["disable", "revoke"].map((action) => ({ operation, action })),
+    ),
+  )(
+    "does not deadlock owner $action against shipment $operation",
+    async ({ operation, action }) => {
+      const id = await version(KEY_A);
+      await activate(id);
+      const placed = await paid();
+      let shipmentId = "";
+      if (operation !== "prepare") {
+        if (operation === "reconcile")
+          fixture.shipping.backend.failWaybill("createWaybill", {
+            afterEffect: true,
+            message: "test_lost_response",
+          });
+        const created = await world.create(placed.id);
+        expect(created.status).toBe(201);
+        shipmentId = created.body.shipment.id;
+        if (operation === "refresh")
+          fixture.shipping.backend.setTracking(created.body.shipment.trackingNumber ?? "", {
+            status: "in_transit",
+            carrierStatusCode: "TEST_TRANSIT",
+          });
+      }
+      const raced = await raceAdminRevocation<{
+        status: number;
+        body: { code?: string; rule?: string };
+      }>(
+        world.pool,
+        world.orders.ownerId,
+        owner,
+        id,
+        () =>
+          operation === "prepare"
+            ? world.create(placed.id)
+            : world.action(
+                placed.id,
+                shipmentId,
+                operation === "cancel"
+                  ? "cancel"
+                  : operation === "refresh"
+                    ? "refresh"
+                    : "reconcile",
+              ),
+        action === "disable" ? "disable" : "revoke",
+      );
+      expect(raced.revocationError).toBeUndefined();
+      if (operation === "prepare") {
+        expect(raced.result.status).toBe(409);
+        expect(raced.result.body).toMatchObject({
+          code: "rule_violation",
+          rule: "provider_not_enabled",
+        });
+      } else {
+        expect(raced.result.status).toBe(200);
+      }
+      await activate(await version(KEY_B));
+    },
+  );
   it("binds before the first waybill call and retains A after rotation and disable", async () => {
     const placed = await paid();
     a = await version(KEY_A);
@@ -263,7 +256,7 @@ describe("managed shipping bindings (real Postgres, fake carrier HTTP)", () => {
     const result = await http<{ rule: string }>(
       world.orders.owner.baseUrl,
       "PUT",
-      "/admin/shipping/providers/nova_post/settings",
+      "/admin/shipping/providers/testship/settings",
       {
         body: {
           settings: {
@@ -282,40 +275,40 @@ describe("managed shipping bindings (real Postgres, fake carrier HTTP)", () => {
   it("isolates directory positive, negative and single-flight caches across versions and environments", async () => {
     const source = world.orders.owner.app.get(ShippingProviders),
       directory = world.orders.owner.app.get(ShippingDirectoryService);
-    const pa = await source.get("nova_post");
+    const pa = await source.get("testship");
     if (!pa) throw new Error("missing_test_port");
     const estimateQuery: EstimateQuery = {
-      providerCode: "nova_post",
+      providerCode: "testship",
       methodCode: "cache_test",
       service: null,
       cityRef: "123",
-      pickupPointRef: "700005",
+      pickupPointRef: "test-city-kyiv-point-1",
       subtotal: { amount: 100, currency: "UAH" },
     };
     expect((await directory.estimate(pa, estimateQuery))?.amount).toBe(200);
     await directory.searchCities(pa, "empty", "en");
-    await directory.resolvePickupPoint(pa, "700005");
-    expect((await directory.resolvePickupPoint(pa, "799999")).status).toBe("unknown");
+    await directory.resolvePickupPoint(pa, "test-city-kyiv-point-1");
+    expect((await directory.resolvePickupPoint(pa, "missing-point")).status).toBe("unknown");
     const b = await version(KEY_A, "production");
     await activate(b);
-    const pb = await source.get("nova_post");
+    const pb = await source.get("testship");
     if (!pb) throw new Error("missing_test_port");
     calls.length = 0;
     expect((await directory.estimate(pb, estimateQuery))?.amount).toBe(100);
     const [point] = await Promise.all([
-      directory.resolvePickupPoint(pb, "700005"),
-      directory.resolvePickupPoint(pb, "700005"),
+      directory.resolvePickupPoint(pb, "test-city-kyiv-point-1"),
+      directory.resolvePickupPoint(pb, "test-city-kyiv-point-1"),
     ]);
-    expect((await directory.resolvePickupPoint(pb, "799999")).status).toBe("unknown");
+    expect((await directory.resolvePickupPoint(pb, "missing-point")).status).toBe("unknown");
     await Promise.all([
       directory.searchCities(pb, "empty", "en"),
       directory.searchCities(pb, "empty", "en"),
     ]);
-    expect(calls.filter((call) => call.path.endsWith("/divisions"))).toHaveLength(2);
-    expect(calls.filter((call) => call.path.endsWith("/settlements"))).toHaveLength(1);
+    expect(calls.filter((call) => call.operation === "findPickupPoint")).toHaveLength(2);
+    expect(calls.filter((call) => call.operation === "searchCities")).toHaveLength(1);
     expect(point?.status).toBe("found");
-    expect(calls.filter((call) => call.path.endsWith("/authorization"))).toHaveLength(1);
-    expect(calls.every((call) => call.host === "api.novapost.com")).toBe(true);
+    expect(calls.filter((call) => call.operation === "authorization")).toHaveLength(1);
+    expect(calls.every((call) => call.environment === "production")).toBe(true);
     await activate(b);
   });
   it("uses the caller transaction for availability, bound lookup and export metadata", async () => {
@@ -325,10 +318,10 @@ describe("managed shipping bindings (real Postgres, fake carrier HTTP)", () => {
       const pending = db.transaction(async (tx) => {
         await tx.execute(sql`set local search_path = pg_catalog`);
         if (op === "active") return source.available(tx);
-        if (op === "admit") return source.admit(tx, "nova_post");
+        if (op === "admit") return source.admit(tx, "testship");
         if (op === "bound")
           return source.forShipment(
-            { providerCode: "nova_post", integrationCredentialVersionId: a },
+            { providerCode: "testship", integrationCredentialVersionId: a },
             tx,
           );
         return source.processorCodes(tx);
@@ -359,9 +352,7 @@ describe("managed shipping bindings (real Postgres, fake carrier HTTP)", () => {
   it("exports retained processor metadata without decrypting unavailable credentials", async () => {
     const app = await startApp({
       shippingDelegated: true,
-      integrationProvidersDir: fileURLToPath(
-        new URL("../../../../packages/providers", import.meta.url),
-      ),
+      integrationProvidersDir: fixture.dir,
     });
     try {
       await expect(app.app.get(ShippingProviders).active()).rejects.toMatchObject({
@@ -369,7 +360,7 @@ describe("managed shipping bindings (real Postgres, fake carrier HTTP)", () => {
       });
       expect(await app.app.get(PersonalDataReader).processors(world.orders.db)).toContainEqual({
         kind: "shipping",
-        name: "nova_post",
+        name: "testship",
       });
     } finally {
       await app.app.close();
@@ -403,7 +394,9 @@ describe("managed shipping bindings (real Postgres, fake carrier HTTP)", () => {
       return snapshot;
     });
     try {
-      const response = shopper.get("/store/shipping/options?country=UA&pickupPointRef=700005");
+      const response = shopper.get(
+        "/store/shipping/options?country=UA&pickupPointRef=test-city-kyiv-point-1",
+      );
       await captured;
       const second = await version(KEY_B, "production");
       await activate(second);
@@ -417,13 +410,13 @@ describe("managed shipping bindings (real Postgres, fake carrier HTTP)", () => {
     }
   });
   it.each(["disable", "revoke"])(
-    "refuses directory work queued before %s without another HTTP start",
+    "refuses directory work queued before %s without another transport start",
     async (action) => {
       const id = await version(KEY_A);
       await activate(id);
       const source = world.orders.owner.app.get(ShippingProviders),
         directory = world.orders.owner.app.get(ShippingDirectoryService);
-      const port = await source.get("nova_post");
+      const port = await source.get("testship");
       if (!port) throw new Error("missing_port");
       await port.checkConnection(new AbortController().signal);
       holdCities = [];
@@ -436,7 +429,7 @@ describe("managed shipping bindings (real Postgres, fake carrier HTTP)", () => {
       await started;
       const queued = directory.searchCities(port, "queued", "en");
       const refused = expect(queued).rejects.toBeDefined();
-      expect(directory.gateState("nova_post").queued).toBe(1);
+      expect(directory.gateState("testship").queued).toBe(1);
       await world.pool.query(
         "update integration_credential_version set state=$2,revoked_at=$3 where id=$1",
         [
@@ -464,7 +457,10 @@ describe("managed shipping bindings (real Postgres, fake carrier HTTP)", () => {
     const first = await version(KEY_A);
     await activate(first);
     const placed = await paid();
-    loseCreateResponse = true;
+    fixture.shipping.backend.failWaybill("createWaybill", {
+      afterEffect: true,
+      message: "test_lost_response",
+    });
     const created = await world.create(placed.id);
     expect(created.status).toBe(201);
     expect(created.body.shipment.status).toBe("unknown");
@@ -475,13 +471,13 @@ describe("managed shipping bindings (real Postgres, fake carrier HTTP)", () => {
     expect(answer.body.status).toBe("created");
     expect(calls.length).toBeGreaterThan(0);
     expect(calls.every((call) => call.key === KEY_A)).toBe(true);
-    expect(calls.filter((call) => call.path.endsWith("/shipments"))).toHaveLength(1);
+    expect(calls.filter((call) => call.operation === "findWaybill")).toHaveLength(1);
   });
   it("refuses null-bound legacy operations with credential_unavailable and backs their tracking group off", async () => {
     const placed = await world.paid("address_no_carrier");
     const id = randomUUID();
     await world.pool.query(
-      "insert into shipment(id,order_id,provider_code,status,client_reference,declared_value_amount,currency,payer,weight_grams,length_mm,width_mm,height_mm,seats,provider_ref,tracking_number,next_track_at) values($1,$2,'nova_post','created',$3,100,'UAH','sender',1,1,1,1,1,'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','999000',now()-interval '1 minute')",
+      "insert into shipment(id,order_id,provider_code,status,client_reference,declared_value_amount,currency,payer,weight_grams,length_mm,width_mm,height_mm,seats,provider_ref,tracking_number,next_track_at) values($1,$2,'testship','created',$3,100,'UAH','sender',1,1,1,1,1,'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','999000',now()-interval '1 minute')",
       [id, placed.id, placed.number],
     );
     const before = calls.length;
@@ -509,27 +505,19 @@ describe("managed shipping bindings (real Postgres, fake carrier HTTP)", () => {
     const legacy = await world.paid("address_no_carrier"),
       id = randomUUID();
     await world.pool.query(
-      "insert into shipment(id,order_id,provider_code,status,client_reference,declared_value_amount,currency,payer,weight_grams,length_mm,width_mm,height_mm,seats,provider_ref,tracking_number) values($1,$2,'nova_post','created',$3,100,'UAH','sender',1,1,1,1,1,'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','999001')",
+      "insert into shipment(id,order_id,provider_code,status,client_reference,declared_value_amount,currency,payer,weight_grams,length_mm,width_mm,height_mm,seats,provider_ref,tracking_number) values($1,$2,'testship','created',$3,100,'UAH','sender',1,1,1,1,1,'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','999001')",
       [id, legacy.id, legacy.number],
     );
     await world.pool.query(
       "update shipment set next_track_at=now()-interval '1 minute' where id=ANY($1::uuid[])",
       [[sa.id, sb.id, id]],
     );
-    vi.stubEnv("NOVA_POST_API_KEY", "invented-env-shipping-key");
-    vi.stubEnv("NOVA_POST_ENVIRONMENT", "sandbox");
     const env = await startApp({
       shippingDelegated: false,
       secretsKeyRing: ring,
-      integrationProvidersDir: fileURLToPath(
-        new URL("../../../../packages/providers", import.meta.url),
-      ),
-      extraShippingProviders: await loadShippingProviders({
-        enabled: ["nova_post"],
-        providersDir: fileURLToPath(new URL("../../../../packages/providers", import.meta.url)),
-      }),
+      integrationProvidersDir: fixture.dir,
+      extraShippingProviders: fixture.shipping.envProviders(),
     });
-    vi.unstubAllEnvs();
     try {
       calls.length = 0;
       const result = await trackShipments(
@@ -538,14 +526,13 @@ describe("managed shipping bindings (real Postgres, fake carrier HTTP)", () => {
       );
       expect(result.scanned).toBe(3);
       expect(result.providerFailures).toBe(0);
-      const polls = calls.filter((call) => call.path.endsWith("/tracking"));
+      const polls = calls.filter((call) => call.operation === "track");
       expect(polls.map((call) => call.key).sort()).toEqual(
         [KEY_A, KEY_B, "invented-env-shipping-key"].sort(),
       );
       expect(polls.every((call) => call.numbers.length === 1)).toBe(true);
     } finally {
       await env.app.close();
-      vi.unstubAllEnvs();
     }
     await world.pool.query("delete from shipment where id=$1", [id]);
   });
@@ -564,12 +551,12 @@ describe("managed shipping bindings (real Postgres, fake carrier HTTP)", () => {
     calls.length = 0;
     const tracking = world.orders.owner.app.get(ShipmentTrackingService);
     await trackShipments({ tracking }, new Date());
-    const polls = calls.filter((call) => call.path.endsWith("/tracking"));
+    const polls = calls.filter((call) => call.operation === "track");
     expect(polls.map((call) => call.key).sort()).toEqual([KEY_A, KEY_B]);
     expect(polls.every((call) => call.numbers.length === 1)).toBe(true);
     const retained = await world.orders.owner.app
       .get(ShippingProviders)
-      .forShipment({ providerCode: "nova_post", integrationCredentialVersionId: a });
+      .forShipment({ providerCode: "testship", integrationCredentialVersionId: a });
     if (!retained) throw new Error("missing_retained_client");
     await world.pool.query(
       "update integration_credential_version set state='revoked',revoked_at=now() where id=$1",
@@ -582,9 +569,9 @@ describe("managed shipping bindings (real Postgres, fake carrier HTTP)", () => {
     calls.length = 0;
     const result = await trackShipments({ tracking }, new Date());
     expect(result.providerFailures).toBe(1);
-    expect(calls.filter((call) => call.path.endsWith("/tracking")).map((call) => call.key)).toEqual(
-      [KEY_B],
-    );
+    expect(calls.filter((call) => call.operation === "track").map((call) => call.key)).toEqual([
+      KEY_B,
+    ]);
     expect((await world.label(first.id, sa.id)).status).toBeGreaterThanOrEqual(400);
     expect((await world.action(first.id, sa.id, "cancel")).status).toBeGreaterThanOrEqual(400);
     expect(calls.every((call) => call.key !== KEY_A)).toBe(true);
@@ -593,7 +580,7 @@ describe("managed shipping bindings (real Postgres, fake carrier HTTP)", () => {
     for (const lookup of [
       () => retained.searchCities({ query: "Test", locale: "en", limit: 10 }, signal()),
       () => retained.listPickupPoints({ cityRef: "123", kinds: ["branch"] }, signal()),
-      () => retained.findPickupPoint({ ref: "700005" }, signal()),
+      () => retained.findPickupPoint({ ref: "test-city-kyiv-point-1" }, signal()),
     ])
       await expect(lookup()).rejects.toMatchObject({ codes: ["credential_revoked"] });
     const settings = {
@@ -611,7 +598,11 @@ describe("managed shipping bindings (real Postgres, fake carrier HTTP)", () => {
       parcel: { weightGrams: 500, lengthMm: 200, widthMm: 150, heightMm: 100, seats: 1 },
       description: "Test parcel",
       recipient: { firstName: "Test", lastName: "Recipient", phone: "380501234567" },
-      destination: { kind: "pickup_point", cityRef: "123", pickupPointRef: "700005" },
+      destination: {
+        kind: "pickup_point",
+        cityRef: "123",
+        pickupPointRef: "test-city-kyiv-point-1",
+      },
       settings,
     };
     for (const operation of [
@@ -642,7 +633,11 @@ describe("managed shipping bindings (real Postgres, fake carrier HTTP)", () => {
         retained.estimate(
           {
             service: null,
-            destination: { kind: "pickup_point", cityRef: "123", pickupPointRef: "700005" },
+            destination: {
+              kind: "pickup_point",
+              cityRef: "123",
+              pickupPointRef: "test-city-kyiv-point-1",
+            },
             declaredValue: { amount: 100, currency: "UAH" },
             parcel: null,
             settings,

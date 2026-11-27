@@ -395,6 +395,7 @@ export class ShipmentsService {
         "no_carrier",
       );
     }
+    await this.changes.lockActor(tx, actor);
     await lockShippingProfile(tx, snapshot.providerCode);
     const versionId = await this.registry.admit(tx, snapshot.providerCode);
     const provider = await this.requireBoundProvider(

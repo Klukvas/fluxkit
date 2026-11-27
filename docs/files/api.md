@@ -531,3 +531,6 @@ Core, no flag. Self-contained: no other module imports it; it must NOT import th
 - `src/integrations/shipping-activation.service.ts` — shipping readiness, environment/override and legacy-open-work checks, lifecycle/audit activation.
 - `drizzle/0024_managed_shipping_credentials{,.down}.sql`, `drizzle/meta/0024_snapshot.json` — guarded nullable shipment binding, identity trigger, FK RESTRICT/index and refusing down migration.
 - `src/shipping/managed-shipping.spec.ts`, `src/integrations/shipping-activation.integration.spec.ts`, `src/database/managed-shipping-migration.spec.ts` — real-service managed shipping/binding/transaction/lifecycle and rollback coverage.
+
+- `src/test/managed-shipping-provider.ts`, `src/test/integration-provider-fixture.ts` — temporary managed shipping packages backed by the in-repo test carrier; token exchange and every simulated request pass through the runtime transport gate, without installed provider packages.
+- `src/test/admin-revocation-race.ts` — real-Postgres admin/lifecycle lock race with an explicit `pg_blocking_pids` barrier; shared by shipment and payment regressions.
