@@ -1,5 +1,7 @@
 # Changelog
 
+- Manual deployments require a successful `CI` run from a push to `main` for the selected commit.
+
 - Rolling deploy: stopping an API or storefront replica no longer answers 502 while nginx still lists its address. The container stays in Docker DNS for 5 s after the process stops accepting, and one refused connection keeps that address out of rotation for 20 s.
 
 - Email: saved Resend and Brevo keys can both be turned on from the Integrations screen when `EMAIL_PROVIDER` is absent. The screen chooses `equal` (about 50 of 100 new messages start with each) or `resend` (every new message starts with Resend). The choice also applies when the server chain already contains both. A message waits while its starting provider is cooling down. It moves to the other only after a definite non-acceptance (`quota_exceeded`, `rate_limited`, `misconfigured`, `not_sent`). A timeout, a rejection or an idempotency conflict stays on the provider that saw it. Migration `0021_email_route_mode` adds `email_route_setting` and `email_message.assigned_provider_code` (`resend` or `brevo` only). A missing or unknown mode fails the read. Any other second email provider still answers `409` `integration_route_unset`. A listed secret now includes `versionState`. The list now includes `emailRouteMode`. Changing the choice records `integration.route_changed`.
