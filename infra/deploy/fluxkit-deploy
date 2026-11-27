@@ -6,9 +6,10 @@
 # The client's command line is "deploy <commit sha>"; stdin carries the release's infra/ directory as a tar stream
 # (git archive --format=tar <sha> infra). By hand, as root: fluxkit-deploy deploy <sha> < infra.tar
 #
-# Order: lock, unpack, pull every image (a missing image changes nothing), backup, switch FLUXKIT_IMAGE_TAG and
+# Order: lock, check for an executable backup command, unpack, pull every image, back up, switch FLUXKIT_IMAGE_TAG and
 # /opt/fluxkit/current, infrastructure, migrate, roll api then storefront, edge. When the new release does not become healthy, the previous one is started again; that
 # cannot undo a migration the new release ran (the old API refuses a newer database: restore the backup).
+# FLUXKIT_DEPLOY_ALLOW_NO_BACKUP=1 allows a deploy without a backup command on a throwaway host.
 #
 # Optional features (docs/deployment.md, "Optional features"): to switch one on, add its name to FEATURES_ENABLED in the env
 # file, then deploy; the start below runs `migrate` (same env file, so the feature's migrations too) before the API, which
@@ -38,6 +39,17 @@ release_digest() {
   for file in "$1/infra/docker-compose.prod.yml" "$ENV_FILE" "$MEILI_ENV_FILE"; do
     sha256sum < "$file" || return 1
   done | sha256sum | cut -d ' ' -f 1
+}
+
+check_backup_command() {
+  if [ -f "$BACKUP_COMMAND" ] && [ -x "$BACKUP_COMMAND" ]; then
+    backup_enabled=true
+  elif [ "${FLUXKIT_DEPLOY_ALLOW_NO_BACKUP:-0}" = 1 ]; then
+    log "WARNING: no executable backup command at $BACKUP_COMMAND. Deploying without a backup (FLUXKIT_DEPLOY_ALLOW_NO_BACKUP=1)." >&2
+    backup_enabled=false
+  else
+    fail "no executable backup command at $BACKUP_COMMAND. Install it or set FLUXKIT_DEPLOY_ALLOW_NO_BACKUP=1 on a throwaway host."
+  fi
 }
 
 compose() {
@@ -193,6 +205,7 @@ tag=${tag:0:7}
 
 exec 9> "$LOCK_FILE"
 flock -n 9 || fail "another deployment is running"
+check_backup_command
 
 [ -n "$(env_value FLUXKIT_IMAGE_PREFIX)" ] || fail "set FLUXKIT_IMAGE_PREFIX (registry repository prefix) in $ENV_FILE"
 api_replicas=$(replica_count FLUXKIT_API_REPLICAS)
@@ -224,11 +237,9 @@ else
   FLUXKIT_IMAGE_TAG=$tag compose "$release_dir" pull --quiet
 fi
 
-if [ -x "$BACKUP_COMMAND" ]; then
+if [ "$backup_enabled" = true ]; then
   log "backup before the switch"
   "$BACKUP_COMMAND"
-else
-  log "no backup command at $BACKUP_COMMAND: no backup taken"
 fi
 
 cp -p "$ENV_FILE" "$ENV_FILE.pre-deploy"
