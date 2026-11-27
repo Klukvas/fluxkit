@@ -18,7 +18,9 @@ updates:
     directory: /
     schedule:
       interval: weekly
-  - package-ecosystem: docker
+  # The Postgres, Redis and Meilisearch images of infra/docker-compose.yml and docker-compose.prod.yml (tag and digest).
+  # The CI service containers in .github/workflows/ci.yml keep their floating tags: move their versions with these PRs.
+  - package-ecosystem: docker-compose
     directory: /infra
     schedule:
       interval: weekly

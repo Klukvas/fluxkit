@@ -6,6 +6,8 @@
 # (nginx: TLS, routing, the admin SPA), meilisearch (catalog search, ADR 0034), redis (shared state for several API instances,
 # docs/plans/2026-11-14-multi-instance.md; used with RATE_LIMIT_STORE=redis). Only the edge publishes ports.
 # More than one api replica needs RATE_LIMIT_STORE=redis; infra/deploy/fluxkit-deploy enforces it.
+# Postgres, Meilisearch and Redis are pinned by tag and digest: every deploy pulls the project, and a moved tag would otherwise
+# recreate the database or Redis inside an application release. Updates arrive as Dependabot PRs (docker-compose ecosystem).
 name: ${COMPOSE_PROJECT_NAME:-fluxkit}
 
 x-hardening: &hardening
@@ -36,7 +38,7 @@ x-api-environment: &api-environment
 
 services:
   postgres:
-    image: postgres:17-alpine
+    image: postgres:17.12-alpine@sha256:f9cf3e1f0066f0eb0c48707d864f0ac5941e9ff454a072077d97a4d278d07d73
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER}
@@ -59,7 +61,7 @@ services:
   # target. Reachable only by the api on the Compose network: never publish its port or route it through the edge.
   meilisearch:
     <<: *hardening
-    image: getmeili/meilisearch:v1.55.0
+    image: getmeili/meilisearch:v1.55.0@sha256:ff546679970126f8822e15d1b6a06bfbff1f2ce2e43f810cfb5258012f92de5c
     # The master key (MEILI_MASTER_KEY, SECRET, at least 16 bytes) lives in its own file, so the api never receives it: it
     # only creates the API's scoped key (docs/deployment.md). A missing file stops `up`.
     env_file: ["${FLUXKIT_MEILI_ENV_FILE:-meilisearch.env}"]
@@ -84,7 +86,7 @@ services:
   # never publish its port or route it through the edge. Runs as the image's redis user (999) so no capability is needed.
   redis:
     <<: *hardening
-    image: redis:8-alpine
+    image: redis:8.12.0-alpine@sha256:5af80107c1eeecb484a2269b80a26d12bfa6521787da4663bd9f19f60a163483
     user: "999:999"
     # Hex password (openssl rand -hex 32), so it can later stand unescaped in REDIS_URL.
     command:
