@@ -120,12 +120,12 @@ pass "stop linger keeps a retiring replica in DNS (infra/docker/stop-linger.spec
 # --- images ---
 ENV_MARKER=$(openssl rand -hex 32)
 # Use the paths operators use so a regression in the build context is visible in the images.
-for file in infra/meilisearch.env infra/production.env.pre-deploy apps/api/.env; do
+for file in infra/meilisearch.env infra/production.env.pre-deploy infra/production.env~ apps/api/.env; do
   [[ ! -e "$file" && ! -L "$file" ]] || continue
   (set -o noclobber; printf 'FLUXKIT_SMOKE_MARKER=%s\n' "$ENV_MARKER" >"$file") || fail "could not create $file"
   MARKER_ENV_FILES+=("$file")
 done
-# A configured checkout can already have all three files.
+# A configured checkout can already have all of these files.
 if [[ -z "${MARKER_ENV_FILES[0]:-}" ]]; then
   file=$(mktemp infra/production.env.smoke.XXXXXXXX)
   MARKER_ENV_FILES+=("$file")
