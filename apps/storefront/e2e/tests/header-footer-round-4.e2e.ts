@@ -210,7 +210,7 @@ test.describe("desktop", () => {
     const shop = footer.getByRole("navigation", { name: "Customer service", exact: true });
     const legal = footer.getByRole("navigation", { name: "Legal", exact: true });
     await expect(shop.getByRole("heading", { level: 2, name: "Customer service" })).toBeVisible();
-    await expect(legal.getByRole("link", { name: "Cookies", exact: true })).toHaveAttribute(
+    await expect(legal.getByRole("link", { name: "Cookie policy", exact: true })).toHaveAttribute(
       "href",
       "/en/legal/cookies",
     );

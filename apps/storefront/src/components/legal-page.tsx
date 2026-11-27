@@ -11,20 +11,17 @@ import {
   LEGAL_PLACEHOLDER_MARKER,
   cookieTable,
   legalIdentity,
+  legalSections,
   withoutLegalMarker,
   type LegalPageSlug,
 } from "../config/legal";
+import { demoContent } from "../config/demo-content";
+import { Paragraphs } from "./paragraphs";
 import { formatDate } from "../lib/date";
 import { localizedHref } from "../lib/locale-path";
 import { slotValues, splitMessage } from "../lib/rich-message";
 
-/**
- * A legal page of the template (privacy plan step 10): neutral placeholder copy that says the shop must supply its own text,
- * the "Template placeholder" box while the text carries the marker (the marker itself is never shown), who runs the shop (from `config/legal.ts`, a visible placeholder while unset) and, on the
- * cookie page, the table of the cookies a shopper can receive. A server component: nothing here needs the browser.
- * TODO(fluxkit): legal review of the cookie statement before an EU launch.
- */
-
+/** Section-based default legal texts; server-rendered, with a review box until the fork reviews each page. */
 function Unset({ t }: { t: Translator }) {
   return <span className="text-muted-foreground">{t("legal.identity.unset")}</span>;
 }
@@ -32,8 +29,13 @@ function Unset({ t }: { t: Translator }) {
 function Identity({ t }: { t: Translator }) {
   const rows: [string, string | null][] = [
     ["legal.identity.name", legalIdentity.shopLegalName],
+    ["legal.identity.taxId", legalIdentity.shopTaxId],
     ["legal.identity.address", legalIdentity.shopLegalAddress],
-    ["legal.identity.contact", legalIdentity.privacyContact],
+    ["legal.identity.phone", legalIdentity.shopPhone],
+    ["legal.identity.email", legalIdentity.shopEmail],
+    ...(!legalIdentity.shopEmail?.trim() || legalIdentity.privacyContact !== legalIdentity.shopEmail
+      ? [["legal.identity.contact", legalIdentity.privacyContact] as [string, string | null]]
+      : []),
   ];
   return (
     <section aria-labelledby="legal-identity" className="flex flex-col gap-3">
@@ -44,7 +46,7 @@ function Identity({ t }: { t: Translator }) {
         {rows.map(([key, value]) => (
           <div key={key} className="flex flex-wrap gap-x-6">
             <dt className="w-40 text-muted-foreground">{t(key)}</dt>
-            <dd className="min-w-0 break-words">{value ?? <Unset t={t} />}</dd>
+            <dd className="min-w-0 break-words">{value?.trim() ? value : <Unset t={t} />}</dd>
           </div>
         ))}
       </dl>
@@ -96,13 +98,25 @@ function CookieTable({ t }: { t: Translator }) {
   );
 }
 
-function PrivacyPointers({ t, locale }: { t: Translator; locale: Locale }) {
-  const parts = splitMessage(t("legal.privacy.selfService", slotValues(["account"])), ["account"]);
+function PrivacyPointers({
+  t,
+  locale,
+  values,
+}: {
+  t: Translator;
+  locale: Locale;
+  values: Readonly<Record<string, string>>;
+}) {
+  const parts = splitMessage(
+    t("legal.privacy.selfService", { ...values, ...slotValues(["account"]) }),
+    ["account"],
+  );
   return (
     <section aria-labelledby="legal-rights" className="flex flex-col gap-2">
       <h2 id="legal-rights" className={textStyles.sectionTitle}>
         {t("legal.privacy.rightsTitle")}
       </h2>
+      <Paragraphs text={t("legal.privacy.rightsBody", values)} />
       <p className="text-foreground">
         {parts.map((part, index) =>
           part.kind === "text" ? (
@@ -118,7 +132,7 @@ function PrivacyPointers({ t, locale }: { t: Translator; locale: Locale }) {
           ),
         )}
       </p>
-      <p className="text-foreground">{t("legal.privacy.guests")}</p>
+      <p className="text-foreground">{t("legal.privacy.guests", values)}</p>
     </section>
   );
 }
@@ -127,12 +141,25 @@ export function LegalPage({
   slug,
   locale,
   t,
+  website,
 }: {
   slug: LegalPageSlug;
   locale: Locale;
   t: Translator;
+  /** Public origin host, supplied by the server route. */
+  website: string;
 }) {
-  const intro = t(`legal.${slug}.intro`);
+  const inline = (value: string | null) => value?.trim() || t("legal.identity.unsetInline");
+  const values = {
+    sellerName: inline(legalIdentity.shopLegalName),
+    sellerTaxId: inline(legalIdentity.shopTaxId),
+    sellerAddress: inline(legalIdentity.shopLegalAddress),
+    sellerEmail: inline(legalIdentity.shopEmail),
+    sellerPhone: inline(legalIdentity.shopPhone),
+    privacyEmail: inline(legalIdentity.privacyContact),
+    website,
+  };
+  const intro = t(`legal.${slug}.intro`, values);
   return (
     <Container className="flex flex-col gap-6 py-8">
       {/* Breadcrumbs like the shop pages listed next to these in the footer (council decision 3). */}
@@ -146,13 +173,13 @@ export function LegalPage({
         />
         <h1 className={textStyles.pageTitle}>{t(`legal.${slug}.title`)}</h1>
       </div>
-      {/* The box follows the text, not a message of its own: it goes away only when the shop replaced the text. */}
-      {intro.includes(LEGAL_PLACEHOLDER_MARKER) ? (
+      {/* The list records legal review; the marker remains a backstop for older fork intros. */}
+      {demoContent.legalTexts.includes(slug) || intro.includes(LEGAL_PLACEHOLDER_MARKER) ? (
         <Alert variant="warning" title={t("legal.placeholder.title")}>
           <p>{t("legal.placeholder.body")}</p>
         </Alert>
       ) : null}
-      <p className="max-w-prose text-foreground">{withoutLegalMarker(intro)}</p>
+      <Paragraphs text={withoutLegalMarker(intro)} />
       <p className="text-muted-foreground">
         {legalIdentity.lastUpdated === null
           ? t("legal.updated.unset")
@@ -161,7 +188,21 @@ export function LegalPage({
             })}
       </p>
       {slug === "cookies" ? <CookieTable t={t} /> : null}
-      {slug === "privacy" ? <PrivacyPointers t={t} locale={locale} /> : null}
+      {legalSections[slug].map((section, index) => (
+        <section
+          key={section.id}
+          aria-labelledby={`legal-section-${section.id}`}
+          className="flex flex-col gap-3"
+        >
+          {section.titleKey === undefined ? null : (
+            <h2 id={`legal-section-${section.id}`} className={textStyles.sectionTitle}>
+              {`${index + 1}. ${t(section.titleKey)}`}
+            </h2>
+          )}
+          <Paragraphs text={t(section.bodyKey, values)} />
+        </section>
+      ))}
+      {slug === "privacy" ? <PrivacyPointers t={t} locale={locale} values={values} /> : null}
       <Identity t={t} />
     </Container>
   );

@@ -2,5 +2,8 @@
   "shopLegalName": null,
   "shopLegalAddress": null,
   "privacyContact": null,
-  "lastUpdated": null
+  "lastUpdated": null,
+  "shopTaxId": null,
+  "shopEmail": null,
+  "shopPhone": null
 }

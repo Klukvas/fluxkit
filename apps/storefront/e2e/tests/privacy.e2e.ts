@@ -45,11 +45,11 @@ test("a shopper downloads their data and deletes the account; the admin sees the
   await page.goto("/en/account/register");
   await waitForHydration(page);
   const notice = page.locator("p").filter({ hasText: /By creating an account you accept the/ });
-  await expect(notice.getByRole("link", { name: "Terms" })).toHaveAttribute(
+  await expect(notice.getByRole("link", { name: "terms of sale" })).toHaveAttribute(
     "href",
     "/en/legal/terms",
   );
-  await expect(notice.getByRole("link", { name: "Privacy notice" })).toHaveAttribute(
+  await expect(notice.getByRole("link", { name: "privacy policy" })).toHaveAttribute(
     "href",
     "/en/legal/privacy",
   );
@@ -183,7 +183,7 @@ test("a shopper downloads their data and deletes the account; the admin sees the
   for (const name of names) expect(["fluxkit_cart", "fluxkit_customer_session"]).toContain(name);
 });
 
-test("the daily limit of the download shows its wait, and the legal pages are placeholders with the placeholder box", async ({
+test("the daily limit of the download shows its wait, and the legal pages show default texts requiring review", async ({
   page,
   shopper,
 }, testInfo) => {
@@ -206,23 +206,22 @@ test("the daily limit of the download shows its wait, and the legal pages are pl
   await expect(limited).toContainText(/Try again in about \d+ (hours?|minutes?)\./);
   await expect(limited).toBeFocused();
 
-  // Legal pages: placeholders with the "Template placeholder" box, linked from the footer, no cookie banner.
+  // Default legal texts require review, are linked from the footer and have no cookie banner.
   // The footer's legal column (the `columns` layout since round 4: a navigation named by its visible heading).
   const footer = page
     .getByRole("contentinfo")
     .getByRole("navigation", { name: "Legal", exact: true });
   for (const [name, path] of [
-    ["Privacy notice", "/en/legal/privacy"],
-    ["Terms", "/en/legal/terms"],
-    ["Cookies", "/en/legal/cookies"],
+    ["Privacy policy", "/en/legal/privacy"],
+    ["Terms of sale", "/en/legal/terms"],
+    ["Cookie policy", "/en/legal/cookies"],
   ] as const) {
     await expect(footer.getByRole("link", { name, exact: true })).toHaveAttribute("href", path);
   }
-  await footer.getByRole("link", { name: "Cookies", exact: true }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Cookies" })).toBeVisible();
-  // The "Template placeholder" box stays while the text carries the marker, but the marker (an English developer note) is
-  // never shown (repair batch 2).
-  await expect(page.getByText("Template placeholder")).toBeVisible();
+  await footer.getByRole("link", { name: "Cookie policy", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Cookie policy" })).toBeVisible();
+  // The review box stays while legalTexts lists the page; no legacy marker is shown.
+  await expect(page.getByText("Default template text: legal review needed")).toBeVisible();
   await expect(page.getByText("TODO(fluxkit)")).toHaveCount(0);
   const table = page.getByRole("table", { name: "The cookies of this shop" });
   // Header row, the API's cart and session cookies, and the storefront's theme preference (design batch B, ADR 0045).
@@ -232,8 +231,20 @@ test("the daily limit of the download shows its wait, and the legal pages are pl
   await expect(table).toContainText("fluxkit_theme");
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await page.goto("/en/legal/privacy");
-  await expect(page.getByRole("heading", { level: 1, name: "Privacy notice" })).toBeVisible();
-  await expect(page.getByText("Not provided by the shop yet").first()).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Privacy policy" })).toBeVisible();
+  await expect(
+    page
+      .locator("section", {
+        has: page.getByRole("heading", { name: "Seller details", exact: true }),
+      })
+      .getByText("Not provided by the shop yet")
+      .first(),
+  ).toBeVisible();
+  await page.goto("/en/legal/terms");
+  await expect(page.getByRole("heading", { level: 1, name: "Terms of sale" })).toBeVisible();
+  const numbered = page.getByRole("main").getByRole("heading", { level: 2, name: /^\d+\. / });
+  expect(await numbered.count()).toBeGreaterThanOrEqual(10);
+  await expect(page.getByRole("main")).not.toContainText("{");
   // An unknown legal page is a real 404.
   const unknown = await page.goto("/en/legal/nothing");
   expect(unknown?.status()).toBe(404);

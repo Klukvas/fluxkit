@@ -170,6 +170,30 @@ describe("header and footer size (a loose sanity cap, ADR 0048)", () => {
     expect(new TextEncoder().encode(header).length).toBeLessThan(9000);
   });
 
+  it("uses the legal page titles for the footer links with real messages", () => {
+    const html = renderToStaticMarkup(
+      <SiteShell
+        themeMode="light"
+        locale="en"
+        messages={en}
+        t={createTranslator(en, "en")}
+        categories={null}
+        searchEnabled={false}
+        year={2026}
+      >
+        Page
+      </SiteShell>,
+    );
+    const footer = html.slice(html.indexOf("<footer"), html.indexOf("</footer>"));
+    for (const [slug, title] of [
+      ["privacy", "Privacy policy"],
+      ["terms", "Terms of sale"],
+      ["cookies", "Cookie policy"],
+    ]) {
+      expect(footer).toContain(`<a href="/en/legal/${slug}">${title}</a>`);
+    }
+  });
+
   it("keeps the footer under 4 000 bytes", () => {
     const html = renderToStaticMarkup(
       <SiteShell

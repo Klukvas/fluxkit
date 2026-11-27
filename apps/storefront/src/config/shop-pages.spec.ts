@@ -224,6 +224,8 @@ describe("demo content (config/demo-content.json, the release check's list)", ()
   });
 
   it("has exactly the keys the release check in next.config.ts reads", () => {
-    expect(Object.keys(demoContent).sort()).toEqual(["shopPages", ...DEMO_CONTENT_FLAGS].sort());
+    expect(Object.keys(demoContent).sort()).toEqual(
+      ["shopPages", "legalTexts", ...DEMO_CONTENT_FLAGS].sort(),
+    );
   });
 });

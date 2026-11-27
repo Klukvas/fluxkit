@@ -32,16 +32,19 @@ export const LEGAL_MARKER = "TODO(fluxkit): replace with the shop's own legal te
 /**
  * The release check of a client fork (privacy plan step 10, owner answer 10): with `STOREFRONT_REQUIRE_LEGAL_TEXT=true` a
  * production build REFUSES while ANY legal placeholder remains: a `legal.*` message of any language that still carries the
- * placeholder marker (the intro of every legal page does, so the shop cannot pass without replacing the texts themselves;
+ * placeholder marker (a backstop for older fork texts;
  * read from the MERGED messages, the area files plus the fork's extras and overrides, `readMergedMessages`), or
  * a controller identity value (`src/config/legal-identity.json`) that is missing, `null`, empty or blank, or (repair batch 2)
  * an entry of `src/config/demo-content.json` that still marks a shop page, the contacts, the home texts or the trust bar as the
- * template's demo copy. Each offender is named. The legal marker stays in the messages but is not shown on the page
- * (`withoutLegalMarker` in `src/config/legal.ts`). Master builds without the variable (it ships placeholders), so its CI and e2e builds are unaffected. Fails closed:
+ * template's demo copy, or a legal page awaiting lawyer review (`legalTexts`). Each offender is named. A legal marker is not shown on the page
+ * (`withoutLegalMarker` in `src/config/legal.ts`). Master builds without the variable (it ships default texts awaiting legal review), so its CI and e2e builds are unaffected. Fails closed:
  * when asked to check and the messages or the identity file cannot be read, the build stops.
  */
 export const LEGAL_IDENTITY_FIELDS = [
   "shopLegalName",
+  "shopTaxId",
+  "shopEmail",
+  "shopPhone",
   "shopLegalAddress",
   "privacyContact",
   "lastUpdated",
@@ -50,8 +53,10 @@ export const LEGAL_IDENTITY_FIELDS = [
 /**
  * The entries of `src/config/demo-content.json` (repair batch 2, plan docs/plans/2026-11-06-storefront-shop-pages.md; the app's
  * typed copy is `src/config/demo-content.ts`, a spec keeps the two equal): the shop pages whose texts are still the template's
- * (a list of slugs), and three flags for the contacts, the home texts and the trust bar.
+ * (a list of slugs), legal texts awaiting review, and three flags for the contacts, the home texts and the trust bar.
  */
+export const LEGAL_TEXT_SLUGS = ["privacy", "terms", "cookies"] as const;
+
 export const DEMO_CONTENT_FLAGS = ["contacts", "home", "trustBar"] as const;
 
 /**
@@ -74,7 +79,7 @@ export function demoContentLeft(file: string): string[] {
     throw new Error(`${file} must hold an object.`);
   }
   const entries = content as Record<string, unknown>;
-  const known = new Set<string>(["shopPages", ...DEMO_CONTENT_FLAGS]);
+  const known = new Set<string>(["shopPages", "legalTexts", ...DEMO_CONTENT_FLAGS]);
   const unknown = Object.keys(entries).filter((key) => !known.has(key));
   if (unknown.length > 0) throw new Error(`${file} has unknown keys: ${unknown.join(", ")}.`);
   const pages = entries["shopPages"] ?? [];
@@ -82,6 +87,24 @@ export function demoContentLeft(file: string): string[] {
     throw new Error(`${file}: "shopPages" must be a list of page slugs.`);
   }
   const left = (pages as string[]).map((slug) => `shopPages: ${slug}`);
+  // Required, unlike the older entries: a fork merging this change must state the review status (`[]` once a lawyer
+  // reviewed every page), so a missing key cannot pass the check while the pages show the template's default texts.
+  const legal = entries["legalTexts"];
+  if (legal === undefined) {
+    throw new Error(
+      `${file}: "legalTexts" is missing: list the legal pages still awaiting legal review, or [] once all were reviewed.`,
+    );
+  }
+  if (!Array.isArray(legal) || legal.some((slug) => typeof slug !== "string")) {
+    throw new Error(`${file}: "legalTexts" must be a list of legal page slugs.`);
+  }
+  const unknownLegal = (legal as string[]).filter(
+    (slug) => !LEGAL_TEXT_SLUGS.some((knownSlug) => knownSlug === slug),
+  );
+  if (unknownLegal.length > 0) {
+    throw new Error(`${file}: "legalTexts" has unknown slugs: ${unknownLegal.join(", ")}.`);
+  }
+  left.push(...(legal as string[]).map((slug) => `legalTexts: ${slug}`));
   for (const flag of DEMO_CONTENT_FLAGS) {
     const value = entries[flag] ?? false;
     if (typeof value !== "boolean") throw new Error(`${file}: "${flag}" must be true or false.`);

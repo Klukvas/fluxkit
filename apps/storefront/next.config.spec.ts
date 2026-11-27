@@ -252,6 +252,9 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
   const placeholderTextKeys = ["legal.privacy.intro", "legal.terms.intro", "legal.cookies.intro"];
   const filledIdentity = {
     shopLegalName: "Example Shop Ltd",
+    shopTaxId: "12345678",
+    shopEmail: "shop@example.test",
+    shopPhone: "+380001234567",
     shopLegalAddress: "1 Example Street, Kyiv",
     privacyContact: "privacy@example.test",
     lastUpdated: "2026-10-29",
@@ -259,7 +262,13 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
 
   const masterDemoContent = join(import.meta.dirname, "src", "config", "demo-content.json");
   /** What a fork that replaced every demo text has (repair batch 2). */
-  const clearedDemo = { shopPages: [], contacts: false, home: false, trustBar: false };
+  const clearedDemo = {
+    legalTexts: [],
+    shopPages: [],
+    contacts: false,
+    home: false,
+    trustBar: false,
+  };
   const sharedDirectory = mkdtempSync(join(tmpdir(), "storefront-demo-"));
   const clearedDemoFile = join(sharedDirectory, "demo-content.json");
   writeFileSync(clearedDemoFile, JSON.stringify(clearedDemo));
@@ -346,12 +355,11 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
     }
   }
 
-  it("uses the marker the legal config names, and master carries it in the intro of every legal page in both languages", () => {
+  it("keeps the marker backstop while master intros use the legalTexts review list", () => {
     expect(LEGAL_MARKER).toBe(LEGAL_PLACEHOLDER_MARKER);
-    const message = failureOf({ messagesDir: masterMessages, identityFile: masterIdentity });
-    for (const language of ["en", "uk"]) {
+    for (const messages of Object.values(messagesByLocale)) {
       for (const key of placeholderTextKeys) {
-        expect(message).toContain(`messages/${language}/legal.json: ${key}`);
+        expect((messages as Record<string, string>)[key]).not.toContain(LEGAL_MARKER);
       }
     }
   });
@@ -385,7 +393,9 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
   it("passes when an override replaces every marked text (a fork's own texts in messages-overrides)", () => {
     const replaced = Object.fromEntries(placeholderTextKeys.map((key) => [key, `Our own ${key}`]));
     const { directory, messagesDir, overridesDir, identityFile } = scratch(
-      () => {},
+      (messages) => {
+        for (const key of placeholderTextKeys) messages[key] = `${LEGAL_MARKER} ${messages[key]}`;
+      },
       filledIdentity,
       { en: replaced, uk: replaced },
     );
@@ -399,7 +409,9 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
   it("refuses while one locale's override leaves a marked text, naming the override file that carries it", () => {
     const replaced = Object.fromEntries(placeholderTextKeys.map((key) => [key, `Our own ${key}`]));
     const { directory, messagesDir, overridesDir, identityFile } = scratch(
-      () => {},
+      (messages) => {
+        for (const key of placeholderTextKeys) messages[key] = `${LEGAL_MARKER} ${messages[key]}`;
+      },
       filledIdentity,
       { en: replaced, uk: { ...replaced, "legal.cookies.intro": `${LEGAL_MARKER} copied` } },
     );
@@ -874,7 +886,9 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
       const message = demoFailure(masterDemoContent);
       const master = JSON.parse(readFileSync(masterDemoContent, "utf8")) as {
         shopPages: string[];
+        legalTexts: string[];
       };
+      for (const slug of master.legalTexts) expect(message).toContain(`legalTexts: ${slug}`);
       expect(master.shopPages.length).toBeGreaterThan(0);
       for (const slug of master.shopPages) expect(message).toContain(`shopPages: ${slug}`);
       for (const flag of DEMO_CONTENT_FLAGS) expect(message).toContain(`\n${flag}`);
@@ -893,9 +907,28 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
       }
     });
 
-    it("treats a missing entry as cleared, and false or [] as cleared", () => {
-      expect(demoFailure(demoFile({}))).toBe("");
+    it("refuses each legal page independently and fails closed on invalid legalTexts", () => {
+      for (const slug of ["privacy", "terms", "cookies"]) {
+        expect(demoFailure(demoFile({ ...clearedDemo, legalTexts: [slug] }))).toMatch(
+          new RegExp(`\\nlegalTexts: ${slug}$`),
+        );
+      }
+      for (const bad of [null, false, "privacy", [1], ["unknown"], ["Privacy"]]) {
+        expect(demoFailure(demoFile({ ...clearedDemo, legalTexts: bad }))).toMatch(/"legalTexts"/);
+      }
+    });
+
+    it("treats a missing older entry as cleared, and false or [] as cleared", () => {
+      expect(demoFailure(demoFile({ legalTexts: [] }))).toBe("");
       expect(demoFailure(demoFile(clearedDemo))).toBe("");
+    });
+
+    it("fails closed when legalTexts is missing, so a fork must state the review status", () => {
+      expect(demoFailure(demoFile({}))).toMatch(/"legalTexts" is missing/);
+      const withoutLegalTexts = Object.fromEntries(
+        Object.entries(clearedDemo).filter(([key]) => key !== "legalTexts"),
+      );
+      expect(demoFailure(demoFile(withoutLegalTexts))).toMatch(/"legalTexts" is missing/);
     });
 
     it("fails closed on a missing file, a malformed file, an unknown key or a value of the wrong type", () => {
@@ -914,10 +947,9 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
 
     it("lists what is left without the check switched on (the same reader)", () => {
       expect(demoContentLeft(demoFile(clearedDemo))).toEqual([]);
-      expect(demoContentLeft(demoFile({ shopPages: ["about"], trustBar: true }))).toEqual([
-        "shopPages: about",
-        "trustBar",
-      ]);
+      expect(
+        demoContentLeft(demoFile({ shopPages: ["about"], trustBar: true, legalTexts: ["terms"] })),
+      ).toEqual(["shopPages: about", "legalTexts: terms", "trustBar"]);
     });
   });
 

@@ -17,8 +17,9 @@ import type {
 } from "../config/shop-pages";
 import { contactsView, type ContactsView } from "../lib/contacts";
 import { localizedHref } from "../lib/locale-path";
-import { paragraphsOf, shopPageLinks } from "../lib/shop-pages";
+import { shopPageLinks } from "../lib/shop-pages";
 import { ContactDetails } from "./contact-details";
+import { Paragraphs } from "./paragraphs";
 import { focusRing } from "./styles";
 
 /**
@@ -28,18 +29,6 @@ import { focusRing } from "./styles";
 
 function headingIdOf(section: ShopPageSection): string {
   return `shop-section-${section.id}`;
-}
-
-function Paragraphs({ text }: { text: string }) {
-  return (
-    <>
-      {paragraphsOf(text).map((paragraph, index) => (
-        <p key={index} className="max-w-prose text-foreground">
-          {paragraph}
-        </p>
-      ))}
-    </>
-  );
 }
 
 function TextView({ section, t }: { section: TextSection; t: Translator }) {
