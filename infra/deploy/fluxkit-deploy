@@ -6,7 +6,7 @@
 # The client's command line is "deploy <commit sha>"; stdin carries the release's infra/ directory as a tar stream
 # (git archive --format=tar <sha> infra). By hand, as root: fluxkit-deploy deploy <sha> < infra.tar
 #
-# Order: lock, check for an executable backup command, unpack, pull every image, back up, switch FLUXKIT_IMAGE_TAG and
+# Order: stage upload, lock, check for an executable backup command, unpack, pull every image, back up, switch FLUXKIT_IMAGE_TAG and
 # /opt/fluxkit/current, infrastructure, migrate, roll api then storefront, edge. When the new release does not become healthy, the previous one is started again; that
 # cannot undo a migration the new release ran (the old API refuses a newer database: restore the backup).
 # FLUXKIT_DEPLOY_ALLOW_NO_BACKUP=1 allows a deploy without a backup command on a throwaway host.
@@ -26,12 +26,10 @@ MEILI_ENV_FILE=${FLUXKIT_MEILI_ENV_FILE:-/etc/fluxkit/meilisearch.env}
 BACKUP_COMMAND=${FLUXKIT_DEPLOY_BACKUP:-/usr/local/sbin/fluxkit-backup}
 PRUNE_COMMAND=${FLUXKIT_DEPLOY_PRUNE:-/usr/local/sbin/fluxkit-prune-images}
 LOCK_FILE=${FLUXKIT_DEPLOY_LOCK:-/run/lock/fluxkit-deploy.lock}
+LOG_DIR=${FLUXKIT_DEPLOY_LOG_DIR:-/var/log/fluxkit-deploy}
 # Test-only: FLUXKIT_DEPLOY_SKIP_PULL=1 uses locally built/tagged smoke images. Never set on the host.
 WAIT_SECONDS=300
 MIGRATE_WAIT_SECONDS=600
-
-log() { echo "fluxkit deploy: $*"; }
-fail() { echo "fluxkit deploy: $*" >&2; exit 1; }
 
 release_digest() {
   # Hash ordered file contents, not paths: rollback restores the exact .pre-deploy bytes. Never print env contents.
@@ -40,6 +38,14 @@ release_digest() {
     sha256sum < "$file" || return 1
   done | sha256sum | cut -d ' ' -f 1
 }
+
+log() {
+  printf 'fluxkit deploy: %s\n' "$*" >&2
+  if [ -n "${summary_file:-}" ]; then
+    printf 'fluxkit deploy: %s\n' "$*" >> "$summary_file"
+  fi
+}
+fail() { log "$@"; exit 1; }
 
 check_backup_command() {
   # The check and the call must name the same file: a relative name would be checked here and looked up in PATH later.
@@ -201,71 +207,143 @@ start_release() {
   compose "$release" up -d --wait --wait-timeout "$WAIT_SECONDS" --no-build || return 1
 }
 
+prune_deploy_logs() {
+  local LC_ALL=C file
+  # Keep this run and the 19 newest prior logs, in UTC timestamp order.
+  set --
+  for file in "$LOG_DIR"/fluxkit-deploy-*.log; do
+    [[ "$file" != "$deploy_log" && -f "$file" && ! -L "$file" ]] || continue
+    [[ "${file##*/}" =~ ^fluxkit-deploy-[0-9]{8}T[0-9]{15}Z-[0-9a-f]{7}-[a-zA-Z0-9]{6}\.log$ ]] || continue
+    set -- "$@" "$file"
+  done
+  while [ "$#" -gt 19 ]; do
+    rm -f -- "$1" "$1.summary" "$1.status"
+    shift
+  done
+}
+
+deploy_release() (
+  # A background child of backup or Compose must not keep the lock after the worker exits.
+  exec 9>&-
+  check_backup_command
+
+  [ -n "$(env_value FLUXKIT_IMAGE_PREFIX)" ] || fail "set FLUXKIT_IMAGE_PREFIX (registry repository prefix) in $ENV_FILE"
+  api_replicas=$(replica_count FLUXKIT_API_REPLICAS)
+  storefront_replicas=$(replica_count FLUXKIT_STOREFRONT_REPLICAS)
+  if [ "$api_replicas" -gt 1 ] && [ "$(env_value RATE_LIMIT_STORE)" != redis ]; then
+    fail "more than one api replica requires RATE_LIMIT_STORE=redis in $ENV_FILE"
+  fi
+  previous_tag=$(env_value FLUXKIT_IMAGE_TAG)
+  [ -n "$previous_tag" ] || fail "FLUXKIT_IMAGE_TAG missing in $ENV_FILE"
+  previous_release=$(readlink -f "$FLUXKIT_ROOT/current") || fail "$FLUXKIT_ROOT/current is missing"
+
+  release_dir="$FLUXKIT_ROOT/releases/$tag"
+  staging=$(mktemp -d "$FLUXKIT_ROOT/releases/.incoming-XXXXXX")
+  trap 'rm -rf "$staging"' EXIT
+  tar -x --no-same-owner --no-same-permissions -C "$staging" -f - infra <&8
+  exec 8<&-
+  [ -f "$staging/infra/docker-compose.prod.yml" ] || fail "the release archive has no infra/docker-compose.prod.yml"
+  if [ -d "$release_dir" ]; then
+    log "release directory $release_dir exists: kept (same commit, same files)"
+  else
+    chmod 755 "$staging"
+    mv "$staging" "$release_dir"
+  fi
+
+  log "release $tag"
+  printf 'previous release tag: %s\n' "$previous_tag"
+  if [ "${FLUXKIT_DEPLOY_SKIP_PULL:-0}" = 1 ]; then
+    log "test-only: registry pull skipped"
+  else
+    log "pulling release images"
+    FLUXKIT_IMAGE_TAG=$tag compose "$release_dir" pull --quiet
+  fi
+
+  if [ "$backup_enabled" = true ]; then
+    log "backup before the switch"
+    "$BACKUP_COMMAND"
+  fi
+
+  cp -p "$ENV_FILE" "$ENV_FILE.pre-deploy"
+  sed -i "s/^FLUXKIT_IMAGE_TAG=.*/FLUXKIT_IMAGE_TAG=$tag/" "$ENV_FILE"
+  ln -sfn "$release_dir" "$FLUXKIT_ROOT/current"
+
+  if start_release "$release_dir" "$api_replicas" "$storefront_replicas"; then
+    log "release $tag is up"
+    if [ -x "$PRUNE_COMMAND" ]; then
+      "$PRUNE_COMMAND" || log "warning: image cleanup failed; the release runs (run $PRUNE_COMMAND by hand)"
+    fi
+    exit 0
+  fi
+
+  log "release $tag did not become healthy; starting the previous release again"
+  compose "$release_dir" logs --tail 50 migrate api >&2 || true
+  cp -p "$ENV_FILE.pre-deploy" "$ENV_FILE"
+  ln -sfn "$previous_release" "$FLUXKIT_ROOT/current"
+  # Roll back through the same release-digest check, recomputed with the byte-identical restored .pre-deploy env file.
+  # Unchanged old replicas are never recreated. If an earlier service already
+  # rolled successfully, replace it with healthy previous-release replicas before draining it. Migrations cannot be undone.
+  start_release "$previous_release" "$api_replicas" "$storefront_replicas" ||
+    fail "the previous release did not start either; if $tag ran a migration, restore the backup (docs/deployment.md, \"Updates and migrations\")"
+  fail "release $tag failed; the previous release runs again"
+)
+
+finish_deploy() {
+  local status=$1
+  (umask 077; printf '%s\n' "$status" > "$deploy_log.status")
+  if [ "$status" -ne 0 ]; then
+    log "deployment failed (exit $status)"
+  fi
+}
+
 # Under the forced command the client's words arrive in SSH_ORIGINAL_COMMAND; by hand they are the arguments.
+# Only the local re-exec can enter the worker, with its archive on fd 8 and its locked fd 9.
+if [ "${1:-}" = --worker ] && [ -z "${SSH_ORIGINAL_COMMAND+x}" ]; then
+  tag=$2
+  deploy_log=$3
+  summary_file="$deploy_log.summary"
+  trap '' HUP PIPE
+  trap 'finish_deploy "$?"' EXIT
+  log "detailed log: $deploy_log"
+  prune_deploy_logs
+  deploy_release
+  exit 0
+fi
+
 read -r action tag extra <<< "${SSH_ORIGINAL_COMMAND:-$*}" || true
 if [ "${action:-}" != deploy ] || ! [[ "${tag:-}" =~ ^[0-9a-f]{7,40}$ ]] || [ -n "${extra:-}" ]; then
   fail "usage: deploy <commit sha, 7 to 40 lowercase hex characters>"
 fi
 tag=${tag:0:7}
 
+if [ -L "$LOG_DIR" ] || ! (umask 077; mkdir -p -- "$LOG_DIR") ||
+  [ ! -O "$LOG_DIR" ] || ! chmod -- 700 "$LOG_DIR"; then
+  fail "cannot secure the deploy log directory $LOG_DIR"
+fi
+archive=$(umask 077; mktemp "$LOG_DIR/.upload-XXXXXX")
+trap 'rm -f -- "$archive"' EXIT
+trap 'exit 129' HUP
+trap 'exit 143' TERM
+cat > "$archive"
+# An open descriptor passes the completed upload to the worker without leaving a named tar behind.
+exec 8< "$archive"
+rm -f -- "$archive"
+trap - EXIT HUP TERM
+
 exec 9> "$LOCK_FILE"
 flock -n 9 || fail "another deployment is running"
-check_backup_command
+deploy_log=$(umask 077; mktemp "$LOG_DIR/fluxkit-deploy-$(date -u +%Y%m%dT%H%M%S%NZ)-$tag-XXXXXX.log")
+(umask 077; : > "$deploy_log.summary")
+# Ignore hangups through the handoff. The worker inherits the already-held lock and no SSH streams.
+trap '' HUP PIPE
+(
+  exec </dev/null >> "$deploy_log" 2>&1
+  unset SSH_ORIGINAL_COMMAND
+  exec setsid --wait /bin/bash "$0" --worker "$tag" "$deploy_log"
+) &
+worker_pid=$!
+exec 8<&- 9>&-
+trap - HUP PIPE
 
-[ -n "$(env_value FLUXKIT_IMAGE_PREFIX)" ] || fail "set FLUXKIT_IMAGE_PREFIX (registry repository prefix) in $ENV_FILE"
-api_replicas=$(replica_count FLUXKIT_API_REPLICAS)
-storefront_replicas=$(replica_count FLUXKIT_STOREFRONT_REPLICAS)
-if [ "$api_replicas" -gt 1 ] && [ "$(env_value RATE_LIMIT_STORE)" != redis ]; then
-  fail "more than one api replica requires RATE_LIMIT_STORE=redis in $ENV_FILE"
-fi
-previous_tag=$(env_value FLUXKIT_IMAGE_TAG)
-[ -n "$previous_tag" ] || fail "FLUXKIT_IMAGE_TAG missing in $ENV_FILE"
-previous_release=$(readlink -f "$FLUXKIT_ROOT/current") || fail "$FLUXKIT_ROOT/current is missing"
-
-release_dir="$FLUXKIT_ROOT/releases/$tag"
-staging=$(mktemp -d "$FLUXKIT_ROOT/releases/.incoming-XXXXXX")
-trap 'rm -rf "$staging"' EXIT
-tar -x --no-same-owner --no-same-permissions -C "$staging" -f - infra
-[ -f "$staging/infra/docker-compose.prod.yml" ] || fail "the release archive has no infra/docker-compose.prod.yml"
-if [ -d "$release_dir" ]; then
-  log "release directory $release_dir exists: kept (same commit, same files)"
-else
-  chmod 755 "$staging"
-  mv "$staging" "$release_dir"
-fi
-
-log "release $tag (running: $previous_tag)"
-if [ "${FLUXKIT_DEPLOY_SKIP_PULL:-0}" = 1 ]; then
-  log "test-only: registry pull skipped"
-else
-  log "pulling release images"
-  FLUXKIT_IMAGE_TAG=$tag compose "$release_dir" pull --quiet
-fi
-
-if [ "$backup_enabled" = true ]; then
-  log "backup before the switch"
-  "$BACKUP_COMMAND"
-fi
-
-cp -p "$ENV_FILE" "$ENV_FILE.pre-deploy"
-sed -i "s/^FLUXKIT_IMAGE_TAG=.*/FLUXKIT_IMAGE_TAG=$tag/" "$ENV_FILE"
-ln -sfn "$release_dir" "$FLUXKIT_ROOT/current"
-
-if start_release "$release_dir" "$api_replicas" "$storefront_replicas"; then
-  log "release $tag is up"
-  if [ -x "$PRUNE_COMMAND" ]; then
-    "$PRUNE_COMMAND" || log "warning: image cleanup failed; the release runs (run $PRUNE_COMMAND by hand)"
-  fi
-  exit 0
-fi
-
-log "release $tag did not become healthy; starting $previous_tag again" >&2
-compose "$release_dir" logs --tail 50 migrate api >&2 || true
-cp -p "$ENV_FILE.pre-deploy" "$ENV_FILE"
-ln -sfn "$previous_release" "$FLUXKIT_ROOT/current"
-# Roll back through the same release-digest check, recomputed with the byte-identical restored .pre-deploy env file.
-# Unchanged old replicas are never recreated. If an earlier service already
-# rolled successfully, replace it with healthy previous-release replicas before draining it. Migrations cannot be undone.
-start_release "$previous_release" "$api_replicas" "$storefront_replicas" ||
-  fail "the previous release $previous_tag did not start either; if $tag ran a migration, restore the backup (docs/deployment.md, \"Updates and migrations\")"
-fail "release $tag failed; $previous_tag runs again"
+tail -n +1 -f --pid="$worker_pid" -- "$deploy_log.summary"
+wait "$worker_pid"

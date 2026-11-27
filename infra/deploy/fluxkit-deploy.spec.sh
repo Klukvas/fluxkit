@@ -7,9 +7,44 @@ SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 # Read only the real helper functions; do not execute the script's host mutations or command-line entry point.
 eval "$(sed -n '/^release_digest()/,/^# Under the forced command/p' "$SCRIPT_DIR/fluxkit-deploy")"
 
+(
+  fixture=$(mktemp -d)
+  trap 'rm -rf "$fixture"' EXIT
+  summary_file="$fixture/summary"
+  result=0
+  (
+    log 'running migrations to completion'
+    printf 'private migration output\n'
+    fail 'release failed'
+  ) > "$fixture/detail" 2>&1 || result=$?
+  [[ "$result" == 1 ]] || { echo 'FAIL: deploy failure must exit 1'; exit 1; }
+  printf 'fluxkit deploy: running migrations to completion\nfluxkit deploy: release failed\n' > "$fixture/expected"
+  cmp "$fixture/expected" "$summary_file"
+  grep -qx 'private migration output' "$fixture/detail"
+)
+echo 'ok   summary carries status and failure lines without detailed command output'
+
 log() { :; }
 fail() { echo "FAIL: $*" >&2; exit 1; }
 export WAIT_SECONDS=1 MIGRATE_WAIT_SECONDS=600
+
+(
+  LOG_DIR=$(mktemp -d)
+  trap 'rm -rf "$LOG_DIR"' EXIT
+  for sequence in $(seq 1 21); do
+    printf -v log_file '%s/fluxkit-deploy-20261127T1200%02d000000000Z-123abcd-AbC123.log' "$LOG_DIR" "$sequence"
+    touch "$log_file" "$log_file.summary" "$log_file.status"
+  done
+  deploy_log=$log_file
+  oldest="$LOG_DIR/fluxkit-deploy-20261127T120001000000000Z-123abcd-AbC123.log"
+  unrelated="$LOG_DIR/fluxkit-deploy-operator-notes.log"
+  touch "$unrelated"
+  prune_deploy_logs
+  [[ ! -e "$oldest" && ! -e "$oldest.summary" && ! -e "$oldest.status" ]] || fail 'oldest deploy log or sidecar was kept'
+  set -- "$LOG_DIR"/*.log
+  [[ $# == 21 && -f "$deploy_log" && -f "$unrelated" ]] || fail 'log retention did not keep 20 deploy logs and the unrelated log'
+)
+echo 'ok   log retention keeps 20 deploy logs and leaves unrelated files alone'
 
 (
   # shellcheck disable=SC2329 # The evaluated backup helper calls this logger indirectly.

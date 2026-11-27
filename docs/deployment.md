@@ -244,8 +244,9 @@ and any commit on `main` by hand (Actions -> Deploy -> Run workflow). It is skip
 
 1. **Images** (GitHub runner, `linux/amd64`): the `api`, `storefront` and `edge` targets, pushed as
    `<DOCKERHUB_USERNAME>/fluxkit-{api,storefront,edge}:<first 7 characters of the commit>`. The host builds nothing.
-2. **Host**: `git archive <commit> infra` goes over SSH to `infra/deploy/fluxkit-deploy`, which locks and requires an executable backup
-   command before unpacking files or pulling images. It unpacks the files into `/opt/fluxkit/releases/<tag>`, pulls every image,
+2. **Host**: `git archive <commit> infra` goes over SSH to `infra/deploy/fluxkit-deploy`. The script stages the archive privately,
+   then passes the deploy lock and archive to a detached worker. The worker requires an executable backup command before unpacking
+   files or pulling images. It unpacks the files into `/opt/fluxkit/releases/<tag>`, pulls every image,
    runs the backup command, writes the tag into `FLUXKIT_IMAGE_TAG`, points `/opt/fluxkit/current` at the release, starts
    infrastructure and waits up to 600 s for `migrate` to exit 0. It then
    rolls API and storefront in order: remove non-running service containers, compare release digests/counts, stage N replacements next to the old replicas one at a time,
@@ -255,6 +256,11 @@ and any commit on `main` by hand (Actions -> Deploy -> Run workflow). It is skip
    reconciles the edge and remaining services; Compose restarts the exited migrate container (nothing pending). On failure it restores the env file and `current` and rolls back as above. That return
    cannot undo a migration (the old API refuses a newer database): then restore the backup ("Updates and migrations").
 3. **Check**: `GET /store/config` and `GET /` through `DEPLOY_PUBLIC_URL`.
+
+After the archive upload and worker start, a dropped SSH connection or a cancelled Actions job leaves the worker running through deployment
+or rollback. Another deploy is refused while the worker holds the lock. While connected, the client streams short status lines and the host
+log path, then returns the worker's exit code. The same applies when running `bash infra/deploy/fluxkit-deploy deploy <sha> < infra.tar`
+by hand as root. See "Logs" to follow a disconnected deploy on the host.
 
 The deploy script exports `FLUXKIT_RELEASE_DIGEST` for every Compose call and labels API/storefront with `com.fluxkit.release-digest`. It hashes the ordered SHA-256 content hashes of that release's Compose file, the production env and the Meilisearch env (paths excluded, contents never logged). This avoids `compose config --hash`, which resolves `env_file` differently from `up` in newer Compose versions. Manual Compose leaves the label empty; the next deploy rolls those containers. New containers with a different label fail staging and are removed while old replicas stay.
 
@@ -277,15 +283,14 @@ Set up once:
 | Host | `FLUXKIT_IMAGE_PREFIX` in the env file | `<DOCKERHUB_USERNAME>/fluxkit`; `FLUXKIT_IMAGE_TAG` present (the running tag) |
 
 The script's paths are the test server's layout and can be changed with variables at its top (`FLUXKIT_ROOT`, the env files, the
-backup and image cleanup commands). The deploy user needs Docker (root, or the `docker` group,
-which is root-equivalent), and Linux tools `flock`, GNU `sed`, `sha256sum` and coreutils `timeout`.
+backup and image cleanup commands). Run the production deploy as root on Linux with Docker, util-linux `flock` and `setsid`, GNU `sed`, and GNU coreutils (`tail`, `timeout`, `sha256sum`).
 
 Notes:
 - Docker Hub creates a repository as **public** on the first push unless the account's default is private. This repository is
   public; a client fork should make the three image repositories private (or use another registry and change the login step).
 - Whoever can push to `main` or holds the Docker Hub token can run code on the host. Protect `main` and keep the token's scope to
   these repositories where Docker Hub allows it.
-- **Reinstall the host script once after this change:** `install -m 0755 infra/deploy/fluxkit-deploy /usr/local/sbin/fluxkit-deploy`. Its installed copy is outside the release archive and is not updated automatically; the old copy still deploys with downtime. Then set the replica counts after checking host memory.
+- **Reinstall the host script once after this change.** Run `install -m 0755 infra/deploy/fluxkit-deploy /usr/local/sbin/fluxkit-deploy` on the host. The installed copy is updated by hand. Then set the replica counts after checking host memory.
 - HTTP drains before Nest lifecycle hooks close the scheduler, database and Redis, for SIGTERM and `createApp` callers using `app.close()`; while draining every answer carries `Connection: close`, so the edge's keep-alive connections end and it moves to another replica. API/storefront get 30 s stop grace; requests exceeding that can be killed. Server-side API GET/HEAD reads retry one connection failure before an answer (refused/reset/unreachable/socket closed), sharing the original abort/timeout budget. The retry is best-effort: a second direct DNS lookup can still select the same unavailable API address. Writes, HTTP statuses, timeouts and aborts are never retried by the storefront wrapper.
 - The edge is still **one container** and its tag changes each release. Recreating it leaves a brief gap (connections refused or TLS handshakes cut off for a few seconds; no HTTP request reaches the shop in that gap); this is not uninterrupted edge availability. A second edge/host load balancer is a later step. Infrastructure recreation can also interrupt service; rolling application replacement does not make database or Redis upgrades highly available.
 - On a throwaway host only, set `FLUXKIT_DEPLOY_ALLOW_NO_BACKUP=1` in the deploy script's environment to proceed with a warning when the backup command is missing or non-executable.
@@ -313,6 +318,11 @@ The owner can enter provider keys in the admin (Settings, Integrations). They ar
 
 ## Logs
 
+- Deploys keep a detailed log under `/var/log/fluxkit-deploy` (`FLUXKIT_DEPLOY_LOG_DIR` to override), named
+  `fluxkit-deploy-<UTC timestamp>-<tag>-<suffix>.log`. As root, follow the path reported by SSH with `tail -f <log-path>`, or list that
+  directory to find the latest run after a disconnect. The directory is root-owned with mode `0700` and its deploy files are `0600`.
+  Compose output, migration details that may contain customer data, and failure diagnostics stay in the detailed host log. The worker keeps
+  a `.summary` file and an exit code in `.status` next to each log. The newest 20 deploy logs and their sidecars are kept.
 - Every container logs to stdout/stderr; the Compose file rotates them (`json-file`, 5 files of 20 MB per container). Read them with `docker compose ... logs -f api`.
 - The API logs errors and job summaries, never passwords, tokens, payment bodies or mail contents (ADR 0031, 0032). nginx access logs contain client IP addresses and URLs (personal data under GDPR): keep the rotation short or ship them to a store with a retention policy. Guest order links keep their token in the URL fragment, which never reaches the server.
 - No metrics or tracing exist. Watch: container health (`docker compose ps`), `migrate` exit codes, `503` from `/media` uploads (disk full), free disk space of the media and Postgres volumes.

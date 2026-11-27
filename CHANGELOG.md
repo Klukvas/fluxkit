@@ -1,5 +1,7 @@
 # Changelog
 
+- Automatic deployments finish or roll back after an SSH disconnect. The client streams status lines and a host log path while Compose and migration output stays in private host logs.
+
 - Automatic deployment refuses to proceed without an executable backup command. On throwaway hosts, `FLUXKIT_DEPLOY_ALLOW_NO_BACKUP=1` allows it to proceed with a warning.
 
 - Rolling deploy: stopping an API or storefront replica no longer answers 502 while nginx still lists its address. The container stays in Docker DNS for 5 s after the process stops accepting, and one refused connection keeps that address out of rotation for 20 s.
