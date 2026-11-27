@@ -89,8 +89,11 @@ async function removeStoredApiKey(api: AdminApi, account: OwnOwner): Promise<voi
 function card(page: Page): Locator {
   return page.getByRole("main").getByRole("region", { name: PROVIDER, exact: true });
 }
+/** A key row: a list item outside the version list, which names the saved fields too. */
 function row(page: Page, field: string): Locator {
-  return card(page).getByRole("listitem").filter({ hasText: field });
+  return card(page)
+    .locator('li:not(ul[aria-label="Saved key versions"] li)')
+    .filter({ hasText: field });
 }
 
 /** Every value an input of the page holds right now. */
@@ -135,7 +138,7 @@ test("the owner stores, replaces nothing by accident and removes a provider key;
   await expect(main.getByRole("heading", { level: 1, name: "Integrations" })).toBeVisible();
   await expect(main.getByText(INACTIVE_NOTICE, { exact: true })).toBeVisible();
   await expect(
-    main.getByText(/Payment and delivery still use the keys set on the server/),
+    main.getByText(/Payment and delivery keys can be saved and explicitly checked now/),
   ).toBeVisible();
   await expect(main.getByText("Keys cannot be saved on this server")).toHaveCount(0);
 
