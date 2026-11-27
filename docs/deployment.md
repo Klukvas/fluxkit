@@ -239,8 +239,9 @@ What was checked (2026-10-30, a scratch database migrated to `0011`, PostgreSQL 
 
 ## Automatic deployment (GitHub Actions and Docker Hub)
 
-`.github/workflows/deploy.yml` (plan `docs/plans/2026-11-12-deploy-workflow.md`) deploys every commit on `main` whose `CI` run passed,
-and any commit on `main` by hand (Actions -> Deploy -> Run workflow). It is skipped while the repository variable `DEPLOY_HOST` is empty.
+`.github/workflows/deploy.yml` (plan `docs/plans/2026-11-12-deploy-workflow.md`) requires a successful `CI` run from a push to `main`
+for the exact commit, including when run by hand (Actions -> Deploy -> Run workflow).
+It is skipped while the repository variable `DEPLOY_HOST` is empty.
 
 1. **Images** (GitHub runner, `linux/amd64`): the `api`, `storefront` and `edge` targets, pushed as
    `<DOCKERHUB_USERNAME>/fluxkit-{api,storefront,edge}:<first 7 characters of the commit>`. The host builds nothing.
