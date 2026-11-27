@@ -195,7 +195,7 @@ Approved by the owner on 2026-11-02 (plan `docs/plans/2026-11-02-storefront-ui-p
 
 ## Added for automatic deployment (2026-11-12, plan `docs/plans/2026-11-12-deploy-workflow.md`)
 - **Docker Hub** (`docker.io`): an external registry that stores the production images pushed by `.github/workflows/deploy.yml`. Nothing of it ships in our code; the images hold no personal data and no secret (the Dockerfile reads none at build time). Repositories are public unless made private (`docs/deployment.md`, "Automatic deployment").
-- **GitHub Actions** used only by that workflow, nothing installed into our packages: `docker/setup-buildx-action@v4`, `docker/login-action@v4`, `docker/build-push-action@v7` (all Apache-2.0, from Docker's own GitHub organisation), versions kept current by Dependabot like the others.
+- **GitHub Actions** used only by that workflow, nothing installed into our packages: `docker/setup-buildx-action` v4, `docker/login-action` v4, `docker/build-push-action` v7 (all Apache-2.0, from Docker's own GitHub organisation), versions kept current by Dependabot like the others. Since 2026-11-27 every action of both workflows is pinned to a full commit SHA with the version in a comment (deploy review D11, `docs/plans/2026-11-27-deploy-review.md`): a moved tag cannot change what runs next to the deploy secrets.
 
 ## Added in the playful default (Rubik font, SIL OFL 1.1)
 
